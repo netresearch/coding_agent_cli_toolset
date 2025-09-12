@@ -31,7 +31,9 @@ prompt_action() {
   case "$tool" in
     rust)        printf "    will run: scripts/install_rust.sh reconcile\n" ;;
     core)        printf "    will run: scripts/install_core.sh update\n" ;;
-    python)      printf "    will run: UV_PYTHON_SPEC=%s scripts/install_python.sh update\n" "$latest" ;;
+    python)      printf "    will run: scripts/install_python.sh update\n" ;;
+    pip|pipx|poetry|httpie|semgrep)
+                  printf "    will run: uv tool install --force --upgrade %s\n" "$tool" ;;
     node)        printf "    will run: scripts/install_node.sh reconcile\n" ;;
     go)          printf "    will run: scripts/install_go.sh\n" ;;
     docker)      printf "    will run: scripts/install_docker.sh\n" ;;
@@ -150,7 +152,7 @@ else
   fi
 fi
 
-# UV + Python stack (before Node/core tools)
+# UV (ensure official binary) + Python stack (before Node/core tools)
 UV_ICON="$(json_field uv state_icon)"
 UV_CURR="$(json_field uv installed)"
 UV_LATEST="$(json_field uv latest_upstream)"
@@ -163,7 +165,7 @@ if [ -n "$(json_bool uv is_up_to_date)" ] && [ -n "$UV_CURR" ]; then
   printf "    up-to-date; skipping.\n"
 else
   if prompt_action "${UV_ICON} uv" "$UV_CURR" "$(json_field uv installed_method)" "$(osc8 "$UV_URL" "$UV_LATEST")" "$(json_field uv upstream_method)" core; then
-    UV_PYTHON_SPEC="$(json_field python latest_upstream)" "$ROOT"/scripts/install_python.sh update
+    "$ROOT"/scripts/install_uv.sh reconcile
     AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 "$CLI" cli_audit.py 2>/dev/null || true)"
   fi
 fi
@@ -245,8 +247,27 @@ for t in pip pipx poetry httpie semgrep; do
     CURR="$(json_field "$t" installed)"
     LATE="$(json_field "$t" latest_upstream)"
     URL="$(json_field "$t" latest_url)"
-    if prompt_action "${ICON} $t" "$CURR" "$(json_field "$t" installed_method)" "$(osc8 "$URL" "$LATE")" "$(json_field "$t" upstream_method)" python; then
-      UV_PYTHON_SPEC="$PY_LATEST" "$ROOT"/scripts/install_python.sh update
+    if prompt_action "${ICON} $t" "$CURR" "$(json_field "$t" installed_method)" "$(osc8 "$URL" "$LATE")" "$(json_field "$t" upstream_method)" "$t"; then
+      if command -v uv >/dev/null 2>&1; then
+        uv tool install --force --upgrade "$t" >/dev/null 2>&1 || true
+      else
+        "$ROOT"/scripts/install_uv.sh reconcile || true
+        if command -v uv >/dev/null 2>&1; then
+          uv tool install --force --upgrade "$t" >/dev/null 2>&1 || true
+        else
+          if command -v pipx >/dev/null 2>&1; then
+            pipx upgrade "$t" >/dev/null 2>&1 || pipx install "$t" >/dev/null 2>&1 || true
+          else
+            if [ "$t" = pip ]; then
+              python3 -m pip install --user -U pip >/dev/null 2>&1 || true
+            elif [ "$t" = pipx ]; then
+              python3 -m pip install --user -U pipx >/dev/null 2>&1 || true
+            else
+              python3 -m pip install --user -U "$t" >/dev/null 2>&1 || true
+            fi
+          fi
+        fi
+      fi
       AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 "$CLI" cli_audit.py 2>/dev/null || true)"
     fi
   fi
