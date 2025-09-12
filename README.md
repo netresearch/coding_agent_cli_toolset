@@ -1,0 +1,155 @@
+# AI CLI Preparation
+
+A minimal utility to audit versions of common developer CLI tools on your system and compare them to the latest upstream releases. It prints a pipe-delimited report suitable for quick human scan or downstream tooling.
+
+## Scope: agent toolchain
+- This audit targets CLIs that coding agents commonly utilize themselves if present on the machine. It is agent-focused; tools may be reported as NOT INSTALLED on your host if you don't use them.
+- Upstream versions are resolved from GitHub releases, PyPI, crates.io, or the npm registry for Node CLIs.
+
+## Features
+- Detects installed versions across PATH (and `~/.cargo/bin` for Rust tools)
+- Fetches latest upstream versions from GitHub, PyPI, crates.io, and npm registry (for `npm`/`pnpm`/`yarn` and Node-only CLIs)
+- Handles tools with non-standard version flags (e.g., `entr`, `sponge`)
+- Short timeouts to avoid hanging
+- Simple, parse-friendly output
+
+## Output Format
+The program prints a header followed by one line per tool:
+
+```
+tool|installed|latest_upstream|status
+fd|fd 9.0.0|v9.0.0|UP-TO-DATE
+...
+[cargo_bin_on_PATH] yes
+```
+
+- `installed`: first version line from the selected binary, or `X` if not found
+- `latest_upstream`: latest tag/version from upstream (may be empty if unknown)
+- `status`: `UP-TO-DATE`, `OUTDATED`, `NOT INSTALLED`, or `UNKNOWN`
+
+## Tool categories (agent-focused)
+- Core runtimes & package managers: `python`, `pip`, `pipx`, `poetry`, `node`, `npm`, `pnpm`, `yarn`
+- Search & code-aware tools: `ripgrep`, `ast-grep`, `fzf`, `fd`, `xsv`
+- Editors/helpers and diffs: `ctags`, `delta`, `bat`, `just`
+- JSON/YAML processors: `jq`, `yq`, `dasel`, `fx`
+- HTTP/CLI clients: `httpie`, `curlie`
+- Watch/run automation: `entr`, `watchexec`, `direnv`
+- Security & compliance: `semgrep`, `bandit`, `gitleaks`, `trivy`
+- Git helpers: `git-absorb`, `git-branchless`
+- Formatters & linters: `black`, `isort`, `flake8`, `eslint`, `prettier`, `shfmt`, `shellcheck`
+- VCS & platforms: `git`, `gh` (GitHub CLI), `glab` (GitLab CLI)
+- Cloud & infra: `aws`, `kubectl`, `terraform`, `docker`, `dive`
+
+Note: Not all of these are expected to be installed globally; the report simply surfaces what is present and how it compares upstream.
+
+## Requirements
+- Python 3.9+
+- Network access to query GitHub/PyPI/crates.io/npm
+
+## Quick Start
+
+```bash
+python3 cli_audit.py | column -s '|' -t
+```
+
+Tip: On systems where `column` is unavailable, just view the raw output or import into your tool of choice.
+
+## Extending the Tool List
+Agent-focused tools live in the `TOOLS` tuple in `cli_audit.py`. Prefer upstreams with discoverable latest releases:
+
+```python
+Tool("fd", ("fd", "fdfind"), "gh", ("sharkdp", "fd")),
+```
+
+- `name`: logical name displayed in output
+- `candidates`: executable names to search on PATH (first line of their version output is used)
+- `source_kind`: one of `gh`, `pypi`, `crates`, `npm`, or `skip`
+- `source_args`: parameters for the source (e.g., owner/repo for GitHub, package name for PyPI/crates/npm)
+
+If `source_kind` is `skip`, upstream lookup is disabled for that tool.
+
+## Notes and Caveats
+- Timeouts are kept intentionally short (3s) to avoid blocking; transient network failures may mark `latest_upstream` as empty.
+- When multiple candidates are installed, the highest semantic version is selected.
+- For tools without a conventional version flag, the script tries a small set of common flags and a few special cases.
+
+## Development
+
+- Lint (optional):
+```bash
+python3 -m pyflakes cli_audit.py
+```
+
+- Run tests (n/a): This repo currently ships without tests. PRs welcome.
+
+## Installation scripts
+
+Language-agnostic core tools and language-specific stacks are provided under `scripts/`:
+
+```bash
+make scripts-perms
+
+# Core simple tools (fd, fzf, ripgrep, jq, yq, bat, delta, just)
+make install-core
+
+# Language stacks
+make install-python
+make install-node
+make install-go
+
+# Higher-level tools
+make install-aws
+make install-kubectl
+make install-terraform
+make install-ansible
+make install-docker
+make install-brew
+make install-rust
+```
+
+These scripts prefer the most up-to-date sources (e.g., nvm for Node, vendor installers for AWS CLI and kubectl) when feasible.
+
+### Actions: install, update, uninstall, reconcile
+
+All scripts accept an action argument. Defaults to `install`.
+
+```bash
+# Update existing toolchains
+make update-core
+make update-python
+make update-node
+make update-go
+make update-aws
+
+# Uninstall
+make uninstall-node
+
+# Reconcile preferred method
+# Example: remove distro Node and switch to nvm-managed
+make reconcile-node
+
+# Example: remove distro Rust and switch to rustup-managed
+make reconcile-rust
+```
+
+## Caching
+
+- Manual baseline (committed): `latest_versions.json` in this repo (override with `CLI_AUDIT_MANUAL_FILE`). Used as the primary source in offline mode; also used as a fallback when online lookups fail. Example content:
+
+```json
+{
+  "rust": "1.89.0",
+  "jq": "jq-1.8.1",
+  "parallel": "20240322"
+}
+```
+
+- Auto-updates: when an online lookup succeeds, the tool writes the discovered latest value back into `latest_versions.json` (toggle with `CLI_AUDIT_WRITE_MANUAL=0`).
+- Offline behavior: set `CLI_AUDIT_OFFLINE=1` to use `latest_versions.json` exclusively.
+
+### Lookup hints
+
+To speed up future runs, the audit records which upstream retrieval method worked last per tool. These hints are stored inside `latest_versions.json` under the special key `"__hints__"`. They help prioritize the fastest working method on subsequent runs and are safe to edit or remove; they will be rebuilt.
+
+## License
+MIT
