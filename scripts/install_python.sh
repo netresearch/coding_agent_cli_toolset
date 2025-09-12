@@ -6,24 +6,7 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 ACTION="${1:-install}"
 
-ensure_uv() {
-  # If uv installed via pip/pipx, remove in favor of official installer binary
-  if command -v uv >/dev/null 2>&1; then
-    return
-  fi
-  # Try official installer (non-interactive)
-  if command -v curl >/dev/null 2>&1; then
-    sh -c "$(curl -LsSf https://astral.sh/uv/install.sh)" || true
-  fi
-  # If still not present, fallback to pipx
-  if ! command -v uv >/dev/null 2>&1; then
-    if command -v python3 >/dev/null 2>&1; then
-      python3 -m pip install --user -U pipx >/dev/null 2>&1 || true
-      python3 -m pipx ensurepath >/dev/null 2>&1 || true
-      python3 -m pipx install uv >/dev/null 2>&1 || true
-    fi
-  fi
-}
+ensure_uv() { :; }
 
 ensure_python_distro() {
   if ! have python3 && have apt-get; then sudo apt-get update && sudo apt-get install -y python3 python3-pip; fi
