@@ -175,6 +175,8 @@ FAST_FLAG_DEFAULTS: dict[str, tuple[str, ...]] = {
     "npm": ("-v", "--version", "version"),
     "pnpm": ("-v", "--version", "version"),
     "yarn": ("-v", "--version", "version"),
+    # sd (stream editor) – prefer --version first to avoid Clap error output
+    "sd": ("--version",),
 }
 
 def _dpkg_owner_for_path(path: str) -> str:
@@ -532,6 +534,20 @@ def get_version_line(path: str, tool_name: str) -> str:
             set_local_flag_hint("curlie", "--version")
             return line
         # Otherwise, no trustworthy local version string
+        return ""
+    if tool_name == "sd":
+        # Some sd versions do not support -v and print an error like
+        # "missing before, after, path" when invoked without required args.
+        # Prefer --version and filter out error/usage lines.
+        for flags in (("--version",), ("-V",), ("-v",), ("version",)):
+            line = run_with_timeout([path, *flags])
+            lcline = (line or "").lower()
+            if not line:
+                continue
+            if "missing before, after, path" in lcline or lcline.startswith("error:") or lcline.startswith("usage"):
+                continue
+            if extract_version_number(line):
+                return line
         return ""
     if tool_name == "uv":
         # uv without subcommand prints an error; prefer --version
