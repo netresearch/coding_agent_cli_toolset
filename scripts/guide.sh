@@ -207,6 +207,22 @@ else
   fi
 fi
 
+# Always offer explicit package manager updates, regardless of Node prompt choice
+if prompt_action "$(json_field npm state_icon) npm (global)" "$(json_field npm installed)" "$(json_field npm installed_method)" "$(osc8 "$(json_field npm latest_url)" "$(json_field npm latest_upstream)")" "$(json_field npm upstream_method)" npm; then
+  corepack enable >/dev/null 2>&1 || true
+  npm install -g npm@latest >/dev/null 2>&1 || true
+  AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 "$CLI" cli_audit.py 2>/dev/null || true)"
+fi
+if prompt_action "$(json_field pnpm state_icon) pnpm" "$(json_field pnpm installed)" "$(json_field pnpm installed_method)" "$(osc8 "$(json_field pnpm latest_url)" "$(json_field pnpm latest_upstream)")" "$(json_field pnpm upstream_method)" pnpm; then
+  corepack prepare pnpm@latest --activate >/dev/null 2>&1 || npm install -g pnpm@latest >/dev/null 2>&1 || true
+  AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 "$CLI" cli_audit.py 2>/dev/null || true)"
+fi
+if prompt_action "$(json_field yarn state_icon) yarn" "$(json_field yarn installed)" "$(json_field yarn installed_method)" "$(osc8 "$(json_field yarn latest_url)" "$(json_field yarn latest_upstream)")" "$(json_field yarn upstream_method)" yarn; then
+  # Prefer stable tag for Yarn (Berry)
+  corepack prepare yarn@stable --activate >/dev/null 2>&1 || npm install -g yarn@latest >/dev/null 2>&1 || true
+  AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 "$CLI" cli_audit.py 2>/dev/null || true)"
+fi
+
 # Go stack – show sanitized version and planned source (before core tools that use go)
 GO_ICON="$(json_field go state_icon)"
 GO_CURR_RAW="$(command -v go >/dev/null 2>&1 && go version 2>/dev/null | awk '{print $3}' || echo)"
@@ -241,7 +257,7 @@ for t in "${CORE_TOOLS[@]}"; do
 done
 
 # Python utilities (managed via pipx): prompt individually if outdated/missing
-for t in pip pipx poetry httpie semgrep; do
+for t in pip pipx poetry httpie semgrep black; do
   if [ -z "$(json_bool "$t" is_up_to_date)" ]; then
     ICON="$(json_field "$t" state_icon)"
     CURR="$(json_field "$t" installed)"
