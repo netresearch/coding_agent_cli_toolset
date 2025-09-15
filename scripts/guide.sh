@@ -239,6 +239,30 @@ else
   fi
 fi
 
+# Prefer uv for Python CLI tools: offer migration from pipx/user when detected
+if command -v uv >/dev/null 2>&1 || "$ROOT"/scripts/install_uv.sh reconcile >/dev/null 2>&1; then
+  for t in pre-commit bandit semgrep httpie black isort flake8 poetry ansible; do
+    METHOD="$(json_field "$t" installed_method)"
+    if [ -n "$METHOD" ] && [ -z "$(json_bool "$t" is_up_to_date)" ]; then
+      : # keep normal outdated prompts elsewhere
+    fi
+    # Migrate only when pipx is the current method
+    if [ -n "$METHOD" ] && printf "%s" "$METHOD" | grep -qi pipx; then
+      ICON="$(json_field "$t" state_icon)"
+      CURR="$(json_field "$t" installed)"
+      LATE="$(json_field "$t" latest_upstream)"
+      URL="$(json_field "$t" latest_url)"
+      TITLE="$ICON $t (migrate to uv tool)"
+      if prompt_action "$TITLE" "$CURR" "$METHOD" "$(osc8 "$URL" "$LATE")" "uv tool" "$t"; then
+        # Install via uv tool, then remove pipx version to avoid shim conflicts
+        uv tool install --force --upgrade "$t" >/dev/null 2>&1 || true
+        if command -v pipx >/dev/null 2>&1; then pipx uninstall "$t" >/dev/null 2>&1 || true; fi
+        AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 "$CLI" cli_audit.py 2>/dev/null || true)"
+      fi
+    fi
+  done
+fi
+
 # Core tools (fd, fzf, rg, jq, yq, bat, delta, just, and npm/cargo/go tools)
 CORE_TOOLS=(fd fzf ripgrep jq yq bat delta just curlie dive trivy gitleaks git-absorb git-branchless eslint prettier shfmt shellcheck fx glab ctags entr parallel ast-grep direnv git gh)
 for t in "${CORE_TOOLS[@]}"; do
