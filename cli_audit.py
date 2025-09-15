@@ -892,6 +892,17 @@ def detect_install_method(path: str, tool_name: str) -> str:
             info = run_with_timeout(["docker", "info", "--format", "{{.OperatingSystem}}"])
             if info and "Docker Desktop" in info:
                 return "docker-desktop (WSL)" if wsl else "docker-desktop"
+        if tool_name == "uv":
+            try:
+                real = os.path.realpath(path)
+            except Exception:
+                real = path
+            # Official installer places binaries directly under ~/.local/bin
+            official_bin = os.path.join(home, ".local", "bin", "uv")
+            if real == official_bin:
+                return "github binary"
+            if "/pipx/venvs/uv/" in real or real.startswith(os.path.join(home, ".local", "pipx", "venvs", "uv")):
+                return "pipx/user"
         if path.startswith(os.path.join(home, ".pnpm")):
             return "pnpm"
         if path.startswith(os.path.join(home, ".yarn")):
