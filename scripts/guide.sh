@@ -241,8 +241,8 @@ fi
 
 # Prefer uv for Python CLI tools: offer migration from pipx/user when detected
 if command -v uv >/dev/null 2>&1 || "$ROOT"/scripts/install_uv.sh reconcile >/dev/null 2>&1; then
-  # Include all Python console CLIs we track (expandable)
-  for t in pip pipx poetry httpie pre-commit bandit semgrep black isort flake8 ansible ansible-core; do
+  # Include all Python console CLIs we track (expandable). ansible is handled separately below.
+  for t in pip pipx poetry httpie pre-commit bandit semgrep black isort flake8; do
     METHOD="$(json_field "$t" installed_method)"
     if [ -n "$METHOD" ] && [ -z "$(json_bool "$t" is_up_to_date)" ]; then
       : # keep normal outdated prompts elsewhere
