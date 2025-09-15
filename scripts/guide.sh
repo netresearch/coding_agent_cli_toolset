@@ -241,13 +241,14 @@ fi
 
 # Prefer uv for Python CLI tools: offer migration from pipx/user when detected
 if command -v uv >/dev/null 2>&1 || "$ROOT"/scripts/install_uv.sh reconcile >/dev/null 2>&1; then
-  for t in pre-commit bandit semgrep httpie black isort flake8 poetry ansible; do
+  # Include all Python console CLIs we track (expandable)
+  for t in pip pipx poetry httpie pre-commit bandit semgrep black isort flake8 ansible ansible-core; do
     METHOD="$(json_field "$t" installed_method)"
     if [ -n "$METHOD" ] && [ -z "$(json_bool "$t" is_up_to_date)" ]; then
       : # keep normal outdated prompts elsewhere
     fi
     # Migrate only when pipx is the current method
-    if [ -n "$METHOD" ] && printf "%s" "$METHOD" | grep -qi pipx; then
+    if [ -n "$METHOD" ] && printf "%s" "$METHOD" | grep -Eqi "pipx|pip/user|pip"; then
       ICON="$(json_field "$t" state_icon)"
       CURR="$(json_field "$t" installed)"
       LATE="$(json_field "$t" latest_upstream)"
@@ -257,6 +258,8 @@ if command -v uv >/dev/null 2>&1 || "$ROOT"/scripts/install_uv.sh reconcile >/de
         # Install via uv tool, then remove pipx version to avoid shim conflicts
         uv tool install --force --upgrade "$t" >/dev/null 2>&1 || true
         if command -v pipx >/dev/null 2>&1; then pipx uninstall "$t" >/dev/null 2>&1 || true; fi
+        # Remove user pip scripts that might shadow uv tools
+        rm -f "$HOME/.local/bin/$t" >/dev/null 2>&1 || true
         AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 "$CLI" cli_audit.py 2>/dev/null || true)"
       fi
     fi
