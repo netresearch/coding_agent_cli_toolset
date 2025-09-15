@@ -62,6 +62,10 @@ DPKG_OWNER_CACHE: dict[str, str] = {}
 DPKG_VERSION_CACHE: dict[str, str] = {}
 SORT_MODE: str = os.environ.get("CLI_AUDIT_SORT", "order")  # 'order' or 'alpha'
 
+# Cache of uv-managed tools (populated lazily)
+UV_TOOLS_LOADED: bool = False
+UV_TOOLS: set[str] = set()
+
 # Manual versions file (committed to repo) used as base/offline source
 MANUAL_FILE: str = os.environ.get(
     "CLI_AUDIT_MANUAL_FILE",
@@ -240,6 +244,56 @@ def _read_json(path: str) -> dict[str, Any]:
     except Exception:
         return {}
 
+
+def _load_uv_tools() -> None:
+    """Populate UV_TOOLS with names managed by `uv tool` (best-effort, fast)."""
+    global UV_TOOLS_LOADED, UV_TOOLS
+    if UV_TOOLS_LOADED:
+        return
+    UV_TOOLS_LOADED = True
+    try:
+        if not shutil.which("uv"):
+            return
+        # Prefer JSON output when supported
+        out = run_with_timeout(["uv", "tool", "list", "--json"]) or ""
+        names: set[str] = set()
+        parsed: Any = None
+        try:
+            parsed = json.loads(out) if out else None
+        except Exception:
+            parsed = None
+        if isinstance(parsed, list):
+            for item in parsed:
+                if isinstance(item, dict):
+                    # Common keys: name/package/id
+                    for key in ("name", "package", "id"):
+                        v = str(item.get(key, "")).strip()
+                        if v:
+                            names.add(v)
+        elif isinstance(parsed, dict):
+            # Some formats may return a dict of tools
+            for k in parsed.keys():
+                names.add(str(k))
+        else:
+            # Fallback: plain text list, one name per line (best-effort)
+            for line in (out or "").splitlines():
+                tok = line.strip().split()[0:1]
+                if tok:
+                    names.add(tok[0])
+        # Normalize to lower-case tool invocation names
+        UV_TOOLS = {n.strip().lower() for n in names if n.strip()}
+    except Exception:
+        # Best-effort only
+        pass
+
+
+def _is_uv_tool(tool_name: str) -> bool:
+    try:
+        _load_uv_tools()
+        return tool_name.lower() in UV_TOOLS
+    except Exception:
+        return False
+
 def _node_pkg_version_from_path(tool_name: str, exe_path: str) -> str:
     """Try to resolve Node CLI version by scanning nearby package.json files.
 
@@ -247,6 +301,12 @@ def _node_pkg_version_from_path(tool_name: str, exe_path: str) -> str:
     """
     try:
         real = os.path.realpath(exe_path)
+        # Corepack shims live under paths that include 'corepack' and have their
+        # own package.json (version ~0.34.x). That version is NOT the actual
+        # pnpm/yarn version. In that case, skip the adjacent package.json fast
+        # path so we fall back to running the CLI with --version/-v.
+        if "corepack" in real or "/.corepack" in real or "/.cache/corepack" in real:
+            return ""
         cur = os.path.dirname(real)
         # Check up to 3 levels up for package.json
         for _ in range(4):
@@ -363,7 +423,9 @@ TOOLS: tuple[Tool, ...] = (
     Tool("yq", ("yq",), "gh", ("mikefarah", "yq")),
     Tool("dasel", ("dasel",), "gh", ("TomWright", "dasel")),
     Tool("sd", ("sd",), "crates", ("sd",)),
-    Tool("rename", ("rename", "rename.ul", "file-rename"), "skip", ()),
+    # Distinguish between perl 'prename' (file-rename) and util-linux 'rename.ul'
+    Tool("prename", ("file-rename", "rename"), "skip", ()),
+    Tool("rename.ul", ("rename.ul",), "skip", ()),
     Tool("sponge", ("sponge",), "skip", ()),
     Tool("xsv", ("xsv",), "crates", ("xsv",)),
     Tool("bat", ("bat", "batcat"), "gh", ("sharkdp", "bat")),
@@ -466,6 +528,33 @@ def run_with_timeout(args: Sequence[str]) -> str:
 
 def get_version_line(path: str, tool_name: str) -> str:
     # Fast-paths first (avoid spawning heavy CLIs where possible)
+    # Special-case rename variants: perl prename (file-rename) and util-linux rename.ul
+    if tool_name in ("prename", "rename.ul"):
+        try:
+            real = os.path.realpath(path)
+        except Exception:
+            real = path
+        base = os.path.basename(real)
+        # Perl File::Rename variant (often /usr/bin/file-rename)
+        if tool_name == "prename" or base == "file-rename" or "file-rename" in real:
+            # Prefer -V, fallback to --version; extract 'File::Rename version X.Y[.Z]'
+            for flags in (("-V",), ("--version",)):
+                line = run_with_timeout([path, *flags]) or run_with_timeout(["file-rename", *flags]) or run_with_timeout(["rename", *flags])
+                if line:
+                    m = re.search(r"File::Rename version (\d+(?:\.\d+)+)", line)
+                    if m:
+                        return f"prename {m.group(1)}"
+            # As a last resort, return the first line if it contains a version
+            line = run_with_timeout([path, "-V"]) or run_with_timeout(["file-rename", "-V"]) or run_with_timeout(["rename", "-V"]) or ""
+            if extract_version_number(line):
+                return line
+        # util-linux variant (rename.ul)
+        if tool_name == "rename.ul" or base == "rename.ul" or "rename.ul" in real:
+            for flags in (("--version",), ("-V",), ("-v",), ("version",)):
+                line = run_with_timeout([path, *flags])
+                if line and extract_version_number(line):
+                    return line
+        # Otherwise fall through to generic handling (dpkg/etc.)
     # 0) Try dpkg metadata for system-managed binaries
     try:
         dpkg_line = _dpkg_version_line_for_path(tool_name, path)
@@ -774,6 +863,18 @@ def detect_install_method(path: str, tool_name: str) -> str:
         home = os.path.expanduser("~")
         if not path:
             return ""
+        # Resolve symlink to inspect real target location
+        try:
+            real = os.path.realpath(path)
+        except Exception:
+            real = path
+        # uv-managed tools: prefer explicit detection
+        # 1) If uv reports management for this tool name
+        if tool_name and _is_uv_tool(tool_name):
+            return "uv tool"
+        # 2) Heuristic: symlink target inside uv data dirs
+        if any(p in real for p in ("/.local/share/uv/", "/.cache/uv/", "/.uv/")):
+            return "uv tool"
         # Special handling for docker: detect Docker Desktop under WSL
         if tool_name == "docker" and DOCKER_INFO_ENABLED:
             # opt-in checks
@@ -805,6 +906,7 @@ def detect_install_method(path: str, tool_name: str) -> str:
         if path.startswith(os.path.join(home, ".cargo", "bin")):
             return "rustup/cargo"
         if path.startswith(os.path.join(home, ".local", "bin")):
+            # Default for Python console scripts; overridden above if uv-managed
             return "pipx/user"
         if "/snap/" in path:
             return "snap"
@@ -827,6 +929,9 @@ def detect_install_method(path: str, tool_name: str) -> str:
 
 
 def upstream_method_for(tool: Tool) -> str:
+    # Special-case Yarn: use Yarn's official tags feed rather than npm package
+    if tool.name == "yarn":
+        return "yarn-tags"
     kind = tool.source_kind
     if kind == "pypi":
         return "pipx"
@@ -1077,19 +1182,60 @@ def latest_npm(package: str) -> tuple[str, str]:
     """
     if OFFLINE_MODE:
         return "", ""
+    # Yarn is distributed via Yarn's own tag feed for modern releases; prefer that
+    if package == "yarn":
+        tag, num = latest_yarn()
+        if tag or num:
+            return tag, num
     try:
         data = json.loads(http_get(f"{NPM_REGISTRY_URL}/{package}"))
-        # Primary: dist-tags.latest
+        # Prefer 'stable' for yarn (Berry v4+) and 'latest' for others
         dist_tags = data.get("dist-tags", {})
-        latest = dist_tags.get("latest", "")
-        if latest:
-            result = (latest, extract_version_number(latest))
-            set_manual_latest(package, latest)
+        if package == "yarn":
+            preferred = dist_tags.get("stable") or dist_tags.get("latest", "")
+        else:
+            preferred = dist_tags.get("latest", "")
+        if preferred:
+            result = (preferred, extract_version_number(preferred))
+            set_manual_latest(package, preferred)
             return result
         # Fallback: engines or versions keys are large; refrain to keep it light
         return "", ""
     except Exception:
         return "", ""
+
+
+def latest_yarn() -> tuple[str, str]:
+    """Get latest Yarn (Berry) version from official tags feed, fallback to GitHub.
+
+    Primary source: https://repo.yarnpkg.com/tags (JSON or simple text)
+    Fallback: GitHub releases for yarnpkg/berry.
+    """
+    if OFFLINE_MODE:
+        return "", ""
+    try:
+        raw = http_get("https://repo.yarnpkg.com/tags")
+        text = raw.decode("utf-8", "ignore").strip()
+        v = ""
+        # Try JSON first
+        try:
+            data = json.loads(text)
+            v = str(data.get("stable", "") or data.get("latest", "")).strip()
+        except Exception:
+            pass
+        if not v:
+            # Fallback: regex parse for 'stable: 4.9.4' or '"stable": "4.9.4"'
+            m = re.search(r'"?stable"?\s*[:=]\s*"?([0-9]+(?:\.[0-9]+)+)"?', text)
+            if m:
+                v = m.group(1)
+        if v:
+            set_manual_latest("yarn", v)
+            return v, extract_version_number(v)
+    except Exception:
+        pass
+    # Fallback: GitHub releases
+    tag, num = latest_github("yarnpkg", "berry")
+    return tag, num
 
 
 def latest_gnu(project: str) -> tuple[str, str]:
