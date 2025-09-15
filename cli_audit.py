@@ -945,7 +945,8 @@ def upstream_method_for(tool: Tool) -> str:
         return "yarn-tags"
     kind = tool.source_kind
     if kind == "pypi":
-        return "pipx"
+        # Prefer uv tool as the standard for Python CLIs
+        return "uv tool"
     if kind == "crates":
         return "cargo"
     if kind == "npm":
