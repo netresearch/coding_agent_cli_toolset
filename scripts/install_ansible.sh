@@ -20,6 +20,8 @@ rm -f "$HOME/.local/bin/ansible" "$HOME/.local/bin/ansible-community" "$HOME/.lo
 if command -v uv >/dev/null 2>&1; then
   # Install or upgrade via uv tool
   uv tool install --force --upgrade ansible || true
+  # Ensure core CLI shims are present (ansible, ansible-playbook, etc.)
+  uv tool install --force --upgrade ansible-core || true
   # Clean up pipx install if present to avoid shim conflicts
   if have pipx; then pipx uninstall ansible >/dev/null 2>&1 || true; fi
 else

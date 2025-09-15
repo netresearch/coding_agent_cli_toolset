@@ -444,7 +444,8 @@ TOOLS: tuple[Tool, ...] = (
     Tool("pre-commit", ("pre-commit",), "pypi", ("pre-commit",)),
     Tool("bandit", ("bandit",), "pypi", ("bandit",)),
     Tool("semgrep", ("semgrep",), "pypi", ("semgrep",)),
-    Tool("ansible", ("ansible",), "pypi", ("ansible",)),
+    # Prefer community package when available; include 'ansible-community' as a candidate
+    Tool("ansible", ("ansible", "ansible-community"), "pypi", ("ansible",)),
     Tool("ansible-core", ("ansible", "ansible-core"), "pypi", ("ansible-core",)),
     Tool("git-absorb", ("git-absorb",), "gh", ("tummychow", "git-absorb")),
     Tool("git-branchless", ("git-branchless",), "gh", ("arxanas", "git-branchless")),
@@ -868,20 +869,22 @@ def detect_install_method(path: str, tool_name: str) -> str:
             real = os.path.realpath(path)
         except Exception:
             real = path
+        # Prefer classifying by the real target path, not the shim location
+        p = real or path
         # python: prefer uv-specific classification before generic uv tool checks
         if tool_name == "python":
             # Dev venv created by scripts/install_python.sh
-            if "/.venvs/" in real:
+            if "/.venvs/" in p:
                 return "uv venv"
             # uv-managed interpreter locations
-            if any(p in real for p in ("/.local/share/uv/", "/.cache/uv/", "/.uv/")):
+            if any(t in p for t in ("/.local/share/uv/", "/.cache/uv/", "/.uv/")):
                 return "uv python"
         # uv-managed tools: prefer explicit detection
         # 1) If uv reports management for this tool name
         if tool_name and _is_uv_tool(tool_name):
             return "uv tool"
         # 2) Heuristic: symlink target inside uv data dirs
-        if any(p in real for p in ("/.local/share/uv/", "/.cache/uv/", "/.uv/")):
+        if any(t in p for t in ("/.local/share/uv/", "/.cache/uv/", "/.uv/")):
             return "uv tool"
         # Special handling for docker: detect Docker Desktop under WSL
         if tool_name == "docker" and DOCKER_INFO_ENABLED:
@@ -890,9 +893,9 @@ def detect_install_method(path: str, tool_name: str) -> str:
             info = run_with_timeout(["docker", "info", "--format", "{{.OperatingSystem}}"])
             if info and "Docker Desktop" in info:
                 return "docker-desktop (WSL)" if wsl else "docker-desktop"
-        if path.startswith(os.path.join(home, ".nvm")):
+        if p.startswith(os.path.join(home, ".nvm")):
             return "nvm/npm"
-        if "/.cache/corepack" in path or "/.corepack" in path:
+        if "/.cache/corepack" in p or "/.corepack" in p:
             return "corepack"
         # Compose plugin: treat Docker Desktop the same as docker engine
         if tool_name == "docker-compose" and DOCKER_INFO_ENABLED:
@@ -911,36 +914,47 @@ def detect_install_method(path: str, tool_name: str) -> str:
                 return "github binary"
             if "/pipx/venvs/uv/" in real or real.startswith(os.path.join(home, ".local", "pipx", "venvs", "uv")):
                 return "pipx/user"
-        if path.startswith(os.path.join(home, ".pnpm")):
+        if p.startswith(os.path.join(home, ".pnpm")):
             return "pnpm"
-        if path.startswith(os.path.join(home, ".yarn")):
+        if p.startswith(os.path.join(home, ".yarn")):
             return "yarn"
+        # npm global installs (user-local and system-wide)
+        if "/lib/node_modules/" in p:
+            # User-local npm prefix (common under ~/.local on Linux)
+            if p.startswith(os.path.join(home, ".local", "lib", "node_modules")):
+                return "npm (user)"
+            # System-wide npm prefix
+            if p.startswith("/usr/local/lib/node_modules") or p.startswith("/usr/lib/node_modules"):
+                return "npm (global)"
         # Go install (GOBIN or GOPATH/bin)
         gobin = os.environ.get("GOBIN", "").strip()
-        if gobin and path.startswith(gobin):
+        if gobin and p.startswith(gobin):
             return "go install"
         gopath = os.environ.get("GOPATH", os.path.join(home, "go"))
-        if path.startswith(os.path.join(gopath, "bin")):
+        if p.startswith(os.path.join(gopath, "bin")):
             return "go install"
-        if path.startswith(os.path.join(home, ".cargo", "bin")):
+        if p.startswith(os.path.join(home, ".cargo", "bin")):
             return "rustup/cargo"
-        if path.startswith(os.path.join(home, ".local", "bin")):
-            # Default for Python console scripts; overridden above if uv-managed
+        # pipx-managed shims: detect by real target path containing pipx venvs
+        if any(t in p for t in ("/.local/share/pipx/venvs/", "/.local/pipx/venvs/")):
             return "pipx/user"
-        if "/snap/" in path:
+        if p.startswith(os.path.join(home, ".local", "bin")):
+            # Generic user-local bin
+            return os.path.join(home, ".local", "bin")
+        if "/snap/" in p:
             return "snap"
-        if "/home/linuxbrew/.linuxbrew" in path or "/opt/homebrew" in path or "/usr/local/Cellar" in path:
+        if "/home/linuxbrew/.linuxbrew" in p or "/opt/homebrew" in p or "/usr/local/Cellar" in p:
             return "homebrew"
-        if path.startswith("/usr/local/bin"):
+        if p.startswith("/usr/local/bin"):
             return "/usr/local/bin"
-        if path.startswith("/usr/bin") or path.startswith("/bin"):
+        if p.startswith("/usr/bin") or p.startswith("/bin"):
             # try dpkg -S quickly to see if it's a dpkg-managed file (cached)
             global DPKG_CACHE
-            if path in DPKG_CACHE:
-                return "apt/dpkg" if DPKG_CACHE[path] else "/usr/bin"
-            line = run_with_timeout(["dpkg", "-S", path])
+            if p in DPKG_CACHE:
+                return "apt/dpkg" if DPKG_CACHE[p] else "/usr/bin"
+            line = run_with_timeout(["dpkg", "-S", p])
             owned = bool(line)
-            DPKG_CACHE[path] = owned
+            DPKG_CACHE[p] = owned
             return "apt/dpkg" if owned else "/usr/bin"
         return "unknown"
     except Exception:
