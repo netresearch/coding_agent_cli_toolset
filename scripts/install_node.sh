@@ -32,7 +32,7 @@ install_node() {
   corepack enable || true
   npm install -g npm@latest || true
   corepack prepare pnpm@latest --activate || true
-  corepack prepare yarn@stable --activate || true
+  corepack prepare yarn@1 --activate || true
   npm install -g eslint prettier || true
 }
 
@@ -49,9 +49,12 @@ update_node() {
     nvm alias default "$NODE_CHANNEL" || true
     nvm use default || true
   fi
+  # Ensure corepack shims are present
+  corepack enable || true
   npm install -g npm@latest || true
-  corepack prepare pnpm@latest --activate || true
-  corepack prepare yarn@stable --activate || true
+  # Update pnpm and yarn via corepack; fall back to npm global if corepack unavailable
+  corepack prepare pnpm@latest --activate || npm install -g pnpm@latest || true
+  corepack prepare yarn@1 --activate || npm install -g yarn@latest || true
   npm update -g eslint prettier || true
 }
 
