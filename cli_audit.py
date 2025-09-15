@@ -868,6 +868,14 @@ def detect_install_method(path: str, tool_name: str) -> str:
             real = os.path.realpath(path)
         except Exception:
             real = path
+        # python: prefer uv-specific classification before generic uv tool checks
+        if tool_name == "python":
+            # Dev venv created by scripts/install_python.sh
+            if "/.venvs/" in real:
+                return "uv venv"
+            # uv-managed interpreter locations
+            if any(p in real for p in ("/.local/share/uv/", "/.cache/uv/", "/.uv/")):
+                return "uv python"
         # uv-managed tools: prefer explicit detection
         # 1) If uv reports management for this tool name
         if tool_name and _is_uv_tool(tool_name):
@@ -1306,6 +1314,37 @@ def latest_gnu(project: str) -> tuple[str, str]:
         return "", ""
 
 
+def _uv_primary_python() -> tuple[str, str, str] | tuple[()]:
+    """Prefer the uv-managed Python interpreter if available.
+
+    Order of preference:
+    1) ~/.venvs/dev/bin/python (created by scripts/install_python.sh)
+    2) Interpreter resolved by `uv python find 3`
+    Returns a tuple (num, line, path) matching the audit format, or () if not found.
+    """
+    try:
+        if not shutil.which("uv"):
+            return ()
+        home = os.path.expanduser("~")
+        # 1) Preferred dev venv interpreter
+        venv_py = os.path.join(home, ".venvs", "dev", "bin", "python")
+        if os.path.isfile(venv_py) and os.access(venv_py, os.X_OK):
+            line = run_with_timeout([venv_py, "--version"]) or ""
+            num = extract_version_number(line)
+            if num:
+                return num, line, venv_py
+        # 2) Fallback to uv's resolved Python for the 3.x line
+        py_path = run_with_timeout(["uv", "python", "find", "3"]) or ""
+        if py_path and os.path.isabs(py_path) and os.path.exists(py_path):
+            line = run_with_timeout([py_path, "--version"]) or ""
+            num = extract_version_number(line)
+            if num:
+                return num, line, py_path
+    except Exception:
+        pass
+    return ()
+
+
 def get_latest(tool: Tool) -> tuple[str, str]:
     kind = tool.source_kind
     args = tool.source_args
@@ -1391,24 +1430,32 @@ def audit_tool(tool: Tool) -> tuple[str, str, str, str, str, str, str, str]:
     any_found = False
     # Use shallow discovery for most tools (first match); deep only for special cases
     deep_scan = (tool.name == "node")  # prefer to find both system and nvm variants
-    for cand in candidates:
-        for path in find_paths(cand, deep=deep_scan):
-            any_found = True
-            line = get_version_line(path, tool.name)
-            num = extract_version_number(line)
-            tuples.append((num, line, path))
-            # Fast exit for fx once we have a version line
-            if tool.name == "fx" and num:
+    chosen: tuple[str, str, str] | tuple[()] = ()
+    # Prefer uv-managed Python as the authoritative interpreter when available
+    if tool.name == "python":
+        uv_choice = _uv_primary_python()
+        if uv_choice:
+            chosen = uv_choice
+    # Only fall back to PATH scanning if we didn't select a uv choice
+    if not chosen:
+        for cand in candidates:
+            for path in find_paths(cand, deep=deep_scan):
+                any_found = True
+                line = get_version_line(path, tool.name)
+                num = extract_version_number(line)
+                tuples.append((num, line, path))
+                # Fast exit for fx once we have a version line
+                if tool.name == "fx" and num:
+                    break
+            if tool.name == "fx" and tuples:
                 break
-        if tool.name == "fx" and tuples:
-            break
-    if any_found:
-        if tool.name == "node":
-            chosen = choose_node_preferred(tuples)
+        if any_found:
+            if tool.name == "node":
+                chosen = choose_node_preferred(tuples)
+            else:
+                chosen = choose_highest(tuples)
         else:
-            chosen = choose_highest(tuples)
-    else:
-        chosen = ()
+            chosen = ()
     if not chosen:
         installed_line = "X"
         installed_num = ""
