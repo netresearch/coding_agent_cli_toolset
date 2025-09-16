@@ -61,6 +61,7 @@ DPKG_CACHE: dict[str, bool] = {}
 DPKG_OWNER_CACHE: dict[str, str] = {}
 DPKG_VERSION_CACHE: dict[str, str] = {}
 SORT_MODE: str = os.environ.get("CLI_AUDIT_SORT", "order")  # 'order' or 'alpha'
+AUDIT_DEBUG: bool = os.environ.get("CLI_AUDIT_DEBUG", "0") == "1"
 
 # Cache of uv-managed tools (populated lazily)
 UV_TOOLS_LOADED: bool = False
@@ -241,7 +242,9 @@ def _read_json(path: str) -> dict[str, Any]:
     try:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
-    except Exception:
+    except Exception as e:
+        if AUDIT_DEBUG:
+            print(f"# DEBUG: _read_json failed for {path}: {e}", file=sys.stderr)
         return {}
 
 
@@ -282,8 +285,10 @@ def _load_uv_tools() -> None:
                     names.add(tok[0])
         # Normalize to lower-case tool invocation names
         UV_TOOLS = {n.strip().lower() for n in names if n.strip()}
-    except Exception:
+    except Exception as e:
         # Best-effort only
+        if AUDIT_DEBUG:
+            print(f"# DEBUG: _load_uv_tools error: {e}", file=sys.stderr)
         pass
 
 
@@ -858,107 +863,95 @@ def status_icon(status: str, installed_line: str) -> str:
     return "❓"
 
 
-def detect_install_method(path: str, tool_name: str) -> str:
-    # Heuristics based on path location
+def _classify_install_method(path: str, tool_name: str) -> tuple[str, str]:
+    """Return (method, reason) for install classification."""
     try:
         home = os.path.expanduser("~")
         if not path:
-            return ""
-        # Resolve symlink to inspect real target location
+            return "", "no-path"
         try:
             real = os.path.realpath(path)
         except Exception:
             real = path
-        # Prefer classifying by the real target path, not the shim location
         p = real or path
-        # python: prefer uv-specific classification before generic uv tool checks
         if tool_name == "python":
-            # Dev venv created by scripts/install_python.sh
             if "/.venvs/" in p:
-                return "uv venv"
-            # uv-managed interpreter locations
+                return "uv venv", "shebang-in-~/.venvs"
             if any(t in p for t in ("/.local/share/uv/", "/.cache/uv/", "/.uv/")):
-                return "uv python"
-        # uv-managed tools: prefer explicit detection
-        # 1) If uv reports management for this tool name
+                return "uv python", "path-contains-uv-python"
         if tool_name and _is_uv_tool(tool_name):
-            return "uv tool"
-        # 2) Heuristic: symlink target inside uv data dirs
+            return "uv tool", "uv-list-match"
         if any(t in p for t in ("/.local/share/uv/", "/.cache/uv/", "/.uv/")):
-            return "uv tool"
-        # Special handling for docker: detect Docker Desktop under WSL
+            return "uv tool", "path-contains-uv"
         if tool_name == "docker" and DOCKER_INFO_ENABLED:
-            # opt-in checks
             wsl = bool(os.environ.get("WSL_DISTRO_NAME", ""))
             info = run_with_timeout(["docker", "info", "--format", "{{.OperatingSystem}}"])
             if info and "Docker Desktop" in info:
-                return "docker-desktop (WSL)" if wsl else "docker-desktop"
+                return ("docker-desktop (WSL)" if wsl else "docker-desktop"), "docker-info-os"
         if p.startswith(os.path.join(home, ".nvm")):
-            return "nvm/npm"
+            return "nvm/npm", "path-under-~/.nvm"
         if "/.cache/corepack" in p or "/.corepack" in p:
-            return "corepack"
-        # Compose plugin: treat Docker Desktop the same as docker engine
+            return "corepack", "path-corepack"
         if tool_name == "docker-compose" and DOCKER_INFO_ENABLED:
             wsl = bool(os.environ.get("WSL_DISTRO_NAME", ""))
             info = run_with_timeout(["docker", "info", "--format", "{{.OperatingSystem}}"])
             if info and "Docker Desktop" in info:
-                return "docker-desktop (WSL)" if wsl else "docker-desktop"
+                return ("docker-desktop (WSL)" if wsl else "docker-desktop"), "docker-info-os"
         if tool_name == "uv":
             try:
                 real = os.path.realpath(path)
             except Exception:
                 real = path
-            # Official installer places binaries directly under ~/.local/bin
             official_bin = os.path.join(home, ".local", "bin", "uv")
             if real == official_bin:
-                return "github binary"
+                return "github binary", "official-installer"
             if "/pipx/venvs/uv/" in real or real.startswith(os.path.join(home, ".local", "pipx", "venvs", "uv")):
-                return "pipx/user"
+                return "pipx/user", "pipx-uv-venv"
         if p.startswith(os.path.join(home, ".pnpm")):
-            return "pnpm"
+            return "pnpm", "path-under-~/.pnpm"
         if p.startswith(os.path.join(home, ".yarn")):
-            return "yarn"
-        # npm global installs (user-local and system-wide)
+            return "yarn", "path-under-~/.yarn"
         if "/lib/node_modules/" in p:
-            # User-local npm prefix (common under ~/.local on Linux)
             if p.startswith(os.path.join(home, ".local", "lib", "node_modules")):
-                return "npm (user)"
-            # System-wide npm prefix
+                return "npm (user)", "path-under-~/.local/lib/node_modules"
             if p.startswith("/usr/local/lib/node_modules") or p.startswith("/usr/lib/node_modules"):
-                return "npm (global)"
-        # Go install (GOBIN or GOPATH/bin)
+                return "npm (global)", "path-under-/usr/local/lib/node_modules"
         gobin = os.environ.get("GOBIN", "").strip()
         if gobin and p.startswith(gobin):
-            return "go install"
+            return "go install", "path-under-GOBIN"
         gopath = os.environ.get("GOPATH", os.path.join(home, "go"))
         if p.startswith(os.path.join(gopath, "bin")):
-            return "go install"
+            return "go install", "path-under-GOPATH/bin"
         if p.startswith(os.path.join(home, ".cargo", "bin")):
-            return "rustup/cargo"
-        # pipx-managed shims: detect by real target path containing pipx venvs
+            return "rustup/cargo", "path-under-~/.cargo/bin"
         if any(t in p for t in ("/.local/share/pipx/venvs/", "/.local/pipx/venvs/")):
-            return "pipx/user"
+            return "pipx/user", "path-under-pipx-venvs"
         if p.startswith(os.path.join(home, ".local", "bin")):
-            # Generic user-local bin
-            return os.path.join(home, ".local", "bin")
+            return os.path.join(home, ".local", "bin"), "path-under-~/.local/bin"
         if "/snap/" in p:
-            return "snap"
+            return "snap", "path-contains-snap"
         if "/home/linuxbrew/.linuxbrew" in p or "/opt/homebrew" in p or "/usr/local/Cellar" in p:
-            return "homebrew"
+            return "homebrew", "path-under-brew-cellar"
         if p.startswith("/usr/local/bin"):
-            return "/usr/local/bin"
+            return "/usr/local/bin", "path-under-/usr/local/bin"
         if p.startswith("/usr/bin") or p.startswith("/bin"):
-            # try dpkg -S quickly to see if it's a dpkg-managed file (cached)
             global DPKG_CACHE
             if p in DPKG_CACHE:
-                return "apt/dpkg" if DPKG_CACHE[p] else "/usr/bin"
+                return ("apt/dpkg" if DPKG_CACHE[p] else "/usr/bin"), "dpkg-cache-hit"
             line = run_with_timeout(["dpkg", "-S", p])
             owned = bool(line)
             DPKG_CACHE[p] = owned
-            return "apt/dpkg" if owned else "/usr/bin"
-        return "unknown"
-    except Exception:
-        return "unknown"
+            return ("apt/dpkg" if owned else "/usr/bin"), "dpkg-query"
+        return "unknown", "no-match"
+    except Exception as e:
+        if AUDIT_DEBUG:
+            print(f"# DEBUG: detect_install_method error for {tool_name} at {path}: {e}", file=sys.stderr)
+        return "unknown", "error"
+
+
+def detect_install_method(path: str, tool_name: str) -> str:
+    method, _reason = _classify_install_method(path, tool_name)
+    return method
 
 
 def upstream_method_for(tool: Tool) -> str:
@@ -1592,6 +1585,8 @@ def main() -> int:
                 "tool": name,
                 "installed": installed if installed != "X" else "",
                 "installed_method": installed_method,
+                "installed_path_resolved": detect_install_method.__name__ and (os.path.realpath(shutil.which(name) or "") if installed else ""),
+                "classification_reason": (_classify_install_method(os.path.realpath(shutil.which(name) or ""), name)[1] if installed else ""),
                 "latest_upstream": latest,
                 "upstream_method": upstream_method,
                 "status": status,
