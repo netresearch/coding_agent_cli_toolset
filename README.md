@@ -27,6 +27,43 @@ fd|fd 9.0.0|v9.0.0|UP-TO-DATE
 - `latest_upstream`: latest tag/version from upstream (may be empty if unknown)
 - `status`: `UP-TO-DATE`, `OUTDATED`, `NOT INSTALLED`, or `UNKNOWN`
 
+### JSON mode
+
+Set `CLI_AUDIT_JSON=1` to emit a JSON array of tool objects instead of the table:
+
+```bash
+CLI_AUDIT_JSON=1 python3 cli_audit.py | jq '.'
+```
+
+Fields (subset):
+- `tool`: logical tool name
+- `installed`: formatted local version display (may include timings)
+- `installed_version`: parsed semantic version of the local tool (when available)
+- `latest_upstream`: formatted upstream version display (may include timings)
+- `latest_version`: parsed semantic version of the upstream tool (when available)
+- `installed_method`: detected installation source (e.g., "uv tool", "npm (user)")
+- `installed_path_resolved`: realpath to the resolved executable (if installed)
+- `classification_reason`: short reason string for the detected install method
+- `upstream_method`: source used for latest lookup (e.g., "github", "uv tool")
+- `status`: `UP-TO-DATE`, `OUTDATED`, `NOT INSTALLED`, or `UNKNOWN`
+
+Example (abridged):
+
+```json
+{
+  "tool": "eslint",
+  "installed": "9.35.0 (340ms)",
+  "installed_version": "9.35.0",
+  "installed_method": "npm (user)",
+  "installed_path_resolved": "/home/you/.local/lib/node_modules/eslint/bin/eslint.js",
+  "classification_reason": "path-under-~/.local/lib/node_modules",
+  "latest_upstream": "9.35.0 (800ms)",
+  "latest_version": "9.35.0",
+  "upstream_method": "github",
+  "status": "UP-TO-DATE"
+}
+```
+
 ## Tool categories (agent-focused)
 - Core runtimes & package managers: `python`, `pip`, `pipx`, `poetry`, `node`, `npm`, `pnpm`, `yarn`
 - Search & code-aware tools: `ripgrep`, `ast-grep`, `fzf`, `fd`, `xsv`
@@ -73,6 +110,14 @@ If `source_kind` is `skip`, upstream lookup is disabled for that tool.
 - When multiple candidates are installed, the highest semantic version is selected.
 - For tools without a conventional version flag, the script tries a small set of common flags and a few special cases.
 
+### Debugging
+
+- Set `CLI_AUDIT_DEBUG=1` to print brief debug messages for suppressed exceptions and best-effort operations (e.g., uv tool enumeration). Disabled by default.
+
+### Empty selection handling
+
+- When selecting tools via `--only` or `CLI_AUDIT_ONLY`, unknown names now yield an empty JSON array in JSON mode and a header-only table in text mode.
+
 ## Development
 
 - Lint (optional):
@@ -108,6 +153,20 @@ make install-rust
 ```
 
 These scripts prefer the most up-to-date sources (e.g., nvm for Node, vendor installers for AWS CLI and kubectl) when feasible.
+
+### Install-method classification (how local tools are attributed)
+
+The audit attempts to identify how a tool was installed by inspecting the resolved executable path and environment hints. Recognized classifications include (non-exhaustive):
+
+- `uv tool`, `uv python`, `uv venv`
+- `pipx/user`
+- `npm (user)`, `npm (global)`, `corepack`, `nvm/npm`
+- `asdf`, `nodenv`, `pyenv`, `rbenv`
+- `homebrew` (Linuxbrew/macOS), `/usr/local/bin`, `apt/dpkg`, `snap`
+- `rustup/cargo`, `go install`, `pnpm`, `yarn`, `pnpm`
+- `volta`, `sdkman`, `nodist`
+
+When ambiguous, the audit may report a generic bucket (e.g., `~/.local/bin`). The JSON output includes `installed_path_resolved` and `classification_reason` to aid debugging.
 
 ### Actions: install, update, uninstall, reconcile
 
