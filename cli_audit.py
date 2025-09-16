@@ -62,6 +62,7 @@ DPKG_OWNER_CACHE: dict[str, str] = {}
 DPKG_VERSION_CACHE: dict[str, str] = {}
 SORT_MODE: str = os.environ.get("CLI_AUDIT_SORT", "order")  # 'order' or 'alpha'
 AUDIT_DEBUG: bool = os.environ.get("CLI_AUDIT_DEBUG", "0") == "1"
+DPKG_CACHE_LIMIT: int = int(os.environ.get("CLI_AUDIT_DPKG_CACHE_LIMIT", "1024"))
 
 # Cache of uv-managed tools (populated lazily)
 UV_TOOLS_LOADED: bool = False
@@ -199,6 +200,12 @@ def _dpkg_owner_for_path(path: str) -> str:
             DPKG_OWNER_CACHE[path] = ""
             return ""
         DPKG_OWNER_CACHE[path] = pkg
+        # bound cache
+        if len(DPKG_OWNER_CACHE) > DPKG_CACHE_LIMIT:
+            try:
+                DPKG_OWNER_CACHE.pop(next(iter(DPKG_OWNER_CACHE)))
+            except Exception:
+                pass
         return pkg
     except Exception:
         return ""
@@ -217,6 +224,11 @@ def _dpkg_version_for_pkg(pkg: str) -> str:
             DPKG_VERSION_CACHE[pkg] = ""
             return ""
         DPKG_VERSION_CACHE[pkg] = ver
+        if len(DPKG_VERSION_CACHE) > DPKG_CACHE_LIMIT:
+            try:
+                DPKG_VERSION_CACHE.pop(next(iter(DPKG_VERSION_CACHE)))
+            except Exception:
+                pass
         return ver
     except Exception:
         return ""
@@ -947,6 +959,11 @@ def _classify_install_method(path: str, tool_name: str) -> tuple[str, str]:
             line = run_with_timeout(["dpkg", "-S", p])
             owned = bool(line)
             DPKG_CACHE[p] = owned
+            if len(DPKG_CACHE) > DPKG_CACHE_LIMIT:
+                try:
+                    DPKG_CACHE.pop(next(iter(DPKG_CACHE)))
+                except Exception:
+                    pass
             return ("apt/dpkg" if owned else "/usr/bin"), "dpkg-query"
         return "unknown", "no-match"
     except Exception as e:
