@@ -948,8 +948,12 @@ def _classify_install_method(path: str, tool_name: str) -> tuple[str, str]:
             return os.path.join(home, ".local", "bin"), "path-under-~/.local/bin"
         if "/snap/" in p:
             return "snap", "path-contains-snap"
-        if "/home/linuxbrew/.linuxbrew" in p or "/opt/homebrew" in p or "/usr/local/Cellar" in p:
-            return "homebrew", "path-under-brew-cellar"
+        # Homebrew (macOS and Linuxbrew). Prefer env hints when available.
+        hb_prefix = os.environ.get("HOMEBREW_PREFIX", "").strip()
+        hb_cellar = os.environ.get("HOMEBREW_CELLAR", "").strip()
+        if (hb_prefix and p.startswith(hb_prefix)) or (hb_cellar and hb_cellar in p) or \
+           ("/home/linuxbrew/.linuxbrew" in p) or ("/opt/homebrew" in p) or ("/usr/local/Cellar" in p):
+            return "homebrew", "brew-prefix-or-cellar"
         if p.startswith("/usr/local/bin"):
             return "/usr/local/bin", "path-under-/usr/local/bin"
         if p.startswith("/usr/bin") or p.startswith("/bin"):
