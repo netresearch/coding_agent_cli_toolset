@@ -207,20 +207,26 @@ else
   fi
 fi
 
-# Always offer explicit package manager updates, regardless of Node prompt choice
-if prompt_action "$(json_field npm state_icon) npm (global)" "$(json_field npm installed)" "$(json_field npm installed_method)" "$(osc8 "$(json_field npm latest_url)" "$(json_field npm latest_upstream)")" "$(json_field npm upstream_method)" npm; then
-  corepack enable >/dev/null 2>&1 || true
-  npm install -g npm@latest >/dev/null 2>&1 || true
-  AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 "$CLI" cli_audit.py 2>/dev/null || true)"
+# Offer explicit package manager updates only when not up-to-date
+if [ -z "$(json_bool npm is_up_to_date)" ]; then
+  if prompt_action "$(json_field npm state_icon) npm (global)" "$(json_field npm installed)" "$(json_field npm installed_method)" "$(osc8 "$(json_field npm latest_url)" "$(json_field npm latest_upstream)")" "$(json_field npm upstream_method)" npm; then
+    corepack enable >/dev/null 2>&1 || true
+    npm install -g npm@latest >/dev/null 2>&1 || true
+    AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 "$CLI" cli_audit.py 2>/dev/null || true)"
+  fi
 fi
-if prompt_action "$(json_field pnpm state_icon) pnpm" "$(json_field pnpm installed)" "$(json_field pnpm installed_method)" "$(osc8 "$(json_field pnpm latest_url)" "$(json_field pnpm latest_upstream)")" "$(json_field pnpm upstream_method)" pnpm; then
-  corepack prepare pnpm@latest --activate >/dev/null 2>&1 || npm install -g pnpm@latest >/dev/null 2>&1 || true
-  AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 "$CLI" cli_audit.py 2>/dev/null || true)"
+if [ -z "$(json_bool pnpm is_up_to_date)" ]; then
+  if prompt_action "$(json_field pnpm state_icon) pnpm" "$(json_field pnpm installed)" "$(json_field pnpm installed_method)" "$(osc8 "$(json_field pnpm latest_url)" "$(json_field pnpm latest_upstream)")" "$(json_field pnpm upstream_method)" pnpm; then
+    corepack prepare pnpm@latest --activate >/dev/null 2>&1 || npm install -g pnpm@latest >/dev/null 2>&1 || true
+    AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 "$CLI" cli_audit.py 2>/dev/null || true)"
+  fi
 fi
-if prompt_action "$(json_field yarn state_icon) yarn" "$(json_field yarn installed)" "$(json_field yarn installed_method)" "$(osc8 "$(json_field yarn latest_url)" "$(json_field yarn latest_upstream)")" "$(json_field yarn upstream_method)" yarn; then
-  # Prefer stable tag for Yarn (Berry)
-  corepack prepare yarn@stable --activate >/dev/null 2>&1 || npm install -g yarn@latest >/dev/null 2>&1 || true
-  AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 "$CLI" cli_audit.py 2>/dev/null || true)"
+if [ -z "$(json_bool yarn is_up_to_date)" ]; then
+  if prompt_action "$(json_field yarn state_icon) yarn" "$(json_field yarn installed)" "$(json_field yarn installed_method)" "$(osc8 "$(json_field yarn latest_url)" "$(json_field yarn latest_upstream)")" "$(json_field yarn upstream_method)" yarn; then
+    # Prefer stable tag for Yarn (Berry)
+    corepack prepare yarn@stable --activate >/dev/null 2>&1 || npm install -g yarn@latest >/dev/null 2>&1 || true
+    AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 "$CLI" cli_audit.py 2>/dev/null || true)"
+  fi
 fi
 
 # Go stack – show sanitized version and planned source (before core tools that use go)
