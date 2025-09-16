@@ -911,6 +911,12 @@ def _classify_install_method(path: str, tool_name: str) -> tuple[str, str]:
             return "pnpm", "path-under-~/.pnpm"
         if p.startswith(os.path.join(home, ".yarn")):
             return "yarn", "path-under-~/.yarn"
+        # asdf shims/installs
+        if p.startswith(os.path.join(home, ".asdf", "shims")) or "/.asdf/installs/" in p:
+            return "asdf", "asdf-shim-or-install"
+        # nodenv shims/versions
+        if p.startswith(os.path.join(home, ".nodenv", "shims")) or "/.nodenv/versions/" in p:
+            return "nodenv", "nodenv-shim-or-version"
         if "/lib/node_modules/" in p:
             if p.startswith(os.path.join(home, ".local", "lib", "node_modules")):
                 return "npm (user)", "path-under-~/.local/lib/node_modules"
