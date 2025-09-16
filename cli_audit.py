@@ -935,6 +935,15 @@ def _classify_install_method(path: str, tool_name: str) -> tuple[str, str]:
         # rbenv shims/versions
         if p.startswith(os.path.join(home, ".rbenv", "shims")) or "/.rbenv/versions/" in p:
             return "rbenv", "rbenv-shim-or-version"
+        # Volta (Node toolchain manager)
+        if p.startswith(os.path.join(home, ".volta")) or "/.volta/" in p:
+            return "volta", "path-under-~/.volta"
+        # SDKMAN!
+        if "/.sdkman/" in p:
+            return "sdkman", "path-contains-~/.sdkman"
+        # nodist (Windows node manager; rare under WSL)
+        if "/.nodist/" in p or "/Nodist/" in p or "/NODIST/" in p:
+            return "nodist", "path-contains-nodist"
         if "/lib/node_modules/" in p:
             if p.startswith(os.path.join(home, ".local", "lib", "node_modules")):
                 return "npm (user)", "path-under-~/.local/lib/node_modules"
@@ -1597,6 +1606,14 @@ def main() -> int:
         name_set = set(selected_names)
         tools_seq = tuple(t for t in tools_seq if t.name.lower() in name_set)
     results: list[tuple[str, str, str, str, str, str, str, str]] = [None] * len(tools_seq)  # type: ignore[assignment]
+    # Guard: empty selection (unknown --only names)
+    if len(tools_seq) == 0:
+        if os.environ.get("CLI_AUDIT_JSON", "0") == "1":
+            print("[]")
+            return 0
+        headers = ("state", "tool", "installed", "installed_method", "latest_upstream", "upstream_method")
+        print("|".join(headers))
+        return 0
     with ThreadPoolExecutor(max_workers=min(MAX_WORKERS, len(tools_seq))) as executor:
         future_to_idx = {}
         for idx, tool in enumerate(tools_seq):
@@ -1620,6 +1637,8 @@ def main() -> int:
                 "installed_method": installed_method,
                 "installed_path_resolved": detect_install_method.__name__ and (os.path.realpath(shutil.which(name) or "") if installed else ""),
                 "classification_reason": (_classify_install_method(os.path.realpath(shutil.which(name) or ""), name)[1] if installed else ""),
+                "installed_version": extract_version_number(installed),
+                "latest_version": extract_version_number(latest),
                 "latest_upstream": latest,
                 "upstream_method": upstream_method,
                 "status": status,
