@@ -929,6 +929,12 @@ def _classify_install_method(path: str, tool_name: str) -> tuple[str, str]:
         # nodenv shims/versions
         if p.startswith(os.path.join(home, ".nodenv", "shims")) or "/.nodenv/versions/" in p:
             return "nodenv", "nodenv-shim-or-version"
+        # pyenv shims/versions
+        if p.startswith(os.path.join(home, ".pyenv", "shims")) or "/.pyenv/versions/" in p:
+            return "pyenv", "pyenv-shim-or-version"
+        # rbenv shims/versions
+        if p.startswith(os.path.join(home, ".rbenv", "shims")) or "/.rbenv/versions/" in p:
+            return "rbenv", "rbenv-shim-or-version"
         if "/lib/node_modules/" in p:
             if p.startswith(os.path.join(home, ".local", "lib", "node_modules")):
                 return "npm (user)", "path-under-~/.local/lib/node_modules"
