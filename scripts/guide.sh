@@ -148,7 +148,7 @@ if [ -n "$(json_bool rust is_up_to_date)" ]; then
   printf "    up-to-date; skipping.\n"
 else
   if prompt_action "${RUST_ICON} Rust (cargo)" "$RUST_INSTALLED" "$RUST_METHOD" "$(osc8 "$RUST_URL" "$RUST_LATEST")" "$(json_field rust upstream_method)" rust; then
-    "$ROOT"/scripts/install_rust.sh reconcile
+    "$ROOT"/scripts/install_rust.sh reconcile || true
   fi
 fi
 
@@ -165,7 +165,7 @@ if [ -n "$(json_bool uv is_up_to_date)" ] && [ -n "$UV_CURR" ]; then
   printf "    up-to-date; skipping.\n"
 else
   if prompt_action "${UV_ICON} uv" "$UV_CURR" "$(json_field uv installed_method)" "$(osc8 "$UV_URL" "$UV_LATEST")" "$(json_field uv upstream_method)" core; then
-    "$ROOT"/scripts/install_uv.sh reconcile
+    "$ROOT"/scripts/install_uv.sh reconcile || true
     AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 "$CLI" cli_audit.py 2>/dev/null || true)"
   fi
 fi
@@ -183,7 +183,7 @@ if [ -n "$(json_bool python is_up_to_date)" ]; then
   printf "    up-to-date; skipping.\n"
 else
   if prompt_action "${PY_ICON} Python stack" "$PY_CURR" "$(json_field python installed_method)" "$(osc8 "$PY_URL" "$PY_LATEST")" "$(json_field python upstream_method)" python; then
-    UV_PYTHON_SPEC="$PY_LATEST" "$ROOT"/scripts/install_python.sh update
+    UV_PYTHON_SPEC="$PY_LATEST" "$ROOT"/scripts/install_python.sh update || true
     AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 "$CLI" cli_audit.py 2>/dev/null || true)"
   fi
 fi
@@ -202,7 +202,7 @@ if [ -n "$NODE_ALL_OK" ]; then
   printf "\n"; printf "==> %s %s\n" "$NODE_ICON" "Node.js stack"; printf "    installed: %s via %s\n" "${NODE_CURR:-<none>}" "$(json_field node installed_method)"; printf "    target:    %s via %s\n" "$(osc8 "$NODE_URL" "${NODE_LATEST:-<unknown>}")" "$(json_field node upstream_method)"; printf "    up-to-date; skipping.\n"
 else
   if prompt_action "${NODE_ICON} Node.js stack" "$NODE_CURR" "$(json_field node installed_method)" "$(osc8 "$NODE_URL" "$NODE_LATEST")" "$(json_field node upstream_method)" node; then
-    "$ROOT"/scripts/install_node.sh reconcile
+    "$ROOT"/scripts/install_node.sh reconcile || true
     AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 "$CLI" cli_audit.py 2>/dev/null || true)"
   fi
 fi
@@ -240,7 +240,7 @@ if [ -n "$(json_bool go is_up_to_date)" ]; then
   printf "\n"; printf "==> %s %s\n" "$GO_ICON" "Go toolchain"; printf "    installed: %s via %s\n" "$GO_CURR" "$GO_METHOD"; printf "    target:    %s via %s\n" "$(osc8 "$GO_URL" "${GO_LATE:-<unknown>}")" "brew"; printf "    up-to-date; skipping.\n"
 else
   if prompt_action "${GO_ICON} Go toolchain" "$GO_CURR" "$GO_METHOD" "$(osc8 "$GO_URL" "$GO_LATE")" "brew" go; then
-    "$ROOT"/scripts/install_go.sh
+    "$ROOT"/scripts/install_go.sh || true
     AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 "$CLI" cli_audit.py 2>/dev/null || true)"
   fi
 fi
@@ -283,7 +283,7 @@ for t in "${CORE_TOOLS[@]}"; do
     printf "\n"; printf "==> %s %s\n" "$ICON" "$t"; printf "    installed: %s via %s\n" "${CURR:-<none>}" "$(json_field "$t" installed_method)"; printf "    target:    %s via %s\n" "$(osc8 "$URL" "${LATE:-<unknown>}")" "$(json_field "$t" upstream_method)"; printf "    up-to-date; skipping.\n"; continue
   fi
   if prompt_action "${ICON} $t" "$CURR" "$(json_field "$t" installed_method)" "$(osc8 "$URL" "$LATE")" "$(json_field "$t" upstream_method)" "$t"; then
-    "$ROOT"/scripts/install_core.sh reconcile "$t"
+    "$ROOT"/scripts/install_core.sh reconcile "$t" || true
     # Re-audit the single tool to reflect updated status inline
     AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 "$CLI" cli_audit.py 2>/dev/null || true)"
   fi
@@ -335,7 +335,7 @@ if [ -n "$(json_bool docker is_up_to_date)" ]; then
   printf "    up-to-date; skipping.\n"
 else
   if prompt_action "${DK_ICON} Docker Engine" "$DK_CURR" "$(json_field docker installed_method)" "$(osc8 "$DK_URL" "$DK_LATEST")" "$(json_field docker upstream_method)" docker; then
-    "$ROOT"/scripts/install_docker.sh
+    "$ROOT"/scripts/install_docker.sh || true
   fi
 fi
 
@@ -369,7 +369,7 @@ if [ -n "$(json_bool aws is_up_to_date)" ] && [ -n "$AWS_CURR" ]; then
   printf "    up-to-date; skipping.\n"
 else
   if prompt_action "${AWS_ICON} AWS CLI" "$AWS_CURR" "$(json_field aws installed_method)" "$(osc8 "$AWS_URL" "$AWS_LATEST")" "$(json_field aws upstream_method)" aws; then
-    "$ROOT"/scripts/install_aws.sh
+    "$ROOT"/scripts/install_aws.sh || true
   fi
 fi
 
@@ -386,7 +386,7 @@ if [ -n "$(json_bool kubectl is_up_to_date)" ]; then
   printf "    up-to-date; skipping.\n"
 else
   if prompt_action "${K8S_ICON} kubectl" "$K8S_CURR" "$(json_field kubectl installed_method)" "$(osc8 "$K8S_URL" "$K8S_LATEST")" "$(json_field kubectl upstream_method)" kubectl; then
-    "$ROOT"/scripts/install_kubectl.sh update
+    "$ROOT"/scripts/install_kubectl.sh update || true
   fi
 fi
 
@@ -403,7 +403,7 @@ if [ -n "$(json_bool terraform is_up_to_date)" ]; then
   printf "    up-to-date; skipping.\n"
 else
   if prompt_action "${TF_ICON} Terraform" "$TF_CURR" "$(json_field terraform installed_method)" "$(osc8 "$TF_URL" "$TF_LATEST")" "$(json_field terraform upstream_method)" terraform; then
-    "$ROOT"/scripts/install_terraform.sh
+    "$ROOT"/scripts/install_terraform.sh || true
   fi
 fi
 
@@ -420,7 +420,7 @@ if [ -n "$(json_bool ansible is_up_to_date)" ]; then
   printf "    up-to-date; skipping.\n"
 else
   if prompt_action "${ANS_ICON} Ansible" "$ANS_CURR" "$(json_field ansible installed_method)" "$(osc8 "$ANS_URL" "$ANS_LATEST")" "$(json_field ansible upstream_method)" ansible; then
-    "$ROOT"/scripts/install_ansible.sh update
+    "$ROOT"/scripts/install_ansible.sh update || true
     AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 "$CLI" cli_audit.py 2>/dev/null || true)"
   fi
 fi
