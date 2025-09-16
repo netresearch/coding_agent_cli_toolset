@@ -415,6 +415,7 @@ if [ -n "$(json_bool ansible is_up_to_date)" ]; then
 else
   if prompt_action "${ANS_ICON} Ansible" "$ANS_CURR" "$(json_field ansible installed_method)" "$(osc8 "$ANS_URL" "$ANS_LATEST")" "$(json_field ansible upstream_method)" ansible; then
     "$ROOT"/scripts/install_ansible.sh update
+    AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 "$CLI" cli_audit.py 2>/dev/null || true)"
   fi
 fi
 
