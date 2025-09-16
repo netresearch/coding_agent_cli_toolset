@@ -1,10 +1,14 @@
 # AI CLI Preparation
 
-A minimal utility to audit versions of common developer CLI tools on your system and compare them to the latest upstream releases. It prints a pipe-delimited report suitable for quick human scan or downstream tooling.
+A minimal utility to verify that tools used by AI coding agents are installed and up to date on your system. It audits versions of common agent toolchain CLIs against the latest upstream releases and prints a pipe-delimited report suitable for quick human scan or downstream tooling.
 
 ## Scope: agent toolchain
 - This audit targets CLIs that coding agents commonly utilize themselves if present on the machine. It is agent-focused; tools may be reported as NOT INSTALLED on your host if you don't use them.
 - Upstream versions are resolved from GitHub releases, PyPI, crates.io, or the npm registry for Node CLIs.
+
+## Primary Use Case: AI coding agent readiness
+
+Use this tool to quickly confirm that the CLIs your AI coding agents rely on are present and current. If tools are missing or outdated, use the provided installer scripts (see Installation scripts) or your preferred package manager to remediate, then re-run the audit until everything is ready.
 
 ## Features
 - Detects installed versions across PATH (and `~/.cargo/bin` for Rust tools)
@@ -14,18 +18,20 @@ A minimal utility to audit versions of common developer CLI tools on your system
 - Simple, parse-friendly output
 
 ## Output Format
-The program prints a header followed by one line per tool:
+The program prints a header followed by one line per tool (6 columns):
 
 ```
-tool|installed|latest_upstream|status
-fd|fd 9.0.0|v9.0.0|UP-TO-DATE
+state|tool|installed|installed_method|latest_upstream|upstream_method
++|fd|9.0.0 (140ms)|apt/dpkg|9.0.0 (220ms)|github
 ...
-[cargo_bin_on_PATH] yes
 ```
 
-- `installed`: first version line from the selected binary, or `X` if not found
-- `latest_upstream`: latest tag/version from upstream (may be empty if unknown)
-- `status`: `UP-TO-DATE`, `OUTDATED`, `NOT INSTALLED`, or `UNKNOWN`
+- `state`: single-character/emoji indicator of status
+- `tool`: logical tool name
+- `installed`: local version display (may include timing)
+- `installed_method`: detected installation source (e.g., `uv tool`, `npm (user)`, `apt/dpkg`)
+- `latest_upstream`: upstream version display (may include timing)
+- `upstream_method`: where the upstream version came from (`github`, `pypi`, `crates`, `npm`, `gnu-ftp`)
 
 ### JSON mode
 
@@ -42,8 +48,10 @@ Fields (subset):
 - `latest_upstream`: formatted upstream version display (may include timings)
 - `latest_version`: parsed semantic version of the upstream tool (when available)
 - `installed_method`: detected installation source (e.g., "uv tool", "npm (user)")
-- `installed_path_resolved`: realpath to the resolved executable (if installed)
-- `classification_reason`: short reason string for the detected install method
+- `installed_path_resolved`: realpath via which(1) (kept for backwards compatibility)
+- `classification_reason`: reason derived from classifying the which(1) path
+- `installed_path_selected`: path of the executable actually selected by the audit run
+- `classification_reason_selected`: reason string for the selected path's classification
 - `upstream_method`: source used for latest lookup (e.g., "github", "uv tool")
 - `status`: `UP-TO-DATE`, `OUTDATED`, `NOT INSTALLED`, or `UNKNOWN`
 
@@ -57,6 +65,8 @@ Example (abridged):
   "installed_method": "npm (user)",
   "installed_path_resolved": "/home/you/.local/lib/node_modules/eslint/bin/eslint.js",
   "classification_reason": "path-under-~/.local/lib/node_modules",
+  "installed_path_selected": "/home/you/.local/lib/node_modules/eslint/bin/eslint.js",
+  "classification_reason_selected": "path-under-~/.local/lib/node_modules",
   "latest_upstream": "9.35.0 (800ms)",
   "latest_version": "9.35.0",
   "upstream_method": "github",
@@ -90,6 +100,26 @@ python3 cli_audit.py | column -s '|' -t
 ```
 
 Tip: On systems where `column` is unavailable, just view the raw output or import into your tool of choice.
+
+## Quick agent readiness check
+
+- Table scan for a quick look:
+
+```bash
+python3 cli_audit.py | column -s '|' -t
+```
+
+- JSON for actionable filtering (e.g., list anything not up to date):
+
+```bash
+CLI_AUDIT_JSON=1 python3 cli_audit.py \
+  | jq -r '.[] | select(.status != "UP-TO-DATE") | [.tool, .status] | @tsv'
+```
+
+- Typical remediation workflow for agent readiness:
+  1. Run the audit.
+  2. Install or update missing/outdated tools using the `make install-*` targets under Installation scripts (or your package manager).
+  3. Re-run the audit until only up-to-date tools remain.
 
 ## Extending the Tool List
 Agent-focused tools live in the `TOOLS` tuple in `cli_audit.py`. Prefer upstreams with discoverable latest releases:

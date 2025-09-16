@@ -30,6 +30,8 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from urllib.parse import urlparse
+import random
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable, List, Sequence, Tuple
 import threading
@@ -63,6 +65,7 @@ DPKG_VERSION_CACHE: dict[str, str] = {}
 SORT_MODE: str = os.environ.get("CLI_AUDIT_SORT", "order")  # 'order' or 'alpha'
 AUDIT_DEBUG: bool = os.environ.get("CLI_AUDIT_DEBUG", "0") == "1"
 DPKG_CACHE_LIMIT: int = int(os.environ.get("CLI_AUDIT_DPKG_CACHE_LIMIT", "1024"))
+VALIDATE_MANUAL: bool = os.environ.get("CLI_AUDIT_VALIDATE_MANUAL", "1") == "1"
 
 # Cache of uv-managed tools (populated lazily)
 UV_TOOLS_LOADED: bool = False
@@ -76,6 +79,94 @@ MANUAL_FILE: str = os.environ.get(
 MANUAL_VERSIONS: dict[str, Any] = {}
 WRITE_MANUAL: bool = os.environ.get("CLI_AUDIT_WRITE_MANUAL", "1") == "1"
 MANUAL_USED: dict[str, bool] = {}
+
+# Selected-path tracking for JSON output (populated by audit_tool)
+SELECTED_PATHS: dict[str, str] = {}
+SELECTED_REASON: dict[str, str] = {}
+
+# Per-origin concurrency caps for network requests
+SEMAPHORES: dict[str, threading.BoundedSemaphore] = {
+    "github.com": threading.BoundedSemaphore(value=int(os.environ.get("CLI_AUDIT_HOST_CAP_GITHUB", "4"))),
+    "api.github.com": threading.BoundedSemaphore(value=int(os.environ.get("CLI_AUDIT_HOST_CAP_GITHUB_API", "4"))),
+    "registry.npmjs.org": threading.BoundedSemaphore(value=int(os.environ.get("CLI_AUDIT_HOST_CAP_NPM", "4"))),
+    "crates.io": threading.BoundedSemaphore(value=int(os.environ.get("CLI_AUDIT_HOST_CAP_CRATES", "4"))),
+    "ftp.gnu.org": threading.BoundedSemaphore(value=int(os.environ.get("CLI_AUDIT_HOST_CAP_GNU", "2"))),
+    "ftpmirror.gnu.org": threading.BoundedSemaphore(value=int(os.environ.get("CLI_AUDIT_HOST_CAP_GNU", "2"))),
+    "mirrors.kernel.org": threading.BoundedSemaphore(value=int(os.environ.get("CLI_AUDIT_HOST_CAP_GNU", "2"))),
+}
+
+
+def _accept_header_for_host(host: str) -> str:
+    try:
+        if host == "api.github.com":
+            return "application/vnd.github+json"
+        if host in ("registry.npmjs.org", "crates.io"):
+            return "application/json"
+        if host.endswith("gnu.org") or host.endswith("kernel.org"):
+            return "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        return "*/*"
+    except Exception:
+        return "*/*"
+
+
+def http_fetch(
+    url: str,
+    timeout: float | int = TIMEOUT_SECONDS,
+    headers: dict[str, str] | None = None,
+    retries: int = 3,
+    backoff_base: float = 0.2,
+    jitter: float = 0.1,
+    method: str | None = None,
+) -> bytes:
+    """Fetch URL with retries, jitter, and per-origin concurrency caps.
+
+    Raises on final failure; callers are expected to catch.
+    """
+    parsed = urlparse(url)
+    host = parsed.netloc
+    sem = SEMAPHORES.get(host)
+    # Build headers
+    req_headers = dict(USER_AGENT_HEADERS)
+    req_headers["Accept"] = _accept_header_for_host(host)
+    if headers:
+        try:
+            req_headers.update(headers)
+        except Exception:
+            pass
+    # GitHub token only for API host
+    if GITHUB_TOKEN and host == "api.github.com":
+        req_headers["Authorization"] = f"Bearer {GITHUB_TOKEN}"
+
+    last_exc: Exception | None = None
+    for attempt in range(max(1, retries)):
+        try:
+            if sem is None:
+                req = urllib.request.Request(url, headers=req_headers, method=method)
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    return resp.read()
+            with sem:
+                req = urllib.request.Request(url, headers=req_headers, method=method)
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    return resp.read()
+        except urllib.error.HTTPError as e:
+            last_exc = e
+            code = getattr(e, "code", 0) or 0
+            retryable = (code == 429) or (500 <= code <= 599) or (host == "api.github.com" and code == 403)
+            if attempt >= retries - 1 or not retryable:
+                raise
+        except Exception as e:
+            last_exc = e
+            if attempt >= retries - 1:
+                raise
+        # backoff with jitter
+        try:
+            delay = backoff_base * (2 ** attempt) + random.random() * jitter
+            time.sleep(delay)
+        except Exception:
+            pass
+    if last_exc:
+        raise last_exc
+    return b""
 
 # Hints: persisted inside latest_versions.json under a special key "__hints__"
 HINTS: dict[str, str] = {}
@@ -95,10 +186,61 @@ def load_manual_versions() -> None:
                     else:
                         mv[str(k)] = str(v)
                 MANUAL_VERSIONS = mv
+                try:
+                    if VALIDATE_MANUAL:
+                        _normalize_manual_versions_if_needed()
+                except Exception as e:
+                    if AUDIT_DEBUG:
+                        print(f"# DEBUG: manual normalize failed: {e}", file=sys.stderr)
             else:
                 MANUAL_VERSIONS = {}
     except Exception:
         MANUAL_VERSIONS = {}
+
+def _normalize_manual_versions_if_needed() -> None:
+    """Validate/normalize MANUAL_VERSIONS values; migrate odd shapes into __hints__.
+
+    This function performs in-place normalization and persists to MANUAL_FILE
+    when changes are detected. It is tolerant and only rewrites on change.
+    """
+    try:
+        if not isinstance(MANUAL_VERSIONS, dict) or not MANUAL_VERSIONS:
+            return
+        original = dict(MANUAL_VERSIONS)
+        hints = original.get("__hints__", {})
+        if not isinstance(hints, dict):
+            hints = {}
+        changed = False
+        normalized: dict[str, Any] = {}
+        for k, v in original.items():
+            sk = str(k)
+            if sk.startswith("__"):
+                normalized[sk] = v
+                continue
+            sv = v if isinstance(v, str) else str(v)
+            # If the stored value isn't a clean version string, try to extract a numeric version
+            ver = extract_version_number(sv)
+            if ver and ver != sv.strip():
+                # record migration of original value
+                hints[f"migrated:{sk}"] = sv
+                normalized[sk] = ver
+                changed = True
+            else:
+                normalized[sk] = sv
+        if changed:
+            normalized["__hints__"] = hints
+            with MANUAL_LOCK:
+                try:
+                    with open(MANUAL_FILE, "w", encoding="utf-8") as f:
+                        json.dump(normalized, f, indent=2, ensure_ascii=False, sort_keys=True)
+                    MANUAL_VERSIONS.clear()
+                    MANUAL_VERSIONS.update(normalized)
+                except Exception as e:
+                    if AUDIT_DEBUG:
+                        print(f"# DEBUG: failed writing normalized manual file: {e}", file=sys.stderr)
+    except Exception as e:
+        if AUDIT_DEBUG:
+            print(f"# DEBUG: normalize error: {e}", file=sys.stderr)
 
 def get_manual_latest(tool_name: str) -> tuple[str, str]:
     if not MANUAL_VERSIONS:
@@ -119,6 +261,9 @@ def load_hints() -> None:
             HINTS = {str(k): str(v) for k, v in data.items()}
         else:
             HINTS = {}
+        # Ensure MANUAL_VERSIONS conforms to normalization after hints are loaded
+        if VALIDATE_MANUAL:
+            _normalize_manual_versions_if_needed()
     except Exception:
         HINTS = {}
 
@@ -129,14 +274,14 @@ def get_hint(key: str) -> str:
 
 def set_hint(key: str, value: str) -> None:
     try:
-        with HINTS_LOCK:
-            load_hints()
-            if HINTS.get(key) == value:
-                return
-            HINTS[key] = value
-            # persist inside manual file under "__hints__"
-            with MANUAL_LOCK:
-                load_manual_versions()
+        # Enforce lock ordering: MANUAL_LOCK -> HINTS_LOCK
+        with MANUAL_LOCK:
+            with HINTS_LOCK:
+                load_hints()
+                if HINTS.get(key) == value:
+                    return
+                HINTS[key] = value
+                # persist inside manual file under "__hints__"
                 mv = dict(MANUAL_VERSIONS)
                 mv["__hints__"] = HINTS
                 with open(MANUAL_FILE, "w", encoding="utf-8") as f:
@@ -397,7 +542,7 @@ def set_manual_latest(tool_name: str, tag_or_version: str) -> None:
         except Exception:
             pass
 
-LATEST_FOR_ALL: bool = os.environ.get("CLI_AUDIT_LATEST_FOR_ALL", "0") == "1"
+# (removed) LATEST_FOR_ALL was unused
 
 try:
     from wcwidth import wcswidth as _wcswidth
@@ -966,6 +1111,23 @@ def _classify_install_method(path: str, tool_name: str) -> tuple[str, str]:
         if any(t in p for t in ("/.local/share/pipx/venvs/", "/.local/pipx/venvs/")):
             return "pipx/user", "path-under-pipx-venvs"
         if p.startswith(os.path.join(home, ".local", "bin")):
+            # Refine ~/.local/bin classification via shebang to detect pipx/uv venv wrappers
+            try:
+                with open(p, "rb") as f:
+                    first = f.readline().decode("utf-8", "ignore").strip()
+                if first.startswith("#!"):
+                    py = first[2:].strip().split()[0]
+                else:
+                    py = ""
+            except Exception:
+                py = ""
+            if py:
+                if "/pipx/venvs/" in py or "/.local/pipx/venvs/" in py:
+                    return "pipx/user", "shebang-pipx-venv"
+                if "/.venvs/" in py:
+                    return "uv venv", "shebang-in-~/.venvs"
+                if any(t in py for t in ("/.local/share/uv/", "/.cache/uv/", "/.uv/")):
+                    return "uv tool", "shebang-uv"
             return os.path.join(home, ".local", "bin"), "path-under-~/.local/bin"
         if "/snap/" in p:
             return "snap", "path-contains-snap"
@@ -1121,12 +1283,8 @@ def choose_node_preferred(installed: list[tuple[str, str, str]]) -> tuple[str, s
 
 
 def http_get(url: str) -> bytes:
-    headers = dict(USER_AGENT_HEADERS)
-    if GITHUB_TOKEN and "api.github.com" in url:
-        headers["Authorization"] = f"Bearer {GITHUB_TOKEN}"
-    req = urllib.request.Request(url, headers=headers)
-    with urllib.request.urlopen(req, timeout=TIMEOUT_SECONDS) as resp:
-        return resp.read()
+    """Compatibility wrapper that delegates to http_fetch with sensible defaults."""
+    return http_fetch(url, timeout=TIMEOUT_SECONDS)
 
 
 def latest_github(owner: str, repo: str) -> tuple[str, str]:
@@ -1542,7 +1700,19 @@ def audit_tool(tool: Tool) -> tuple[str, str, str, str, str, str, str, str]:
     else:
         latest_display = ""
     latest_url = latest_target_url(tool, latest_tag, latest_num)
-    installed_method = detect_install_method(installed_path, tool.name) if installed_line != "X" else ""
+    # Determine install method and remember selected path/reason for JSON
+    if installed_line != "X":
+        try:
+            method, reason = _classify_install_method(installed_path, tool.name)
+        except Exception:
+            method, reason = detect_install_method(installed_path, tool.name), ""
+        installed_method = method
+        SELECTED_PATHS[tool.name] = installed_path
+        SELECTED_REASON[tool.name] = reason
+    else:
+        installed_method = ""
+        SELECTED_PATHS[tool.name] = ""
+        SELECTED_REASON[tool.name] = ""
     upstream_method = "manual" if MANUAL_USED.get(tool.name) else upstream_method_for(tool)
     homepage_url = tool_homepage_url(tool)
     # Shorten installed column to numeric version if available; empty if not installed
@@ -1643,6 +1813,9 @@ def main() -> int:
                 "installed_method": installed_method,
                 "installed_path_resolved": detect_install_method.__name__ and (os.path.realpath(shutil.which(name) or "") if installed else ""),
                 "classification_reason": (_classify_install_method(os.path.realpath(shutil.which(name) or ""), name)[1] if installed else ""),
+                # New fields: actual selected path/reason used during this run
+                "installed_path_selected": SELECTED_PATHS.get(name, ""),
+                "classification_reason_selected": SELECTED_REASON.get(name, ""),
                 "installed_version": extract_version_number(installed),
                 "latest_version": extract_version_number(latest),
                 "latest_upstream": latest,
