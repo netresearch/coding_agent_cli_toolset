@@ -546,6 +546,24 @@ def run_with_timeout(args: Sequence[str]) -> str:
 
 def get_version_line(path: str, tool_name: str) -> str:
     # Fast-paths first (avoid spawning heavy CLIs where possible)
+    # Special-case docker-compose plugin before dpkg checks to avoid misattributing
+    # the docker engine version (e.g., 28.x) to compose (2.x).
+    if tool_name == "docker-compose":
+        try:
+            base = os.path.basename(path)
+        except Exception:
+            base = os.path.basename(path) if path else ""
+        # Prefer plugin form when the candidate is the docker binary
+        if base == "docker":
+            line = run_with_timeout([path, "compose", "version"])
+            if line:
+                set_local_dc_hint("plugin")
+                return line
+        # Legacy binary
+        line = run_with_timeout([path, "version"])
+        if line:
+            set_local_dc_hint("legacy")
+            return line
     # Special-case rename variants: perl prename (file-rename) and util-linux rename.ul
     if tool_name in ("prename", "rename.ul"):
         try:
@@ -784,20 +802,8 @@ def get_version_line(path: str, tool_name: str) -> str:
                 set_local_flag_hint("kubectl", " ".join(args[1:]))
                 return line
     if tool_name == "docker-compose":
-        # Handle both plugin: 'docker compose version' and legacy: 'docker-compose version'
-        # If path endswith 'docker', try the plugin form; otherwise call the binary
-        hint = get_local_dc_hint()
-        if os.path.basename(path) == "docker" and (hint in ("plugin", "") ):
-            line = run_with_timeout([path, "compose", "version"])
-            if line:
-                set_local_dc_hint("plugin")
-                return line
-        # legacy binary
-        if hint in ("legacy", ""):
-            line = run_with_timeout([path, "version"])
-            if line:
-                set_local_dc_hint("legacy")
-                return line
+        # Fallbacks already attempted above; return empty to continue generic flags if needed
+        return ""
     for flags in VERSION_FLAG_SETS:
         local = get_local_flag_hint(tool_name)
         ordered = list(VERSION_FLAG_SETS)
