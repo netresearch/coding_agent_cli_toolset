@@ -28,6 +28,7 @@ import shutil
 import subprocess
 import sys
 import time
+import datetime
 import urllib.error
 import urllib.request
 from urllib.parse import urlparse
@@ -66,6 +67,104 @@ SORT_MODE: str = os.environ.get("CLI_AUDIT_SORT", "order")  # 'order' or 'alpha'
 AUDIT_DEBUG: bool = os.environ.get("CLI_AUDIT_DEBUG", "0") == "1"
 DPKG_CACHE_LIMIT: int = int(os.environ.get("CLI_AUDIT_DPKG_CACHE_LIMIT", "1024"))
 VALIDATE_MANUAL: bool = os.environ.get("CLI_AUDIT_VALIDATE_MANUAL", "1") == "1"
+
+# Local-readiness UX toggles
+HINTS_ENABLED: bool = os.environ.get("CLI_AUDIT_HINTS", "1") == "1"
+GROUP_BY_CATEGORY: bool = os.environ.get("CLI_AUDIT_GROUP", "1") == "1"
+FAST_MODE: bool = os.environ.get("CLI_AUDIT_FAST", "0") == "1"
+STREAM_OUTPUT: bool = os.environ.get("CLI_AUDIT_STREAM", "0") == "1"
+
+# Snapshot / mode toggles (decouple collection from rendering)
+COLLECT_ONLY: bool = os.environ.get("CLI_AUDIT_COLLECT", "0") == "1"
+RENDER_ONLY: bool = os.environ.get("CLI_AUDIT_RENDER", "0") == "1"
+SNAPSHOT_FILE: str = os.environ.get(
+    "CLI_AUDIT_SNAPSHOT_FILE",
+    os.path.join(os.path.dirname(__file__), "tools_snapshot.json"),
+)
+
+def _now_iso() -> str:
+    try:
+        return datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+    except Exception:
+        return ""
+
+def _atomic_write_json(path: str, obj: Any) -> None:
+    try:
+        base = os.path.dirname(path) or "."
+        tmp = os.path.join(base, ".tmp_" + os.path.basename(path))
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(obj, f, indent=2, ensure_ascii=False, sort_keys=True)
+        os.replace(tmp, path)
+    except Exception as e:
+        if AUDIT_DEBUG:
+            print(f"# DEBUG: atomic write failed for {path}: {e}", file=sys.stderr)
+
+def _read_json_safe(path: str) -> dict[str, Any]:
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+def load_snapshot(paths: Sequence[str] | None = None) -> dict[str, Any]:
+    """Load snapshot from the first existing path among provided or defaults.
+
+    Tries SNAPSHOT_FILE, then legacy latest_versions.json.
+    """
+    candidates: list[str] = []
+    if paths:
+        candidates.extend(list(paths))
+    else:
+        candidates.append(SNAPSHOT_FILE)
+        legacy = os.path.join(os.path.dirname(__file__), "latest_versions.json")
+        if legacy not in candidates:
+            candidates.append(legacy)
+    for p in candidates:
+        if os.path.isfile(p):
+            d = _read_json_safe(p)
+            if d:
+                return d
+    return {}
+
+def write_snapshot(tools_payload: list[dict[str, Any]], extra: dict[str, Any] | None = None) -> None:
+    meta = {
+        "schema_version": 1,
+        "created_at": _now_iso(),
+        "offline": OFFLINE_MODE,
+        "count": len(tools_payload),
+        "partial_failures": sum(1 for t in tools_payload if (t.get("status") == "UNKNOWN" and not t.get("installed"))),
+    }
+    if extra:
+        try:
+            meta.update(extra)
+        except Exception:
+            pass
+    doc = {"__meta__": meta, "tools": tools_payload}
+    _atomic_write_json(SNAPSHOT_FILE, doc)
+
+def render_from_snapshot(doc: dict[str, Any], selected: set[str] | None = None) -> list[tuple[str, str, str, str, str, str, str, str]]:
+    items = doc.get("tools", [])
+    out: list[tuple[str, str, str, str, str, str, str, str]] = []
+    try:
+        for it in items:
+            name = str(it.get("tool", "")).strip()
+            if not name:
+                continue
+            if selected and name.lower() not in selected:
+                continue
+            installed = str(it.get("installed", ""))
+            installed_method = str(it.get("installed_method", ""))
+            latest = str(it.get("latest_upstream", it.get("latest_version", "")))
+            upstream_method = str(it.get("upstream_method", ""))
+            status = str(it.get("status", "UNKNOWN"))
+            tool_url = str(it.get("tool_url", ""))
+            latest_url = str(it.get("latest_url", ""))
+            # Reconstruct display tuple (state icon computed at print time)
+            out.append((name, installed, installed_method, latest, upstream_method, status, tool_url, latest_url))
+    except Exception:
+        pass
+    return out
 
 # Cache of uv-managed tools (populated lazily)
 UV_TOOLS_LOADED: bool = False
@@ -328,6 +427,12 @@ FAST_FLAG_DEFAULTS: dict[str, tuple[str, ...]] = {
     "yarn": ("-v", "--version", "version"),
     # sd (stream editor) – prefer --version first to avoid Clap error output
     "sd": ("--version",),
+    # Prefer known-good flags for common tools that reject -v
+    "jq": ("--version",),
+    "fzf": ("--version",),
+    "ctags": ("--version", "-V"),
+    "ripgrep": ("-V", "--version"),
+    "ast-grep": ("--version", "-V", "version"),
 }
 
 def _dpkg_owner_for_path(path: str) -> str:
@@ -542,6 +647,32 @@ def set_manual_latest(tool_name: str, tag_or_version: str) -> None:
         except Exception:
             pass
 
+def set_manual_method(tool_name: str, method: str) -> None:
+    """Persist the upstream lookup method used for a tool into latest_versions.json.
+
+    Stored under the special key "__methods__" as a mapping of tool_name -> method.
+    Safe to call repeatedly; only writes when a change is detected.
+    """
+    try:
+        if not method:
+            return
+        with MANUAL_LOCK:
+            load_manual_versions()
+            mv = dict(MANUAL_VERSIONS)
+            methods = mv.get("__methods__", {})
+            if not isinstance(methods, dict):
+                methods = {}
+            if methods.get(tool_name) == method:
+                return
+            methods[tool_name] = method
+            mv["__methods__"] = methods
+            with open(MANUAL_FILE, "w", encoding="utf-8") as f:
+                json.dump(mv, f, indent=2, ensure_ascii=False, sort_keys=True)
+            MANUAL_VERSIONS.clear()
+            MANUAL_VERSIONS.update(mv)
+    except Exception:
+        pass
+
 # (removed) LATEST_FOR_ALL was unused
 
 try:
@@ -635,6 +766,179 @@ TOOLS: tuple[Tool, ...] = (
     Tool("docker-compose", ("docker-compose", "docker"), "gh", ("docker", "compose")),
 )
 
+
+# Category mapping for table grouping and JSON filtering (local-only UX)
+CATEGORY_MAP: dict[str, str] = {
+    # Runtimes & package managers
+    "go": "runtimes",
+    "uv": "runtimes",
+    "python": "runtimes",
+    "pip": "runtimes",
+    "pipx": "runtimes",
+    "poetry": "runtimes",
+    "rust": "runtimes",
+    "node": "runtimes",
+    "npm": "runtimes",
+    "pnpm": "runtimes",
+    "yarn": "runtimes",
+    # Search & code-aware tools
+    "ripgrep": "search",
+    "ast-grep": "search",
+    "fzf": "search",
+    "fd": "search",
+    "rga": "search",
+    # Editors/helpers and diffs
+    "ctags": "editors",
+    "delta": "editors",
+    "bat": "editors",
+    "just": "task-runners",
+    # JSON/YAML processors & viewers
+    "jq": "json-yaml",
+    "yq": "json-yaml",
+    "dasel": "json-yaml",
+    "fx": "json-yaml",
+    # HTTP/CLI clients
+    "httpie": "http",
+    "curlie": "http",
+    # Watch/run automation
+    "entr": "automation",
+    "watchexec": "automation",
+    "direnv": "automation",
+    # Security & compliance
+    "semgrep": "security",
+    "bandit": "security",
+    "gitleaks": "security",
+    "trivy": "security",
+    # Git helpers
+    "git-absorb": "git-helpers",
+    "git-branchless": "git-helpers",
+    # Formatters & linters
+    "black": "formatters",
+    "isort": "formatters",
+    "flake8": "formatters",
+    "eslint": "formatters",
+    "prettier": "formatters",
+    "shfmt": "formatters",
+    "shellcheck": "formatters",
+    # VCS & platforms
+    "git": "vcs",
+    "gh": "vcs",
+    "glab": "vcs",
+    # Cloud & infra
+    "aws": "cloud-infra",
+    "kubectl": "cloud-infra",
+    "terraform": "cloud-infra",
+    "docker": "cloud-infra",
+    "docker-compose": "cloud-infra",
+    # Others / special
+    "xsv": "data",
+    "sd": "editors",
+    "prename": "editors",
+    "rename.ul": "editors",
+    "sponge": "editors",
+    "ansible": "automation",
+    "ansible-core": "automation",
+    "dive": "cloud-infra",
+}
+
+CATEGORY_ORDER: tuple[str, ...] = (
+    "runtimes",
+    "search",
+    "editors",
+    "json-yaml",
+    "http",
+    "automation",
+    "security",
+    "git-helpers",
+    "formatters",
+    "vcs",
+    "cloud-infra",
+    "task-runners",
+    "data",
+    "other",
+)
+
+HINT_MAP: dict[str, str] = {
+    # Python stack
+    "python": "make install-python",
+    "pip": "make install-python",
+    "pipx": "make install-python",
+    "poetry": "make install-python",
+    "black": "make install-python",
+    "isort": "make install-python",
+    "flake8": "make install-python",
+    "bandit": "make install-python",
+    "httpie": "make install-python",
+    "pre-commit": "make install-python",
+    "semgrep": "make install-python",
+    # Node stack
+    "node": "make install-node",
+    "npm": "make install-node",
+    "pnpm": "make install-node",
+    "yarn": "make install-node",
+    "eslint": "make install-node",
+    "prettier": "make install-node",
+    # Go
+    "go": "make install-go",
+    # Rust / core simple tools
+    "rust": "make install-rust",
+    "fd": "make install-core",
+    "fzf": "make install-core",
+    "ripgrep": "make install-core",
+    "jq": "make install-core",
+    "yq": "make install-core",
+    "bat": "make install-core",
+    "delta": "make install-core",
+    "ctags": "make install-core",
+    "just": "make install-core",
+    "xsv": "make install-core",
+    "dasel": "make install-core",
+    "sd": "make install-core",
+    "entr": "make install-core",
+    "watchexec": "make install-core",
+    # Cloud/Infra
+    "aws": "make install-aws",
+    "kubectl": "make install-kubectl",
+    "terraform": "make install-terraform",
+    "docker": "make install-docker",
+    "docker-compose": "make install-docker",
+    # Security
+    "gitleaks": "make install-core",
+    "trivy": "make install-core",
+    # Automation / config
+    "ansible": "make install-ansible",
+    "ansible-core": "make install-ansible",
+    # VCS/platforms
+    "git": "make install-core",
+    "gh": "make install-core",
+    "glab": "make install-core",
+    # Misc
+    "direnv": "make install-core",
+    "dive": "make install-core",
+}
+
+ALIAS_MAP: dict[str, tuple[str, ...]] = {
+    "agent-core": ("ripgrep", "ast-grep", "fd", "fzf", "jq", "yq", "bat", "delta", "just", "ctags", "direnv", "httpie"),
+    "python-core": ("python", "pip", "pipx", "poetry", "black", "isort", "flake8", "httpie", "pre-commit", "bandit", "semgrep"),
+    "node-core": ("node", "npm", "pnpm", "yarn", "eslint", "prettier"),
+    "go-core": ("go",),
+    "infra-core": ("aws", "kubectl", "terraform", "docker", "docker-compose", "trivy", "gitleaks", "dive"),
+    "data-core": ("jq", "yq", "xsv", "dasel", "fx", "httpie"),
+    "security-core": ("semgrep", "bandit", "gitleaks", "trivy"),
+    "onboarding-core": ("fd", "fzf", "ripgrep", "jq", "yq", "bat", "delta", "just", "git", "gh"),
+}
+
+def category_for(tool_name: str) -> str:
+    try:
+        return CATEGORY_MAP.get(tool_name, "other")
+    except Exception:
+        return "other"
+
+def hint_for(tool_name: str) -> str:
+    try:
+        return HINT_MAP.get(tool_name, "")
+    except Exception:
+        return ""
 
 def find_paths(command_name: str, deep: bool) -> list[str]:
     paths: list[str] = []
@@ -968,7 +1272,21 @@ def get_version_line(path: str, tool_name: str) -> str:
             ordered = [tuple([local])] + [t for t in ordered if t != tuple([local])]
         for flags in ordered:
             line = run_with_timeout([path, *flags])
-            if line:
+            if not line:
+                continue
+            lcline = (line or "").lower()
+            # Skip obvious error/usage outputs and try next flag
+            if (
+                lcline.startswith("error:") or
+                lcline.startswith("usage") or
+                "unknown option" in lcline or
+                "unexpected argument" in lcline or
+                "requires at least one pattern" in lcline or
+                "try --help" in lcline
+            ):
+                continue
+            ver = extract_version_number(line)
+            if ver:
                 set_local_flag_hint(tool_name, flags[0])
                 return line
     return ""
@@ -1582,6 +1900,7 @@ def get_latest(tool: Tool) -> tuple[str, str]:
         tag, num = latest_github(owner, repo)
         if tag or num:
             MANUAL_USED[tool.name] = False
+            set_manual_method(tool.name, "github")
             return tag, num
         if manual_available:
             MANUAL_USED[tool.name] = True
@@ -1593,6 +1912,7 @@ def get_latest(tool: Tool) -> tuple[str, str]:
         tag, num = latest_pypi(pkg)
         if tag or num:
             MANUAL_USED[tool.name] = False
+            set_manual_method(tool.name, "pypi")
             return tag, num
         if manual_available:
             MANUAL_USED[tool.name] = True
@@ -1604,6 +1924,7 @@ def get_latest(tool: Tool) -> tuple[str, str]:
         tag, num = latest_crates(crate)
         if tag or num:
             MANUAL_USED[tool.name] = False
+            set_manual_method(tool.name, "crates")
             return tag, num
         if manual_available:
             MANUAL_USED[tool.name] = True
@@ -1615,6 +1936,9 @@ def get_latest(tool: Tool) -> tuple[str, str]:
         tag, num = latest_npm(pkg)
         if tag or num:
             MANUAL_USED[tool.name] = False
+            # yarn uses yarn-tags via latest_npm() fallback logic
+            meth = "yarn-tags" if pkg == "yarn" else "npm"
+            set_manual_method(tool.name, meth)
             return tag, num
         if manual_available:
             MANUAL_USED[tool.name] = True
@@ -1626,6 +1950,7 @@ def get_latest(tool: Tool) -> tuple[str, str]:
         tag, num = latest_gnu(proj)
         if tag or num:
             MANUAL_USED[tool.name] = False
+            set_manual_method(tool.name, "gnu-ftp")
             return tag, num
         if manual_available:
             MANUAL_USED[tool.name] = True
@@ -1758,10 +2083,21 @@ def _parse_tool_filter(argv: Sequence[str]) -> list[str]:
                 part = part.strip()
                 if part:
                     names.append(part)
+        # FAST_MODE: default to a small subset when no filters provided
+        if FAST_MODE and not names:
+            names = ["agent-core"]
+        # Expand friendly aliases like 'python-core' into explicit tool lists
+        expanded: list[str] = []
+        for n in names:
+            key = n.lower()
+            if key in ALIAS_MAP:
+                expanded.extend(ALIAS_MAP[key])
+            else:
+                expanded.append(key)
         # normalize and de-duplicate preserving order
         seen = set()
         filtered: list[str] = []
-        for n in names:
+        for n in expanded:
             key = n.lower()
             if key not in seen:
                 seen.add(key)
@@ -1790,6 +2126,13 @@ def main() -> int:
         headers = ("state", "tool", "installed", "installed_method", "latest_upstream", "upstream_method")
         print("|".join(headers))
         return 0
+    # If streaming mode and not JSON, print header first to show immediate output
+    streamed_header_printed = False
+    if os.environ.get("CLI_AUDIT_JSON", "0") != "1" and STREAM_OUTPUT:
+        headers = (" ", "tool", "installed", "installed_method", "latest_upstream", "upstream_method")
+        print("|".join(headers))
+        streamed_header_printed = True
+
     with ThreadPoolExecutor(max_workers=min(MAX_WORKERS, len(tools_seq))) as executor:
         future_to_idx = {}
         for idx, tool in enumerate(tools_seq):
@@ -1799,16 +2142,73 @@ def main() -> int:
         for future in as_completed(future_to_idx):
             idx = future_to_idx[future]
             try:
-                results[idx] = future.result()
+                row = future.result()
             except Exception:
                 t = tools_seq[idx]
-                results[idx] = (t.name, "X", "", "", upstream_method_for(t), "UNKNOWN", tool_homepage_url(t), latest_target_url(t, "", ""))
+                row = (t.name, "X", "", "", upstream_method_for(t), "UNKNOWN", tool_homepage_url(t), latest_target_url(t, "", ""))
+            results[idx] = row
+            # In streaming mode, print each row as soon as available (no grouping)
+            if STREAM_OUTPUT and os.environ.get("CLI_AUDIT_JSON", "0") != "1":
+                name, installed, installed_method, latest, upstream_method, status, tool_url, latest_url = row
+                icon = status_icon(status, installed)
+                name_render = osc8(tool_url, name)
+                latest_render = osc8(latest_url, latest)
+                hint = hint_for(name) if HINTS_ENABLED and status in ("NOT INSTALLED", "OUTDATED") else ""
+                latest_with_hint = latest_render if not hint else (latest_render + f"  [{hint}]")
+                print("|".join((icon, name_render, installed, installed_method, latest_with_hint, upstream_method)))
+
+    # RENDER-ONLY mode: bypass live audit, render from snapshot
+    if RENDER_ONLY:
+        snap = load_snapshot()
+        # Render fast path using snapshot doc
+        selected_names = set(_parse_tool_filter(sys.argv[1:]))
+        rows = render_from_snapshot(snap, selected_names or None)
+        # JSON output from snapshot
+        if os.environ.get("CLI_AUDIT_JSON", "0") == "1":
+            payload = []
+            for name, installed, installed_method, latest, upstream_method, status, tool_url, latest_url in rows:
+                payload.append({
+                    "tool": name,
+                    "category": category_for(name),
+                    "installed": installed,
+                    "installed_method": installed_method,
+                    "installed_version": extract_version_number(installed),
+                    "latest_version": extract_version_number(latest),
+                    "latest_upstream": latest,
+                    "upstream_method": upstream_method,
+                    "status": status,
+                    "tool_url": tool_url,
+                    "latest_url": latest_url,
+                    "state_icon": status_icon(status, installed),
+                    "is_up_to_date": (status == "UP-TO-DATE"),
+                })
+            print(json.dumps(payload, ensure_ascii=False))
+            return 0
+        # Table output from snapshot
+        headers = (" ", "tool", "installed", "installed_method", "latest_upstream", "upstream_method")
+        print("|".join(headers))
+        for name, installed, installed_method, latest, upstream_method, status, tool_url, latest_url in rows:
+            icon = status_icon(status, installed)
+            print("|".join((icon, name, installed, installed_method, latest, upstream_method)))
+        # Summary line from snapshot meta if present
+        try:
+            meta = snap.get("__meta__", {})
+            total = meta.get("count", len(rows))
+            missing = sum(1 for r in rows if r[5] == "NOT INSTALLED")
+            outdated = sum(1 for r in rows if r[5] == "OUTDATED")
+            unknown = sum(1 for r in rows if r[5] == "UNKNOWN")
+            offline_tag = " (offline)" if meta.get("offline") else ""
+            print(f"\nReadiness{offline_tag}: {total} tools, {outdated} outdated, {missing} missing, {unknown} unknown")
+        except Exception:
+            pass
+        return 0
 
     if os.environ.get("CLI_AUDIT_JSON", "0") == "1":
         payload = []
         for name, installed, installed_method, latest, upstream_method, status, tool_url, latest_url in results:
             payload.append({
                 "tool": name,
+                "category": category_for(name),
                 "installed": installed if installed != "X" else "",
                 "installed_method": installed_method,
                 "installed_path_resolved": detect_install_method.__name__ and (os.path.realpath(shutil.which(name) or "") if installed else ""),
@@ -1830,18 +2230,73 @@ def main() -> int:
         return 0
 
     # Always print raw (with OSC8 + emoji if enabled). When piped to column, OSC8 should be transparent.
-    headers = ("state", "tool", "installed", "installed_method", "latest_upstream", "upstream_method")
-    print("|".join(headers))
+    # In streaming mode, we've already printed lines; skip re-printing body
+    if not STREAM_OUTPUT:
+        headers = (" ", "tool", "installed", "installed_method", "latest_upstream", "upstream_method")
+        print("|".join(headers))
 
-    # If alphabetical output requested, reorder printed rows
-    rows = results
-    if SORT_MODE == "alpha":
-        rows = sorted(results, key=lambda r: r[0].lower())
-    for name, installed, installed_method, latest, upstream_method, status, tool_url, latest_url in rows:
-        icon = status_icon(status, installed)
-        name_render = osc8(tool_url, name)
-        latest_render = osc8(latest_url, latest)
-        print("|".join((icon, name_render, installed, installed_method, latest_render, upstream_method)))
+    # Optionally group rows by category for faster scanning
+    def _category_key(row: tuple[str, ...]) -> tuple[int, str]:
+        nm = row[0]
+        cat = category_for(nm)
+        try:
+            order = CATEGORY_ORDER.index(cat)
+        except Exception:
+            order = len(CATEGORY_ORDER)
+        return (order, nm)
+
+    if not STREAM_OUTPUT:
+        rows = results
+        if GROUP_BY_CATEGORY:
+            rows = sorted(results, key=_category_key)
+        elif SORT_MODE == "alpha":
+            rows = sorted(results, key=lambda r: r[0].lower())
+
+        for name, installed, installed_method, latest, upstream_method, status, tool_url, latest_url in rows:
+            icon = status_icon(status, installed)
+            name_render = osc8(tool_url, name)
+            latest_render = osc8(latest_url, latest)
+            hint = hint_for(name) if HINTS_ENABLED and status in ("NOT INSTALLED", "OUTDATED") else ""
+            latest_with_hint = latest_render if not hint else (latest_render + f"  [{hint}]")
+            print("|".join((icon, name_render, installed, installed_method, latest_with_hint, upstream_method)))
+    # Readiness summary (human-only; local UX)
+    try:
+        total = len(results)
+        missing = sum(1 for r in results if r[5] == "NOT INSTALLED")
+        outdated = sum(1 for r in results if r[5] == "OUTDATED")
+        unknown = sum(1 for r in results if r[5] == "UNKNOWN")
+        offline_tag = " (offline)" if OFFLINE_MODE else ""
+        print(f"\nReadiness{offline_tag}: {total} tools, {outdated} outdated, {missing} missing, {unknown} unknown")
+    except Exception:
+        pass
+
+    # COLLECT-ONLY: write snapshot at end and exit
+    if COLLECT_ONLY:
+        try:
+            # Reuse JSON payload builder to form snapshot document
+            payload = []
+            for name, installed, installed_method, latest, upstream_method, status, tool_url, latest_url in results:
+                payload.append({
+                    "tool": name,
+                    "category": category_for(name),
+                    "installed": installed if installed != "X" else "",
+                    "installed_method": installed_method,
+                    "installed_path_selected": SELECTED_PATHS.get(name, ""),
+                    "classification_reason_selected": SELECTED_REASON.get(name, ""),
+                    "installed_version": extract_version_number(installed),
+                    "latest_version": extract_version_number(latest),
+                    "latest_upstream": latest,
+                    "upstream_method": upstream_method,
+                    "status": status,
+                    "tool_url": tool_url,
+                    "latest_url": latest_url,
+                })
+            write_snapshot(payload)
+        except Exception as e:
+            if AUDIT_DEBUG:
+                print(f"# DEBUG: failed to write snapshot: {e}", file=sys.stderr)
+        return 0
+
     # Optional footer (disabled by default to avoid breaking table layout)
     if os.environ.get("CLI_AUDIT_FOOTER", "0") == "1":
         path_has_cargo = CARGO_BIN in os.environ.get("PATH", "").split(":")
