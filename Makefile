@@ -1,40 +1,62 @@
 PYTHON ?= python3
 
-.PHONY: audit lint fmt help
+# Load defaults in precedence order: .env.default < .env (highest)
+-include .env.default
+-include .env
+
+.PHONY: audit audit-offline audit-only-% audit-offline-% lint fmt help update audit-auto upgrade
 
 help:
 	@echo "Available targets:"
-	@echo "  audit  - run the CLI audit"
-	@echo "  guide  - interactive install/update walkthrough (ordered)"
-	@echo "  lint   - run basic lint checks"
-	@echo "  fmt    - no-op (placeholder)"
-	@echo "  install-core    - install core simple tools"
-	@echo "  install-python  - install Python toolchain"
-	@echo "  install-node    - install Node toolchain"
-	@echo "  install-go      - install Go toolchain"
-	@echo "  install-aws     - install AWS CLI"
-	@echo "  install-kubectl - install kubectl"
-	@echo "  install-terraform - install Terraform"
-	@echo "  install-ansible - install Ansible"
-	@echo "  install-docker  - install Docker CLI"
-	@echo "  install-brew    - install Homebrew (Linuxbrew)"
-	@echo "  install-rust    - install Rust (rustup/cargo)"
+	@echo "  audit        - render audit from snapshot (no network)"
+	@echo "  audit-auto   - update snapshot if stale/missing, then render"
+	@echo "  update       - collect-only (fetch + write snapshot), verbose"
+	@echo "  upgrade      - run the interactive upgrade guide (renamed)"
+	@echo "  guide        - alias for upgrade (deprecated)"
+	@echo "  lint         - run basic lint checks"
+	@echo "  fmt          - no-op (placeholder)"
+	@echo "  install-*    - install various toolchains"
 
+# Render-only from snapshot
 audit:
-	@bash -c 'set -o pipefail; CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 $(PYTHON) cli_audit.py | \
+	@bash -c 'set -o pipefail; CLI_AUDIT_RENDER=1 CLI_AUDIT_GROUP=0 CLI_AUDIT_HINTS=1 CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 $(PYTHON) cli_audit.py | \
+	$(PYTHON) smart_column.py -s "|" -t --right 3,5 --header' || true
+
+# Offline, grouped, with hints (fast local scan)
+audit-offline:
+	@bash -c 'set -o pipefail; CLI_AUDIT_OFFLINE=1 CLI_AUDIT_RENDER=1 CLI_AUDIT_GROUP=0 CLI_AUDIT_HINTS=1 CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 $(PYTHON) cli_audit.py | \
 	$(PYTHON) smart_column.py -s "|" -t --right 3,5 --header' || true
 
 # Audit a single tool (table)
 audit-%: scripts-perms
-	@bash -c 'set -o pipefail; CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 $(PYTHON) cli_audit.py --only $* | \
+	@bash -c 'set -o pipefail; CLI_AUDIT_RENDER=1 CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 $(PYTHON) cli_audit.py --only $* | \
 	$(PYTHON) smart_column.py -s "|" -t --right 3,5 --header' || true
 
-# Audit a single tool (JSON)
-audit-json-%: scripts-perms
-	@bash -c 'set -o pipefail; CLI_AUDIT_JSON=1 $(PYTHON) cli_audit.py --only $*' || true
+# Offline subset (respects alias presets like python-core, infra-core, etc.)
+audit-offline-%: scripts-perms
+	@bash -c 'set -o pipefail; CLI_AUDIT_OFFLINE=1 CLI_AUDIT_RENDER=1 CLI_AUDIT_GROUP=0 CLI_AUDIT_HINTS=1 CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 $(PYTHON) cli_audit.py --only $* | \
+	$(PYTHON) smart_column.py -s "|" -t --right 3,5 --header' || true
 
-guide: scripts-perms
+# Collect-only: fetch and write snapshot (verbose)
+update:
+	@bash -c 'set -o pipefail; CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 CLI_AUDIT_PROGRESS=1 $(PYTHON) cli_audit.py' || true
+
+# Audit-auto: attempt collect when snapshot missing; then render
+SNAP_FILE?=$(shell python3 -c "import os;print(os.environ.get('CLI_AUDIT_SNAPSHOT_FILE','tools_snapshot.json'))")
+
+audit-auto:
+	@if [ ! -f "$(SNAP_FILE)" ]; then \
+		echo "# snapshot missing: $(SNAP_FILE); running update..."; \
+		CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 CLI_AUDIT_PROGRESS=1 $(PYTHON) cli_audit.py || true; \
+	fi; \
+	CLI_AUDIT_RENDER=1 CLI_AUDIT_GROUP=0 CLI_AUDIT_HINTS=1 CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 $(PYTHON) cli_audit.py | \
+	$(PYTHON) smart_column.py -s "|" -t --right 3,5 --header || true
+
+# Rename guide -> upgrade
+upgrade: scripts-perms
 	@bash scripts/guide.sh
+
+guide: upgrade
 
 lint:
 	@command -v pyflakes >/dev/null 2>&1 && pyflakes cli_audit.py || echo "pyflakes not installed; skipping"

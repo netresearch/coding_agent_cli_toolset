@@ -101,6 +101,24 @@ python3 cli_audit.py | column -s '|' -t
 
 Tip: On systems where `column` is unavailable, just view the raw output or import into your tool of choice.
 
+## Snapshot-based workflow (local-only friendly)
+
+This tool now separates data collection from rendering:
+
+- `make update`: collect-only. Fetches/upgrades the snapshot with installed/upstream info and writes a JSON snapshot (`tools_snapshot.json` by default). Verbose; helpful to identify slowness.
+- `make audit`: render-only. Prints the table strictly from the snapshot (no network). Safe to run repeatedly.
+- `make audit-auto`: updates the snapshot only if it is missing, then renders.
+- `make upgrade`: interactive remediation (renamed from `guide`).
+
+Advanced:
+- Snapshot path can be overridden via `CLI_AUDIT_SNAPSHOT_FILE=/path/to/snapshot.json`.
+- Environment toggles for scripting:
+  - `CLI_AUDIT_COLLECT=1` → collect-only
+  - `CLI_AUDIT_RENDER=1` → render-only
+  - `CLI_AUDIT_OFFLINE=1` → force offline lookups (uses baseline methods, marks upstream as `manual`)
+
+The snapshot (`tools_snapshot.json`) includes `__meta__` (schema version, timestamp) and a `tools` array containing fields used by the table, plus the upstream lookup method when available.
+
 ## Quick agent readiness check
 
 - Table scan for a quick look:
@@ -114,6 +132,13 @@ python3 cli_audit.py | column -s '|' -t
 ```bash
 CLI_AUDIT_JSON=1 python3 cli_audit.py \
   | jq -r '.[] | select(.status != "UP-TO-DATE") | [.tool, .status] | @tsv'
+```
+
+- JSON by category (e.g., focus on security):
+
+```bash
+CLI_AUDIT_JSON=1 python3 cli_audit.py \
+  | jq -r '.[] | select(.category=="security" and .status != "UP-TO-DATE") | [.tool, .status] | @tsv'
 ```
 
 - Typical remediation workflow for agent readiness:
@@ -183,6 +208,32 @@ make install-rust
 ```
 
 These scripts prefer the most up-to-date sources (e.g., nvm for Node, vendor installers for AWS CLI and kubectl) when feasible.
+
+### Role-focused quick checks (local-only)
+
+Use friendly `--only` aliases to focus on a subset quickly (these expand to explicit tool lists under the hood):
+
+```bash
+# Agent-centric core tools
+python3 cli_audit.py --only agent-core | python3 smart_column.py -s "|" -t --right 3,5 --header
+
+# Python / Node / Go cores
+python3 cli_audit.py --only python-core | python3 smart_column.py -s "|" -t --right 3,5 --header
+python3 cli_audit.py --only node-core   | python3 smart_column.py -s "|" -t --right 3,5 --header
+python3 cli_audit.py --only go-core     | python3 smart_column.py -s "|" -t --right 3,5 --header
+
+# Infra and Security
+python3 cli_audit.py --only infra-core    | python3 smart_column.py -s "|" -t --right 3,5 --header
+python3 cli_audit.py --only security-core | python3 smart_column.py -s "|" -t --right 3,5 --header
+
+# Data tooling
+python3 cli_audit.py --only data-core | python3 smart_column.py -s "|" -t --right 3,5 --header
+```
+
+Notes:
+- Category subheaders and a one-line "Readiness: ..." summary are printed for fast local scanning.
+- Set `CLI_AUDIT_HINTS=0` to suppress brief remediation hints inline.
+- When `CLI_AUDIT_OFFLINE=1`, the readiness line displays `(offline)` to indicate baseline-only latest checks.
 
 ### Install-method classification (how local tools are attributed)
 
