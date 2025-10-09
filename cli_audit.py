@@ -82,6 +82,30 @@ SNAPSHOT_FILE: str = os.environ.get(
     os.path.join(os.path.dirname(__file__), "tools_snapshot.json"),
 )
 
+# HTTP behavior controls
+HTTP_RETRIES: int = int(os.environ.get("CLI_AUDIT_HTTP_RETRIES", "2"))
+HTTP_BACKOFF_BASE: float = float(os.environ.get("CLI_AUDIT_BACKOFF_BASE", "0.2"))
+HTTP_BACKOFF_JITTER: float = float(os.environ.get("CLI_AUDIT_BACKOFF_JITTER", "0.1"))
+
+# Ultra-verbose tracing
+TRACE: bool = os.environ.get("CLI_AUDIT_TRACE", "0") == "1"
+TRACE_NET: bool = os.environ.get("CLI_AUDIT_TRACE_NET", "0") == "1"
+SLOW_MS: int = int(os.environ.get("CLI_AUDIT_SLOW_MS", "2000"))
+
+def _vlog(msg: str) -> None:
+    if PROGRESS or TRACE:
+        try:
+            print(msg, file=sys.stderr)
+        except Exception:
+            pass
+
+def _tlog(msg: str) -> None:
+    if TRACE:
+        try:
+            print(msg, file=sys.stderr)
+        except Exception:
+            pass
+
 def _now_iso() -> str:
     try:
         return datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
@@ -127,7 +151,7 @@ def load_snapshot(paths: Sequence[str] | None = None) -> dict[str, Any]:
                 return d
     return {}
 
-def write_snapshot(tools_payload: list[dict[str, Any]], extra: dict[str, Any] | None = None) -> None:
+def write_snapshot(tools_payload: list[dict[str, Any]], extra: dict[str, Any] | None = None) -> dict[str, Any]:
     meta = {
         "schema_version": 1,
         "created_at": _now_iso(),
@@ -142,6 +166,7 @@ def write_snapshot(tools_payload: list[dict[str, Any]], extra: dict[str, Any] | 
             pass
     doc = {"__meta__": meta, "tools": tools_payload}
     _atomic_write_json(SNAPSHOT_FILE, doc)
+    return meta
 
 def render_from_snapshot(doc: dict[str, Any], selected: set[str] | None = None) -> list[tuple[str, str, str, str, str, str, str, str]]:
     items = doc.get("tools", [])
@@ -212,9 +237,9 @@ def http_fetch(
     url: str,
     timeout: float | int = TIMEOUT_SECONDS,
     headers: dict[str, str] | None = None,
-    retries: int = 3,
-    backoff_base: float = 0.2,
-    jitter: float = 0.1,
+    retries: int = None,
+    backoff_base: float = None,
+    jitter: float = None,
     method: str | None = None,
 ) -> bytes:
     """Fetch URL with retries, jitter, and per-origin concurrency caps.
@@ -236,31 +261,47 @@ def http_fetch(
     if GITHUB_TOKEN and host == "api.github.com":
         req_headers["Authorization"] = f"Bearer {GITHUB_TOKEN}"
 
+    if retries is None:
+        retries = HTTP_RETRIES
+    if backoff_base is None:
+        backoff_base = HTTP_BACKOFF_BASE
+    if jitter is None:
+        jitter = HTTP_BACKOFF_JITTER
     last_exc: Exception | None = None
     for attempt in range(max(1, retries)):
         try:
             if sem is None:
                 req = urllib.request.Request(url, headers=req_headers, method=method)
                 with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    if TRACE_NET:
+                        _tlog(f"# http_open host={host} code={getattr(resp, 'status', 0)} url={url}")
                     return resp.read()
             with sem:
                 req = urllib.request.Request(url, headers=req_headers, method=method)
                 with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    if TRACE_NET:
+                        _tlog(f"# http_open host={host} code={getattr(resp, 'status', 0)} url={url}")
                     return resp.read()
         except urllib.error.HTTPError as e:
             last_exc = e
             code = getattr(e, "code", 0) or 0
             retryable = (code == 429) or (500 <= code <= 599) or (host == "api.github.com" and code == 403)
+            if TRACE_NET:
+                _tlog(f"# http_error host={host} code={code} retryable={retryable} url={url}")
             if attempt >= retries - 1 or not retryable:
                 raise
         except Exception as e:
             last_exc = e
+            if TRACE_NET:
+                _tlog(f"# http_exc host={host} type={type(e).__name__} attempt={attempt+1}/{retries} url={url}")
             if attempt >= retries - 1:
                 raise
         # backoff with jitter
         try:
-            delay = backoff_base * (2 ** attempt) + random.random() * jitter
-            time.sleep(delay)
+            delay = (backoff_base or 0) * (2 ** attempt) + random.random() * (jitter or 0)
+            if delay > 0 and (PROGRESS or TRACE_NET):
+                _tlog(f"# http_backoff host={host} attempt={attempt+1}/{retries} delay={delay:.2f}s url={url}")
+                time.sleep(delay)
         except Exception:
             pass
     if last_exc:
@@ -2005,6 +2046,10 @@ def audit_tool(tool: Tool) -> tuple[str, str, str, str, str, str, str, str]:
     latest_start = time.time()
     latest_tag, latest_num = get_latest(tool)
     latest_end = time.time()
+    # Slow operation trace
+    dur_ms = int((latest_end - latest_start) * 1000)
+    if dur_ms >= SLOW_MS:
+        _vlog(f"# slow latest tool={tool.name} dur={dur_ms}ms method={upstream_method_for(tool)} offline={OFFLINE_MODE}")
 
     if installed_line == "X":
         status = "NOT INSTALLED"
@@ -2133,7 +2178,10 @@ def main() -> int:
         print("|".join(headers))
         streamed_header_printed = True
 
-    with ThreadPoolExecutor(max_workers=min(MAX_WORKERS, len(tools_seq))) as executor:
+    total_tools = len(tools_seq)
+    completed_tools = 0
+    print(f"# start collect: tools={total_tools} timeout={TIMEOUT_SECONDS}s retries={HTTP_RETRIES} offline={OFFLINE_MODE}", file=sys.stderr) if PROGRESS else None
+    with ThreadPoolExecutor(max_workers=min(MAX_WORKERS, total_tools)) as executor:
         future_to_idx = {}
         for idx, tool in enumerate(tools_seq):
             if PROGRESS:
@@ -2147,6 +2195,13 @@ def main() -> int:
                 t = tools_seq[idx]
                 row = (t.name, "X", "", "", upstream_method_for(t), "UNKNOWN", tool_homepage_url(t), latest_target_url(t, "", ""))
             results[idx] = row
+            if PROGRESS:
+                try:
+                    name, installed, _installed_method, latest, upstream_method, status, _tool_url, _latest_url = row
+                    completed_tools += 1
+                    print(f"# done {name} ({completed_tools}/{total_tools}) status={status} installed='{installed}' latest='{latest}' upstream={upstream_method}", file=sys.stderr)
+                except Exception:
+                    pass
             # In streaming mode, print each row as soon as available (no grouping)
             if STREAM_OUTPUT and os.environ.get("CLI_AUDIT_JSON", "0") != "1":
                 name, installed, installed_method, latest, upstream_method, status, tool_url, latest_url = row
@@ -2291,7 +2346,17 @@ def main() -> int:
                     "tool_url": tool_url,
                     "latest_url": latest_url,
                 })
-            write_snapshot(payload)
+            if PROGRESS:
+                print(f"# writing snapshot to {SNAPSHOT_FILE}...", file=sys.stderr)
+            meta = write_snapshot(payload)
+            if PROGRESS:
+                try:
+                    print(
+                        f"# snapshot written: path={SNAPSHOT_FILE} count={meta.get('count')} created_at={meta.get('created_at')} offline={meta.get('offline')}",
+                        file=sys.stderr,
+                    )
+                except Exception:
+                    pass
         except Exception as e:
             if AUDIT_DEBUG:
                 print(f"# DEBUG: failed to write snapshot: {e}", file=sys.stderr)
