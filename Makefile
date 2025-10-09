@@ -6,45 +6,31 @@ PYTHON ?= python3
 
 .PHONY: audit audit-offline audit-only-% audit-offline-% lint fmt help update audit-auto upgrade
 
-help:
-	@echo "Available targets:"
-	@echo "  audit        - render audit from snapshot (no network)"
-	@echo "  audit-auto   - update snapshot if stale/missing, then render"
-	@echo "  update       - collect-only (fetch + write snapshot), verbose"
-	@echo "  upgrade      - run the interactive upgrade guide (renamed)"
-	@echo "  guide        - alias for upgrade (deprecated)"
-	@echo "  lint         - run basic lint checks"
-	@echo "  fmt          - no-op (placeholder)"
-	@echo "  install-*    - install various toolchains"
+help: ## Show available targets
+	@awk 'BEGIN{FS=":.*##";print "\nUsage: make <target>\n"} /^[a-zA-Z0-9_.-]+:.*##/ {printf "  %-22s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-# Render-only from snapshot
-audit:
+audit: ## Render audit from snapshot (no network, <100ms)
 	@bash -c 'set -o pipefail; CLI_AUDIT_RENDER=1 CLI_AUDIT_GROUP=0 CLI_AUDIT_HINTS=1 CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 $(PYTHON) cli_audit.py | \
 	$(PYTHON) smart_column.py -s "|" -t --right 3,5 --header' || true
 
-# Offline, grouped, with hints (fast local scan)
-audit-offline:
+audit-offline: ## Offline audit with hints (fast local scan)
 	@bash -c 'set -o pipefail; CLI_AUDIT_OFFLINE=1 CLI_AUDIT_RENDER=1 CLI_AUDIT_GROUP=0 CLI_AUDIT_HINTS=1 CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 $(PYTHON) cli_audit.py | \
 	$(PYTHON) smart_column.py -s "|" -t --right 3,5 --header' || true
 
-# Audit a single tool (table)
-audit-%: scripts-perms
+audit-%: scripts-perms ## Audit single tool (e.g., make audit-ripgrep)
 	@bash -c 'set -o pipefail; CLI_AUDIT_RENDER=1 CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 $(PYTHON) cli_audit.py --only $* | \
 	$(PYTHON) smart_column.py -s "|" -t --right 3,5 --header' || true
 
-# Offline subset (respects alias presets like python-core, infra-core, etc.)
-audit-offline-%: scripts-perms
+audit-offline-%: scripts-perms ## Offline audit subset (e.g., make audit-offline-python-core)
 	@bash -c 'set -o pipefail; CLI_AUDIT_OFFLINE=1 CLI_AUDIT_RENDER=1 CLI_AUDIT_GROUP=0 CLI_AUDIT_HINTS=1 CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 $(PYTHON) cli_audit.py --only $* | \
 	$(PYTHON) smart_column.py -s "|" -t --right 3,5 --header' || true
 
-# Collect-only: fetch and write snapshot (verbose)
-update:
+update: ## Collect fresh data and write snapshot (~10s)
 	@bash -c 'set -o pipefail; CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 CLI_AUDIT_PROGRESS=1 $(PYTHON) cli_audit.py' || true
 
-# Audit-auto: attempt collect when snapshot missing; then render
 SNAP_FILE?=$(shell python3 -c "import os;print(os.environ.get('CLI_AUDIT_SNAPSHOT_FILE','tools_snapshot.json'))")
 
-audit-auto:
+audit-auto: ## Update snapshot if missing, then render
 	@if [ ! -f "$(SNAP_FILE)" ]; then \
 		echo "# snapshot missing: $(SNAP_FILE); running update..."; \
 		CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 CLI_AUDIT_PROGRESS=1 $(PYTHON) cli_audit.py || true; \
@@ -52,61 +38,59 @@ audit-auto:
 	CLI_AUDIT_RENDER=1 CLI_AUDIT_GROUP=0 CLI_AUDIT_HINTS=1 CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 $(PYTHON) cli_audit.py | \
 	$(PYTHON) smart_column.py -s "|" -t --right 3,5 --header || true
 
-# Rename guide -> upgrade
-upgrade: scripts-perms
+upgrade: scripts-perms ## Run interactive upgrade guide
 	@bash scripts/guide.sh
 
-guide: upgrade
+guide: upgrade ## Alias for upgrade (deprecated)
 
-lint:
+lint: ## Run pyflakes lint checks
 	@command -v pyflakes >/dev/null 2>&1 && pyflakes cli_audit.py || echo "pyflakes not installed; skipping"
 
-fmt:
+fmt: ## Format code (placeholder)
 	@echo "Nothing to format"
 
-scripts-perms:
+scripts-perms: ## Ensure scripts are executable
 	chmod +x scripts/*.sh || true
 	chmod +x scripts/lib/*.sh || true
 
-install-core: scripts-perms
+install-core: scripts-perms ## Install core tools (fd, fzf, ripgrep, jq, yq, bat, delta, just)
 	./scripts/install_core.sh
 
-install-python: scripts-perms
+install-python: scripts-perms ## Install Python toolchain via uv
 	./scripts/install_python.sh
 
-install-node: scripts-perms
+install-node: scripts-perms ## Install Node.js via nvm
 	./scripts/install_node.sh
 
-install-go: scripts-perms
+install-go: scripts-perms ## Install Go runtime
 	./scripts/install_go.sh
 
-install-aws: scripts-perms
+install-aws: scripts-perms ## Install AWS CLI
 	./scripts/install_aws.sh
 
-install-kubectl: scripts-perms
+install-kubectl: scripts-perms ## Install Kubernetes CLI
 	./scripts/install_kubectl.sh
 
-install-terraform: scripts-perms
+install-terraform: scripts-perms ## Install Terraform
 	./scripts/install_terraform.sh
 
-install-ansible: scripts-perms
+install-ansible: scripts-perms ## Install Ansible
 	./scripts/install_ansible.sh
 
-install-docker: scripts-perms
+install-docker: scripts-perms ## Install Docker
 	./scripts/install_docker.sh
 
-install-brew: scripts-perms
+install-brew: scripts-perms ## Install Homebrew (macOS/Linux)
 	./scripts/install_brew.sh
 
-install-rust: scripts-perms
+install-rust: scripts-perms ## Install Rust via rustup
 	./scripts/install_rust.sh
 
-# Generic action targets (install/update/uninstall/reconcile)
-update-%: scripts-perms
+update-%: scripts-perms ## Update tool (e.g., make update-python)
 	./scripts/install_$*.sh update
 
-uninstall-%: scripts-perms
+uninstall-%: scripts-perms ## Uninstall tool (e.g., make uninstall-python)
 	./scripts/install_$*.sh uninstall
 
-reconcile-%: scripts-perms
+reconcile-%: scripts-perms ## Reconcile tool installation (e.g., make reconcile-node)
 	./scripts/install_$*.sh reconcile
