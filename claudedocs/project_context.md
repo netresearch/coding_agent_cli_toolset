@@ -1,0 +1,290 @@
+# AI CLI Preparation - Project Context (AI Agent Reference)
+
+**Last Updated:** 2025-10-09
+**For:** AI Coding Agents (Claude Code, etc.)
+
+## Quick Reference
+
+**Purpose:** Environment audit tool ensuring AI coding agents have all necessary CLI tools installed and current
+
+**Repository:** github.com/netresearch/coding_agent_cli_toolset
+**Primary Language:** Python 3.9+ (dev: 3.14.0rc2)
+**Architecture:** Offline-first, parallel, resilient tool version auditing
+**Tool Coverage:** 50+ developer tools across 10 categories
+
+## Core Capabilities
+
+- Multi-source version resolution (GitHub, PyPI, crates.io, npm, GNU FTP)
+- Installation method detection (uv, pipx, npm, cargo, apt, homebrew, etc.)
+- Offline operation via committed cache (latest_versions.json)
+- Snapshot-based workflow (separate collection from rendering)
+- Parallel execution (16 workers, 3s timeout per tool)
+- Role-based presets (agent-core, python-core, security-core, etc.)
+
+## File Structure
+
+```
+ai_cli_preparation/
+├── cli_audit.py (2375 lines)    # Main audit engine
+├── smart_column.py (222 lines)  # ANSI/emoji-aware formatter
+├── latest_versions.json          # Manual cache + hints
+├── tools_snapshot.json           # Audit results snapshot
+├── Makefile                      # Build targets
+├── package.json                  # Claude Code dependency
+├── scripts/                      # Installation scripts
+│   ├── install_core.sh
+│   ├── install_python.sh
+│   ├── install_node.sh
+│   ├── install_go.sh
+│   └── ... (9 more)
+├── docs/                         # Human-focused technical docs
+│   ├── INDEX.md
+│   ├── ARCHITECTURE.md
+│   ├── API_REFERENCE.md
+│   ├── DEVELOPER_GUIDE.md
+│   ├── TOOL_ECOSYSTEM.md
+│   ├── DEPLOYMENT.md
+│   └── TROUBLESHOOTING.md
+└── claudedocs/                   # AI agent context (this directory)
+```
+
+## Key Components
+
+### Tool Dataclass (cli_audit.py:729)
+```python
+@dataclass(frozen=True)
+class Tool:
+    name: str                    # Display name
+    candidates: tuple[str, ...]  # Executable names
+    source_kind: str            # gh|pypi|crates|npm|gnu|skip
+    source_args: tuple[str, ...] # Source-specific params
+```
+
+### TOOLS Registry (cli_audit.py:738)
+Ordered tuple of 50+ Tool definitions, categorized:
+1. Runtimes (go, python, rust, node) + package managers
+2. Core dev tools (ripgrep, ast-grep, fzf, fd, jq, etc.)
+3. Security (semgrep, bandit, gitleaks, trivy)
+4. Formatters (black, eslint, prettier, shellcheck)
+5. Git tools (git, gh, glab, git-absorb)
+6. Cloud/infra (aws, kubectl, terraform, docker)
+
+### Architecture Pattern
+```
+CLI Entry → Mode Router → Parallel Collection (ThreadPoolExecutor)
+          ↓                        ↓
+    COLLECT/RENDER/NORMAL    audit_tool() × 50+
+                                  ↓
+                        Local Discovery + Upstream APIs
+                                  ↓
+                        Cache Layer (hints → manual → upstream)
+                                  ↓
+                        Snapshot Write / Render
+```
+
+## Common Operations
+
+### Quick Audit
+```bash
+# Render from snapshot (no network, <100ms)
+make audit
+
+# Update snapshot with fresh data (~10s)
+make update
+
+# Interactive upgrade guide
+make upgrade
+
+# Offline audit with hints
+make audit-offline
+```
+
+### Role-Based Audits
+```bash
+make audit-offline-agent-core    # AI agent essentials
+make audit-offline-python-core   # Python development
+make audit-offline-security-core # Security tools
+```
+
+### Debug Mode
+```bash
+CLI_AUDIT_DEBUG=1 python3 cli_audit.py --only ripgrep
+CLI_AUDIT_TRACE=1 python3 cli_audit.py
+```
+
+## Environment Variables (Key)
+
+**Mode Control:**
+- `CLI_AUDIT_COLLECT=1` - Collect-only (no rendering)
+- `CLI_AUDIT_RENDER=1` - Render-only (no network)
+- `CLI_AUDIT_OFFLINE=1` - Force offline (manual cache only)
+
+**Performance:**
+- `CLI_AUDIT_MAX_WORKERS=16` - Concurrency
+- `CLI_AUDIT_TIMEOUT_SECONDS=3` - Per-tool timeout
+
+**Output:**
+- `CLI_AUDIT_JSON=1` - JSON output
+- `CLI_AUDIT_LINKS=1` - OSC 8 hyperlinks
+- `CLI_AUDIT_EMOJI=1` - Emoji status icons
+
+**Debug:**
+- `CLI_AUDIT_DEBUG=1` - Debug messages
+- `CLI_AUDIT_TRACE=1` - Detailed trace
+- `CLI_AUDIT_PROGRESS=1` - Progress output
+
+## Integration Points
+
+**Claude Code Dependency:** package.json includes @anthropic-ai/claude-code ^2.0.11
+
+**Use Case:** Ensures Claude Code and other AI agents have access to all necessary developer tools (ripgrep for code search, ast-grep for semantic search, jq for JSON parsing, git/gh for version control, etc.)
+
+**Workflow:**
+1. AI agent environment needs verification
+2. Run `make audit` to check tool availability
+3. If tools missing/outdated, run `make upgrade` for guided installation
+4. Re-audit until environment ready
+5. AI agent has full tooling access
+
+## Cache Files
+
+### latest_versions.json
+```json
+{
+  "__hints__": {
+    "gh:owner/repo": "latest_redirect",  // API method cache
+    "local_flag:tool": "--version"        // Version flag cache
+  },
+  "__methods__": {
+    "tool": "source_kind"  // Override upstream source
+  },
+  "tool-name": "1.2.3"     // Latest version cache
+}
+```
+
+### tools_snapshot.json
+```json
+{
+  "__meta__": {
+    "schema_version": 1,
+    "created_at": "2025-10-09T...",
+    "count": 50
+  },
+  "tools": [
+    {
+      "tool": "ripgrep",
+      "installed": "14.1.1 (150ms)",
+      "installed_method": "rustup/cargo",
+      "latest_upstream": "14.1.1 (220ms)",
+      "upstream_method": "github",
+      "status": "UP-TO-DATE"
+    }
+  ]
+}
+```
+
+## Current Git State
+
+**Branch:** main
+**Modified:** cli_audit.py, latest_versions.json
+**Untracked:** node_modules/
+**Remote:** git@github.com:netresearch/coding_agent_cli_toolset.git
+
+**Recent commits:**
+- 0c7ade3 - Snapshot-based collect/render modes
+- 3dd5082 - Lock ordering fixes (thread safety)
+- c160361 - Classification improvements (shebang detection)
+- 634c035 - HTTP robustness (retries, backoff)
+- 8c04e03 - Smoke testing
+
+## Key Design Patterns
+
+1. **Offline-First:** Works without network via committed cache
+2. **Parallel Execution:** 16 concurrent workers, 3s timeout per tool
+3. **Graceful Degradation:** Timeouts, retries, fallbacks at every layer
+4. **Immutable Data:** Frozen dataclasses, atomic file writes
+5. **Lock Ordering:** MANUAL_LOCK → HINTS_LOCK (enforced)
+6. **Cache Hierarchy:** hints → manual → upstream (fastest to slowest)
+
+## Threading Model
+
+- **ThreadPoolExecutor:** Parallel tool audits
+- **MANUAL_LOCK:** For latest_versions.json updates
+- **HINTS_LOCK:** For __hints__ updates (nested in MANUAL_LOCK)
+- **Lock Order Rule:** Always acquire MANUAL_LOCK before HINTS_LOCK
+
+## Performance Characteristics
+
+| Scenario | Time | Notes |
+|----------|------|-------|
+| Collection (online) | ~10s | 50 tools, 16 workers |
+| Collection (offline) | ~3s | Cache hits only |
+| Render from snapshot | <100ms | No network, pure JSON read |
+| Single tool audit | ~300ms | Version check + upstream |
+
+## Extension Points
+
+**Adding new tools:**
+1. Add Tool() to TOOLS registry in cli_audit.py
+2. Place in appropriate category
+3. Add to latest_versions.json for offline fallback
+4. Update TOOL_ECOSYSTEM.md documentation
+
+**Adding new upstream sources:**
+1. Implement latest_<source>() function
+2. Update get_latest() dispatcher
+3. Add source_kind to Tool options
+
+## Documentation Map
+
+**For Humans (docs/):**
+- INDEX.md - Documentation navigation
+- ARCHITECTURE.md - System design, data flows
+- API_REFERENCE.md - Functions, environment variables
+- DEVELOPER_GUIDE.md - Contributing, adding tools
+- TOOL_ECOSYSTEM.md - Complete 50+ tool catalog
+- DEPLOYMENT.md - Makefile targets, CI/CD
+- TROUBLESHOOTING.md - Common issues, debugging
+
+**For AI Agents (claudedocs/):**
+- project_context.md (this file) - Quick reference
+- session_summary.md - Current session state
+
+## Quick Troubleshooting
+
+**Network timeouts:**
+```bash
+CLI_AUDIT_TIMEOUT_SECONDS=10 python3 cli_audit.py
+CLI_AUDIT_HTTP_RETRIES=5 python3 cli_audit.py
+```
+
+**GitHub rate limiting:**
+```bash
+export GITHUB_TOKEN=ghp_...
+python3 cli_audit.py
+```
+
+**Version detection issues:**
+```bash
+CLI_AUDIT_DEBUG=1 python3 cli_audit.py --only tool-name
+```
+
+**Cache corruption:**
+```bash
+rm latest_versions.json tools_snapshot.json
+make update
+```
+
+## AI Agent Best Practices
+
+1. **Check tool availability** before attempting to use CLI tools
+2. **Use offline mode** for repeated audits (faster)
+3. **Reference tool catalog** in TOOL_ECOSYSTEM.md for capabilities
+4. **Leverage parallel execution** for efficiency
+5. **Handle graceful failures** - tool may be unavailable
+
+## See Also
+
+- Main README: ../README.md (user-focused documentation)
+- Technical docs: ../docs/ (comprehensive developer documentation)
+- Installation scripts: ../scripts/ (automated tool installation)
