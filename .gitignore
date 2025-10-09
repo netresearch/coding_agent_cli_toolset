@@ -28,3 +28,6 @@ htmlcov/
 
 # Local overrides
 *.local
+
+# Node.js (minimal usage for Claude Code dependency)
+node_modules/
