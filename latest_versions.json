@@ -116,7 +116,7 @@
     "migrated:terraform": "v1.13.2",
     "migrated:trivy": "v0.66.0",
     "migrated:watchexec": "v2.3.2",
-    "migrated:yarn": "{'stable': '4.9.4', 'canary': '4.9.4'}",
+    "migrated:yarn": "{'stable': '4.10.3', 'canary': '4.10.3'}",
     "migrated:yq": "v4.47.2"
   },
   "__methods__": {
@@ -181,6 +181,6 @@
   "uv": "0.8.17",
   "watchexec": "2.3.2",
   "xsv": "0.13.0",
-  "yarn": "4.9.4",
+  "yarn": "{'stable': '4.10.3', 'canary': '4.10.3'}",
   "yq": "4.47.2"
 }
