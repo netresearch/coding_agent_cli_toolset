@@ -88,7 +88,7 @@ audit-auto: ## Update snapshot if missing, then render
 	$(PYTHON) smart_column.py -s "|" -t --right 3,5 --header || true
 
 update: ## Collect fresh data and write snapshot (~10s)
-	@bash -c 'set -o pipefail; CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 CLI_AUDIT_PROGRESS=1 $(PYTHON) cli_audit.py' || true
+	@bash -c 'set -o pipefail; CLI_AUDIT_COLLECT=1 $(PYTHON) cli_audit.py' || true
 
 upgrade: scripts-perms ## Run interactive upgrade guide
 	@bash scripts/guide.sh
