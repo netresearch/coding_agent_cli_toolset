@@ -2297,11 +2297,25 @@ def main() -> int:
             # Always show basic progress counter (not just PROGRESS=1)
             if COLLECT_ONLY:
                 try:
-                    name = row[0] if row else "?"
-                    # Simple progress: "# [15/60] git ✓"
-                    print(f"# [{completed_tools}/{total_tools}] {name}", file=sys.stderr, flush=True)
+                    name, installed, _im, latest, _um, status, _tu, _lu = row
+                    # Clear status indicator: ✓ (success), ⚠ (warning), ✗ (failed)
+                    if status in ("UP-TO-DATE", "OUTDATED"):
+                        indicator = "✓"
+                    elif status == "NOT INSTALLED":
+                        indicator = "⚠"
+                    elif status == "UNKNOWN":
+                        indicator = "✗"
+                    else:
+                        indicator = "?"
+                    # Show: "# ✓ [15/60] git (installed: 2.51.0, latest: 2.51.0)"
+                    version_info = f"installed: {installed}" if installed and installed != "X" else "not installed"
+                    if latest and latest != installed and status == "OUTDATED":
+                        version_info += f", latest: {latest}"
+                    print(f"# {indicator} [{completed_tools}/{total_tools}] {name} ({version_info})", file=sys.stderr, flush=True)
                 except Exception:
-                    pass
+                    # Fallback to simple message if row parsing fails
+                    name = row[0] if row and len(row) > 0 else "?"
+                    print(f"# [{completed_tools}/{total_tools}] {name}", file=sys.stderr, flush=True)
 
             # Detailed progress for debugging (only when PROGRESS=1)
             if PROGRESS:
