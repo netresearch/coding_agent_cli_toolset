@@ -31,3 +31,6 @@ htmlcov/
 
 # Node.js (minimal usage for Claude Code dependency)
 node_modules/
+
+# AI agent session context (not committed)
+claudedocs/

@@ -1,0 +1,36 @@
+version: 1
+
+environment:
+  mode: workstation
+
+tools:
+  python:
+    version: "3.12.*"
+    method: uv
+    fallback: pipx
+
+  ripgrep:
+    version: latest
+    method: cargo
+
+  node:
+    version: "20.*"
+    method: nvm
+
+preferences:
+  reconciliation: parallel
+  breaking_changes: warn
+  auto_upgrade: true
+  timeout_seconds: 10
+  max_workers: 8
+  package_managers:
+    python:
+      - uv
+      - pipx
+      - pip
+    rust:
+      - rustup
+      - cargo
+    node:
+      - nvm
+      - npm
