@@ -2003,6 +2003,10 @@ def get_latest(tool: Tool) -> tuple[str, str]:
 
 
 def audit_tool(tool: Tool) -> tuple[str, str, str, str, str, str, str, str]:
+    # Debug: show when tool audit starts
+    if AUDIT_DEBUG:
+        print(f"# DEBUG: START audit_tool({tool.name}) source={tool.source_kind} offline={OFFLINE_MODE}", file=sys.stderr, flush=True)
+
     # Detect installed candidates
     t0_inst = time.time()
     candidates = tool.candidates
@@ -2045,8 +2049,18 @@ def audit_tool(tool: Tool) -> tuple[str, str, str, str, str, str, str, str]:
 
     t1_inst = time.time()
     latest_start = time.time()
+
+    # Debug: show network call about to happen
+    if AUDIT_DEBUG:
+        print(f"# DEBUG: NETWORK get_latest({tool.name}) source={tool.source_kind} offline={OFFLINE_MODE}", file=sys.stderr, flush=True)
+
     latest_tag, latest_num = get_latest(tool)
     latest_end = time.time()
+
+    # Debug: show network call completed
+    if AUDIT_DEBUG:
+        dur_ms = int((latest_end - latest_start) * 1000)
+        print(f"# DEBUG: DONE get_latest({tool.name}) dur={dur_ms}ms tag='{latest_tag}' num='{latest_num}'", file=sys.stderr, flush=True)
     # Slow operation trace
     dur_ms = int((latest_end - latest_start) * 1000)
     if dur_ms >= SLOW_MS:
@@ -2278,18 +2292,34 @@ def main() -> int:
 
     # Detailed progress for debugging (only when PROGRESS=1)
     print(f"# start collect: tools={total_tools} timeout={TIMEOUT_SECONDS}s retries={HTTP_RETRIES} offline={OFFLINE_MODE}", file=sys.stderr) if PROGRESS else None
+
+    # Debug: show thread pool configuration
+    if AUDIT_DEBUG:
+        actual_workers = min(MAX_WORKERS, total_tools)
+        print(f"# DEBUG: ThreadPoolExecutor starting with max_workers={actual_workers}", file=sys.stderr, flush=True)
+
     with ThreadPoolExecutor(max_workers=min(MAX_WORKERS, total_tools)) as executor:
         future_to_idx = {}
         for idx, tool in enumerate(tools_seq):
             if PROGRESS:
                 print(f"# auditing {tool.name}...", file=sys.stderr)
+            if AUDIT_DEBUG:
+                print(f"# DEBUG: SUBMIT future for tool={tool.name} idx={idx}", file=sys.stderr, flush=True)
             future_to_idx[executor.submit(audit_tool, tool)] = idx
         for future in as_completed(future_to_idx):
             idx = future_to_idx[future]
+
+            # Debug: show future completion
+            if AUDIT_DEBUG:
+                tool_name = tools_seq[idx].name
+                print(f"# DEBUG: COMPLETE future for tool={tool_name} idx={idx}", file=sys.stderr, flush=True)
+
             try:
                 row = future.result()
-            except Exception:
+            except Exception as e:
                 t = tools_seq[idx]
+                if AUDIT_DEBUG:
+                    print(f"# DEBUG: EXCEPTION in future for tool={t.name}: {e}", file=sys.stderr, flush=True)
                 row = (t.name, "X", "", "", upstream_method_for(t), "UNKNOWN", tool_homepage_url(t), latest_target_url(t, "", ""))
             results[idx] = row
             completed_tools += 1
