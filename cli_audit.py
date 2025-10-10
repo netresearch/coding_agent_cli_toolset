@@ -202,7 +202,9 @@ MANUAL_FILE: str = os.environ.get(
     os.path.join(os.path.dirname(__file__), "latest_versions.json"),
 )
 MANUAL_VERSIONS: dict[str, Any] = {}
-WRITE_MANUAL: bool = os.environ.get("CLI_AUDIT_WRITE_MANUAL", "1") == "1"
+# Disable incremental writes during parallel collection to avoid file locking issues
+# The full snapshot is written at the end anyway
+WRITE_MANUAL: bool = os.environ.get("CLI_AUDIT_WRITE_MANUAL", "1") == "1" and not COLLECT_ONLY
 MANUAL_USED: dict[str, bool] = {}
 
 # Selected-path tracking for JSON output (populated by audit_tool)
@@ -698,6 +700,8 @@ def _python_dist_version_from_venv(tool_name: str, exe_path: str, dist_name: str
         return ""
 
 def set_manual_latest(tool_name: str, tag_or_version: str) -> None:
+    if AUDIT_DEBUG:
+        print(f"# DEBUG: set_manual_latest({tool_name}, {tag_or_version[:50] if tag_or_version else ''}) WRITE_MANUAL={WRITE_MANUAL}", file=sys.stderr, flush=True)
     if not WRITE_MANUAL:
         return
     s = (tag_or_version or "").strip()
