@@ -55,7 +55,7 @@ STDOUT_IS_TTY: bool = sys.stdout.isatty()
 ENABLE_LINKS: bool = os.environ.get("CLI_AUDIT_LINKS", "1") == "1"
 USE_EMOJI_ICONS: bool = os.environ.get("CLI_AUDIT_EMOJI", "1") == "1"
 OFFLINE_MODE: bool = os.environ.get("CLI_AUDIT_OFFLINE", "0") == "1"
-MAX_WORKERS: int = int(os.environ.get("CLI_AUDIT_MAX_WORKERS", "16"))
+MAX_WORKERS: int = int(os.environ.get("CLI_AUDIT_MAX_WORKERS", "8"))
 DOCKER_INFO_ENABLED: bool = os.environ.get("CLI_AUDIT_DOCKER_INFO", "1") == "1"
 PROGRESS: bool = os.environ.get("CLI_AUDIT_PROGRESS", "0") == "1"
 OFFLINE_USE_CACHE: bool = os.environ.get("CLI_AUDIT_OFFLINE_USE_CACHE", "1") == "1"  # kept for compatibility, no effect
