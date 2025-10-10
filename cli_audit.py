@@ -90,7 +90,7 @@ HTTP_BACKOFF_JITTER: float = float(os.environ.get("CLI_AUDIT_BACKOFF_JITTER", "0
 
 # Ultra-verbose tracing
 TRACE: bool = os.environ.get("CLI_AUDIT_TRACE", "0") == "1"
-TRACE_NET: bool = os.environ.get("CLI_AUDIT_TRACE_NET", "0") == "1"
+TRACE_NET: bool = os.environ.get("CLI_AUDIT_TRACE_NET", "0") == "1" or AUDIT_DEBUG  # Auto-enable with DEBUG
 SLOW_MS: int = int(os.environ.get("CLI_AUDIT_SLOW_MS", "2000"))
 
 def _vlog(msg: str) -> None:
@@ -271,30 +271,55 @@ def http_fetch(
     last_exc: Exception | None = None
     for attempt in range(max(1, retries)):
         try:
+            # Debug: show HTTP request details
+            if AUDIT_DEBUG:
+                method_str = method or "GET"
+                print(f"# DEBUG: HTTP {method_str} {url} (timeout={timeout}s, attempt={attempt+1}/{retries})", file=sys.stderr, flush=True)
+
             if sem is None:
                 req = urllib.request.Request(url, headers=req_headers, method=method)
+                req_start = time.time()
                 with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    data = resp.read()
+                    req_dur = int((time.time() - req_start) * 1000)
                     if TRACE_NET:
                         _tlog(f"# http_open host={host} code={getattr(resp, 'status', 0)} url={url}")
-                    return resp.read()
+                    if AUDIT_DEBUG:
+                        status = getattr(resp, 'status', 0)
+                        content_len = len(data)
+                        print(f"# DEBUG: HTTP {status} {url} ({req_dur}ms, {content_len} bytes)", file=sys.stderr, flush=True)
+                    return data
             with sem:
                 req = urllib.request.Request(url, headers=req_headers, method=method)
+                req_start = time.time()
                 with urllib.request.urlopen(req, timeout=timeout) as resp:
+                    data = resp.read()
+                    req_dur = int((time.time() - req_start) * 1000)
                     if TRACE_NET:
                         _tlog(f"# http_open host={host} code={getattr(resp, 'status', 0)} url={url}")
-                    return resp.read()
+                    if AUDIT_DEBUG:
+                        status = getattr(resp, 'status', 0)
+                        content_len = len(data)
+                        print(f"# DEBUG: HTTP {status} {url} ({req_dur}ms, {content_len} bytes)", file=sys.stderr, flush=True)
+                    return data
         except urllib.error.HTTPError as e:
             last_exc = e
             code = getattr(e, "code", 0) or 0
             retryable = (code == 429) or (500 <= code <= 599) or (host == "api.github.com" and code == 403)
             if TRACE_NET:
                 _tlog(f"# http_error host={host} code={code} retryable={retryable} url={url}")
+            if AUDIT_DEBUG:
+                print(f"# DEBUG: HTTP ERROR {code} {url} (retryable={retryable}, attempt={attempt+1}/{retries})", file=sys.stderr, flush=True)
             if attempt >= retries - 1 or not retryable:
                 raise
         except Exception as e:
             last_exc = e
+            exc_type = type(e).__name__
+            exc_msg = str(e)[:100]  # Truncate long error messages
             if TRACE_NET:
-                _tlog(f"# http_exc host={host} type={type(e).__name__} attempt={attempt+1}/{retries} url={url}")
+                _tlog(f"# http_exc host={host} type={exc_type} attempt={attempt+1}/{retries} url={url}")
+            if AUDIT_DEBUG:
+                print(f"# DEBUG: HTTP EXCEPTION {exc_type}: {exc_msg} on {url} (attempt={attempt+1}/{retries})", file=sys.stderr, flush=True)
             if attempt >= retries - 1:
                 raise
         # backoff with jitter
@@ -1652,13 +1677,16 @@ def latest_github(owner: str, repo: str) -> tuple[str, str]:
         return "", ""
     # Always prefer the releases/latest redirect (skips pre-releases)
     try:
-        req = urllib.request.Request(
-            f"https://github.com/{owner}/{repo}/releases/latest",
-            headers=USER_AGENT_HEADERS,
-            method="HEAD",
-        )
+        url = f"https://github.com/{owner}/{repo}/releases/latest"
+        if AUDIT_DEBUG:
+            print(f"# DEBUG: GitHub HEAD {url} (timeout={TIMEOUT_SECONDS}s)", file=sys.stderr, flush=True)
+        req = urllib.request.Request(url, headers=USER_AGENT_HEADERS, method="HEAD")
         opener = urllib.request.build_opener(urllib.request.HTTPRedirectHandler)
+        req_start = time.time()
         resp = opener.open(req, timeout=TIMEOUT_SECONDS)
+        req_dur = int((time.time() - req_start) * 1000)
+        if AUDIT_DEBUG:
+            print(f"# DEBUG: GitHub HEAD response ({req_dur}ms, redirect to {resp.geturl()})", file=sys.stderr, flush=True)
         final = resp.geturl()
         last = final.rsplit("/", 1)[-1]
         if last and last.lower() not in ("releases", "latest"):
