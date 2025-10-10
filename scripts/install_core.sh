@@ -693,8 +693,10 @@ install_glab() {
 }
 
 install_just() {
-  if have just; then return; fi
-  if have brew; then brew install just; return; fi
+  if have brew; then
+    if have just; then brew upgrade just || brew install just; else brew install just; fi
+    return
+  fi
   if have cargo; then cargo install just; return; fi
 }
 
