@@ -822,12 +822,17 @@ TOOLS: tuple[Tool, ...] = (
     Tool("prettier", ("prettier",), "gh", ("prettier", "prettier")),
     Tool("shfmt", ("shfmt",), "gh", ("mvdan", "sh")),
     Tool("shellcheck", ("shellcheck",), "gh", ("koalaman", "shellcheck")),
+    Tool("golangci-lint", ("golangci-lint",), "gh", ("golangci", "golangci-lint")),
     # 4) JSON/YAML viewers
     Tool("fx", ("fx",), "gh", ("antonmedv", "fx")),
+    # 4.5) AI assistants
+    Tool("codex", ("codex",), "npm", ("@openai/codex",)),
+    Tool("claude", ("claude",), "npm", ("@anthropic-ai/claude-code",)),
     # 5) VCS & platforms
     Tool("git", ("git",), "gh", ("git", "git")),
     Tool("gh", ("gh",), "gh", ("cli", "cli")),
     Tool("glab", ("glab",), "gh", ("profclems", "glab")),
+    Tool("gam", ("gam",), "gh", ("GAM-team", "GAM")),
     # 6) Task runners
     Tool("just", ("just",), "gh", ("casey", "just")),
     # 7) Cloud / infra
@@ -869,6 +874,9 @@ CATEGORY_MAP: dict[str, str] = {
     "yq": "json-yaml",
     "dasel": "json-yaml",
     "fx": "json-yaml",
+    # AI assistants
+    "codex": "ai-assistants",
+    "claude": "ai-assistants",
     # HTTP/CLI clients
     "httpie": "http",
     "curlie": "http",
@@ -892,10 +900,12 @@ CATEGORY_MAP: dict[str, str] = {
     "prettier": "formatters",
     "shfmt": "formatters",
     "shellcheck": "formatters",
+    "golangci-lint": "formatters",
     # VCS & platforms
     "git": "vcs",
     "gh": "vcs",
     "glab": "vcs",
+    "gam": "vcs",
     # Cloud & infra
     "aws": "cloud-infra",
     "kubectl": "cloud-infra",
@@ -927,6 +937,7 @@ CATEGORY_ORDER: tuple[str, ...] = (
     "cloud-infra",
     "task-runners",
     "data",
+    "ai-assistants",
     "other",
 )
 
