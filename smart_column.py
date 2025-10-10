@@ -217,10 +217,19 @@ def main():
             pass
         os._exit(0)
 
+def _sigint_handler(signum, frame):
+    """Handle SIGINT (Ctrl-C) with immediate clean exit."""
+    # Suppress any partial output issues by forcing immediate exit
+    print("", file=sys.stderr)
+    os._exit(130)  # Standard Unix exit code for SIGINT, immediate exit
+
+
 if __name__ == '__main__':
+    # Install signal handler for clean Ctrl-C behavior
+    signal.signal(signal.SIGINT, _sigint_handler)
     try:
         main()
     except KeyboardInterrupt:
-        # Clean exit on Ctrl-C without stack trace
+        # Fallback: clean exit on Ctrl-C without stack trace
         print("", file=sys.stderr)
-        raise SystemExit(130)  # Standard Unix exit code for SIGINT
+        os._exit(130)  # Standard Unix exit code for SIGINT, immediate exit
