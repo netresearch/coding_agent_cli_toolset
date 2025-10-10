@@ -2381,8 +2381,9 @@ def main() -> int:
             results[idx] = row
             completed_tools += 1
 
-            # Always show basic progress counter (not just PROGRESS=1)
-            if COLLECT_ONLY:
+            # Always show basic progress counter during parallel execution (not just PROGRESS=1)
+            # Show progress for both COLLECT_ONLY (make update) and live audit (make upgrade)
+            if COLLECT_ONLY or MAX_WORKERS > 1:
                 try:
                     name, installed, _im, latest, _um, status, _tu, _lu = row
                     # Clear status indicator: ✓ (success), ⚠ (warning), ✗ (failed)

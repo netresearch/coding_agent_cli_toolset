@@ -71,9 +71,11 @@ ensure_perms
 
 echo "Gathering current tool status... (offline=$OFFLINE, timeout=${CLI_AUDIT_TIMEOUT_SECONDS:-3}s)"
 # Capture audit output safely; avoid broken pipe noises when downstream prompts stop reading
+# Progress indicators go to stderr (pass through to user), table data goes to stdout (captured)
 AUDIT_OUTPUT="$(run_audit || true)"
 # Also capture JSON using cached latests to avoid extra network calls
-AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_OFFLINE="$OFFLINE" "$CLI" cli_audit.py 2>/dev/null || true)"
+# Progress indicators visible during collection
+AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_OFFLINE="$OFFLINE" "$CLI" cli_audit.py || true)"
 if [ "$VERBOSE" = "1" ]; then
   # Pretty print the audit output for context
   printf "%s\n" "$AUDIT_OUTPUT" | "$CLI" smart_column.py -s '|' -t --right 3,5 --header || printf "%s\n" "$AUDIT_OUTPUT"
