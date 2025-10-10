@@ -1711,12 +1711,16 @@ def latest_github(owner: str, repo: str) -> tuple[str, str]:
     # Special-case: golang/go has no GitHub releases; filter stable tags only
     try:
         if owner == "golang" and repo == "go":
+            if AUDIT_DEBUG:
+                print(f"# DEBUG: Processing golang/go tags (special case)", file=sys.stderr, flush=True)
             # Fetch up to 200 tags (2 pages) and choose the highest stable goX[.Y][.Z] tag
             best: tuple[tuple[int, ...], str, str] | None = None
             for page in (1, 2):
                 data = json.loads(http_get(f"https://api.github.com/repos/{owner}/{repo}/tags?per_page=100&page={page}"))
                 if not isinstance(data, list):
                     break
+                if AUDIT_DEBUG:
+                    print(f"# DEBUG: Processing page {page} with {len(data)} tags", file=sys.stderr, flush=True)
                 for item in data:
                     name = (item.get("name") or "").strip()
                     # Accept only stable tags like go1.25 or go1.25.1; exclude weekly/beta/rc
@@ -1735,11 +1739,19 @@ def latest_github(owner: str, repo: str) -> tuple[str, str]:
                 # If we already found a good candidate on the first page, stop early
                 if best is not None:
                     break
+            if AUDIT_DEBUG:
+                print(f"# DEBUG: Best go tag found: {best}", file=sys.stderr, flush=True)
             if best is not None:
                 _, tag_name, ver_num = best
                 result = (tag_name, ver_num)
+                if AUDIT_DEBUG:
+                    print(f"# DEBUG: Calling set_manual_latest({repo}, {tag_name})", file=sys.stderr, flush=True)
                 set_manual_latest(repo, tag_name)
+                if AUDIT_DEBUG:
+                    print(f"# DEBUG: Calling set_hint(gh:{owner}/{repo}, tags_api)", file=sys.stderr, flush=True)
                 set_hint(f"gh:{owner}/{repo}", "tags_api")
+                if AUDIT_DEBUG:
+                    print(f"# DEBUG: Returning result for go: {result}", file=sys.stderr, flush=True)
                 return result
     except Exception:
         pass
@@ -2050,10 +2062,18 @@ def audit_tool(tool: Tool) -> tuple[str, str, str, str, str, str, str, str]:
             chosen = uv_choice
     # Only fall back to PATH scanning if we didn't select a uv choice
     if not chosen:
+        if AUDIT_DEBUG:
+            print(f"# DEBUG: Scanning PATH for {tool.name} candidates: {candidates}", file=sys.stderr, flush=True)
         for cand in candidates:
+            if AUDIT_DEBUG:
+                print(f"# DEBUG: Searching for candidate: {cand}", file=sys.stderr, flush=True)
             for path in find_paths(cand, deep=deep_scan):
                 any_found = True
+                if AUDIT_DEBUG:
+                    print(f"# DEBUG: Found path: {path}, getting version...", file=sys.stderr, flush=True)
                 line = get_version_line(path, tool.name)
+                if AUDIT_DEBUG:
+                    print(f"# DEBUG: Version line: {line}", file=sys.stderr, flush=True)
                 num = extract_version_number(line)
                 tuples.append((num, line, path))
                 # Fast exit for fx once we have a version line
