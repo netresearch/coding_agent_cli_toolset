@@ -125,7 +125,8 @@
     "pipx": "pypi",
     "poetry": "pypi",
     "ripgrep": "github",
-    "sd": "crates"
+    "sd": "crates",
+    "uv": "github"
   },
   "ansible": "12.0.0",
   "ansible-core": "2.19.2",
@@ -170,7 +171,7 @@
   "pre-commit": "4.3.0",
   "prettier": "3.6.2",
   "ripgrep": "14.1.1",
-  "ripgrep-all": "v0.10.9",
+  "ripgrep-all": "0.10.9",
   "rust": "1.89.0",
   "sd": "1.0.0",
   "semgrep": "1.136.0",
@@ -181,6 +182,6 @@
   "uv": "0.9.1",
   "watchexec": "2.3.2",
   "xsv": "0.13.0",
-  "yarn": "4.10.3",
+  "yarn": "{'stable': '4.10.3', 'canary': '4.10.3'}",
   "yq": "4.47.2"
 }

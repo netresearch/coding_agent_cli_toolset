@@ -2153,7 +2153,95 @@ def _parse_tool_filter(argv: Sequence[str]) -> list[str]:
         return []
 
 
+def _render_only_mode() -> int:
+    """Fast path: render audit results from snapshot without live checks."""
+    # Friendly startup message for UX
+    snap_file = os.environ.get("CLI_AUDIT_SNAPSHOT_FILE", "tools_snapshot.json")
+    if os.path.exists(snap_file):
+        meta = {}
+        try:
+            with open(snap_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                meta = data.get("__meta__", {})
+        except Exception:
+            pass
+        tool_count = meta.get("count", "~50")
+        age = meta.get("collected_at", "")
+        if age:
+            try:
+                from datetime import datetime
+                collected_dt = datetime.fromisoformat(age)
+                now = datetime.now(collected_dt.tzinfo)
+                age_seconds = (now - collected_dt).total_seconds()
+                if age_seconds < 60:
+                    age_str = "just now"
+                elif age_seconds < 3600:
+                    age_str = f"{int(age_seconds / 60)}m ago"
+                elif age_seconds < 86400:
+                    age_str = f"{int(age_seconds / 3600)}h ago"
+                else:
+                    age_str = f"{int(age_seconds / 86400)}d ago"
+            except Exception:
+                age_str = "cached"
+        else:
+            age_str = "cached"
+        print(f"# Auditing {tool_count} development tools from snapshot ({age_str})...", file=sys.stderr)
+    else:
+        print(f"# No snapshot found - run 'make update' to collect fresh data", file=sys.stderr)
+
+    snap = load_snapshot()
+    selected_names = _parse_tool_filter(sys.argv[1:])
+    selected_set = set(selected_names) if selected_names else None
+    rows = render_from_snapshot(snap, selected_set)
+
+    # JSON output from snapshot
+    if os.environ.get("CLI_AUDIT_JSON", "0") == "1":
+        payload = []
+        for name, installed, installed_method, latest, upstream_method, status, tool_url, latest_url in rows:
+            payload.append({
+                "tool": name,
+                "category": category_for(name),
+                "installed": installed,
+                "installed_method": installed_method,
+                "installed_version": extract_version_number(installed),
+                "latest_version": extract_version_number(latest),
+                "latest_upstream": latest,
+                "upstream_method": upstream_method,
+                "status": status,
+                "tool_url": tool_url,
+                "latest_url": latest_url,
+                "state_icon": status_icon(status, installed),
+                "is_up_to_date": (status == "UP-TO-DATE"),
+            })
+        print(json.dumps(payload, ensure_ascii=False))
+        return 0
+
+    # Table output from snapshot
+    headers = (" ", "tool", "installed", "installed_method", "latest_upstream", "upstream_method")
+    print("|".join(headers))
+    for name, installed, installed_method, latest, upstream_method, status, tool_url, latest_url in rows:
+        icon = status_icon(status, installed)
+        print("|".join((icon, name, installed, installed_method, latest, upstream_method)))
+
+    # Summary line from snapshot meta if present
+    try:
+        meta = snap.get("__meta__", {})
+        total = meta.get("count", len(rows))
+        missing = sum(1 for r in rows if r[5] == "NOT INSTALLED")
+        outdated = sum(1 for r in rows if r[5] == "OUTDATED")
+        unknown = sum(1 for r in rows if r[5] == "UNKNOWN")
+        offline_tag = " (offline)" if meta.get("offline") else ""
+        print(f"\nReadiness{offline_tag}: {total} tools, {outdated} outdated, {missing} missing, {unknown} unknown")
+    except Exception:
+        pass
+    return 0
+
+
 def main() -> int:
+    # RENDER-ONLY mode: bypass live audit entirely, render from snapshot (FAST PATH)
+    if RENDER_ONLY:
+        return _render_only_mode()
+
     # Determine selected tools (optional filtering)
     selected_names = _parse_tool_filter(sys.argv[1:])
     # Optional alphabetical sort for output stability when desired
@@ -2181,6 +2269,14 @@ def main() -> int:
 
     total_tools = len(tools_seq)
     completed_tools = 0
+
+    # Always show friendly startup message (not just when PROGRESS=1)
+    if COLLECT_ONLY:
+        offline_note = " (offline mode)" if OFFLINE_MODE else ""
+        print(f"# Collecting fresh data for {total_tools} tools{offline_note}...", file=sys.stderr)
+        print(f"# Estimated time: ~{TIMEOUT_SECONDS * 3}s (timeout={TIMEOUT_SECONDS}s per tool)", file=sys.stderr)
+
+    # Detailed progress for debugging (only when PROGRESS=1)
     print(f"# start collect: tools={total_tools} timeout={TIMEOUT_SECONDS}s retries={HTTP_RETRIES} offline={OFFLINE_MODE}", file=sys.stderr) if PROGRESS else None
     with ThreadPoolExecutor(max_workers=min(MAX_WORKERS, total_tools)) as executor:
         future_to_idx = {}
@@ -2212,52 +2308,6 @@ def main() -> int:
                 hint = hint_for(name) if HINTS_ENABLED and status in ("NOT INSTALLED", "OUTDATED") else ""
                 latest_with_hint = latest_render if not hint else (latest_render + f"  [{hint}]")
                 print("|".join((icon, name_render, installed, installed_method, latest_with_hint, upstream_method)))
-
-    # RENDER-ONLY mode: bypass live audit, render from snapshot
-    if RENDER_ONLY:
-        snap = load_snapshot()
-        # Render fast path using snapshot doc
-        selected_names = set(_parse_tool_filter(sys.argv[1:]))
-        rows = render_from_snapshot(snap, selected_names or None)
-        # JSON output from snapshot
-        if os.environ.get("CLI_AUDIT_JSON", "0") == "1":
-            payload = []
-            for name, installed, installed_method, latest, upstream_method, status, tool_url, latest_url in rows:
-                payload.append({
-                    "tool": name,
-                    "category": category_for(name),
-                    "installed": installed,
-                    "installed_method": installed_method,
-                    "installed_version": extract_version_number(installed),
-                    "latest_version": extract_version_number(latest),
-                    "latest_upstream": latest,
-                    "upstream_method": upstream_method,
-                    "status": status,
-                    "tool_url": tool_url,
-                    "latest_url": latest_url,
-                    "state_icon": status_icon(status, installed),
-                    "is_up_to_date": (status == "UP-TO-DATE"),
-                })
-            print(json.dumps(payload, ensure_ascii=False))
-            return 0
-        # Table output from snapshot
-        headers = (" ", "tool", "installed", "installed_method", "latest_upstream", "upstream_method")
-        print("|".join(headers))
-        for name, installed, installed_method, latest, upstream_method, status, tool_url, latest_url in rows:
-            icon = status_icon(status, installed)
-            print("|".join((icon, name, installed, installed_method, latest, upstream_method)))
-        # Summary line from snapshot meta if present
-        try:
-            meta = snap.get("__meta__", {})
-            total = meta.get("count", len(rows))
-            missing = sum(1 for r in rows if r[5] == "NOT INSTALLED")
-            outdated = sum(1 for r in rows if r[5] == "OUTDATED")
-            unknown = sum(1 for r in rows if r[5] == "UNKNOWN")
-            offline_tag = " (offline)" if meta.get("offline") else ""
-            print(f"\nReadiness{offline_tag}: {total} tools, {outdated} outdated, {missing} missing, {unknown} unknown")
-        except Exception:
-            pass
-        return 0
 
     if os.environ.get("CLI_AUDIT_JSON", "0") == "1":
         payload = []
@@ -2347,9 +2397,17 @@ def main() -> int:
                     "tool_url": tool_url,
                     "latest_url": latest_url,
                 })
-            if PROGRESS:
-                print(f"# writing snapshot to {SNAPSHOT_FILE}...", file=sys.stderr)
+            # Always show completion message (not just when PROGRESS=1)
+            print(f"# Writing snapshot to {SNAPSHOT_FILE}...", file=sys.stderr)
             meta = write_snapshot(payload)
+            try:
+                count = meta.get('count', len(payload))
+                print(f"# ✓ Snapshot saved: {count} tools audited", file=sys.stderr)
+                print(f"# Run 'make audit' to view results", file=sys.stderr)
+            except Exception:
+                print(f"# ✓ Snapshot saved to {SNAPSHOT_FILE}", file=sys.stderr)
+
+            # Detailed debug info (only when PROGRESS=1)
             if PROGRESS:
                 try:
                     print(
