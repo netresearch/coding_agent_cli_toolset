@@ -25,6 +25,7 @@ import argparse
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -2369,12 +2370,21 @@ def main() -> int:
     return 0
 
 
+def _sigint_handler(signum, frame):
+    """Handle SIGINT (Ctrl-C) with immediate clean exit."""
+    # Suppress threading shutdown errors by forcing immediate exit
+    print("", file=sys.stderr)
+    os._exit(130)  # Standard Unix exit code for SIGINT, immediate exit
+
+
 if __name__ == "__main__":
+    # Install signal handler for clean Ctrl-C behavior
+    signal.signal(signal.SIGINT, _sigint_handler)
     try:
         raise SystemExit(main())
     except KeyboardInterrupt:
-        # Clean exit on Ctrl-C without stack trace
+        # Fallback: clean exit on Ctrl-C without stack trace
         print("", file=sys.stderr)
-        raise SystemExit(130)  # Standard Unix exit code for SIGINT
+        os._exit(130)  # Standard Unix exit code for SIGINT, immediate exit
 
 
