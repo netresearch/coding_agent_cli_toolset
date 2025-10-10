@@ -73,9 +73,10 @@ echo "Gathering current tool status... (offline=$OFFLINE, timeout=${CLI_AUDIT_TI
 # Capture audit output safely; avoid broken pipe noises when downstream prompts stop reading
 # Progress indicators go to stderr (pass through to user), table data goes to stdout (captured)
 AUDIT_OUTPUT="$(run_audit || true)"
-# Also capture JSON using cached latests to avoid extra network calls
+# Also capture JSON using cached latests to avoid extra network calls and rate limits
 # Progress indicators visible during collection
-AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_OFFLINE="$OFFLINE" "$CLI" cli_audit.py || true)"
+# Use MANUAL_FIRST mode to prefer cached versions over live API calls (avoids rate limit issues)
+AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_OFFLINE="$OFFLINE" CLI_AUDIT_MANUAL_FIRST=1 "$CLI" cli_audit.py || true)"
 if [ "$VERBOSE" = "1" ]; then
   # Pretty print the audit output for context
   printf "%s\n" "$AUDIT_OUTPUT" | "$CLI" smart_column.py -s '|' -t --right 3,5 --header || printf "%s\n" "$AUDIT_OUTPUT"
@@ -168,7 +169,7 @@ if [ -n "$(json_bool uv is_up_to_date)" ] && [ -n "$UV_CURR" ]; then
 else
   if prompt_action "${UV_ICON} uv" "$UV_CURR" "$(json_field uv installed_method)" "$(osc8 "$UV_URL" "$UV_LATEST")" "$(json_field uv upstream_method)" core; then
     "$ROOT"/scripts/install_uv.sh reconcile || true
-    AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 "$CLI" cli_audit.py 2>/dev/null || true)"
+    AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_MANUAL_FIRST=1 "$CLI" cli_audit.py 2>/dev/null || true)"
   fi
 fi
 
@@ -186,7 +187,7 @@ if [ -n "$(json_bool python is_up_to_date)" ]; then
 else
   if prompt_action "${PY_ICON} Python stack" "$PY_CURR" "$(json_field python installed_method)" "$(osc8 "$PY_URL" "$PY_LATEST")" "$(json_field python upstream_method)" python; then
     UV_PYTHON_SPEC="$PY_LATEST" "$ROOT"/scripts/install_python.sh update || true
-    AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 "$CLI" cli_audit.py 2>/dev/null || true)"
+    AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_MANUAL_FIRST=1 "$CLI" cli_audit.py 2>/dev/null || true)"
   fi
 fi
 
@@ -205,7 +206,7 @@ if [ -n "$NODE_ALL_OK" ]; then
 else
   if prompt_action "${NODE_ICON} Node.js stack" "$NODE_CURR" "$(json_field node installed_method)" "$(osc8 "$NODE_URL" "$NODE_LATEST")" "$(json_field node upstream_method)" node; then
     "$ROOT"/scripts/install_node.sh reconcile || true
-    AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 "$CLI" cli_audit.py 2>/dev/null || true)"
+    AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_MANUAL_FIRST=1 "$CLI" cli_audit.py 2>/dev/null || true)"
   fi
 fi
 
@@ -214,20 +215,20 @@ if [ -z "$(json_bool npm is_up_to_date)" ]; then
   if prompt_action "$(json_field npm state_icon) npm (global)" "$(json_field npm installed)" "$(json_field npm installed_method)" "$(osc8 "$(json_field npm latest_url)" "$(json_field npm latest_upstream)")" "$(json_field npm upstream_method)" npm; then
     corepack enable >/dev/null 2>&1 || true
     npm install -g npm@latest >/dev/null 2>&1 || true
-    AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 "$CLI" cli_audit.py 2>/dev/null || true)"
+    AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_MANUAL_FIRST=1 "$CLI" cli_audit.py 2>/dev/null || true)"
   fi
 fi
 if [ -z "$(json_bool pnpm is_up_to_date)" ]; then
   if prompt_action "$(json_field pnpm state_icon) pnpm" "$(json_field pnpm installed)" "$(json_field pnpm installed_method)" "$(osc8 "$(json_field pnpm latest_url)" "$(json_field pnpm latest_upstream)")" "$(json_field pnpm upstream_method)" pnpm; then
     corepack prepare pnpm@latest --activate >/dev/null 2>&1 || npm install -g pnpm@latest >/dev/null 2>&1 || true
-    AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 "$CLI" cli_audit.py 2>/dev/null || true)"
+    AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_MANUAL_FIRST=1 "$CLI" cli_audit.py 2>/dev/null || true)"
   fi
 fi
 if [ -z "$(json_bool yarn is_up_to_date)" ]; then
   if prompt_action "$(json_field yarn state_icon) yarn" "$(json_field yarn installed)" "$(json_field yarn installed_method)" "$(osc8 "$(json_field yarn latest_url)" "$(json_field yarn latest_upstream)")" "$(json_field yarn upstream_method)" yarn; then
     # Prefer stable tag for Yarn (Berry)
     corepack prepare yarn@stable --activate >/dev/null 2>&1 || npm install -g yarn@latest >/dev/null 2>&1 || true
-    AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 "$CLI" cli_audit.py 2>/dev/null || true)"
+    AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_MANUAL_FIRST=1 "$CLI" cli_audit.py 2>/dev/null || true)"
   fi
 fi
 
@@ -243,7 +244,7 @@ if [ -n "$(json_bool go is_up_to_date)" ]; then
 else
   if prompt_action "${GO_ICON} Go toolchain" "$GO_CURR" "$GO_METHOD" "$(osc8 "$GO_URL" "$GO_LATE")" "brew" go; then
     "$ROOT"/scripts/install_go.sh || true
-    AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 "$CLI" cli_audit.py 2>/dev/null || true)"
+    AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_MANUAL_FIRST=1 "$CLI" cli_audit.py 2>/dev/null || true)"
   fi
 fi
 
@@ -268,7 +269,7 @@ if command -v uv >/dev/null 2>&1 || "$ROOT"/scripts/install_uv.sh reconcile >/de
         if command -v pipx >/dev/null 2>&1; then pipx uninstall "$t" >/dev/null 2>&1 || true; fi
         # Remove user pip scripts that might shadow uv tools
         rm -f "$HOME/.local/bin/$t" >/dev/null 2>&1 || true
-        AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 "$CLI" cli_audit.py 2>/dev/null || true)"
+        AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_MANUAL_FIRST=1 "$CLI" cli_audit.py 2>/dev/null || true)"
       fi
     fi
   done
@@ -287,7 +288,7 @@ for t in "${CORE_TOOLS[@]}"; do
   if prompt_action "${ICON} $t" "$CURR" "$(json_field "$t" installed_method)" "$(osc8 "$URL" "$LATE")" "$(json_field "$t" upstream_method)" "$t"; then
     "$ROOT"/scripts/install_core.sh reconcile "$t" || true
     # Re-audit the single tool to reflect updated status inline
-    AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 "$CLI" cli_audit.py 2>/dev/null || true)"
+    AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_MANUAL_FIRST=1 "$CLI" cli_audit.py 2>/dev/null || true)"
   fi
 done
 
@@ -319,7 +320,7 @@ for t in pip pipx poetry httpie semgrep black; do
           fi
         fi
       fi
-      AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 "$CLI" cli_audit.py 2>/dev/null || true)"
+      AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_MANUAL_FIRST=1 "$CLI" cli_audit.py 2>/dev/null || true)"
     fi
   fi
 done
@@ -423,7 +424,7 @@ if [ -n "$(json_bool ansible is_up_to_date)" ]; then
 else
   if prompt_action "${ANS_ICON} Ansible" "$ANS_CURR" "$(json_field ansible installed_method)" "$(osc8 "$ANS_URL" "$ANS_LATEST")" "$(json_field ansible upstream_method)" ansible; then
     "$ROOT"/scripts/install_ansible.sh update || true
-    AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 "$CLI" cli_audit.py 2>/dev/null || true)"
+    AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_MANUAL_FIRST=1 "$CLI" cli_audit.py 2>/dev/null || true)"
   fi
 fi
 
