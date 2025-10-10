@@ -29,6 +29,8 @@ reconcile_rust() {
     uninstall_rust || true
   fi
   install_rust
+  # Always update to latest after ensuring rustup installation
+  update_rust
 }
 
 case "$ACTION" in
