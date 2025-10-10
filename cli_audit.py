@@ -1760,6 +1760,42 @@ def latest_github(owner: str, repo: str) -> tuple[str, str]:
                 return result
     except Exception:
         pass
+    # Special-case: python/cpython - filter stable release tags only (vX.Y.Z, exclude rc/alpha/beta)
+    try:
+        if owner == "python" and repo == "cpython":
+            # Fetch tags and choose the highest stable vX.Y.Z tag (exclude rc/alpha/beta/a/b)
+            best: tuple[tuple[int, ...], str, str] | None = None
+            for page in (1, 2):
+                data = json.loads(http_get(f"https://api.github.com/repos/{owner}/{repo}/tags?per_page=100&page={page}"))
+                if not isinstance(data, list):
+                    break
+                for item in data:
+                    name = (item.get("name") or "").strip()
+                    # Accept only stable final release tags like v3.14.0 or v3.12.7
+                    # Exclude rc, alpha, beta, a, b suffixes
+                    if not re.match(r"^v\d+\.\d+\.\d+$", name):
+                        continue
+                    ver = extract_version_number(name)
+                    if not ver:
+                        continue
+                    try:
+                        nums = tuple(int(x) for x in ver.split("."))
+                    except Exception:
+                        continue
+                    tup = (nums, name, ver)
+                    if best is None or tup[0] > best[0]:
+                        best = tup
+                # If we found a good candidate on the first page, stop early
+                if best is not None:
+                    break
+            if best is not None:
+                _, tag_name, ver_num = best
+                result = (tag_name, ver_num)
+                set_manual_latest(repo, tag_name)
+                set_hint(f"gh:{owner}/{repo}", "tags_api")
+                return result
+    except Exception:
+        pass
     # Fallbacks for rare cases
     try:
         data = json.loads(http_get(f"https://api.github.com/repos/{owner}/{repo}/tags?per_page=1"))
