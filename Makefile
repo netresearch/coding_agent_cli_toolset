@@ -4,7 +4,7 @@ PYTHON ?= python3
 -include .env.default
 -include .env
 
-.PHONY: help audit audit-offline audit-% audit-offline-% update upgrade guide \
+.PHONY: user-help help audit audit-offline audit-% audit-offline-% update upgrade guide \
 	test test-unit test-integration test-coverage test-watch test-failed \
 	lint lint-code lint-types lint-security format format-check \
 	install install-dev install-core install-python install-node install-go \
@@ -18,7 +18,21 @@ PYTHON ?= python3
 # HELP & OVERVIEW
 # ============================================================================
 
-help: ## Show this help message
+.DEFAULT_GOAL := user-help
+
+user-help: ## Show user commands only (default)
+	@echo ""
+	@echo "AI CLI Preparation - User Commands"
+	@echo "==================================="
+	@echo ""
+	@awk 'BEGIN{FS=":.*##"; section=""} \
+		/^## / {section=$$0; gsub(/^## /, "", section)} \
+		/^[a-zA-Z0-9_-]+:.*##/ && section=="USER" {printf "  \033[36m%-22s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@echo ""
+	@echo "\033[90mRun '\033[0m\033[1mmake help\033[0m\033[90m' for development and maintenance commands.\033[0m"
+	@echo ""
+
+help: ## Show complete help with all commands
 	@echo ""
 	@echo "AI CLI Preparation - Makefile Commands"
 	@echo "======================================"
@@ -237,9 +251,3 @@ clean-all: clean ## Remove all artifacts including virtual environments
 scripts-perms: ## Ensure scripts are executable
 	@chmod +x scripts/*.sh 2>/dev/null || true
 	@chmod +x scripts/lib/*.sh 2>/dev/null || true
-
-# ============================================================================
-# CONVENIENCE ALIASES
-# ============================================================================
-
-.DEFAULT_GOAL := help
