@@ -101,6 +101,268 @@ python3 cli_audit.py | column -s '|' -t
 
 Tip: On systems where `column` is unavailable, just view the raw output or import into your tool of choice.
 
+## Code Examples
+
+### Installing a Single Tool
+
+```python
+from cli_audit import install_tool, Config, Environment
+
+# Create configuration and detect environment
+config = Config()
+env = Environment.detect()
+
+# Install a Python tool using pipx
+result = install_tool(
+    tool_name="black",
+    package_name="black",
+    target_version="latest",
+    config=config,
+    env=env,
+    language="python",
+    verbose=True,
+)
+
+if result.success:
+    print(f"✓ {result.tool_name} {result.installed_version} installed via {result.package_manager_used}")
+    print(f"  Binary: {result.binary_path}")
+    print(f"  Duration: {result.duration_seconds:.2f}s")
+else:
+    print(f"✗ Installation failed: {result.error_message}")
+```
+
+### Bulk Installation
+
+```python
+from cli_audit import bulk_install, Config, Environment
+
+config = Config()
+env = Environment.detect()
+
+# Install multiple tools in parallel
+result = bulk_install(
+    mode="explicit",
+    tool_names=["ripgrep", "fd", "bat"],
+    config=config,
+    env=env,
+    max_workers=3,
+    verbose=True,
+)
+
+print(f"✓ Successes: {len(result.successes)}")
+print(f"✗ Failures: {len(result.failures)}")
+print(f"Duration: {result.duration_seconds:.2f}s")
+
+for success in result.successes:
+    print(f"  ✓ {success.tool_name} {success.installed_version}")
+```
+
+### Upgrading Tools
+
+```python
+from cli_audit import upgrade_tool, get_upgrade_candidates, Config, Environment
+
+config = Config()
+env = Environment.detect()
+
+# Check for available upgrades
+candidates = get_upgrade_candidates(
+    tools=["black", "ripgrep"],
+    config=config,
+    env=env,
+    verbose=True,
+)
+
+print(f"Found {len(candidates)} upgrade candidates:")
+for candidate in candidates:
+    print(f"  {candidate.tool_name}: {candidate.current_version} → {candidate.available_version}")
+
+# Upgrade a specific tool
+if candidates:
+    candidate = candidates[0]
+    result = upgrade_tool(
+        tool_name=candidate.tool_name,
+        target_version=candidate.available_version,
+        current_version=candidate.current_version,
+        config=config,
+        env=env,
+        verbose=True,
+    )
+
+    if result.success:
+        print(f"✓ Upgraded {result.tool_name} to {result.installed_version}")
+    else:
+        print(f"✗ Upgrade failed: {result.error_message}")
+```
+
+### Using Configuration Files
+
+Create a `.cli-audit.yml` file in your project root:
+
+```yaml
+version: 1
+
+environment:
+  mode: workstation  # auto, ci, server, or workstation
+
+tools:
+  black:
+    version: "24.*"  # Pin to major version
+    method: pipx
+    fallback: pip
+
+  ripgrep:
+    version: latest
+    method: cargo
+
+preferences:
+  reconciliation: aggressive  # or parallel
+  breaking_changes: warn      # accept, warn, or reject
+  auto_upgrade: true
+  timeout_seconds: 10
+  max_workers: 8
+  cache_ttl_seconds: 3600     # 1 hour version cache
+
+  bulk:
+    fail_fast: false
+    auto_rollback: true
+    generate_rollback_script: true
+
+  package_managers:
+    python:
+      - uv
+      - pipx
+      - pip
+    rust:
+      - cargo
+
+presets:
+  dev-essentials:
+    - black
+    - ripgrep
+    - fd
+    - bat
+```
+
+Load and use the configuration:
+
+```python
+from cli_audit import load_config, bulk_install, Environment
+
+# Load configuration from standard locations
+config = load_config(verbose=True)
+env = Environment.from_config(config)
+
+# Install tools from a preset
+result = bulk_install(
+    mode="preset",
+    preset_name="dev-essentials",
+    config=config,
+    env=env,
+)
+
+print(f"Installed {len(result.successes)} tools from preset")
+```
+
+### Reconciling Multiple Installations
+
+```python
+from cli_audit import reconcile_tool, bulk_reconcile, Config, Environment
+
+config = Config()
+env = Environment.detect()
+
+# Reconcile a single tool (remove duplicates)
+result = reconcile_tool(
+    tool_name="python",
+    config=config,
+    env=env,
+    dry_run=False,  # Set to True to preview actions
+    verbose=True,
+)
+
+if result.reconciled:
+    print(f"✓ Reconciled {result.tool_name}")
+    print(f"  Kept: {result.kept_installation.path} ({result.kept_installation.method})")
+    print(f"  Removed: {len(result.removed_installations)} installations")
+else:
+    print(f"No action needed for {result.tool_name}")
+
+# Bulk reconciliation
+bulk_result = bulk_reconcile(
+    tools=["python", "node", "rust"],
+    config=config,
+    env=env,
+    max_workers=3,
+)
+
+print(f"Reconciled {len(bulk_result.reconciled)} tools")
+```
+
+### Custom Preferences
+
+```python
+from cli_audit import Config, Preferences, BulkPreferences, install_tool, Environment
+
+# Create custom preferences
+bulk_prefs = BulkPreferences(
+    fail_fast=True,
+    auto_rollback=True,
+    generate_rollback_script=True,
+)
+
+prefs = Preferences(
+    reconciliation="aggressive",
+    breaking_changes="reject",  # Don't allow major version upgrades
+    auto_upgrade=False,
+    max_workers=4,
+    cache_ttl_seconds=1800,  # 30 minutes
+    bulk=bulk_prefs,
+)
+
+config = Config(preferences=prefs)
+env = Environment.detect()
+
+# Use custom preferences
+result = install_tool(
+    tool_name="black",
+    package_name="black",
+    target_version="23.12.0",  # Pin specific version
+    config=config,
+    env=env,
+    language="python",
+)
+```
+
+### Dry Run and Install Planning
+
+```python
+from cli_audit import generate_install_plan, dry_run_install, Config, Environment
+
+config = Config()
+env = Environment.detect()
+
+# Generate installation plan
+plan = generate_install_plan(
+    tool_name="ripgrep",
+    package_name="ripgrep",
+    target_version="latest",
+    config=config,
+    env=env,
+    language="rust",
+)
+
+print("Installation plan:")
+for step in plan.steps:
+    print(f"  {step.description}")
+    print(f"    Command: {' '.join(step.command)}")
+
+# Execute dry run (no actual changes)
+result = dry_run_install(plan, verbose=True)
+print(f"\nDry run completed in {result.duration_seconds:.2f}s")
+print(f"Estimated steps: {len(result.steps_completed)}")
+```
+
 ## Snapshot-based workflow (local-only friendly)
 
 This tool now separates data collection from rendering:

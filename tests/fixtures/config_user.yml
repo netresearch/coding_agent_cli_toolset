@@ -1,0 +1,17 @@
+version: 1
+
+environment:
+  mode: auto
+
+tools:
+  python:
+    version: "3.12.*"
+    method: pipx
+
+  ripgrep:
+    version: latest
+    method: cargo
+
+preferences:
+  max_workers: 8
+  timeout_seconds: 10

@@ -1,0 +1,12 @@
+version: 1
+
+environment:
+  mode: workstation
+
+tools:
+  python:
+    version: "3.11.*"
+    method: uv
+
+preferences:
+  max_workers: 4
