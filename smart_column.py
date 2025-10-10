@@ -218,4 +218,9 @@ def main():
         os._exit(0)
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        # Clean exit on Ctrl-C without stack trace
+        print("", file=sys.stderr)
+        raise SystemExit(130)  # Standard Unix exit code for SIGINT
