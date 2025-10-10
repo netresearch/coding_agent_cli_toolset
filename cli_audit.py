@@ -202,9 +202,10 @@ MANUAL_FILE: str = os.environ.get(
     os.path.join(os.path.dirname(__file__), "latest_versions.json"),
 )
 MANUAL_VERSIONS: dict[str, Any] = {}
-# Disable incremental writes during parallel collection to avoid file locking issues
-# The full snapshot is written at the end anyway
-WRITE_MANUAL: bool = os.environ.get("CLI_AUDIT_WRITE_MANUAL", "1") == "1" and not COLLECT_ONLY
+# Disable incremental writes during parallel execution to avoid file locking deadlocks
+# With MAX_WORKERS > 1, multiple threads compete for MANUAL_LOCK causing severe contention
+# Incremental writes are unnecessary since snapshot/results are finalized at the end
+WRITE_MANUAL: bool = os.environ.get("CLI_AUDIT_WRITE_MANUAL", "1") == "1" and MAX_WORKERS == 1
 MANUAL_USED: dict[str, bool] = {}
 
 # Selected-path tracking for JSON output (populated by audit_tool)
