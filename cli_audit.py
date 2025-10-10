@@ -55,7 +55,7 @@ STDOUT_IS_TTY: bool = sys.stdout.isatty()
 ENABLE_LINKS: bool = os.environ.get("CLI_AUDIT_LINKS", "1") == "1"
 USE_EMOJI_ICONS: bool = os.environ.get("CLI_AUDIT_EMOJI", "1") == "1"
 OFFLINE_MODE: bool = os.environ.get("CLI_AUDIT_OFFLINE", "0") == "1"
-MAX_WORKERS: int = int(os.environ.get("CLI_AUDIT_MAX_WORKERS", "8"))
+MAX_WORKERS: int = int(os.environ.get("CLI_AUDIT_MAX_WORKERS", "4"))  # Reduced from 8 to avoid network congestion
 DOCKER_INFO_ENABLED: bool = os.environ.get("CLI_AUDIT_DOCKER_INFO", "1") == "1"
 PROGRESS: bool = os.environ.get("CLI_AUDIT_PROGRESS", "0") == "1"
 OFFLINE_USE_CACHE: bool = os.environ.get("CLI_AUDIT_OFFLINE_USE_CACHE", "1") == "1"  # kept for compatibility, no effect
@@ -2288,7 +2288,10 @@ def main() -> int:
     if COLLECT_ONLY:
         offline_note = " (offline mode)" if OFFLINE_MODE else ""
         print(f"# Collecting fresh data for {total_tools} tools{offline_note}...", file=sys.stderr)
-        print(f"# Estimated time: ~{TIMEOUT_SECONDS * 3}s (timeout={TIMEOUT_SECONDS}s per tool)", file=sys.stderr)
+        estimated_time = int((total_tools / MAX_WORKERS) * TIMEOUT_SECONDS * 1.5)
+        print(f"# Estimated time: ~{estimated_time}s (timeout={TIMEOUT_SECONDS}s per tool, {MAX_WORKERS} workers)", file=sys.stderr)
+        if not OFFLINE_MODE:
+            print(f"# Note: Network issues may cause hangs. Press Ctrl-C to cancel, or use 'make audit-offline' for faster results.", file=sys.stderr)
 
     # Detailed progress for debugging (only when PROGRESS=1)
     print(f"# start collect: tools={total_tools} timeout={TIMEOUT_SECONDS}s retries={HTTP_RETRIES} offline={OFFLINE_MODE}", file=sys.stderr) if PROGRESS else None
