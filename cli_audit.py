@@ -2292,10 +2292,21 @@ def main() -> int:
                 t = tools_seq[idx]
                 row = (t.name, "X", "", "", upstream_method_for(t), "UNKNOWN", tool_homepage_url(t), latest_target_url(t, "", ""))
             results[idx] = row
+            completed_tools += 1
+
+            # Always show basic progress counter (not just PROGRESS=1)
+            if COLLECT_ONLY:
+                try:
+                    name = row[0] if row else "?"
+                    # Simple progress: "# [15/60] git ✓"
+                    print(f"# [{completed_tools}/{total_tools}] {name}", file=sys.stderr, flush=True)
+                except Exception:
+                    pass
+
+            # Detailed progress for debugging (only when PROGRESS=1)
             if PROGRESS:
                 try:
                     name, installed, _installed_method, latest, upstream_method, status, _tool_url, _latest_url = row
-                    completed_tools += 1
                     print(f"# done {name} ({completed_tools}/{total_tools}) status={status} installed='{installed}' latest='{latest}' upstream={upstream_method}", file=sys.stderr)
                 except Exception:
                     pass
