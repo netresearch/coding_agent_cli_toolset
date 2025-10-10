@@ -2298,7 +2298,7 @@ def _render_only_mode() -> int:
         outdated = sum(1 for r in rows if r[5] == "OUTDATED")
         unknown = sum(1 for r in rows if r[5] == "UNKNOWN")
         offline_tag = " (offline)" if meta.get("offline") else ""
-        print(f"\nReadiness{offline_tag}: {total} tools, {outdated} outdated, {missing} missing, {unknown} unknown")
+        print(f"\nReadiness{offline_tag}: {total} tools, {outdated} outdated, {missing} missing, {unknown} unknown", file=sys.stderr)
     except Exception:
         pass
     return 0
