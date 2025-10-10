@@ -49,6 +49,10 @@ GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 # Manual cache lock for updating the committed latest_versions.json
 MANUAL_LOCK = threading.Lock()
 
+# GitHub rate limit tracking
+GITHUB_RATE_LIMIT_HIT = False
+GITHUB_RATE_LIMIT_LOCK = threading.Lock()
+
 # Output rendering options
 STDOUT_IS_TTY: bool = sys.stdout.isatty()
 # Respect env flags regardless of TTY so links/icons can be used with pipes (e.g., column)
@@ -309,6 +313,13 @@ def http_fetch(
             last_exc = e
             code = getattr(e, "code", 0) or 0
             retryable = (code == 429) or (500 <= code <= 599) or (host == "api.github.com" and code == 403)
+
+            # Detect GitHub rate limit errors
+            if host == "api.github.com" and code == 403:
+                global GITHUB_RATE_LIMIT_HIT
+                with GITHUB_RATE_LIMIT_LOCK:
+                    GITHUB_RATE_LIMIT_HIT = True
+
             if TRACE_NET:
                 _tlog(f"# http_error host={host} code={code} retryable={retryable} url={url}")
             if AUDIT_DEBUG:
@@ -2579,12 +2590,58 @@ def main() -> int:
         except Exception as e:
             if AUDIT_DEBUG:
                 print(f"# DEBUG: failed to write snapshot: {e}", file=sys.stderr)
+
+        # GitHub rate limit warning (always show if encountered)
+        if GITHUB_RATE_LIMIT_HIT:
+            print("", file=sys.stderr)
+            print("⚠️  GitHub API Rate Limit Detected", file=sys.stderr)
+            print("", file=sys.stderr)
+            print("Some version checks failed due to GitHub API rate limits.", file=sys.stderr)
+            print("Without authentication, GitHub allows only 60 requests per hour.", file=sys.stderr)
+            print("", file=sys.stderr)
+            print("To fix this issue:", file=sys.stderr)
+            print("  1. Create a GitHub Personal Access Token:", file=sys.stderr)
+            print("     https://github.com/settings/tokens/new", file=sys.stderr)
+            print("     (No special permissions required - just create a token)", file=sys.stderr)
+            print("", file=sys.stderr)
+            print("  2. Set the GITHUB_TOKEN environment variable:", file=sys.stderr)
+            print("     export GITHUB_TOKEN='your_token_here'", file=sys.stderr)
+            print("", file=sys.stderr)
+            print("  3. Add to your shell profile (~/.bashrc or ~/.zshrc):", file=sys.stderr)
+            print("     echo 'export GITHUB_TOKEN=\"your_token_here\"' >> ~/.bashrc", file=sys.stderr)
+            print("", file=sys.stderr)
+            print("With a token, you get 5,000 requests per hour.", file=sys.stderr)
+            print("", file=sys.stderr)
+
         return 0
 
     # Optional footer (disabled by default to avoid breaking table layout)
     if os.environ.get("CLI_AUDIT_FOOTER", "0") == "1":
         path_has_cargo = CARGO_BIN in os.environ.get("PATH", "").split(":")
         print(f"# cargo_bin: {'yes' if path_has_cargo else 'no'}")
+
+    # GitHub rate limit warning (always show if encountered)
+    if GITHUB_RATE_LIMIT_HIT:
+        print("", file=sys.stderr)
+        print("⚠️  GitHub API Rate Limit Detected", file=sys.stderr)
+        print("", file=sys.stderr)
+        print("Some version checks failed due to GitHub API rate limits.", file=sys.stderr)
+        print("Without authentication, GitHub allows only 60 requests per hour.", file=sys.stderr)
+        print("", file=sys.stderr)
+        print("To fix this issue:", file=sys.stderr)
+        print("  1. Create a GitHub Personal Access Token:", file=sys.stderr)
+        print("     https://github.com/settings/tokens/new", file=sys.stderr)
+        print("     (No special permissions required - just create a token)", file=sys.stderr)
+        print("", file=sys.stderr)
+        print("  2. Set the GITHUB_TOKEN environment variable:", file=sys.stderr)
+        print("     export GITHUB_TOKEN='your_token_here'", file=sys.stderr)
+        print("", file=sys.stderr)
+        print("  3. Add to your shell profile (~/.bashrc or ~/.zshrc):", file=sys.stderr)
+        print("     echo 'export GITHUB_TOKEN=\"your_token_here\"' >> ~/.bashrc", file=sys.stderr)
+        print("", file=sys.stderr)
+        print("With a token, you get 5,000 requests per hour.", file=sys.stderr)
+        print("", file=sys.stderr)
+
     return 0
 
 
