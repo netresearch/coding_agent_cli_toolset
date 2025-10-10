@@ -2254,6 +2254,7 @@ def _render_only_mode() -> int:
         print(f"# Auditing {tool_count} development tools from snapshot ({age_str})...", file=sys.stderr)
     else:
         print(f"# No snapshot found - run 'make update' to collect fresh data", file=sys.stderr)
+    print("", file=sys.stderr)  # Blank line to separate informational message from table output
 
     snap = load_snapshot()
     selected_names = _parse_tool_filter(sys.argv[1:])
