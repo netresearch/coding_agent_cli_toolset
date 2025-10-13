@@ -2402,6 +2402,11 @@ def main() -> int:
         print(f"# Collecting fresh data for {total_tools} tools{offline_note}...", file=sys.stderr)
         estimated_time = int((total_tools / MAX_WORKERS) * TIMEOUT_SECONDS * 1.5)
         print(f"# Estimated time: ~{estimated_time}s (timeout={TIMEOUT_SECONDS}s per tool, {MAX_WORKERS} workers)", file=sys.stderr)
+        # Show GITHUB_TOKEN status
+        if GITHUB_TOKEN:
+            print(f"# GITHUB_TOKEN: configured (authenticated requests enabled)", file=sys.stderr)
+        else:
+            print(f"# GITHUB_TOKEN: not set (limited to 60 requests/hour)", file=sys.stderr)
         if not OFFLINE_MODE:
             print(f"# Note: Network issues may cause hangs. Press Ctrl-C to cancel, or use 'make audit-offline' for faster results.", file=sys.stderr)
 
@@ -2455,7 +2460,8 @@ def main() -> int:
                         indicator = "?"
                     # Show: "# ✓ [15/60] git (installed: 2.51.0, latest: 2.51.0)"
                     version_info = f"installed: {installed}" if installed and installed != "X" else "not installed"
-                    if latest and latest != installed and status == "OUTDATED":
+                    # Always show latest version if available (not just when outdated)
+                    if latest:
                         version_info += f", latest: {latest}"
                     print(f"# {indicator} [{completed_tools}/{total_tools}] {name} ({version_info})", file=sys.stderr, flush=True)
                 except Exception:
