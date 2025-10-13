@@ -2396,17 +2396,50 @@ def main() -> int:
     total_tools = len(tools_seq)
     completed_tools = 0
 
+    # Always show GITHUB_TOKEN status and actual rate limit info (for both COLLECT_ONLY and live audit)
+    if not OFFLINE_MODE:
+        try:
+            # Query GitHub rate limit API to show actual current status
+            rate_limit_data = http_get("https://api.github.com/rate_limit", timeout=2, retries=1)
+            rate_info = json.loads(rate_limit_data)
+            core_limit = rate_info.get("resources", {}).get("core", {})
+            limit = core_limit.get("limit", 0)
+            remaining = core_limit.get("remaining", 0)
+            reset_time = core_limit.get("reset", 0)
+
+            if limit > 0:
+                # Calculate time until reset
+                import time as time_module
+                reset_in_min = max(0, int((reset_time - time_module.time()) / 60))
+                if GITHUB_TOKEN:
+                    print(f"# GitHub rate limit: {remaining}/{limit} requests remaining (resets in {reset_in_min}m)", file=sys.stderr)
+                else:
+                    print(f"# GitHub rate limit: {remaining}/{limit} requests remaining (resets in {reset_in_min}m) - no token", file=sys.stderr)
+            else:
+                # Fallback if API call failed
+                if GITHUB_TOKEN:
+                    print(f"# GITHUB_TOKEN: configured (5,000 requests/hour)", file=sys.stderr)
+                else:
+                    print(f"# GITHUB_TOKEN: not set (60 requests/hour limit)", file=sys.stderr)
+        except Exception:
+            # Fallback if rate limit check fails
+            if GITHUB_TOKEN:
+                print(f"# GITHUB_TOKEN: configured (5,000 requests/hour)", file=sys.stderr)
+            else:
+                print(f"# GITHUB_TOKEN: not set (60 requests/hour limit)", file=sys.stderr)
+    else:
+        # In offline mode, just show token status
+        if GITHUB_TOKEN:
+            print(f"# GITHUB_TOKEN: configured", file=sys.stderr)
+        else:
+            print(f"# GITHUB_TOKEN: not set", file=sys.stderr)
+
     # Always show friendly startup message (not just when PROGRESS=1)
     if COLLECT_ONLY:
         offline_note = " (offline mode)" if OFFLINE_MODE else ""
         print(f"# Collecting fresh data for {total_tools} tools{offline_note}...", file=sys.stderr)
         estimated_time = int((total_tools / MAX_WORKERS) * TIMEOUT_SECONDS * 1.5)
         print(f"# Estimated time: ~{estimated_time}s (timeout={TIMEOUT_SECONDS}s per tool, {MAX_WORKERS} workers)", file=sys.stderr)
-        # Show GITHUB_TOKEN status
-        if GITHUB_TOKEN:
-            print(f"# GITHUB_TOKEN: configured (authenticated requests enabled)", file=sys.stderr)
-        else:
-            print(f"# GITHUB_TOKEN: not set (limited to 60 requests/hour)", file=sys.stderr)
         if not OFFLINE_MODE:
             print(f"# Note: Network issues may cause hangs. Press Ctrl-C to cancel, or use 'make audit-offline' for faster results.", file=sys.stderr)
 
@@ -2449,21 +2482,47 @@ def main() -> int:
             if COLLECT_ONLY or MAX_WORKERS > 1:
                 try:
                     name, installed, _im, latest, _um, status, _tu, _lu = row
-                    # Clear status indicator: ✓ (success), ⚠ (warning), ✗ (failed)
-                    if status in ("UP-TO-DATE", "OUTDATED"):
-                        indicator = "✓"
-                    elif status == "NOT INSTALLED":
-                        indicator = "⚠"
-                    elif status == "UNKNOWN":
-                        indicator = "✗"
+
+                    # ANSI color codes
+                    GREEN = "\033[32m"
+                    YELLOW = "\033[33m"
+                    RED = "\033[31m"
+                    BOLD_GREEN = "\033[1;32m"
+                    RESET = "\033[0m"
+
+                    # Determine comparison operator and colors
+                    # Extract version without timing info (e.g., "0.9.2 (8ms)" -> "0.9.2")
+                    inst_val = installed.split(" (")[0] if installed and installed != "X" else "n/a"
+                    latest_val = latest.split(" (")[0] if latest else "n/a"
+
+                    if installed and installed != "X" and latest:
+                        if status == "UP-TO-DATE":
+                            operator = "==="
+                            inst_color = GREEN
+                            latest_color = GREEN
+                        else:  # OUTDATED
+                            operator = "!=="
+                            inst_color = YELLOW
+                            latest_color = BOLD_GREEN
+                    elif not (installed and installed != "X") and latest:
+                        # Not installed but latest available
+                        operator = "?"
+                        inst_color = RED
+                        latest_color = BOLD_GREEN
+                    elif (installed and installed != "X") and not latest:
+                        # Installed but latest unknown
+                        operator = "?"
+                        inst_color = YELLOW
+                        latest_color = RED
                     else:
-                        indicator = "?"
-                    # Show: "# ✓ [15/60] git (installed: 2.51.0, latest: 2.51.0)"
-                    version_info = f"installed: {installed}" if installed and installed != "X" else "not installed"
-                    # Always show latest version if available (not just when outdated)
-                    if latest:
-                        version_info += f", latest: {latest}"
-                    print(f"# {indicator} [{completed_tools}/{total_tools}] {name} ({version_info})", file=sys.stderr, flush=True)
+                        # Both unknown
+                        operator = "?"
+                        inst_color = RED
+                        latest_color = RED
+
+                    # Format: "# [1/64] uv (installed: 0.9.2 === latest: 0.9.2)"
+                    version_info = f"installed: {inst_color}{inst_val}{RESET} {operator} latest: {latest_color}{latest_val}{RESET}"
+                    print(f"# [{completed_tools}/{total_tools}] {name} ({version_info})", file=sys.stderr, flush=True)
                 except Exception:
                     # Fallback to simple message if row parsing fails
                     name = row[0] if row and len(row) > 0 else "?"
