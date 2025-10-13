@@ -534,6 +534,202 @@ make reconcile-node
 make reconcile-rust
 ```
 
+## Auto-Update: Package Manager Detection and Updates
+
+The `auto-update` feature automatically detects all installed package managers and runs their built-in update/upgrade tools. This is a comprehensive way to keep your entire development environment up-to-date.
+
+### Supported Package Managers
+
+**System Package Managers:**
+- apt (Debian/Ubuntu)
+- Homebrew (macOS/Linux)
+- Snap
+- Flatpak
+
+**Language-Specific Package Managers:**
+- Cargo (Rust) + Rustup
+- UV (Python)
+- Pipx (Python)
+- Pip (Python)
+- NPM (Node.js)
+- PNPM (Node.js)
+- Yarn (Node.js)
+- Go (binaries)
+- RubyGems
+
+### Quick Start
+
+```bash
+# Detect all installed package managers
+make auto-update-detect
+
+# Update all package managers and their packages
+make auto-update
+
+# Preview what would be updated (dry-run)
+make auto-update-dry-run
+
+# Update only system package managers (apt, brew, snap, flatpak)
+make auto-update-system-only
+
+# Update all except system package managers
+make auto-update-skip-system
+```
+
+### Advanced Usage
+
+The `scripts/auto_update.sh` script can be called directly for fine-grained control:
+
+```bash
+# Show detected package managers
+./scripts/auto_update.sh detect
+
+# Update all package managers
+./scripts/auto_update.sh update
+
+# Update specific package manager only
+./scripts/auto_update.sh cargo
+./scripts/auto_update.sh npm
+./scripts/auto_update.sh brew
+
+# Dry-run mode (show what would be updated)
+./scripts/auto_update.sh --dry-run update
+
+# Verbose output
+./scripts/auto_update.sh --verbose update
+
+# Skip system package managers
+./scripts/auto_update.sh --skip-system update
+
+# Environment variable control
+DRY_RUN=1 ./scripts/auto_update.sh update
+VERBOSE=1 ./scripts/auto_update.sh update
+SKIP_SYSTEM=1 ./scripts/auto_update.sh update
+```
+
+### What Gets Updated
+
+Each package manager updates itself and all packages it manages:
+
+**APT:** Updates package lists and upgrades all installed packages
+```bash
+sudo apt-get update && sudo apt-get upgrade -y
+```
+
+**Homebrew:** Updates package index and upgrades all formulae/casks
+```bash
+brew update && brew upgrade && brew cleanup
+```
+
+**Cargo:** Updates Rust toolchain via rustup and upgrades all cargo-installed binaries
+```bash
+rustup update
+cargo install-update -a  # requires cargo-update
+```
+
+**UV:** Self-updates UV and upgrades all UV-managed tools
+```bash
+uv self update
+uv tool upgrade <each-tool>
+```
+
+**Pipx:** Updates pipx itself and all pipx-installed packages
+```bash
+pip3 install --user --upgrade pipx
+pipx upgrade-all
+```
+
+**NPM:** Updates npm itself and all global packages
+```bash
+npm install -g npm@latest
+npm update -g
+```
+
+**PNPM:** Updates pnpm (via corepack) and global packages
+```bash
+corepack prepare pnpm@latest --activate
+pnpm update -g
+```
+
+**Yarn:** Updates yarn (via corepack)
+```bash
+corepack prepare yarn@stable --activate
+```
+
+**RubyGems:** Updates gem system and all installed gems
+```bash
+gem update --system
+gem update
+gem cleanup
+```
+
+### Workflow Recommendations
+
+**Daily Development Workflow:**
+```bash
+# Quick check what's available
+make auto-update-detect
+
+# Preview updates without making changes
+make auto-update-dry-run
+
+# Apply updates to everything
+make auto-update
+```
+
+**CI/CD or Scripting:**
+```bash
+# Silent updates with environment variables
+VERBOSE=0 ./scripts/auto_update.sh update
+
+# Update only user-level tools (skip system packages)
+SKIP_SYSTEM=1 ./scripts/auto_update.sh update
+```
+
+**Selective Updates:**
+```bash
+# Update only Rust ecosystem
+./scripts/auto_update.sh cargo
+
+# Update only Node.js ecosystem
+./scripts/auto_update.sh npm
+./scripts/auto_update.sh pnpm
+./scripts/auto_update.sh yarn
+
+# Update only Python ecosystem
+./scripts/auto_update.sh uv
+./scripts/auto_update.sh pipx
+```
+
+### Integration with Existing Workflow
+
+The auto-update feature complements the existing audit/upgrade workflow:
+
+```bash
+# 1. Update version snapshot from upstream sources
+make update
+
+# 2. Review what needs updating
+make audit
+
+# 3. Run interactive upgrade for specific tools
+make upgrade
+
+# 4. Auto-update all package managers and their packages
+make auto-update
+
+# 5. Verify everything is up-to-date
+make audit
+```
+
+### Notes
+
+- System package managers (apt, brew, snap, flatpak) require appropriate permissions (sudo)
+- The auto-update process is designed to be safe and non-destructive
+- Use `--dry-run` to preview changes before applying them
+- Some package managers (like Go) don't have built-in bulk update mechanisms - manual updates are required
+- The script gracefully handles missing package managers (skips them)
+
 ## Caching
 
 - Manual baseline (committed): `latest_versions.json` in this repo (override with `CLI_AUDIT_MANUAL_FILE`). Used as the primary source in offline mode; also used as a fallback when online lookups fail. Example content:
