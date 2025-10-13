@@ -1,15 +1,21 @@
 # AI CLI Preparation - Documentation Index
 
-**Version:** 1.0
-**Last Updated:** 2025-10-09
+**Version:** 2.0.0-alpha.6
+**Last Updated:** 2025-10-13
 
 ## Overview
 
 AI CLI Preparation is a specialized environment audit tool designed to ensure AI coding agents (like Claude Code) have access to all necessary developer tools. This documentation provides comprehensive technical details for developers, contributors, and integrators.
 
+**Project Status:**
+- **Phase 1 (Detection & Auditing):** ✅ Complete
+- **Phase 2 (Installation & Upgrade):** ✅ Implementation Complete | 📝 Documentation Complete
+
 ## Documentation Structure
 
 ### For Developers & Contributors
+
+#### Phase 1: Detection & Auditing
 
 1. **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Quick Lookup & Cheat Sheet ⭐
    - One-liners for common operations
@@ -23,9 +29,9 @@ AI CLI Preparation is a specialized environment audit tool designed to ensure AI
    - HTTP layer with retries and rate limiting
    - Cache hierarchy and resilience patterns
 
-3. **[API_REFERENCE.md](API_REFERENCE.md)** - API Documentation
+3. **[API_REFERENCE.md](API_REFERENCE.md)** - Phase 1 API Documentation
    - Tool dataclass specification
-   - Core functions by category
+   - Core audit functions by category
    - Configuration via environment variables
    - Cache file formats and schemas
 
@@ -35,57 +41,95 @@ AI CLI Preparation is a specialized environment audit tool designed to ensure AI
    - Usage examples and patterns
    - Cross-references to detailed docs
 
-5. **[DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)** - Contributing Guide
-   - How to add new tools
-   - Testing strategies and validation
-   - Code organization and style
-   - Common contribution patterns
-
-6. **[TOOL_ECOSYSTEM.md](TOOL_ECOSYSTEM.md)** - Tool Catalog
+5. **[TOOL_ECOSYSTEM.md](TOOL_ECOSYSTEM.md)** - Tool Catalog
    - Complete 50+ tool reference
    - Categories and use cases
    - Upgrade strategies per tool
    - Role-based presets
 
-7. **[DEPLOYMENT.md](DEPLOYMENT.md)** - Operations Guide
+6. **[DEPLOYMENT.md](DEPLOYMENT.md)** - Operations Guide
    - Makefile target reference
    - Installation script usage
    - Snapshot workflow patterns
    - Offline mode configuration
 
-8. **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Problem Solving
+7. **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Problem Solving
    - Common issues and solutions
    - Debugging techniques
    - Performance optimization
    - Network timeout handling
 
-9. **[../scripts/README.md](../scripts/README.md)** - Installation Scripts
-   - All 13+ installation scripts documented
-   - Actions: install, update, uninstall, reconcile
-   - Per-script usage and best practices
-   - Troubleshooting script issues
+#### Phase 2: Installation & Upgrade Management
+
+8. **[PHASE2_API_REFERENCE.md](PHASE2_API_REFERENCE.md)** - Phase 2 API Documentation ⭐
+   - Installation, upgrade, and reconciliation APIs
+   - Environment detection and configuration
+   - Bulk operations and dependency resolution
+   - Breaking change management
+   - Package manager selection
+
+9. **[CLI_REFERENCE.md](CLI_REFERENCE.md)** - Command-Line Reference
+   - All CLI commands and options
+   - Environment variable reference (60+ variables)
+   - Output formats and usage patterns
+   - Common workflows and examples
+
+10. **[TESTING.md](TESTING.md)** - Testing Guide
+    - Test organization and structure
+    - Running tests (unit, integration, E2E)
+    - Writing tests and fixtures
+    - Mocking patterns and best practices
+    - Coverage requirements and CI integration
+
+11. **[ERROR_CATALOG.md](ERROR_CATALOG.md)** - Error Reference
+    - Complete error categorization
+    - Causes, resolutions, and troubleshooting
+    - InstallError exception patterns
+    - Retryable error detection
+    - Exit codes and debugging
+
+12. **[INTEGRATION_EXAMPLES.md](INTEGRATION_EXAMPLES.md)** - Integration Patterns
+    - CI/CD integration (GitHub Actions, GitLab CI)
+    - Development workflow automation
+    - Custom toolchain management
+    - Python API integration examples
+    - Configuration patterns
+
+#### Contributing
+
+13. **[DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)** - Contributing Guide
+    - How to add new tools
+    - Testing strategies and validation
+    - Code organization and style
+    - Common contribution patterns
+
+14. **[../scripts/README.md](../scripts/README.md)** - Installation Scripts
+    - All 13+ installation scripts documented
+    - Actions: install, update, uninstall, reconcile
+    - Per-script usage and best practices
+    - Troubleshooting script issues
 
 ### Planning & Specifications
 
-10. **[PRD.md](PRD.md)** - Product Requirements Document
+15. **[PRD.md](PRD.md)** - Product Requirements Document
     - Phase 1 summary (detection and auditing)
     - Phase 2 specification (installation and upgrade management)
     - User stories and success criteria
     - Risk assessment and mitigation strategies
 
-11. **[PHASE2_IMPLEMENTATION.md](PHASE2_IMPLEMENTATION.md)** - Implementation Roadmap
+16. **[PHASE2_IMPLEMENTATION.md](PHASE2_IMPLEMENTATION.md)** - Implementation Roadmap
     - 5 implementation phases with timelines
     - Deliverables and success criteria per phase
     - Testing strategies and rollout plan
     - Risk mitigation and validation
 
-12. **[CONFIGURATION_SPEC.md](CONFIGURATION_SPEC.md)** - Configuration Reference
+17. **[CONFIGURATION_SPEC.md](CONFIGURATION_SPEC.md)** - Configuration Reference
     - .cli-audit.yml schema and syntax
     - File locations and precedence rules
     - Version specification syntax
     - Examples for all environments
 
-13. **[adr/README.md](adr/README.md)** - Architecture Decision Records
+18. **[adr/README.md](adr/README.md)** - Architecture Decision Records
     - ADR process and templates
     - Index of all architectural decisions
     - Phase 2 decision rationale
@@ -102,30 +146,30 @@ AI CLI Preparation is a specialized environment audit tool designed to ensure AI
 ### By Role
 
 **First-Time Users:**
-Start with [QUICK_REFERENCE.md](QUICK_REFERENCE.md) ⭐ → [TOOL_ECOSYSTEM.md](TOOL_ECOSYSTEM.md) → [DEPLOYMENT.md](DEPLOYMENT.md)
+Start with [QUICK_REFERENCE.md](QUICK_REFERENCE.md) ⭐ → [CLI_REFERENCE.md](CLI_REFERENCE.md) → [TOOL_ECOSYSTEM.md](TOOL_ECOSYSTEM.md) → [DEPLOYMENT.md](DEPLOYMENT.md)
 
 **Contributors:**
-Start with [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) → [ARCHITECTURE.md](ARCHITECTURE.md) → [API_REFERENCE.md](API_REFERENCE.md) → [FUNCTION_REFERENCE.md](FUNCTION_REFERENCE.md)
+Start with [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) → [ARCHITECTURE.md](ARCHITECTURE.md) → [PHASE2_API_REFERENCE.md](PHASE2_API_REFERENCE.md) → [TESTING.md](TESTING.md)
 
 **Maintainers:**
-Start with [ARCHITECTURE.md](ARCHITECTURE.md) → [TROUBLESHOOTING.md](TROUBLESHOOTING.md) → [DEPLOYMENT.md](DEPLOYMENT.md) → [adr/README.md](adr/README.md)
+Start with [ARCHITECTURE.md](ARCHITECTURE.md) → [PHASE2_API_REFERENCE.md](PHASE2_API_REFERENCE.md) → [ERROR_CATALOG.md](ERROR_CATALOG.md) → [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 
 **Integrators:**
-Start with [TOOL_ECOSYSTEM.md](TOOL_ECOSYSTEM.md) → [API_REFERENCE.md](API_REFERENCE.md) → [DEPLOYMENT.md](DEPLOYMENT.md)
+Start with [INTEGRATION_EXAMPLES.md](INTEGRATION_EXAMPLES.md) ⭐ → [PHASE2_API_REFERENCE.md](PHASE2_API_REFERENCE.md) → [CLI_REFERENCE.md](CLI_REFERENCE.md) → [CONFIGURATION_SPEC.md](CONFIGURATION_SPEC.md)
 
 **Product/Planning:**
 Start with [PRD.md](PRD.md) → [adr/README.md](adr/README.md) → [PHASE2_IMPLEMENTATION.md](PHASE2_IMPLEMENTATION.md)
 
 **AI Agent Developers:**
-Start with [../claudedocs/](../claudedocs/) → [TOOL_ECOSYSTEM.md](TOOL_ECOSYSTEM.md) → [API_REFERENCE.md](API_REFERENCE.md)
+Start with [../claudedocs/](../claudedocs/) → [INTEGRATION_EXAMPLES.md](INTEGRATION_EXAMPLES.md) → [PHASE2_API_REFERENCE.md](PHASE2_API_REFERENCE.md) → [TOOL_ECOSYSTEM.md](TOOL_ECOSYSTEM.md)
 
 **Operators/DevOps:**
-Start with [QUICK_REFERENCE.md](QUICK_REFERENCE.md) → [DEPLOYMENT.md](DEPLOYMENT.md) → [../scripts/README.md](../scripts/README.md)
+Start with [QUICK_REFERENCE.md](QUICK_REFERENCE.md) → [CLI_REFERENCE.md](CLI_REFERENCE.md) → [DEPLOYMENT.md](DEPLOYMENT.md) → [../scripts/README.md](../scripts/README.md)
 
 ### By Task
 
 **Quick Command Lookup:**
-[QUICK_REFERENCE.md](QUICK_REFERENCE.md) ⭐ - Start here for common operations
+[QUICK_REFERENCE.md](QUICK_REFERENCE.md) ⭐ → [CLI_REFERENCE.md](CLI_REFERENCE.md) - Start here for common operations
 
 **Adding a New Tool:**
 [DEVELOPER_GUIDE.md#adding-tools](DEVELOPER_GUIDE.md#adding-tools) → [API_REFERENCE.md#tool-dataclass](API_REFERENCE.md#tool-dataclass)
@@ -133,14 +177,23 @@ Start with [QUICK_REFERENCE.md](QUICK_REFERENCE.md) → [DEPLOYMENT.md](DEPLOYME
 **Understanding Architecture:**
 [ARCHITECTURE.md#overview](ARCHITECTURE.md#overview) → [ARCHITECTURE.md#data-flow](ARCHITECTURE.md#data-flow)
 
-**Using Functions:**
+**Using Phase 1 API (Audit):**
 [FUNCTION_REFERENCE.md](FUNCTION_REFERENCE.md) → [API_REFERENCE.md](API_REFERENCE.md)
 
+**Using Phase 2 API (Install/Upgrade):**
+[PHASE2_API_REFERENCE.md](PHASE2_API_REFERENCE.md) ⭐ → [INTEGRATION_EXAMPLES.md](INTEGRATION_EXAMPLES.md)
+
 **Installing Tools:**
-[../scripts/README.md](../scripts/README.md) → [DEPLOYMENT.md](DEPLOYMENT.md)
+[INTEGRATION_EXAMPLES.md](INTEGRATION_EXAMPLES.md) → [CLI_REFERENCE.md](CLI_REFERENCE.md) → [../scripts/README.md](../scripts/README.md)
 
 **Debugging Issues:**
-[TROUBLESHOOTING.md#common-issues](TROUBLESHOOTING.md#common-issues) → [QUICK_REFERENCE.md](QUICK_REFERENCE.md) → [API_REFERENCE.md#environment-variables](API_REFERENCE.md#environment-variables)
+[ERROR_CATALOG.md](ERROR_CATALOG.md) ⭐ → [TROUBLESHOOTING.md](TROUBLESHOOTING.md) → [CLI_REFERENCE.md](CLI_REFERENCE.md)
+
+**Writing Tests:**
+[TESTING.md](TESTING.md) → [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)
+
+**CI/CD Integration:**
+[INTEGRATION_EXAMPLES.md#cicd-integration](INTEGRATION_EXAMPLES.md#cicd-integration) → [CLI_REFERENCE.md](CLI_REFERENCE.md)
 
 **Running in Production:**
 [DEPLOYMENT.md#makefile-targets](DEPLOYMENT.md#makefile-targets) → [DEPLOYMENT.md#offline-mode](DEPLOYMENT.md#offline-mode)
@@ -149,7 +202,7 @@ Start with [QUICK_REFERENCE.md](QUICK_REFERENCE.md) → [DEPLOYMENT.md](DEPLOYME
 [PRD.md](PRD.md) → [adr/README.md](adr/README.md) → [PHASE2_IMPLEMENTATION.md](PHASE2_IMPLEMENTATION.md) → [CONFIGURATION_SPEC.md](CONFIGURATION_SPEC.md)
 
 **Configuring Tool Installation:**
-[CONFIGURATION_SPEC.md](CONFIGURATION_SPEC.md) → [ADR-006](adr/ADR-006-configuration-file-format.md)
+[CONFIGURATION_SPEC.md](CONFIGURATION_SPEC.md) → [INTEGRATION_EXAMPLES.md#configuration-patterns](INTEGRATION_EXAMPLES.md#configuration-patterns)
 
 **Understanding Architectural Decisions:**
 [adr/README.md](adr/README.md) - Browse ADR index for specific decisions
