@@ -837,6 +837,8 @@ TOOLS: tuple[Tool, ...] = (
     Tool("ansible-core", ("ansible", "ansible-core"), "pypi", ("ansible-core",)),
     Tool("git-absorb", ("git-absorb",), "gh", ("tummychow", "git-absorb")),
     Tool("git-branchless", ("git-branchless",), "gh", ("arxanas", "git-branchless")),
+    Tool("git-lfs", ("git-lfs",), "gh", ("git-lfs", "git-lfs")),
+    Tool("tfsec", ("tfsec",), "gh", ("aquasecurity", "tfsec")),
     # 3) Formatters & linters
     Tool("black", ("black",), "pypi", ("black",)),
     Tool("isort", ("isort",), "pypi", ("isort",)),
@@ -856,8 +858,11 @@ TOOLS: tuple[Tool, ...] = (
     Tool("gh", ("gh",), "gh", ("cli", "cli")),
     Tool("glab", ("glab",), "gh", ("profclems", "glab")),
     Tool("gam", ("gam",), "gh", ("GAM-team", "GAM")),
-    # 6) Task runners
+    # 6) Task runners & build systems
     Tool("just", ("just",), "gh", ("casey", "just")),
+    Tool("ninja", ("ninja",), "gh", ("ninja-build", "ninja")),
+    # 6.5) Code navigation
+    Tool("cscope", ("cscope",), "skip", ()),
     # 7) Cloud / infra
     Tool("aws", ("aws",), "gh", ("aws", "aws-cli")),
     Tool("kubectl", ("kubectl",), "gh", ("kubernetes", "kubernetes")),

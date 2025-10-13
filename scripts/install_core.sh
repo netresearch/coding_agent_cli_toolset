@@ -50,6 +50,7 @@ get_version() {
     gitleaks) cmd="$(command -v gitleaks || true)" ;;
     git-absorb) cmd="$(command -v git-absorb || true)" ;;
     git-branchless) cmd="$(command -v git-branchless || true)" ;;
+    git-lfs) cmd="$(command -v git-lfs || true)" ;;
     eslint) cmd="$(command -v eslint || true)" ;;
     prettier) cmd="$(command -v prettier || true)" ;;
     shfmt) cmd="$(command -v shfmt || true)" ;;
@@ -59,6 +60,11 @@ get_version() {
     entr) cmd="$(command -v entr || true)" ;;
     glab) cmd="$(command -v glab || true)" ;;
     gam) cmd="$(command -v gam || true)" ;;
+    semgrep) cmd="$(command -v semgrep || true)" ;;
+    pre-commit) cmd="$(command -v pre-commit || true)" ;;
+    tfsec) cmd="$(command -v tfsec || true)" ;;
+    ninja) cmd="$(command -v ninja || true)" ;;
+    cscope) cmd="$(command -v cscope || true)" ;;
     *) cmd="" ;;
   esac
   if [ -z "$cmd" ]; then return 0; fi
@@ -94,6 +100,24 @@ get_version() {
     entr)
       # entr prints version as "release: X.Y" on usage output; no stable --version flag
       "$cmd" 2>&1 | awk '/^release:/ {print $2; exit}'; return 0 ;;
+    git-lfs)
+      # git-lfs prints "git-lfs/X.Y.Z (GitHub; ...)"
+      "$cmd" version 2>/dev/null | awk '{print $1}' | cut -d'/' -f2 | head -n1; return 0 ;;
+    semgrep)
+      # semgrep --version prints version number directly
+      "$cmd" --version 2>/dev/null | head -n1; return 0 ;;
+    pre-commit)
+      # pre-commit --version prints version number directly
+      "$cmd" --version 2>/dev/null | head -n1; return 0 ;;
+    tfsec)
+      # tfsec --version prints "vX.Y.Z"
+      "$cmd" --version 2>/dev/null | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' | head -n1; return 0 ;;
+    ninja)
+      # ninja --version prints version directly
+      "$cmd" --version 2>/dev/null | head -n1; return 0 ;;
+    cscope)
+      # cscope -V prints multi-line with version in first line
+      "$cmd" -V 2>/dev/null | head -n1 | grep -Eo '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -n1; return 0 ;;
     *)
       "$cmd" --version 2>/dev/null | head -n1; return 0 ;;
   esac
@@ -696,15 +720,10 @@ install_glab() {
 
 install_golangci_lint() {
   if have brew; then brew install golangci-lint; return; fi
-  # Try go install first (requires go 1.17+)
-  if command -v go >/dev/null 2>&1; then
-    GO111MODULE=on go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest && $INSTALL "$(go_bin_path)/golangci-lint" "$BIN_DIR/golangci-lint" && return
-  fi
-  # Try GitHub release binary as fallback
-  local tmp tag ver url name file AUTH
+  # Try GitHub release binary first (most authoritative source for latest version)
+  local tmp tag ver url name file
   tmp="$(mktemp -d)"
-  if [ -n "${GITHUB_TOKEN:-}" ]; then AUTH=( -H "Authorization: Bearer ${GITHUB_TOKEN}" ); else AUTH=(); fi
-  tag="$(curl -fsSIL ${AUTH[@]} -H "User-Agent: cli-audit" -o /dev/null -w '%{url_effective}' https://github.com/golangci/golangci-lint/releases/latest | awk -F'/' '{print $NF}')"
+  tag="$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/golangci/golangci-lint/releases/latest | awk -F'/' '{print $NF}')"
   if [ -n "$tag" ]; then
     ver="${tag#v}"
     case "$ARCH" in
@@ -713,13 +732,17 @@ install_golangci_lint() {
       *) name="golangci-lint-${ver}-linux-amd64.tar.gz" ;;
     esac
     url="https://github.com/golangci/golangci-lint/releases/download/${tag}/${name}"
-    if curl -fsSL ${AUTH[@]} -H "User-Agent: cli-audit" "$url" -o "$tmp/golangci-lint.tgz"; then
+    if curl -fsSL "$url" -o "$tmp/golangci-lint.tgz"; then
       if tar -C "$tmp" -xzf "$tmp/golangci-lint.tgz" >/dev/null 2>&1; then
         # Find the binary in the extracted directory
         file="$(find "$tmp" -type f -name golangci-lint -perm -111 | head -n1)"
         if [ -n "$file" ]; then $INSTALL "$file" "$BIN_DIR/golangci-lint" && return; fi
       fi
     fi
+  fi
+  # Fallback to go install (requires go 1.17+)
+  if command -v go >/dev/null 2>&1; then
+    GO111MODULE=on go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest && $INSTALL "$(go_bin_path)/golangci-lint" "$BIN_DIR/golangci-lint" && return
   fi
 }
 
@@ -775,6 +798,103 @@ install_just() {
     return
   fi
   if have cargo; then cargo install just; return; fi
+}
+
+install_git_lfs() {
+  if have brew; then brew install git-lfs; return; fi
+  # Try GitHub release binary
+  local tmp tag ver url name
+  tmp="$(mktemp -d)"
+  tag="$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/git-lfs/git-lfs/releases/latest | awk -F'/' '{print $NF}')"
+  if [ -n "$tag" ]; then
+    ver="${tag#v}"
+    case "$ARCH" in
+      x86_64|amd64) name="git-lfs-linux-amd64-v${ver}.tar.gz" ;;
+      aarch64|arm64) name="git-lfs-linux-arm64-v${ver}.tar.gz" ;;
+      *) name="git-lfs-linux-amd64-v${ver}.tar.gz" ;;
+    esac
+    url="https://github.com/git-lfs/git-lfs/releases/download/${tag}/${name}"
+    if curl -fsSL "$url" -o "$tmp/git-lfs.tgz"; then
+      if tar -C "$tmp" -xzf "$tmp/git-lfs.tgz" >/dev/null 2>&1; then
+        local file="$(find "$tmp" -type f -name git-lfs -perm -111 | head -n1)"
+        if [ -n "$file" ]; then
+          $INSTALL "$file" "$BIN_DIR/git-lfs"
+          # Run git lfs install to set up git hooks
+          command -v git-lfs >/dev/null 2>&1 && git lfs install --skip-repo || true
+          return
+        fi
+      fi
+    fi
+  fi
+  # Fallback to apt
+  if have apt-get; then
+    sudo apt-get update && sudo apt-get install -y git-lfs
+    git lfs install --skip-repo || true
+    return
+  fi
+}
+
+install_semgrep() {
+  if have brew; then brew install semgrep; return; fi
+  # Prefer pipx for isolated installation
+  if command -v pipx >/dev/null 2>&1; then pipx install semgrep; return; fi
+  # Fallback to pip
+  if command -v pip3 >/dev/null 2>&1; then pip3 install --user semgrep; return; fi
+}
+
+install_pre_commit() {
+  if have brew; then brew install pre-commit; return; fi
+  # Prefer pipx for isolated installation
+  if command -v pipx >/dev/null 2>&1; then pipx install pre-commit; return; fi
+  # Fallback to pip
+  if command -v pip3 >/dev/null 2>&1; then pip3 install --user pre-commit; return; fi
+}
+
+install_tfsec() {
+  if have brew; then brew install tfsec; return; fi
+  # GitHub release binary
+  local tmp tag ver url name
+  tmp="$(mktemp -d)"
+  tag="$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/aquasecurity/tfsec/releases/latest | awk -F'/' '{print $NF}')"
+  if [ -n "$tag" ]; then
+    ver="${tag#v}"
+    case "$ARCH" in
+      x86_64|amd64) name="tfsec-linux-amd64" ;;
+      aarch64|arm64) name="tfsec-linux-arm64" ;;
+      *) name="tfsec-linux-amd64" ;;
+    esac
+    url="https://github.com/aquasecurity/tfsec/releases/download/${tag}/${name}"
+    if curl -fsSL "$url" -o "$tmp/tfsec"; then
+      chmod +x "$tmp/tfsec" || true
+      $INSTALL "$tmp/tfsec" "$BIN_DIR/tfsec" && return
+    fi
+  fi
+}
+
+install_ninja() {
+  if have brew; then brew install ninja; return; fi
+  # Try GitHub release binary
+  local tmp tag url
+  tmp="$(mktemp -d)"
+  tag="$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/ninja-build/ninja/releases/latest | awk -F'/' '{print $NF}')"
+  if [ -n "$tag" ]; then
+    url="https://github.com/ninja-build/ninja/releases/download/${tag}/ninja-linux.zip"
+    if curl -fsSL "$url" -o "$tmp/ninja.zip"; then
+      if command -v unzip >/dev/null 2>&1 && unzip -q "$tmp/ninja.zip" -d "$tmp" >/dev/null 2>&1; then
+        if [ -f "$tmp/ninja" ]; then
+          chmod +x "$tmp/ninja"
+          $INSTALL "$tmp/ninja" "$BIN_DIR/ninja" && return
+        fi
+      fi
+    fi
+  fi
+  # Fallback to apt
+  if have apt-get; then sudo apt-get update && sudo apt-get install -y ninja-build; return; fi
+}
+
+install_cscope() {
+  if have brew; then brew install cscope; return; fi
+  if have apt-get; then sudo apt-get update && sudo apt-get install -y cscope; return; fi
 }
 
 install_core_tools() {
@@ -938,6 +1058,33 @@ reconcile_one() {
       ;;
     gh)
       install_gh
+      ;;
+    git-lfs)
+      sudo apt-get remove -y git-lfs >/dev/null 2>&1 || true
+      install_git_lfs
+      ;;
+    semgrep)
+      if command -v pipx >/dev/null 2>&1; then pipx uninstall semgrep >/dev/null 2>&1 || true; fi
+      if command -v pip3 >/dev/null 2>&1; then pip3 uninstall -y semgrep >/dev/null 2>&1 || true; fi
+      install_semgrep
+      ;;
+    pre-commit)
+      if command -v pipx >/dev/null 2>&1; then pipx uninstall pre-commit >/dev/null 2>&1 || true; fi
+      if command -v pip3 >/dev/null 2>&1; then pip3 uninstall -y pre-commit >/dev/null 2>&1 || true; fi
+      install_pre_commit
+      ;;
+    tfsec)
+      $RM "$BIN_DIR/tfsec" >/dev/null 2>&1 || true
+      install_tfsec
+      ;;
+    ninja)
+      sudo apt-get remove -y ninja-build >/dev/null 2>&1 || true
+      $RM "$BIN_DIR/ninja" >/dev/null 2>&1 || true
+      install_ninja
+      ;;
+    cscope)
+      sudo apt-get remove -y cscope >/dev/null 2>&1 || true
+      install_cscope
       ;;
     *) echo "Unknown tool: $t" ;;
   esac

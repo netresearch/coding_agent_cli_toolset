@@ -4,20 +4,21 @@ Complete catalog of all tools tracked by AI CLI Preparation, organized by catego
 
 ## Overview
 
-AI CLI Preparation tracks **50+ developer tools** across 10 categories, optimized for AI coding agent environments. Each tool is classified by installation method and tracked against upstream releases.
+AI CLI Preparation tracks **68 developer tools** across 11 categories, optimized for AI coding agent environments. Each tool is classified by installation method and tracked against upstream releases.
 
 ## Categories
 
 - [Runtimes & Package Managers](#runtimes--package-managers) - Language runtimes and package managers (11 tools)
-- [Search & Code Analysis](#search--code-analysis) - Code search and analysis tools (5 tools)
+- [Search & Code Analysis](#search--code-analysis) - Code search and analysis tools (6 tools)
 - [Editors & Utilities](#editors--utilities) - Editing helpers and diffs (8 tools)
 - [JSON/YAML Processors](#jsonyaml-processors) - Data format tools (4 tools)
 - [HTTP Clients](#http-clients) - HTTP/API testing tools (2 tools)
-- [Automation & Watch](#automation--watch) - File watching and automation (4 tools)
-- [Security & Compliance](#security--compliance) - Security scanning tools (4 tools)
-- [Git Tools](#git-tools) - Version control and Git helpers (5 tools)
-- [Formatters & Linters](#formatters--linters) - Code formatting and linting (7 tools)
+- [Automation & Watch](#automation--watch) - File watching and automation (6 tools)
+- [Security & Compliance](#security--compliance) - Security scanning tools (5 tools)
+- [Git Tools](#git-tools) - Version control and Git helpers (8 tools)
+- [Formatters & Linters](#formatters--linters) - Code formatting and linting (12 tools)
 - [Cloud & Infrastructure](#cloud--infrastructure) - Cloud and container tools (5 tools)
+- [Build Systems](#build-systems) - Build automation and compilation tools (1 tool)
 
 ## Role-Based Presets
 
@@ -157,6 +158,14 @@ make audit-offline-data-core
 - **Use Case:** Semantic code search, structural find-and-replace
 - **Install:** `cargo install ast-grep`
 - **Upgrade:** `cargo install --force ast-grep`
+
+### cscope
+- **Purpose:** C source code browser and navigation tool
+- **Executable:** `cscope`
+- **Upstream:** SourceForge (cscope)
+- **Use Case:** Navigate C/C++ codebases, find function definitions and callers
+- **Install:** `apt install cscope` or `brew install cscope`
+- **Upgrade:** Update via system package manager
 
 ### fzf
 - **Purpose:** Command-line fuzzy finder
@@ -402,6 +411,14 @@ make audit-offline-data-core
 - **Install:** `pipx install pre-commit`
 - **Upgrade:** `pipx upgrade pre-commit`
 
+### tfsec
+- **Purpose:** Security scanner for Terraform code
+- **Executable:** `tfsec`
+- **Upstream:** GitHub (aquasecurity/tfsec)
+- **Use Case:** Finding security issues in Terraform/IaC configurations
+- **Install:** `scripts/install_core.sh reconcile tfsec` or download from releases
+- **Upgrade:** Re-download latest release
+
 ---
 
 ## Git Tools
@@ -445,6 +462,30 @@ make audit-offline-data-core
 - **Use Case:** Advanced git workflows
 - **Install:** `cargo install git-branchless`
 - **Upgrade:** `cargo install --force git-branchless`
+
+### just
+- **Purpose:** Command runner for project-specific tasks
+- **Executable:** `just`
+- **Upstream:** GitHub (casey/just)
+- **Use Case:** Project task automation with justfile recipes
+- **Install:** `cargo install just` or `apt install just`
+- **Upgrade:** `cargo install --force just` or `scripts/auto_update.sh`
+
+### gam
+- **Purpose:** Google Workspace Admin command-line management
+- **Executable:** `gam`
+- **Upstream:** GitHub (GAM-team/GAM)
+- **Use Case:** Automate Google Workspace administration
+- **Install:** Download from GitHub releases
+- **Upgrade:** Re-download latest release
+
+### git-lfs
+- **Purpose:** Git Large File Storage extension
+- **Executable:** `git-lfs`
+- **Upstream:** GitHub (git-lfs/git-lfs)
+- **Use Case:** Version control for large files (models, datasets, media)
+- **Install:** `scripts/install_core.sh reconcile git-lfs` or `apt install git-lfs`
+- **Upgrade:** Re-download latest release or update system package
 
 ---
 
@@ -506,6 +547,30 @@ make audit-offline-data-core
 - **Install:** `apt install shellcheck` or download binary
 - **Upgrade:** Update system package
 
+### golangci-lint
+- **Purpose:** Fast Go linters aggregator
+- **Executable:** `golangci-lint`
+- **Upstream:** GitHub (golangci/golangci-lint)
+- **Use Case:** Running multiple Go linters in parallel
+- **Install:** `go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest`
+- **Upgrade:** `go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest`
+
+### codex
+- **Purpose:** OpenAI Codex CLI (if available)
+- **Executable:** `codex`
+- **Upstream:** npm (@openai/codex)
+- **Use Case:** AI code generation from CLI
+- **Install:** `npm install -g @openai/codex`
+- **Upgrade:** `npm update -g @openai/codex`
+
+### claude
+- **Purpose:** Anthropic Claude Code CLI
+- **Executable:** `claude`
+- **Upstream:** npm (@anthropic-ai/claude-code)
+- **Use Case:** AI coding assistant from command line
+- **Install:** `npm install -g @anthropic-ai/claude-code`
+- **Upgrade:** `npm update -g @anthropic-ai/claude-code`
+
 ---
 
 ## Cloud & Infrastructure
@@ -557,6 +622,18 @@ make audit-offline-data-core
 - **Use Case:** Analyzing and reducing Docker image sizes
 - **Install:** `go install github.com/wagoodman/dive@latest`
 - **Upgrade:** `go install github.com/wagoodman/dive@latest`
+
+---
+
+## Build Systems
+
+### ninja
+- **Purpose:** Small build system with focus on speed
+- **Executable:** `ninja`
+- **Upstream:** GitHub (ninja-build/ninja)
+- **Use Case:** Fast incremental builds, used by CMake and Meson
+- **Install:** `scripts/install_core.sh reconcile ninja` or `apt install ninja-build`
+- **Upgrade:** Re-download latest release or update system package
 
 ---
 
