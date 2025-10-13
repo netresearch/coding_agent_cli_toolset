@@ -69,13 +69,38 @@ ensure_perms() {
 
 ensure_perms
 
-echo "Gathering current tool status... (offline=$OFFLINE, timeout=${CLI_AUDIT_TIMEOUT_SECONDS:-3}s)"
-# Run collection ONCE using cached versions - progress messages visible
-# MANUAL_FIRST=1 means prefer cached versions from latest_versions.json over live network calls
-# Expected workflow: 'make update' populates cache first, then 'make upgrade' uses it
-# This is the ONLY audit - all subsequent re-audits use the snapshot
-(cd "$ROOT" && CLI_AUDIT_COLLECT=1 CLI_AUDIT_OFFLINE="$OFFLINE" CLI_AUDIT_MANUAL_FIRST=1 "$CLI" cli_audit.py >/dev/null || true)
-# Render table from snapshot (no network calls, instant)
+# Check cache age and warn if stale
+SNAP_FILE="${CLI_AUDIT_SNAPSHOT_FILE:-$ROOT/tools_snapshot.json}"
+CACHE_MAX_AGE_HOURS="${CACHE_MAX_AGE_HOURS:-24}"
+
+check_cache_age() {
+  if [ ! -f "$SNAP_FILE" ]; then
+    echo "⚠️  Warning: Snapshot cache missing ($SNAP_FILE)" >&2
+    echo "   Run 'make update' first to populate the cache." >&2
+    return 1
+  fi
+
+  # Get snapshot age in hours
+  local now=$(date +%s)
+  local snap_time=$(stat -c %Y "$SNAP_FILE" 2>/dev/null || stat -f %m "$SNAP_FILE" 2>/dev/null || echo 0)
+  local age_seconds=$((now - snap_time))
+  local age_hours=$((age_seconds / 3600))
+
+  if [ $age_hours -gt $CACHE_MAX_AGE_HOURS ]; then
+    echo "⚠️  Warning: Snapshot cache is ${age_hours} hours old (threshold: ${CACHE_MAX_AGE_HOURS}h)" >&2
+    echo "   Consider running 'make update' for fresh version data." >&2
+    return 2
+  fi
+
+  return 0
+}
+
+check_cache_age || true
+
+echo "Gathering current tool status from snapshot..."
+# Use RENDER mode ONLY - no collection, no network calls
+# Expected workflow: 'make update' populates cache, 'make upgrade' uses it
+# All data comes from existing snapshot - instant read
 AUDIT_OUTPUT="$(cd "$ROOT" && CLI_AUDIT_RENDER=1 CLI_AUDIT_LINKS=0 CLI_AUDIT_EMOJI=0 "$CLI" cli_audit.py || true)"
 # Also get JSON from snapshot (no network calls, instant)
 AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" cli_audit.py || true)"
@@ -278,7 +303,7 @@ if command -v uv >/dev/null 2>&1 || "$ROOT"/scripts/install_uv.sh reconcile >/de
 fi
 
 # Core tools (fd, fzf, rg, jq, yq, bat, delta, just, and npm/cargo/go tools)
-CORE_TOOLS=(fd fzf ripgrep jq yq bat delta just curlie dive trivy gitleaks git-absorb git-branchless eslint prettier shfmt shellcheck fx glab ctags entr parallel ast-grep direnv git gh)
+CORE_TOOLS=(fd fzf ripgrep jq yq bat delta just curlie dive trivy gitleaks git-absorb git-branchless eslint prettier shfmt shellcheck golangci-lint fx glab gam ctags entr parallel ast-grep direnv git gh)
 for t in "${CORE_TOOLS[@]}"; do
   ICON="$(json_field "$t" state_icon)"
   CURR="$(json_field "$t" installed)"
@@ -327,19 +352,21 @@ for t in pip pipx poetry httpie semgrep black; do
   fi
 done
 
-# Docker
+# Docker CLI client
 DK_ICON="$(json_field docker state_icon)"
 DK_CURR="$(json_field docker installed)"
 DK_LATEST="$(json_field docker latest_upstream)"
 DK_URL="$(json_field docker latest_url)"
 if [ -n "$(json_bool docker is_up_to_date)" ]; then
   printf "\n"
-  printf "==> %s %s\n" "$DK_ICON" "Docker Engine"
+  printf "==> %s %s\n" "$DK_ICON" "Docker CLI"
   printf "    installed: %s via %s\n" "${DK_CURR:-<none>}" "$(json_field docker installed_method)"
   printf "    target:    %s via %s\n" "$(osc8 "$DK_URL" "${DK_LATEST:-<unknown>}")" "$(json_field docker upstream_method)"
   printf "    up-to-date; skipping.\n"
 else
-  if prompt_action "${DK_ICON} Docker Engine" "$DK_CURR" "$(json_field docker installed_method)" "$(osc8 "$DK_URL" "$DK_LATEST")" "$(json_field docker upstream_method)" docker; then
+  if prompt_action "${DK_ICON} Docker CLI (client)" "$DK_CURR" "$(json_field docker installed_method)" "$(osc8 "$DK_URL" "$DK_LATEST")" "$(json_field docker upstream_method)" docker; then
+    echo "Note: This updates the Docker CLI client. Docker Engine (server) is managed separately."
+    echo "      If using Docker Desktop, the engine is updated via Docker Desktop updates."
     "$ROOT"/scripts/install_docker.sh || true
   fi
 fi
