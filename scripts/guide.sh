@@ -70,9 +70,11 @@ ensure_perms() {
 ensure_perms
 
 echo "Gathering current tool status... (offline=$OFFLINE, timeout=${CLI_AUDIT_TIMEOUT_SECONDS:-3}s)"
-# Run collection ONCE to update snapshot - progress messages visible
-# This is the ONLY full audit - all subsequent re-audits use the snapshot
-(cd "$ROOT" && CLI_AUDIT_COLLECT=1 CLI_AUDIT_OFFLINE="$OFFLINE" "$CLI" cli_audit.py >/dev/null || true)
+# Run collection ONCE using cached versions - progress messages visible
+# MANUAL_FIRST=1 means prefer cached versions from latest_versions.json over live network calls
+# Expected workflow: 'make update' populates cache first, then 'make upgrade' uses it
+# This is the ONLY audit - all subsequent re-audits use the snapshot
+(cd "$ROOT" && CLI_AUDIT_COLLECT=1 CLI_AUDIT_OFFLINE="$OFFLINE" CLI_AUDIT_MANUAL_FIRST=1 "$CLI" cli_audit.py >/dev/null || true)
 # Render table from snapshot (no network calls, instant)
 AUDIT_OUTPUT="$(cd "$ROOT" && CLI_AUDIT_RENDER=1 CLI_AUDIT_LINKS=0 CLI_AUDIT_EMOJI=0 "$CLI" cli_audit.py || true)"
 # Also get JSON from snapshot (no network calls, instant)
