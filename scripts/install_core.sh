@@ -741,8 +741,9 @@ install_golangci_lint() {
     fi
   fi
   # Fallback to go install (requires go 1.17+)
+  # Note: v2+ uses /v2 module path per Go module conventions
   if command -v go >/dev/null 2>&1; then
-    GO111MODULE=on go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest && $INSTALL "$(go_bin_path)/golangci-lint" "$BIN_DIR/golangci-lint" && return
+    GO111MODULE=on go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest && $INSTALL "$(go_bin_path)/golangci-lint" "$BIN_DIR/golangci-lint" && return
   fi
 }
 
