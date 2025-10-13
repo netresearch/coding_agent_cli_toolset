@@ -431,5 +431,9 @@ fi
 echo
 echo "All done. Re-run: make audit"
 
+# Check for any rate limit warnings from the final audit
+# Run one more audit to show any accumulated warnings (including rate limits)
+CLI_AUDIT_JSON=1 CLI_AUDIT_MANUAL_FIRST=1 "$CLI" cli_audit.py 2>&1 >/dev/null | grep -A 30 "GitHub API Rate Limit" || true
+
 
 
