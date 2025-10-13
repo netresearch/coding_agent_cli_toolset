@@ -102,6 +102,14 @@ detect_nvm() {
   command -v nvm >/dev/null 2>&1
 }
 
+detect_gcloud() {
+  command -v gcloud >/dev/null 2>&1
+}
+
+detect_az() {
+  command -v az >/dev/null 2>&1
+}
+
 # ============================================================================
 # System Package Managers (requires sudo)
 # ============================================================================
@@ -163,6 +171,15 @@ update_cargo() {
   # Update rustup first
   if detect_rustup; then
     run_cmd "Rustup: Update toolchains" rustup update
+
+    # Update rustup components (clippy, rustfmt, rust-analyzer, etc.)
+    vlog "Rustup: Updating components"
+    for component in clippy rustfmt rust-analyzer rust-src; do
+      if rustup component list 2>/dev/null | grep -q "^${component}.*installed"; then
+        vlog "Rustup: Component $component is installed"
+        # Components are updated with rustup update, no separate update needed
+      fi
+    done
   fi
 
   # Install cargo-update if not present
@@ -211,6 +228,14 @@ update_pipx() {
 
   run_cmd "Pipx: Upgrade pipx" pip3 install --user --upgrade pipx
   run_cmd "Pipx: Upgrade all packages" pipx upgrade-all
+
+  # Explicitly list important dev tools we track via pipx
+  local important_tools=("semgrep" "pre-commit" "coverage" "tox" "checkov" "black" "flake8" "pylint" "mypy")
+  for tool in "${important_tools[@]}"; do
+    if pipx list 2>/dev/null | grep -q "package $tool"; then
+      vlog "Pipx: $tool is installed"
+    fi
+  done
 
   log "Pipx: Complete"
 }
@@ -330,6 +355,34 @@ update_gem() {
   log "RubyGems: Complete"
 }
 
+update_gcloud() {
+  if ! detect_gcloud; then return; fi
+  log "Google Cloud SDK: Updating components"
+
+  run_cmd "gcloud: Update all components" gcloud components update --quiet
+
+  log "Google Cloud SDK: Complete"
+}
+
+update_az() {
+  if ! detect_az; then return; fi
+  log "Azure CLI: Updating"
+
+  # Azure CLI update method depends on installation type
+  if command -v apt-get >/dev/null 2>&1 && dpkg -l azure-cli >/dev/null 2>&1; then
+    # Installed via apt
+    run_cmd "Azure CLI: Update via apt" sudo apt-get update && sudo apt-get install --only-upgrade -y azure-cli
+  elif command -v brew >/dev/null 2>&1 && brew list azure-cli >/dev/null 2>&1; then
+    # Installed via brew
+    run_cmd "Azure CLI: Update via brew" brew upgrade azure-cli
+  else
+    # Try az upgrade command (available in az CLI 2.11.0+)
+    run_cmd "Azure CLI: Self-upgrade" az upgrade --yes
+  fi
+
+  log "Azure CLI: Complete"
+}
+
 # ============================================================================
 # Main Orchestration
 # ============================================================================
@@ -357,6 +410,10 @@ show_detected() {
   detect_yarn && managers+=("yarn")
   detect_go && managers+=("go")
   detect_gem && managers+=("gem")
+
+  # Cloud CLIs
+  detect_gcloud && managers+=("gcloud")
+  detect_az && managers+=("az")
 
   if [ ${#managers[@]} -eq 0 ]; then
     echo "No package managers detected."
@@ -395,6 +452,10 @@ run_all_updates() {
   update_go
   update_gem
 
+  # Cloud CLIs
+  update_gcloud
+  update_az
+
   echo ""
   log "Auto-update complete!"
 }
@@ -414,7 +475,7 @@ Commands:
   update    Run updates for all detected package managers
   apt       Update only APT packages
   brew      Update only Homebrew packages
-  cargo     Update only Cargo packages
+  cargo     Update only Cargo packages (includes rustup components)
   uv        Update only UV tools
   pipx      Update only Pipx packages
   pip       Update only Pip packages
@@ -425,6 +486,8 @@ Commands:
   gem       Update only RubyGems packages
   snap      Update only Snap packages
   flatpak   Update only Flatpak packages
+  gcloud    Update Google Cloud SDK components
+  az        Update Azure CLI
 
 Options:
   --dry-run         Show what would be updated without making changes
@@ -525,6 +588,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     flatpak)
       update_flatpak
+      exit 0
+      ;;
+    gcloud)
+      update_gcloud
+      exit 0
+      ;;
+    az)
+      update_az
       exit 0
       ;;
     *)
