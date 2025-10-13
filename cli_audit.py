@@ -41,7 +41,19 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 TIMEOUT_SECONDS: int = int(os.environ.get("CLI_AUDIT_TIMEOUT_SECONDS", "3"))
-CARGO_BIN: str = os.path.expanduser("~/.cargo/bin")
+HOME: str = os.path.expanduser("~")
+CARGO_BIN: str = os.path.join(HOME, ".cargo", "bin")
+# Common tool installation directories to check beyond PATH
+EXTRA_SEARCH_PATHS: list[str] = [
+    os.path.join(HOME, "bin"),
+    os.path.join(HOME, ".local", "bin"),
+    "/usr/local/bin",
+]
+# Tool-specific installation directories (tool_name -> [search_dirs])
+TOOL_SPECIFIC_PATHS: dict[str, list[str]] = {
+    "gam": [os.path.join(HOME, "bin", "gam7"), os.path.join(HOME, "bin", "gam")],
+    "claude": [os.path.join(HOME, ".claude", "local"), os.path.join(HOME, ".local", "bin"), os.path.join(HOME, "bin")],
+}
 USER_AGENT_HEADERS = {"User-Agent": "cli-audit/1.0"}
 NPM_REGISTRY_URL = "https://registry.npmjs.org"
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
@@ -59,7 +71,7 @@ STDOUT_IS_TTY: bool = sys.stdout.isatty()
 ENABLE_LINKS: bool = os.environ.get("CLI_AUDIT_LINKS", "1") == "1"
 USE_EMOJI_ICONS: bool = os.environ.get("CLI_AUDIT_EMOJI", "1") == "1"
 OFFLINE_MODE: bool = os.environ.get("CLI_AUDIT_OFFLINE", "0") == "1"
-MAX_WORKERS: int = int(os.environ.get("CLI_AUDIT_MAX_WORKERS", "4"))  # Reduced from 8 to avoid network congestion
+MAX_WORKERS: int = int(os.environ.get("CLI_AUDIT_MAX_WORKERS", "16"))  # Default matches .env.default and documentation
 DOCKER_INFO_ENABLED: bool = os.environ.get("CLI_AUDIT_DOCKER_INFO", "1") == "1"
 PROGRESS: bool = os.environ.get("CLI_AUDIT_PROGRESS", "0") == "1"
 OFFLINE_USE_CACHE: bool = os.environ.get("CLI_AUDIT_OFFLINE_USE_CACHE", "1") == "1"  # kept for compatibility, no effect
@@ -113,7 +125,7 @@ def _tlog(msg: str) -> None:
 
 def _now_iso() -> str:
     try:
-        return datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+        return datetime.datetime.now(datetime.UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     except Exception:
         return ""
 
@@ -267,7 +279,7 @@ def http_fetch(
             pass
     # GitHub token only for API host
     if GITHUB_TOKEN and host == "api.github.com":
-        req_headers["Authorization"] = f"Bearer {GITHUB_TOKEN}"
+        req_headers["Authorization"] = f"token {GITHUB_TOKEN}"
 
     if retries is None:
         retries = HTTP_RETRIES
@@ -1057,10 +1069,28 @@ def find_paths(command_name: str, deep: bool) -> list[str]:
                         paths.append(line)
         except Exception:
             pass
+
+    # Check tool-specific installation directories
+    if command_name in TOOL_SPECIFIC_PATHS:
+        for search_dir in TOOL_SPECIFIC_PATHS[command_name]:
+            candidate = os.path.join(search_dir, command_name)
+            if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+                if candidate not in paths:
+                    paths.append(candidate)
+
+    # Check common extra search paths
+    for search_dir in EXTRA_SEARCH_PATHS:
+        candidate = os.path.join(search_dir, command_name)
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            if candidate not in paths:
+                paths.append(candidate)
+
+    # Check cargo bin (legacy location check)
     cargo_path = os.path.join(CARGO_BIN, command_name)
     if os.path.isfile(cargo_path) and os.access(cargo_path, os.X_OK):
         if cargo_path not in paths:
             paths.append(cargo_path)
+
     return paths
 
 
@@ -1344,6 +1374,19 @@ def get_version_line(path: str, tool_name: str) -> str:
             if "client version" in lcline or VERSION_RE.search(line):
                 set_local_flag_hint("kubectl", " ".join(args[1:]))
                 return line
+    if tool_name == "docker":
+        # Docker CLI version (client); prefer explicit client version to avoid confusion with server
+        # Try docker version --format first for clean output
+        line = run_with_timeout([path, "version", "--format", "{{.Client.Version}}"])
+        if line and extract_version_number(line):
+            set_local_flag_hint("docker", "version --format {{.Client.Version}}")
+            return f"docker {line.strip()}"
+        # Fallback to --version which shows "Docker version X.Y.Z, build ..."
+        line = run_with_timeout([path, "--version"])
+        if line:
+            set_local_flag_hint("docker", "--version")
+            return line
+        return ""
     if tool_name == "docker-compose":
         # Fallbacks already attempted above; return empty to continue generic flags if needed
         return ""
@@ -1458,11 +1501,15 @@ def _classify_install_method(path: str, tool_name: str) -> tuple[str, str]:
             return "uv tool", "uv-list-match"
         if any(t in p for t in ("/.local/share/uv/", "/.cache/uv/", "/.uv/")):
             return "uv tool", "path-contains-uv"
-        if tool_name == "docker" and DOCKER_INFO_ENABLED:
-            wsl = bool(os.environ.get("WSL_DISTRO_NAME", ""))
-            info = run_with_timeout(["docker", "info", "--format", "{{.OperatingSystem}}"])
-            if info and "Docker Desktop" in info:
-                return ("docker-desktop (WSL)" if wsl else "docker-desktop"), "docker-info-os"
+        if tool_name == "docker":
+            # Classify docker CLI client by path, not by server source
+            # Note: docker server may be from Docker Desktop, but CLI is what we audit
+            if p.startswith("/usr/bin/") or p.startswith("/bin/"):
+                # System-installed docker CLI (may connect to Docker Desktop server)
+                return "system", "path-under-/usr/bin"
+            if p.startswith("/usr/local/bin/"):
+                return "/usr/local/bin", "path-under-/usr/local/bin"
+            # Fall through to generic classification
         if p.startswith(os.path.join(home, ".nvm")):
             return "nvm/npm", "path-under-~/.nvm"
         if "/.cache/corepack" in p or "/.corepack" in p:
@@ -1965,21 +2012,17 @@ def latest_gnu(project: str) -> tuple[str, str]:
             latest_v = versions[-1]
             return latest_v, (extract_version_number(latest_v) or latest_v)
 
-        # Try canonical directory
-        html = http_get(f"https://ftp.gnu.org/gnu/{project}/").decode("utf-8", "ignore")
-        # 1) Prefer LATEST-IS-* hint if present
+        # Try mirrors first (faster, more up-to-date than canonical ftp.gnu.org)
+        # 1) Try kernel mirror (fast, reliable, ~1s)
+        html = http_get(f"https://mirrors.kernel.org/gnu/{project}/").decode("utf-8", "ignore")
         tag, num = parse_dir(html)
         if not tag:
-            # Try sorted listing query
-            html = http_get(f"https://ftp.gnu.org/gnu/{project}/?C=M;O=D").decode("utf-8", "ignore")
-            tag, num = parse_dir(html)
-        if not tag:
-            # Try mirror
+            # 2) Try ftpmirror (fast alternative, ~0.9s)
             html = http_get(f"https://ftpmirror.gnu.org/gnu/{project}/").decode("utf-8", "ignore")
             tag, num = parse_dir(html)
         if not tag:
-            # Try kernel mirror
-            html = http_get(f"https://mirrors.kernel.org/gnu/{project}/").decode("utf-8", "ignore")
+            # 3) Try canonical directory (last resort, slower ~5s)
+            html = http_get(f"https://ftp.gnu.org/gnu/{project}/").decode("utf-8", "ignore")
             tag, num = parse_dir(html)
         if not tag:
             return "", ""
@@ -2400,7 +2443,7 @@ def main() -> int:
     if not OFFLINE_MODE:
         try:
             # Query GitHub rate limit API to show actual current status
-            rate_limit_data = http_get("https://api.github.com/rate_limit", timeout=2, retries=1)
+            rate_limit_data = http_get("https://api.github.com/rate_limit")
             rate_info = json.loads(rate_limit_data)
             core_limit = rate_info.get("resources", {}).get("core", {})
             limit = core_limit.get("limit", 0)
@@ -2421,8 +2464,10 @@ def main() -> int:
                     print(f"# GITHUB_TOKEN: configured (5,000 requests/hour)", file=sys.stderr)
                 else:
                     print(f"# GITHUB_TOKEN: not set (60 requests/hour limit)", file=sys.stderr)
-        except Exception:
+        except Exception as e:
             # Fallback if rate limit check fails
+            if AUDIT_DEBUG:
+                print(f"# DEBUG: Rate limit API call failed: {e}", file=sys.stderr)
             if GITHUB_TOKEN:
                 print(f"# GITHUB_TOKEN: configured (5,000 requests/hour)", file=sys.stderr)
             else:
@@ -2492,24 +2537,51 @@ def main() -> int:
 
                     # Determine comparison operator and colors
                     # Extract version without timing info (e.g., "0.9.2 (8ms)" -> "0.9.2")
-                    inst_val = installed.split(" (")[0] if installed and installed != "X" else "n/a"
-                    latest_val = latest.split(" (")[0] if latest else "n/a"
+                    inst_val = installed.split(" (")[0] if installed and installed != "X" else ""
+                    latest_val = latest.split(" (")[0] if latest else ""
 
-                    if installed and installed != "X" and latest:
+                    # Treat timing-only values like "(37ms)" as not installed
+                    if inst_val.startswith("(") or not inst_val:
+                        inst_val = ""
+                    if latest_val.startswith("(") or not latest_val:
+                        latest_val = ""
+
+                    # Display values
+                    inst_display = inst_val if inst_val else "n/a"
+                    latest_display = latest_val if latest_val else "n/a"
+
+                    if inst_val and latest_val:
                         if status == "UP-TO-DATE":
                             operator = "==="
                             inst_color = GREEN
                             latest_color = GREEN
-                        else:  # OUTDATED
-                            operator = "!=="
-                            inst_color = YELLOW
-                            latest_color = BOLD_GREEN
-                    elif not (installed and installed != "X") and latest:
+                        else:  # OUTDATED or version mismatch
+                            # Check if cache has stale data (installed is newer than "latest")
+                            try:
+                                from packaging import version as pkg_version
+                                inst_ver = pkg_version.parse(inst_val.lstrip("v"))
+                                latest_ver = pkg_version.parse(latest_val.lstrip("v"))
+                                if inst_ver > latest_ver:
+                                    # Installed is NEWER - cache is stale
+                                    operator = ">>>"  # Installed ahead of cache
+                                    inst_color = GREEN
+                                    latest_color = RED
+                                else:
+                                    # Normal outdated case
+                                    operator = "!=="
+                                    inst_color = YELLOW
+                                    latest_color = BOLD_GREEN
+                            except Exception:
+                                # Can't parse versions, use default outdated styling
+                                operator = "!=="
+                                inst_color = YELLOW
+                                latest_color = BOLD_GREEN
+                    elif not inst_val and latest_val:
                         # Not installed but latest available
                         operator = "?"
                         inst_color = RED
                         latest_color = BOLD_GREEN
-                    elif (installed and installed != "X") and not latest:
+                    elif inst_val and not latest_val:
                         # Installed but latest unknown
                         operator = "?"
                         inst_color = YELLOW
@@ -2521,7 +2593,7 @@ def main() -> int:
                         latest_color = RED
 
                     # Format: "# [1/64] uv (installed: 0.9.2 === latest: 0.9.2)"
-                    version_info = f"installed: {inst_color}{inst_val}{RESET} {operator} latest: {latest_color}{latest_val}{RESET}"
+                    version_info = f"installed: {inst_color}{inst_display}{RESET} {operator} latest: {latest_color}{latest_display}{RESET}"
                     print(f"# [{completed_tools}/{total_tools}] {name} ({version_info})", file=sys.stderr, flush=True)
                 except Exception:
                     # Fallback to simple message if row parsing fails
@@ -2573,7 +2645,8 @@ def main() -> int:
 
     # Always print raw (with OSC8 + emoji if enabled). When piped to column, OSC8 should be transparent.
     # In streaming mode, we've already printed lines; skip re-printing body
-    if not STREAM_OUTPUT:
+    # In COLLECT_ONLY mode, skip table output (only needed for audit/render)
+    if not STREAM_OUTPUT and not COLLECT_ONLY:
         headers = (" ", "tool", "installed", "installed_method", "latest_upstream", "upstream_method")
         print("|".join(headers))
 
@@ -2587,7 +2660,7 @@ def main() -> int:
             order = len(CATEGORY_ORDER)
         return (order, nm)
 
-    if not STREAM_OUTPUT:
+    if not STREAM_OUTPUT and not COLLECT_ONLY:
         rows = results
         if GROUP_BY_CATEGORY:
             rows = sorted(results, key=_category_key)
