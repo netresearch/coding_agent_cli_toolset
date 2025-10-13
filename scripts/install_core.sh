@@ -54,9 +54,11 @@ get_version() {
     prettier) cmd="$(command -v prettier || true)" ;;
     shfmt) cmd="$(command -v shfmt || true)" ;;
     shellcheck) cmd="$(command -v shellcheck || true)" ;;
+    golangci-lint) cmd="$(command -v golangci-lint || true)" ;;
     fx) cmd="$(command -v fx || true)" ;;
     entr) cmd="$(command -v entr || true)" ;;
     glab) cmd="$(command -v glab || true)" ;;
+    gam) cmd="$(command -v gam || true)" ;;
     *) cmd="" ;;
   esac
   if [ -z "$cmd" ]; then return 0; fi
@@ -692,6 +694,81 @@ install_glab() {
   fi
 }
 
+install_golangci_lint() {
+  if have brew; then brew install golangci-lint; return; fi
+  # Try go install first (requires go 1.17+)
+  if command -v go >/dev/null 2>&1; then
+    GO111MODULE=on go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest && $INSTALL "$(go_bin_path)/golangci-lint" "$BIN_DIR/golangci-lint" && return
+  fi
+  # Try GitHub release binary as fallback
+  local tmp tag ver url name file AUTH
+  tmp="$(mktemp -d)"
+  if [ -n "${GITHUB_TOKEN:-}" ]; then AUTH=( -H "Authorization: Bearer ${GITHUB_TOKEN}" ); else AUTH=(); fi
+  tag="$(curl -fsSIL ${AUTH[@]} -H "User-Agent: cli-audit" -o /dev/null -w '%{url_effective}' https://github.com/golangci/golangci-lint/releases/latest | awk -F'/' '{print $NF}')"
+  if [ -n "$tag" ]; then
+    ver="${tag#v}"
+    case "$ARCH" in
+      x86_64|amd64) name="golangci-lint-${ver}-linux-amd64.tar.gz" ;;
+      aarch64|arm64) name="golangci-lint-${ver}-linux-arm64.tar.gz" ;;
+      *) name="golangci-lint-${ver}-linux-amd64.tar.gz" ;;
+    esac
+    url="https://github.com/golangci/golangci-lint/releases/download/${tag}/${name}"
+    if curl -fsSL ${AUTH[@]} -H "User-Agent: cli-audit" "$url" -o "$tmp/golangci-lint.tgz"; then
+      if tar -C "$tmp" -xzf "$tmp/golangci-lint.tgz" >/dev/null 2>&1; then
+        # Find the binary in the extracted directory
+        file="$(find "$tmp" -type f -name golangci-lint -perm -111 | head -n1)"
+        if [ -n "$file" ]; then $INSTALL "$file" "$BIN_DIR/golangci-lint" && return; fi
+      fi
+    fi
+  fi
+}
+
+install_gam() {
+  if have brew; then brew install gam; return; fi
+  # GAM (Google Workspace Admin) from GitHub releases (GAM-team/GAM)
+  local tmp tag ver url name file arch_base
+  tmp="$(mktemp -d)"
+  tag="$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/GAM-team/GAM/releases/latest | awk -F'/' '{print $NF}')"
+  if [ -n "$tag" ]; then
+    ver="${tag#v}"
+    case "$ARCH" in
+      x86_64|amd64) arch_base="x86_64" ;;
+      aarch64|arm64) arch_base="arm64" ;;
+      *) arch_base="x86_64" ;;
+    esac
+    # Try different glibc variants (newer first, then legacy)
+    for variant in "glibc2.39" "glibc2.35" "legacy"; do
+      name="gam-${ver}-linux-${arch_base}-${variant}.tar.xz"
+      url="https://github.com/GAM-team/GAM/releases/download/${tag}/${name}"
+      if curl -fsSL "$url" -o "$tmp/gam.tar.xz" 2>/dev/null; then
+        if tar -C "$tmp" -xJf "$tmp/gam.tar.xz" >/dev/null 2>&1; then
+          # GAM extracts to a directory like gam-7.25.01-linux-x86_64-glibc2.39/
+          file="$(find "$tmp" -type f -name gam -perm -111 | head -n1)"
+          if [ -n "$file" ]; then
+            # Install GAM to a dedicated directory to keep its dependencies together
+            local gam_dir="$HOME/bin/gam7"
+            mkdir -p "$gam_dir"
+            # Copy the entire extracted directory contents
+            local extracted_dir="$(dirname "$file")"
+            cp -r "$extracted_dir"/* "$gam_dir/" 2>/dev/null || true
+            # Create/update symlink in BIN_DIR
+            if [ -f "$gam_dir/gam" ]; then
+              if [ "$BIN_DIR" = "/usr/local/bin" ] && [ ! -w "$BIN_DIR" ]; then
+                sudo ln -sf "$gam_dir/gam" "$BIN_DIR/gam" 2>/dev/null || true
+              else
+                ln -sf "$gam_dir/gam" "$BIN_DIR/gam" 2>/dev/null || true
+              fi
+              return
+            fi
+          fi
+        fi
+        # Clean up and try next variant
+        rm -f "$tmp/gam.tar.xz" 2>/dev/null || true
+      fi
+    done
+  fi
+}
+
 install_just() {
   if have brew; then
     if have just; then brew upgrade just || brew install just; else brew install just; fi
@@ -793,6 +870,10 @@ reconcile_one() {
       $RM "/usr/local/bin/shellcheck" >/dev/null 2>&1 || true
       install_shellcheck
       ;;
+    golangci-lint)
+      rm -f "/usr/local/bin/golangci-lint" "$HOME/.local/bin/golangci-lint" "$(go_bin_path)/golangci-lint" >/dev/null 2>&1 || true
+      install_golangci_lint
+      ;;
     fx)
       # Remove Node variant if present, then install Go variant
       ensure_nvm_loaded || true
@@ -806,6 +887,11 @@ reconcile_one() {
       ;;
     glab)
       install_glab
+      ;;
+    gam)
+      # Remove old installation if present, then install fresh
+      rm -f "$BIN_DIR/gam" >/dev/null 2>&1 || true
+      install_gam
       ;;
     ctags)
       # Record baseline presence of distro ctags packages
