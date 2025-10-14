@@ -1195,6 +1195,44 @@ def get_version_line(path: str, tool_name: str) -> str:
             return line
 
     # Special cases next
+    if tool_name == "composer":
+        # Composer may print PHP deprecation warnings before version
+        # Example: "Deprecation Notice: ..." then "Composer version 2.5.8 2023-06-09 17:13:21"
+        for flags in (("--version",), ("-V",)):
+            try:
+                proc = subprocess.run(
+                    [path, *flags], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=TIMEOUT_SECONDS, check=False
+                )
+            except Exception:
+                continue
+            out = (proc.stdout or "").splitlines()
+            # Skip deprecation warnings and find line starting with "Composer version"
+            for line in out:
+                if line.strip().startswith("Composer version"):
+                    return line.strip()
+            # Fallback: find any line with version that doesn't look like a warning
+            for line in out:
+                if not line.lower().startswith("deprecation") and extract_version_number(line):
+                    return line.strip()
+        return ""
+    if tool_name == "tfsec":
+        # tfsec prints multi-line migration notice before version
+        # Example: "====...\ntfsec is joining the Trivy family\n...\n====\nv1.28.14"
+        for flags in (("--version",), ("-V",), ("version",)):
+            try:
+                proc = subprocess.run(
+                    [path, *flags], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=TIMEOUT_SECONDS, check=False
+                )
+            except Exception:
+                continue
+            out = (proc.stdout or "").splitlines()
+            # Find line that starts with v and has version pattern, skipping banner lines
+            for line in out:
+                stripped = line.strip()
+                if stripped and not any(kw in stripped.lower() for kw in ["trivy", "tfsec is", "continue", "read more", "==", "attention", "directed"]):
+                    if extract_version_number(stripped):
+                        return stripped
+        return ""
     if tool_name == "shellcheck":
         # ShellCheck prints multi-line banner with a dedicated 'version: X.Y.Z' line when using -V
         # Prefer -V, then --version; return the whole first matching line for consistent display.
