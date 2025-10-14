@@ -70,7 +70,7 @@ get_cargo_scopes() {
 get_cargo_packages_by_scope() {
   local scope="$1"
   if [ "$scope" = "user" ]; then
-    cargo install --list 2>/dev/null | grep -c '^[^ ]' || echo "0"
+    cargo install --list 2>/dev/null | grep -c '^[^ ]' | tr -d '[:space:]' || echo "0"
   else
     echo "0"
   fi
@@ -237,7 +237,7 @@ get_gem_packages_by_scope() {
       ;;
     project)
       if [ -f "./Gemfile" ]; then
-        bundle list 2>/dev/null | grep -c '^\s*\*' || echo "0"
+        bundle list 2>/dev/null | grep -c '^\s*\*' | tr -d '[:space:]' || echo "0"
       else
         echo "0"
       fi
@@ -272,7 +272,7 @@ get_nuget_packages_by_scope() {
       ;;
     project)
       if command -v dotnet >/dev/null 2>&1; then
-        dotnet list package 2>/dev/null | grep -c '>' || echo "0"
+        dotnet list package 2>/dev/null | grep -c '>' | tr -d '[:space:]' || echo "0"
       else
         echo "0"
       fi
@@ -297,7 +297,7 @@ get_az_packages_by_scope() {
   detected_scope="$(get_az_scopes)"
 
   if [ "$scope" = "$detected_scope" ]; then
-    az extension list 2>/dev/null | grep -c '"name":' || echo "0"
+    az extension list 2>/dev/null | grep -c '"name":' | tr -d '[:space:]' || echo "0"
   else
     echo "0"
   fi
@@ -348,15 +348,20 @@ get_pip_scopes() {
 
 get_pip_packages_by_scope() {
   local scope="$1"
+  local count
   case "$scope" in
     user)
-      python3 -m pip list --user 2>/dev/null | tail -n +3 | wc -l | tr -d '[:space:]'
+      # Use system python3 explicitly (not virtualenv)
+      count=$(/usr/bin/python3 -m pip list --user 2>/dev/null | tail -n +3 | wc -l | tr -d '[:space:]') || count="0"
+      echo "${count:-0}"
       ;;
     project)
       if [ -n "${VIRTUAL_ENV:-}" ]; then
-        python3 -m pip list 2>/dev/null | tail -n +3 | wc -l | tr -d '[:space:]'
+        count=$(python3 -m pip list 2>/dev/null | tail -n +3 | wc -l | tr -d '[:space:]') || count="0"
+        echo "${count:-0}"
       elif [ -d "./.venv" ]; then
-        ./.venv/bin/python -m pip list 2>/dev/null | tail -n +3 | wc -l | tr -d '[:space:]'
+        count=$(./.venv/bin/python -m pip list 2>/dev/null | tail -n +3 | wc -l | tr -d '[:space:]') || count="0"
+        echo "${count:-0}"
       else
         echo "0"
       fi
@@ -392,11 +397,11 @@ get_npm_packages_by_scope() {
   local scope="$1"
   case "$scope" in
     user|system)
-      npm list -g --depth=0 2>/dev/null | grep -c '^[├└]' || echo "0"
+      npm list -g --depth=0 2>/dev/null | grep -c '^[├└]' | tr -d '[:space:]' || echo "0"
       ;;
     project)
       if [ -f "./package.json" ]; then
-        npm list --depth=0 2>/dev/null | grep -c '^[├└]' || echo "0"
+        npm list --depth=0 2>/dev/null | grep -c '^[├└]' | tr -d '[:space:]' || echo "0"
       else
         echo "0"
       fi
@@ -430,13 +435,16 @@ get_pnpm_scopes() {
 
 get_pnpm_packages_by_scope() {
   local scope="$1"
+  local count
   case "$scope" in
     user|system)
-      pnpm list -g --depth=0 2>/dev/null | grep -c '^[├└]' || echo "0"
+      count=$(pnpm list -g --depth=0 2>/dev/null | grep -c '^[├└]' | tr -d '[:space:]') || count="0"
+      echo "${count:-0}"
       ;;
     project)
       if [ -f "./package.json" ]; then
-        pnpm list --depth=0 2>/dev/null | grep -c '^[├└]' || echo "0"
+        count=$(pnpm list --depth=0 2>/dev/null | grep -c '^[├└]' | tr -d '[:space:]') || count="0"
+        echo "${count:-0}"
       else
         echo "0"
       fi
@@ -470,13 +478,16 @@ get_yarn_scopes() {
 
 get_yarn_packages_by_scope() {
   local scope="$1"
+  local count
   case "$scope" in
     user|system)
-      yarn global list 2>/dev/null | grep -c '^info' || echo "0"
+      count=$(yarn global list 2>/dev/null | grep -c '^info' | tr -d '[:space:]') || count="0"
+      echo "${count:-0}"
       ;;
     project)
       if [ -f "./package.json" ]; then
-        yarn list --depth=0 2>/dev/null | grep -c '^├─' || echo "0"
+        count=$(yarn list --depth=0 2>/dev/null | grep -c '^├─' | tr -d '[:space:]') || count="0"
+        echo "${count:-0}"
       else
         echo "0"
       fi
@@ -640,7 +651,7 @@ get_bundler_scopes() {
 get_bundler_packages_by_scope() {
   local scope="$1"
   if [ "$scope" = "project" ] && [ -f "./Gemfile" ]; then
-    bundle list 2>/dev/null | grep -c '^\s*\*' || echo "0"
+    bundle list 2>/dev/null | grep -c '^\s*\*' | tr -d '[:space:]' || echo "0"
   else
     echo "0"
   fi
