@@ -554,6 +554,98 @@ get_manager_stats() {
   printf "%s|%s|%s" "$location" "$version" "$pkg_count"
 }
 
+# Check if a package manager is outdated by querying cli_audit.py
+check_manager_outdated() {
+  local mgr="$1"
+  local current_version="$2"
+
+  # Skip if version is unknown
+  [ "$current_version" = "unknown" ] && return 1
+
+  # Use cli_audit.py to check version status (fast, uses snapshot cache)
+  # Redirect all output and errors to avoid interfering with display
+  local audit_result
+  audit_result="$(CLI_AUDIT_RENDER=0 CLI_AUDIT_OFFLINE=1 python3 cli_audit.py --only "$mgr" 2>/dev/null)" || audit_result=""
+
+  # Check if result contains "outdated" (case insensitive)
+  if echo "$audit_result" | grep -qi "outdated"; then
+    return 0  # Outdated
+  else
+    return 1  # Up-to-date or unknown
+  fi
+}
+
+# Show update hint for a specific manager
+show_manager_update_hint() {
+  local mgr="$1"
+
+  case "$mgr" in
+    apt)
+      echo "  • $mgr: Run 'sudo apt-get update && sudo apt-get upgrade -y' or 'make auto-update-system'"
+      ;;
+    snap)
+      echo "  • $mgr: Run 'sudo snap refresh' or 'make auto-update-system'"
+      ;;
+    brew)
+      echo "  • $mgr: Run 'brew update && brew upgrade' or 'make auto-update'"
+      ;;
+    flatpak)
+      echo "  • $mgr: Run 'flatpak update -y' or 'make auto-update'"
+      ;;
+    cargo)
+      echo "  • $mgr: Run 'cargo install cargo-update && cargo install-update -a' or 'make auto-update'"
+      ;;
+    rustup)
+      echo "  • $mgr: Run 'rustup update' or 'make auto-update'"
+      ;;
+    uv)
+      echo "  • $mgr: Run 'uv self update' or './scripts/auto_update.sh uv'"
+      ;;
+    pipx)
+      echo "  • $mgr: Run 'pip3 install --user --upgrade pipx' or './scripts/auto_update.sh pipx'"
+      ;;
+    pip)
+      echo "  • $mgr: Run 'python3 -m pip install --user --upgrade pip' or './scripts/auto_update.sh pip'"
+      ;;
+    npm)
+      echo "  • $mgr: Run 'npm install -g npm@latest' or './scripts/auto_update.sh npm'"
+      ;;
+    pnpm)
+      echo "  • $mgr: Run 'npm install -g pnpm@latest' or './scripts/auto_update.sh pnpm'"
+      ;;
+    yarn)
+      echo "  • $mgr: Run 'npm install -g yarn@latest' or './scripts/auto_update.sh yarn'"
+      ;;
+    go)
+      echo "  • $mgr: Download latest from https://go.dev/dl/ and install"
+      ;;
+    gem)
+      echo "  • $mgr: Run 'gem update --system' or './scripts/auto_update.sh gem'"
+      ;;
+    composer)
+      echo "  • $mgr: Run 'composer self-update'"
+      ;;
+    poetry)
+      echo "  • $mgr: Run 'poetry self update' or 'uv tool upgrade poetry'"
+      ;;
+    conda)
+      echo "  • $mgr: Run 'conda update -n base conda'"
+      ;;
+    mamba)
+      echo "  • $mgr: Run 'conda update -n base mamba' or 'mamba update mamba'"
+      ;;
+    gcloud)
+      echo "  • $mgr: Run 'gcloud components update' or './scripts/auto_update.sh gcloud'"
+      ;;
+    az)
+      echo "  • $mgr: Run 'az upgrade' or './scripts/auto_update.sh az'"
+      ;;
+    *)
+      echo "  • $mgr: Check official documentation for update instructions"
+      ;;
+  esac
+}
+
 show_detected() {
   log "Detecting installed package managers with scope information..."
   echo ""
@@ -561,6 +653,7 @@ show_detected() {
   local all_managers=(apt snap brew flatpak cargo rustup uv pipx pip npm pnpm yarn go gem composer poetry conda mamba bundler jspm nuget gcloud az)
   local found_managers=0
   local found_scopes=0
+  local outdated_managers=()
 
   # First pass: detect which managers are installed
   local managers=()
@@ -584,7 +677,7 @@ show_detected() {
   printf "%-12s %-8s %-8s %-8s %s\n" "MANAGER" "VERSION" "SCOPE" "PACKAGES" "LOCATION"
   printf "%-12s %-8s %-8s %-8s %s\n" "-------" "-------" "-----" "--------" "--------"
 
-  # Second pass: display one line per scope
+  # Second pass: display one line per scope and check for updates
   for mgr in "${managers[@]}"; do
     # Get scopes for this manager
     local scopes
@@ -597,6 +690,12 @@ show_detected() {
     local version location stats
     stats="$(get_manager_stats "$mgr")"
     IFS='|' read -r location version _ <<< "$stats"
+
+    # Check if manager itself is outdated (only once per manager)
+    # Wrap in subshell to prevent pipefail from exiting on check failure
+    if ( check_manager_outdated "$mgr" "$version" ); then
+      outdated_managers+=("$mgr")
+    fi
 
     # Split scopes and print one line per scope
     IFS=',' read -ra SCOPE_ARRAY <<< "$scopes"
@@ -612,6 +711,22 @@ show_detected() {
   echo ""
   log "$found_scopes total scopes across $found_managers managers"
   echo ""
+
+  # Show outdated package managers if any
+  if [ ${#outdated_managers[@]} -gt 0 ]; then
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "⚠️  Outdated Package Managers Detected"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    echo "The following package managers have updates available:"
+    echo ""
+    for mgr in "${outdated_managers[@]}"; do
+      show_manager_update_hint "$mgr"
+    done
+    echo ""
+    echo "Run 'make auto-update' or './scripts/auto_update.sh update' to update all."
+    echo ""
+  fi
 }
 
 confirm_project_update() {
