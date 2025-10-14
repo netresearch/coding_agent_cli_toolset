@@ -167,10 +167,10 @@ auto-update-detect: scripts-perms ## Detect all installed package managers
 	./scripts/auto_update.sh detect
 
 auto-update: scripts-perms ## Auto-update all package managers and their packages
-	./scripts/auto_update.sh update
+	SCOPE=all ./scripts/auto_update.sh update
 
 auto-update-dry-run: scripts-perms ## Show what would be updated without making changes
-	./scripts/auto_update.sh --dry-run update
+	SCOPE=all ./scripts/auto_update.sh --dry-run update
 
 auto-update-system-only: scripts-perms ## Update only system package managers (apt, brew, snap, flatpak)
 	@bash -c './scripts/auto_update.sh apt && ./scripts/auto_update.sh brew && ./scripts/auto_update.sh snap && ./scripts/auto_update.sh flatpak' || true
