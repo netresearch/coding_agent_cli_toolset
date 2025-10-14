@@ -425,78 +425,79 @@ get_manager_stats() {
     apt)
       location="$(command -v apt-get 2>/dev/null || echo "N/A")"
       version="$(apt-get --version 2>/dev/null | head -n1 | awk '{print $2}' || echo "unknown")"
-      pkg_count="$(dpkg -l 2>/dev/null | grep '^ii' | wc -l || echo "0")"
+      pkg_count="$(dpkg -l 2>/dev/null | grep '^ii' | wc -l | tr -d '[:space:]' || echo "0")"
       ;;
     brew)
       location="$(command -v brew 2>/dev/null || echo "N/A")"
       version="$(brew --version 2>/dev/null | head -n1 | awk '{print $2}' || echo "unknown")"
-      pkg_count="$(brew list --formula 2>/dev/null | wc -l || echo "0")"
+      pkg_count="$(brew list --formula 2>/dev/null | wc -l | tr -d '[:space:]' || echo "0")"
       ;;
     snap)
       location="$(command -v snap 2>/dev/null || echo "N/A")"
       version="$(snap version 2>/dev/null | grep '^snap' | awk '{print $2}' || echo "unknown")"
-      pkg_count="$(snap list 2>/dev/null | tail -n +2 | wc -l || echo "0")"
+      pkg_count="$(snap list 2>/dev/null | tail -n +2 | wc -l | tr -d '[:space:]' || echo "0")"
       ;;
     flatpak)
       location="$(command -v flatpak 2>/dev/null || echo "N/A")"
       version="$(flatpak --version 2>/dev/null | awk '{print $2}' || echo "unknown")"
-      pkg_count="$(flatpak list --app 2>/dev/null | wc -l || echo "0")"
+      pkg_count="$(flatpak list --app 2>/dev/null | wc -l | tr -d '[:space:]' || echo "0")"
       ;;
     cargo)
       location="$(command -v cargo 2>/dev/null || echo "N/A")"
       version="$(cargo --version 2>/dev/null | awk '{print $2}' || echo "unknown")"
-      pkg_count="$(cargo install --list 2>/dev/null | grep -c '^[^ ]' || echo "0")"
+      pkg_count="$(cargo install --list 2>/dev/null | grep -c '^[^ ]' | tr -d '[:space:]' || echo "0")"
       ;;
     rustup)
       location="$(command -v rustup 2>/dev/null || echo "N/A")"
       version="$(rustup --version 2>/dev/null | awk '{print $2}' || echo "unknown")"
-      pkg_count="$(rustup toolchain list 2>/dev/null | wc -l || echo "0")"
+      pkg_count="$(rustup toolchain list 2>/dev/null | wc -l | tr -d '[:space:]' || echo "0")"
       ;;
     uv)
       location="$(command -v uv 2>/dev/null || echo "N/A")"
       version="$(uv --version 2>/dev/null | awk '{print $2}' || echo "unknown")"
-      pkg_count="$(uv tool list 2>/dev/null | wc -l || echo "0")"
+      pkg_count="$(uv tool list 2>/dev/null | wc -l | tr -d '[:space:]' || echo "0")"
       ;;
     pipx)
       location="$(command -v pipx 2>/dev/null || echo "N/A")"
       version="$(pipx --version 2>/dev/null || echo "unknown")"
-      pkg_count="$(pipx list --short 2>/dev/null | wc -l || echo "0")"
+      pkg_count="$(pipx list --short 2>/dev/null | wc -l | tr -d '[:space:]' || echo "0")"
       ;;
     pip)
       location="$(command -v pip3 2>/dev/null || command -v pip 2>/dev/null || echo "N/A")"
-      version="$(python3 -m pip --version 2>/dev/null | awk '{print $2}' || echo "unknown")"
-      pkg_count="$(python3 -m pip list --user 2>/dev/null | tail -n +3 | wc -l || echo "0")"
+      version="$(/usr/bin/python3 -m pip --version 2>/dev/null | awk '{print $2}' || echo "unknown")"
+      pkg_count="$(/usr/bin/python3 -m pip list --user 2>/dev/null | tail -n +3 | wc -l | tr -d '[:space:]' || echo "0")"
+      pkg_count="${pkg_count:-0}"
       ;;
     npm)
       location="$(command -v npm 2>/dev/null || echo "N/A")"
       version="$(npm --version 2>/dev/null || echo "unknown")"
-      pkg_count="$(npm list -g --depth=0 2>/dev/null | grep -c '^[├└]' || echo "0")"
+      pkg_count="$(npm list -g --depth=0 2>/dev/null | grep -c '^[├└]' | tr -d '[:space:]' || echo "0")"
       ;;
     pnpm)
       location="$(command -v pnpm 2>/dev/null || echo "N/A")"
       version="$(pnpm --version 2>/dev/null || echo "unknown")"
-      pkg_count="$(pnpm list -g --depth=0 2>/dev/null | grep -c '^[├└]' || echo "0")"
+      pkg_count="$(pnpm list -g --depth=0 2>/dev/null | grep -c '^[├└]' | tr -d '[:space:]' || echo "0")"
       ;;
     yarn)
       location="$(command -v yarn 2>/dev/null || echo "N/A")"
       version="$(yarn --version 2>/dev/null || echo "unknown")"
-      pkg_count="$(yarn global list 2>/dev/null | grep -c '^info' || echo "0")"
+      pkg_count="$(yarn global list 2>/dev/null | grep -c '^info' | tr -d '[:space:]' || echo "0")"
       ;;
     go)
       location="$(command -v go 2>/dev/null || echo "N/A")"
       version="$(go version 2>/dev/null | awk '{print $3}' | sed 's/go//' || echo "unknown")"
       local gobin="$(go env GOBIN 2>/dev/null || echo "$(go env GOPATH 2>/dev/null)/bin")"
-      pkg_count="$([ -d "$gobin" ] && ls -1 "$gobin" 2>/dev/null | wc -l || echo "0")"
+      pkg_count="$([ -d "$gobin" ] && ls -1 "$gobin" 2>/dev/null | wc -l | tr -d '[:space:]' || echo "0")"
       ;;
     gem)
       location="$(command -v gem 2>/dev/null || echo "N/A")"
       version="$(gem --version 2>/dev/null || echo "unknown")"
-      pkg_count="$(gem list --no-versions 2>/dev/null | wc -l || echo "0")"
+      pkg_count="$(gem list --no-versions 2>/dev/null | wc -l | tr -d '[:space:]' || echo "0")"
       ;;
     composer)
       location="$(command -v composer 2>/dev/null || echo "N/A")"
       version="$(composer --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown")"
-      pkg_count="$(composer global show 2>/dev/null | wc -l || echo "0")"
+      pkg_count="$(composer global show 2>/dev/null | wc -l | tr -d '[:space:]' || echo "0")"
       ;;
     poetry)
       location="$(command -v poetry 2>/dev/null || echo "N/A")"
@@ -506,12 +507,12 @@ get_manager_stats() {
     conda)
       location="$(command -v conda 2>/dev/null || echo "N/A")"
       version="$(conda --version 2>/dev/null | awk '{print $2}' || echo "unknown")"
-      pkg_count="$(conda list 2>/dev/null | tail -n +4 | wc -l || echo "0")"
+      pkg_count="$(conda list 2>/dev/null | tail -n +4 | wc -l | tr -d '[:space:]' || echo "0")"
       ;;
     mamba)
       location="$(command -v mamba 2>/dev/null || echo "N/A")"
       version="$(mamba --version 2>/dev/null | awk '{print $2}' || echo "unknown")"
-      pkg_count="$(mamba list 2>/dev/null | tail -n +4 | wc -l || echo "0")"
+      pkg_count="$(mamba list 2>/dev/null | tail -n +4 | wc -l | tr -d '[:space:]' || echo "0")"
       ;;
     bundler)
       location="$(command -v bundle 2>/dev/null || echo "N/A")"
@@ -536,12 +537,12 @@ get_manager_stats() {
     gcloud)
       location="$(command -v gcloud 2>/dev/null || echo "N/A")"
       version="$(gcloud version 2>/dev/null | grep 'Google Cloud SDK' | awk '{print $4}' || echo "unknown")"
-      pkg_count="$(gcloud components list --filter='State.name:Installed' --format='value(id)' 2>/dev/null | wc -l || echo "0")"
+      pkg_count="$(gcloud components list --filter='State.name:Installed' --format='value(id)' 2>/dev/null | wc -l | tr -d '[:space:]' || echo "0")"
       ;;
     az)
       location="$(command -v az 2>/dev/null || echo "N/A")"
       version="$(az version --output tsv 2>/dev/null | grep '^azure-cli' | awk '{print $2}' || echo "unknown")"
-      pkg_count="$(az extension list 2>/dev/null | grep -c '"name":' || echo "0")"
+      pkg_count="$(az extension list 2>/dev/null | grep -c '"name":' | tr -d '[:space:]' || echo "0")"
       ;;
     *)
       location="unknown"
@@ -593,7 +594,7 @@ show_detected() {
     [ -z "$scopes" ] && continue
 
     # Get version and location once (reuse for all scopes)
-    local version location
+    local version location stats
     stats="$(get_manager_stats "$mgr")"
     IFS='|' read -r location version _ <<< "$stats"
 
