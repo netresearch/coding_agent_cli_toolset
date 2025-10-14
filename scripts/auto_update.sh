@@ -585,7 +585,7 @@ get_manager_stats() {
   printf "%s|%s|%s" "$location" "$version" "$pkg_count"
 }
 
-# Check if a package manager is outdated by querying cli_audit.py
+# Check if a package manager is outdated by querying the snapshot
 check_manager_outdated() {
   local mgr="$1"
   local current_version="$2"
@@ -593,13 +593,29 @@ check_manager_outdated() {
   # Skip if version is unknown
   [ "$current_version" = "unknown" ] && return 1
 
-  # Use cli_audit.py to check version status (fast, uses snapshot cache)
-  # Redirect all output and errors to avoid interfering with display
-  local audit_result
-  audit_result="$(CLI_AUDIT_RENDER=0 CLI_AUDIT_OFFLINE=1 python3 cli_audit.py --only "$mgr" 2>/dev/null)" || audit_result=""
+  # Use tools_snapshot.json directly (fast, no subprocess needed)
+  local snapshot_file="${CLI_AUDIT_SNAPSHOT_FILE:-tools_snapshot.json}"
 
-  # Check if result contains "outdated" (case insensitive)
-  if echo "$audit_result" | grep -qi "outdated"; then
+  # Check if snapshot exists
+  [ ! -f "$snapshot_file" ] && return 1
+
+  # Extract status for this tool from JSON snapshot
+  local status
+  status="$(python3 -c "
+import json, sys
+try:
+    with open('$snapshot_file') as f:
+        data = json.load(f)
+        for tool in data.get('tools', []):
+            if tool.get('tool') == '$mgr':
+                print(tool.get('status', ''))
+                sys.exit(0)
+except:
+    pass
+" 2>/dev/null)" || status=""
+
+  # Check if status is OUTDATED
+  if [ "$status" = "OUTDATED" ]; then
     return 0  # Outdated
   else
     return 1  # Up-to-date or unknown

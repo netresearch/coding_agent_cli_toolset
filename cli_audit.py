@@ -802,6 +802,8 @@ TOOLS: tuple[Tool, ...] = (
     Tool("npm", ("npm",), "npm", ("npm",)),
     Tool("pnpm", ("pnpm",), "npm", ("pnpm",)),
     Tool("yarn", ("yarn",), "npm", ("yarn",)),
+    Tool("composer", ("composer",), "gh", ("composer", "composer")),
+    Tool("gem", ("gem",), "gh", ("rubygems", "rubygems")),
     # 2) Core developer tools and utilities
     Tool("fd", ("fd", "fdfind"), "gh", ("sharkdp", "fd")),
     Tool("fzf", ("fzf",), "gh", ("junegunn", "fzf")),
@@ -886,6 +888,8 @@ CATEGORY_MAP: dict[str, str] = {
     "npm": "runtimes",
     "pnpm": "runtimes",
     "yarn": "runtimes",
+    "composer": "runtimes",
+    "gem": "runtimes",
     # Search & code-aware tools
     "ripgrep": "search",
     "ast-grep": "search",
