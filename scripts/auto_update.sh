@@ -385,6 +385,37 @@ update_gem() {
   log "RubyGems: Complete"
 }
 
+update_composer() {
+  if ! detect_composer; then return; fi
+  log "Composer: Updating"
+
+  run_cmd "Composer: Self-update" composer self-update
+  run_cmd "Composer: Update global packages" composer global update
+
+  log "Composer: Complete"
+}
+
+update_poetry() {
+  if ! detect_poetry; then return; fi
+  log "Poetry: Updating"
+
+  # Try poetry self update first (Poetry 1.2+)
+  if poetry self update --help >/dev/null 2>&1; then
+    run_cmd "Poetry: Self-update" poetry self update
+  # Fallback to uv tool upgrade if poetry is managed by uv
+  elif command -v uv >/dev/null 2>&1 && uv tool list 2>/dev/null | grep -q "^poetry"; then
+    run_cmd "Poetry: Upgrade via UV" uv tool upgrade poetry
+  # Fallback to pipx upgrade if poetry is managed by pipx
+  elif command -v pipx >/dev/null 2>&1 && pipx list 2>/dev/null | grep -q "poetry"; then
+    run_cmd "Poetry: Upgrade via pipx" pipx upgrade poetry
+  else
+    vlog "Poetry: No automatic update method available"
+    log "Poetry: Manual update required (see https://python-poetry.org/docs/#updating-poetry)"
+  fi
+
+  log "Poetry: Complete"
+}
+
 update_gcloud() {
   if ! detect_gcloud; then return; fi
   log "Google Cloud SDK: Updating components"
@@ -772,7 +803,8 @@ run_all_updates() {
       update_snap
       # Check if system-scoped
       [ "$(get_brew_scopes)" = "system" ] && update_brew
-      [ "$(get_flatpak_scopes)" = *"system"* ] && update_flatpak
+      [[ "$(get_flatpak_scopes)" == *"system"* ]] && update_flatpak
+      [[ "$(get_gem_scopes)" == *"system"* ]] && update_gem
     else
       log "Skipping system package managers (SKIP_SYSTEM=1)"
     fi
@@ -789,12 +821,14 @@ run_all_updates() {
     update_pnpm
     update_yarn
     update_go
+    update_composer
+    update_poetry
     update_gcloud
 
-    # Check if user-scoped
+    # Check if user-scoped (conditional updates based on scope detection)
     [ "$(get_brew_scopes)" = "user" ] && update_brew
-    [ "$(get_flatpak_scopes)" = *"user"* ] && update_flatpak
-    [ "$(get_gem_scopes)" = *"user"* ] && update_gem
+    [[ "$(get_flatpak_scopes)" == *"user"* ]] && update_flatpak
+    [[ "$(get_gem_scopes)" == *"user"* ]] && update_gem
     [ "$(get_az_scopes)" = "user" ] && update_az
   fi
 
