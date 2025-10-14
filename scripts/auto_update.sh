@@ -110,6 +110,34 @@ detect_az() {
   command -v az >/dev/null 2>&1
 }
 
+detect_composer() {
+  command -v composer >/dev/null 2>&1
+}
+
+detect_poetry() {
+  command -v poetry >/dev/null 2>&1
+}
+
+detect_conda() {
+  command -v conda >/dev/null 2>&1
+}
+
+detect_mamba() {
+  command -v mamba >/dev/null 2>&1
+}
+
+detect_bundler() {
+  command -v bundle >/dev/null 2>&1
+}
+
+detect_jspm() {
+  command -v jspm >/dev/null 2>&1
+}
+
+detect_nuget() {
+  command -v nuget >/dev/null 2>&1 || command -v dotnet >/dev/null 2>&1
+}
+
 # ============================================================================
 # System Package Managers (requires sudo)
 # ============================================================================
@@ -387,42 +415,193 @@ update_az() {
 # Main Orchestration
 # ============================================================================
 
+get_manager_stats() {
+  local mgr="$1"
+  local location version pkg_count
+
+  case "$mgr" in
+    apt)
+      location="$(command -v apt-get 2>/dev/null || echo "N/A")"
+      version="$(apt-get --version 2>/dev/null | head -n1 | awk '{print $2}' || echo "unknown")"
+      pkg_count="$(dpkg -l 2>/dev/null | grep '^ii' | wc -l || echo "0")"
+      ;;
+    brew)
+      location="$(command -v brew 2>/dev/null || echo "N/A")"
+      version="$(brew --version 2>/dev/null | head -n1 | awk '{print $2}' || echo "unknown")"
+      pkg_count="$(brew list --formula 2>/dev/null | wc -l || echo "0")"
+      ;;
+    snap)
+      location="$(command -v snap 2>/dev/null || echo "N/A")"
+      version="$(snap version 2>/dev/null | grep '^snap' | awk '{print $2}' || echo "unknown")"
+      pkg_count="$(snap list 2>/dev/null | tail -n +2 | wc -l || echo "0")"
+      ;;
+    flatpak)
+      location="$(command -v flatpak 2>/dev/null || echo "N/A")"
+      version="$(flatpak --version 2>/dev/null | awk '{print $2}' || echo "unknown")"
+      pkg_count="$(flatpak list --app 2>/dev/null | wc -l || echo "0")"
+      ;;
+    cargo)
+      location="$(command -v cargo 2>/dev/null || echo "N/A")"
+      version="$(cargo --version 2>/dev/null | awk '{print $2}' || echo "unknown")"
+      pkg_count="$(cargo install --list 2>/dev/null | grep -c '^[^ ]' || echo "0")"
+      ;;
+    rustup)
+      location="$(command -v rustup 2>/dev/null || echo "N/A")"
+      version="$(rustup --version 2>/dev/null | awk '{print $2}' || echo "unknown")"
+      pkg_count="$(rustup toolchain list 2>/dev/null | wc -l || echo "0")"
+      ;;
+    uv)
+      location="$(command -v uv 2>/dev/null || echo "N/A")"
+      version="$(uv --version 2>/dev/null | awk '{print $2}' || echo "unknown")"
+      pkg_count="$(uv tool list 2>/dev/null | wc -l || echo "0")"
+      ;;
+    pipx)
+      location="$(command -v pipx 2>/dev/null || echo "N/A")"
+      version="$(pipx --version 2>/dev/null || echo "unknown")"
+      pkg_count="$(pipx list --short 2>/dev/null | wc -l || echo "0")"
+      ;;
+    pip)
+      location="$(command -v pip3 2>/dev/null || command -v pip 2>/dev/null || echo "N/A")"
+      version="$(python3 -m pip --version 2>/dev/null | awk '{print $2}' || echo "unknown")"
+      pkg_count="$(python3 -m pip list --user 2>/dev/null | tail -n +3 | wc -l || echo "0")"
+      ;;
+    npm)
+      location="$(command -v npm 2>/dev/null || echo "N/A")"
+      version="$(npm --version 2>/dev/null || echo "unknown")"
+      pkg_count="$(npm list -g --depth=0 2>/dev/null | grep -c '^[├└]' || echo "0")"
+      ;;
+    pnpm)
+      location="$(command -v pnpm 2>/dev/null || echo "N/A")"
+      version="$(pnpm --version 2>/dev/null || echo "unknown")"
+      pkg_count="$(pnpm list -g --depth=0 2>/dev/null | grep -c '^[├└]' || echo "0")"
+      ;;
+    yarn)
+      location="$(command -v yarn 2>/dev/null || echo "N/A")"
+      version="$(yarn --version 2>/dev/null || echo "unknown")"
+      pkg_count="$(yarn global list 2>/dev/null | grep -c '^info' || echo "0")"
+      ;;
+    go)
+      location="$(command -v go 2>/dev/null || echo "N/A")"
+      version="$(go version 2>/dev/null | awk '{print $3}' | sed 's/go//' || echo "unknown")"
+      local gobin="$(go env GOBIN 2>/dev/null || echo "$(go env GOPATH 2>/dev/null)/bin")"
+      pkg_count="$([ -d "$gobin" ] && ls -1 "$gobin" 2>/dev/null | wc -l || echo "0")"
+      ;;
+    gem)
+      location="$(command -v gem 2>/dev/null || echo "N/A")"
+      version="$(gem --version 2>/dev/null || echo "unknown")"
+      pkg_count="$(gem list --no-versions 2>/dev/null | wc -l || echo "0")"
+      ;;
+    composer)
+      location="$(command -v composer 2>/dev/null || echo "N/A")"
+      version="$(composer --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown")"
+      pkg_count="$(composer global show 2>/dev/null | wc -l || echo "0")"
+      ;;
+    poetry)
+      location="$(command -v poetry 2>/dev/null || echo "N/A")"
+      version="$(poetry --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown")"
+      pkg_count="N/A"
+      ;;
+    conda)
+      location="$(command -v conda 2>/dev/null || echo "N/A")"
+      version="$(conda --version 2>/dev/null | awk '{print $2}' || echo "unknown")"
+      pkg_count="$(conda list 2>/dev/null | tail -n +4 | wc -l || echo "0")"
+      ;;
+    mamba)
+      location="$(command -v mamba 2>/dev/null || echo "N/A")"
+      version="$(mamba --version 2>/dev/null | awk '{print $2}' || echo "unknown")"
+      pkg_count="$(mamba list 2>/dev/null | tail -n +4 | wc -l || echo "0")"
+      ;;
+    bundler)
+      location="$(command -v bundle 2>/dev/null || echo "N/A")"
+      version="$(bundle --version 2>/dev/null | awk '{print $3}' || echo "unknown")"
+      pkg_count="N/A"
+      ;;
+    jspm)
+      location="$(command -v jspm 2>/dev/null || echo "N/A")"
+      version="$(jspm --version 2>/dev/null || echo "unknown")"
+      pkg_count="N/A"
+      ;;
+    nuget)
+      if command -v nuget >/dev/null 2>&1; then
+        location="$(command -v nuget)"
+        version="$(nuget help 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown")"
+      else
+        location="$(command -v dotnet 2>/dev/null || echo "N/A")"
+        version="$(dotnet --version 2>/dev/null || echo "unknown")"
+      fi
+      pkg_count="N/A"
+      ;;
+    gcloud)
+      location="$(command -v gcloud 2>/dev/null || echo "N/A")"
+      version="$(gcloud version 2>/dev/null | grep 'Google Cloud SDK' | awk '{print $4}' || echo "unknown")"
+      pkg_count="$(gcloud components list --filter='State.name:Installed' --format='value(id)' 2>/dev/null | wc -l || echo "0")"
+      ;;
+    az)
+      location="$(command -v az 2>/dev/null || echo "N/A")"
+      version="$(az version --output tsv 2>/dev/null | grep '^azure-cli' | awk '{print $2}' || echo "unknown")"
+      pkg_count="$(az extension list 2>/dev/null | grep -c '"name":' || echo "0")"
+      ;;
+    *)
+      location="unknown"
+      version="unknown"
+      pkg_count="0"
+      ;;
+  esac
+
+  printf "%s|%s|%s" "$location" "$version" "$pkg_count"
+}
+
 show_detected() {
   log "Detecting installed package managers..."
   echo ""
 
   local managers=()
+  local found=0
 
   # System package managers
-  detect_apt && managers+=("apt")
-  detect_brew && managers+=("brew")
-  detect_snap && managers+=("snap")
-  detect_flatpak && managers+=("flatpak")
+  detect_apt && managers+=("apt") && found=$((found + 1)) || true
+  detect_brew && managers+=("brew") && found=$((found + 1)) || true
+  detect_snap && managers+=("snap") && found=$((found + 1)) || true
+  detect_flatpak && managers+=("flatpak") && found=$((found + 1)) || true
 
   # Language-specific
-  detect_rustup && managers+=("rustup")
-  detect_cargo && managers+=("cargo")
-  detect_uv && managers+=("uv")
-  detect_pipx && managers+=("pipx")
-  detect_pip && managers+=("pip")
-  detect_npm && managers+=("npm")
-  detect_pnpm && managers+=("pnpm")
-  detect_yarn && managers+=("yarn")
-  detect_go && managers+=("go")
-  detect_gem && managers+=("gem")
+  detect_rustup && managers+=("rustup") && found=$((found + 1)) || true
+  detect_cargo && managers+=("cargo") && found=$((found + 1)) || true
+  detect_uv && managers+=("uv") && found=$((found + 1)) || true
+  detect_pipx && managers+=("pipx") && found=$((found + 1)) || true
+  detect_pip && managers+=("pip") && found=$((found + 1)) || true
+  detect_npm && managers+=("npm") && found=$((found + 1)) || true
+  detect_pnpm && managers+=("pnpm") && found=$((found + 1)) || true
+  detect_yarn && managers+=("yarn") && found=$((found + 1)) || true
+  detect_go && managers+=("go") && found=$((found + 1)) || true
+  detect_gem && managers+=("gem") && found=$((found + 1)) || true
+  detect_composer && managers+=("composer") && found=$((found + 1)) || true
+  detect_poetry && managers+=("poetry") && found=$((found + 1)) || true
+  detect_conda && managers+=("conda") && found=$((found + 1)) || true
+  detect_mamba && managers+=("mamba") && found=$((found + 1)) || true
+  detect_bundler && managers+=("bundler") && found=$((found + 1)) || true
+  detect_jspm && managers+=("jspm") && found=$((found + 1)) || true
+  detect_nuget && managers+=("nuget") && found=$((found + 1)) || true
 
   # Cloud CLIs
-  detect_gcloud && managers+=("gcloud")
-  detect_az && managers+=("az")
+  detect_gcloud && managers+=("gcloud") && found=$((found + 1)) || true
+  detect_az && managers+=("az") && found=$((found + 1)) || true
 
-  if [ ${#managers[@]} -eq 0 ]; then
+  if [ $found -eq 0 ]; then
     echo "No package managers detected."
     return
   fi
 
-  echo "Detected package managers:"
+  echo "Found $found package managers:"
+  echo ""
+  printf "%-12s %-8s %-8s %s\n" "MANAGER" "VERSION" "PACKAGES" "LOCATION"
+  printf "%-12s %-8s %-8s %s\n" "-------" "-------" "--------" "--------"
+
   for mgr in "${managers[@]}"; do
-    printf "  ✓ %s\n" "$mgr"
+    local stats location version pkg_count
+    stats="$(get_manager_stats "$mgr")"
+    IFS='|' read -r location version pkg_count <<< "$stats"
+    printf "%-12s %-8s %-8s %s\n" "$mgr" "$version" "$pkg_count" "$location"
   done
   echo ""
 }
