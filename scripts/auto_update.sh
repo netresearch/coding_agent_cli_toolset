@@ -6,10 +6,12 @@ set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$DIR/lib/common.sh"
+. "$DIR/lib/scope_detection.sh"
 
 DRY_RUN="${DRY_RUN:-0}"
 VERBOSE="${VERBOSE:-0}"
 SKIP_SYSTEM="${SKIP_SYSTEM:-0}"
+SCOPE="${SCOPE:-}"  # Can be: system, user, project, all, or auto-detect if empty
 
 log() {
   printf "[auto-update] %s\n" "$*" >&2
@@ -552,91 +554,165 @@ get_manager_stats() {
 }
 
 show_detected() {
-  log "Detecting installed package managers..."
+  log "Detecting installed package managers with scope information..."
   echo ""
 
+  local all_managers=(apt snap brew flatpak cargo rustup uv pipx pip npm pnpm yarn go gem composer poetry conda mamba bundler jspm nuget gcloud az)
+  local found_managers=0
+  local found_scopes=0
+
+  # First pass: detect which managers are installed
   local managers=()
-  local found=0
+  for mgr in "${all_managers[@]}"; do
+    if command -v "$mgr" >/dev/null 2>&1 || \
+       ([ "$mgr" = "apt" ] && command -v apt-get >/dev/null 2>&1) || \
+       ([ "$mgr" = "bundler" ] && command -v bundle >/dev/null 2>&1) || \
+       ([ "$mgr" = "nuget" ] && command -v dotnet >/dev/null 2>&1); then
+      managers+=("$mgr")
+      found_managers=$((found_managers + 1))
+    fi
+  done
 
-  # System package managers
-  detect_apt && managers+=("apt") && found=$((found + 1)) || true
-  detect_brew && managers+=("brew") && found=$((found + 1)) || true
-  detect_snap && managers+=("snap") && found=$((found + 1)) || true
-  detect_flatpak && managers+=("flatpak") && found=$((found + 1)) || true
-
-  # Language-specific
-  detect_rustup && managers+=("rustup") && found=$((found + 1)) || true
-  detect_cargo && managers+=("cargo") && found=$((found + 1)) || true
-  detect_uv && managers+=("uv") && found=$((found + 1)) || true
-  detect_pipx && managers+=("pipx") && found=$((found + 1)) || true
-  detect_pip && managers+=("pip") && found=$((found + 1)) || true
-  detect_npm && managers+=("npm") && found=$((found + 1)) || true
-  detect_pnpm && managers+=("pnpm") && found=$((found + 1)) || true
-  detect_yarn && managers+=("yarn") && found=$((found + 1)) || true
-  detect_go && managers+=("go") && found=$((found + 1)) || true
-  detect_gem && managers+=("gem") && found=$((found + 1)) || true
-  detect_composer && managers+=("composer") && found=$((found + 1)) || true
-  detect_poetry && managers+=("poetry") && found=$((found + 1)) || true
-  detect_conda && managers+=("conda") && found=$((found + 1)) || true
-  detect_mamba && managers+=("mamba") && found=$((found + 1)) || true
-  detect_bundler && managers+=("bundler") && found=$((found + 1)) || true
-  detect_jspm && managers+=("jspm") && found=$((found + 1)) || true
-  detect_nuget && managers+=("nuget") && found=$((found + 1)) || true
-
-  # Cloud CLIs
-  detect_gcloud && managers+=("gcloud") && found=$((found + 1)) || true
-  detect_az && managers+=("az") && found=$((found + 1)) || true
-
-  if [ $found -eq 0 ]; then
+  if [ $found_managers -eq 0 ]; then
     echo "No package managers detected."
     return
   fi
 
-  echo "Found $found package managers:"
+  echo "Found $found_managers package managers:"
   echo ""
-  printf "%-12s %-8s %-8s %s\n" "MANAGER" "VERSION" "PACKAGES" "LOCATION"
-  printf "%-12s %-8s %-8s %s\n" "-------" "-------" "--------" "--------"
+  printf "%-12s %-8s %-8s %-8s %s\n" "MANAGER" "VERSION" "SCOPE" "PACKAGES" "LOCATION"
+  printf "%-12s %-8s %-8s %-8s %s\n" "-------" "-------" "-----" "--------" "--------"
 
+  # Second pass: display one line per scope
   for mgr in "${managers[@]}"; do
-    local stats location version pkg_count
+    # Get scopes for this manager
+    local scopes
+    scopes="$(get_manager_scopes "$mgr")"
+
+    # Skip if no scopes detected
+    [ -z "$scopes" ] && continue
+
+    # Get version and location once (reuse for all scopes)
+    local version location
     stats="$(get_manager_stats "$mgr")"
-    IFS='|' read -r location version pkg_count <<< "$stats"
-    printf "%-12s %-8s %-8s %s\n" "$mgr" "$version" "$pkg_count" "$location"
+    IFS='|' read -r location version _ <<< "$stats"
+
+    # Split scopes and print one line per scope
+    IFS=',' read -ra SCOPE_ARRAY <<< "$scopes"
+    for scope in "${SCOPE_ARRAY[@]}"; do
+      local pkg_count
+      pkg_count="$(get_manager_packages_by_scope "$mgr" "$scope")"
+
+      printf "%-12s %-8s %-8s %-8s %s\n" "$mgr" "$version" "$scope" "$pkg_count" "$location"
+      found_scopes=$((found_scopes + 1))
+    done
   done
+
+  echo ""
+  log "$found_scopes total scopes across $found_managers managers"
   echo ""
 }
 
-run_all_updates() {
-  log "Starting auto-update for all detected package managers"
+confirm_project_update() {
+  local mgr="$1"
+  local project_file="$2"
+
+  echo ""
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "📦 PROJECT SCOPE UPDATE: $mgr"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo ""
+  echo "Project: $(pwd)"
+  echo "File:    $project_file"
+  echo ""
+  echo "This will update project dependencies"
+  echo ""
+  echo "⚠️  WARNING: This may break your project if dependencies are"
+  echo "            version-pinned or have breaking changes"
   echo ""
 
-  # System package managers (skip if requested)
-  if [ "$SKIP_SYSTEM" = "0" ]; then
-    update_apt
-    update_brew
-    update_snap
-    update_flatpak
+  read -p "Continue with project update? [y/N] " -n 1 -r
+  echo ""
+
+  if [[ $REPLY =~ ^[Yy]$ ]]; then
+    return 0
   else
-    log "Skipping system package managers (SKIP_SYSTEM=1)"
+    log "$mgr: Project update cancelled"
+    return 1
+  fi
+}
+
+run_all_updates() {
+  # Determine target scope
+  local target_scope="${SCOPE:-$(determine_default_scope)}"
+
+  log "Starting auto-update for scope: $target_scope"
+  echo ""
+
+  # System scope updates
+  if [ "$target_scope" = "system" ] || [ "$target_scope" = "all" ]; then
+    if [ "$SKIP_SYSTEM" = "0" ]; then
+      update_apt
+      update_snap
+      # Check if system-scoped
+      [ "$(get_brew_scopes)" = "system" ] && update_brew
+      [ "$(get_flatpak_scopes)" = *"system"* ] && update_flatpak
+    else
+      log "Skipping system package managers (SKIP_SYSTEM=1)"
+    fi
   fi
 
-  # Language-specific package managers
-  update_cargo
-  update_uv
-  update_pipx
-  update_pip
-  update_npm
-  update_pnpm
-  update_yarn
-  update_go
-  update_gem
+  # User scope updates
+  if [ "$target_scope" = "user" ] || [ "$target_scope" = "all" ]; then
+    # User-only managers
+    update_cargo
+    update_uv
+    update_pipx
+    update_pip
+    update_npm
+    update_pnpm
+    update_yarn
+    update_go
+    update_gcloud
 
-  # Cloud CLIs
-  update_gcloud
-  update_az
+    # Check if user-scoped
+    [ "$(get_brew_scopes)" = "user" ] && update_brew
+    [ "$(get_flatpak_scopes)" = *"user"* ] && update_flatpak
+    [ "$(get_gem_scopes)" = *"user"* ] && update_gem
+    [ "$(get_az_scopes)" = "user" ] && update_az
+  fi
+
+  # Project scope updates (require confirmation)
+  if [ "$target_scope" = "project" ]; then
+    log "Project scope update - checking for project dependencies..."
+
+    # NPM/PNPM/Yarn
+    if [ -f "./package.json" ]; then
+      if command -v npm >/dev/null 2>&1 && confirm_project_update "npm" "./package.json"; then
+        run_cmd "NPM: Update project dependencies" npm update
+      fi
+    fi
+
+    # Pip/UV
+    if [ -f "./pyproject.toml" ] || [ -d "./.venv" ]; then
+      if command -v pip3 >/dev/null 2>&1 && [ -n "${VIRTUAL_ENV:-}" ] && confirm_project_update "pip" "./.venv"; then
+        run_cmd "Pip: Update project dependencies" python3 -m pip install --upgrade -r requirements.txt 2>/dev/null || true
+      fi
+    fi
+
+    # Bundler/Gem
+    if [ -f "./Gemfile" ] && command -v bundle >/dev/null 2>&1 && confirm_project_update "bundler" "./Gemfile"; then
+      run_cmd "Bundler: Update project dependencies" bundle update
+    fi
+
+    # Composer
+    if [ -f "./composer.json" ] && command -v composer >/dev/null 2>&1 && confirm_project_update "composer" "./composer.json"; then
+      run_cmd "Composer: Update project dependencies" composer update
+    fi
+  fi
 
   echo ""
-  log "Auto-update complete!"
+  log "Auto-update complete for scope: $target_scope"
 }
 
 # ============================================================================
@@ -647,11 +723,11 @@ usage() {
   cat <<EOF
 Usage: $0 [OPTIONS] [COMMAND]
 
-Auto-update all package managers and their packages.
+Auto-update all package managers and their packages with scope-aware filtering.
 
 Commands:
-  detect    Show detected package managers (default)
-  update    Run updates for all detected package managers
+  detect    Show detected package managers with scope information (default)
+  update    Run updates for detected package managers (scope-aware)
   apt       Update only APT packages
   brew      Update only Homebrew packages
   cargo     Update only Cargo packages (includes rustup components)
@@ -678,14 +754,26 @@ Environment Variables:
   DRY_RUN=1         Enable dry-run mode
   VERBOSE=1         Enable verbose output
   SKIP_SYSTEM=1     Skip system package managers
+  SCOPE=<scope>     Set update scope: system, user, project, all
+                    (Default: auto-detect based on current directory)
+
+Scope Behavior:
+  - In project directory (has package.json, Gemfile, etc.): defaults to 'project'
+  - Outside project directory: defaults to 'user'
+  - 'system' scope: Updates system-wide packages (requires sudo)
+  - 'all' scope: Updates system + user (skips project for safety)
+  - Project updates always require explicit confirmation
 
 Examples:
-  $0 detect                    # List detected package managers
-  $0 update                    # Update all package managers
-  $0 --dry-run update          # Show what would be updated
-  $0 cargo                     # Update only Cargo packages
-  DRY_RUN=1 $0 update          # Dry-run via environment variable
-  SKIP_SYSTEM=1 $0 update      # Skip system package managers
+  $0 detect                     # List detected managers with scopes
+  $0 update                     # Update based on directory context
+  SCOPE=user $0 update          # Update only user-scoped packages
+  SCOPE=system $0 update        # Update only system-scoped packages
+  SCOPE=project $0 update       # Update project dependencies (with confirmation)
+  SCOPE=all $0 update           # Update system + user scopes
+  $0 --dry-run update           # Show what would be updated
+  $0 cargo                      # Update only Cargo packages
+  DRY_RUN=1 SCOPE=user $0 update # Dry-run user-scope updates
 
 EOF
 }

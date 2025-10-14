@@ -15,7 +15,9 @@ export
 	install-brew install-rust update-% uninstall-% reconcile-% \
 	build build-dist build-wheel check-dist publish publish-test publish-prod \
 	clean clean-build clean-test clean-pyc clean-all \
-	scripts-perms audit-auto auto-update auto-update-detect auto-update-dry-run auto-update-system-only auto-update-skip-system
+	scripts-perms audit-auto auto-update auto-update-detect auto-update-dry-run \
+	auto-update-system auto-update-user auto-update-project auto-update-all \
+	auto-update-system-only auto-update-skip-system
 
 # ============================================================================
 # HELP & OVERVIEW
@@ -175,6 +177,18 @@ auto-update-system-only: scripts-perms ## Update only system package managers (a
 
 auto-update-skip-system: scripts-perms ## Update all package managers except system ones
 	./scripts/auto_update.sh --skip-system update
+
+auto-update-system: scripts-perms ## Update only system-scoped packages (requires sudo)
+	SCOPE=system ./scripts/auto_update.sh update
+
+auto-update-user: scripts-perms ## Update only user-scoped packages (no sudo)
+	SCOPE=user ./scripts/auto_update.sh update
+
+auto-update-project: scripts-perms ## Update project dependencies (with confirmation)
+	SCOPE=project ./scripts/auto_update.sh update
+
+auto-update-all: scripts-perms ## Update system + user scopes (skip project)
+	SCOPE=all ./scripts/auto_update.sh update
 
 # ============================================================================
 # DEVELOPMENT COMMANDS - Testing, Linting, Formatting
