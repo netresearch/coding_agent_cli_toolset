@@ -1,0 +1,14 @@
+{
+  "name": "bat",
+  "install_method": "github_release_binary",
+  "description": "A cat clone with syntax highlighting and Git integration",
+  "homepage": "https://github.com/sharkdp/bat",
+  "github_repo": "sharkdp/bat",
+  "binary_name": "bat",
+  "download_url_template": "https://github.com/sharkdp/bat/releases/download/{version}/bat-{version}-{arch}-unknown-linux-musl.tar.gz",
+  "arch_map": {
+    "x86_64": "x86_64",
+    "aarch64": "aarch64",
+    "armv7l": "armv7"
+  }
+}

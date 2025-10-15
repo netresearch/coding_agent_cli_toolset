@@ -1,0 +1,14 @@
+{
+  "name": "fd",
+  "install_method": "github_release_binary",
+  "description": "A simple, fast and user-friendly alternative to find",
+  "homepage": "https://github.com/sharkdp/fd",
+  "github_repo": "sharkdp/fd",
+  "binary_name": "fd",
+  "download_url_template": "https://github.com/sharkdp/fd/releases/download/{version}/fd-{version}-{arch}-unknown-linux-musl.tar.gz",
+  "arch_map": {
+    "x86_64": "x86_64",
+    "aarch64": "aarch64",
+    "armv7l": "armv7"
+  }
+}
