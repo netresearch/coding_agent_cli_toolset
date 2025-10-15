@@ -5,4 +5,9 @@
   "homepage": "https://go.dev",
   "binary_name": "go",
   "script": "install_go.sh"
+  ,"guide": {
+    "display_name": "Go toolchain",
+    "install_action": "install",
+    "order": 50
+  }
 }

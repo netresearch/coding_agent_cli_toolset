@@ -55,3 +55,28 @@ catalog_get_property() {
     jq -r ".$property // empty" "$json"
   fi
 }
+
+# Get guide-specific metadata from catalog
+catalog_get_guide_property() {
+  local tool="$1"
+  local property="$2"
+  local default="${3:-}"
+  local catalog_dir="$ROOT/catalog"
+
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "$default"
+    return
+  fi
+
+  local json="$catalog_dir/$tool.json"
+  if [ -f "$json" ]; then
+    local value="$(jq -r ".guide.$property // empty" "$json")"
+    if [ -n "$value" ] && [ "$value" != "null" ]; then
+      echo "$value"
+    else
+      echo "$default"
+    fi
+  else
+    echo "$default"
+  fi
+}
