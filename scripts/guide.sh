@@ -281,13 +281,14 @@ osc8() {
 }
 
 # Rust first (for cargo-based tools) - use JSON for accuracy
+# Note: upstream_method for rust is version source (github), not installation method
 RUST_ICON="$(json_field rust state_icon)"
 RUST_INSTALLED="$(json_field rust installed)"
 RUST_METHOD="$(json_field rust installed_method)"
 RUST_LATEST="$(json_field rust latest_upstream)"
 RUST_URL="$(json_field rust latest_url)"
 RUST_PLANNED_METHOD="$(json_field rust upstream_method)"
-if [ -n "$(json_bool rust is_up_to_date)" ] && [ "$RUST_METHOD" = "$RUST_PLANNED_METHOD" ]; then
+if [ -n "$(json_bool rust is_up_to_date)" ]; then
   printf "\n"
   printf "==> %s %s\n" "$RUST_ICON" "Rust (cargo)"
   printf "    installed: %s via %s\n" "${RUST_INSTALLED:-<none>}" "${RUST_METHOD:-unknown}"
@@ -300,13 +301,14 @@ else
 fi
 
 # UV (ensure official binary) + Python stack (before Node/core tools)
+# Note: upstream_method for uv is version source (github), not installation method
 UV_ICON="$(json_field uv state_icon)"
 UV_CURR="$(json_field uv installed)"
 UV_METHOD="$(json_field uv installed_method)"
 UV_PLANNED="$(json_field uv upstream_method)"
 UV_LATEST="$(json_field uv latest_upstream)"
 UV_URL="$(json_field uv latest_url)"
-if [ -n "$(json_bool uv is_up_to_date)" ] && [ -n "$UV_CURR" ] && [ "$UV_METHOD" = "$UV_PLANNED" ]; then
+if [ -n "$(json_bool uv is_up_to_date)" ] && [ -n "$UV_CURR" ]; then
   printf "\n"
   printf "==> %s %s\n" "$UV_ICON" "uv"
   printf "    installed: %s via %s\n" "${UV_CURR:-<none>}" "$UV_METHOD"
@@ -320,13 +322,14 @@ else
 fi
 
 # Python stack (after ensuring uv)
+# Note: upstream_method for python is version source (github), not installation method
 PY_ICON="$(json_field python state_icon)"
 PY_CURR="$(json_field python installed)"
 PY_LATEST="$(json_field python latest_upstream)"
 PY_URL="$(json_field python latest_url)"
 PY_METHOD="$(json_field python installed_method)"
 PY_PLANNED="$(json_field python upstream_method)"
-if [ -n "$(json_bool python is_up_to_date)" ] && [ "$PY_METHOD" = "$PY_PLANNED" ]; then
+if [ -n "$(json_bool python is_up_to_date)" ]; then
   printf "\n"
   printf "==> %s %s\n" "$PY_ICON" "Python stack"
   printf "    installed: %s via %s\n" "${PY_CURR:-<none>}" "$PY_METHOD"
