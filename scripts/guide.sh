@@ -10,6 +10,9 @@ OFFLINE="${OFFLINE:-0}"
 
 CLI="${PYTHON:-python3}"
 
+# Load catalog query functions
+. "$DIR/lib/catalog.sh"
+
 run_audit() {
   (cd "$ROOT" && CLI_AUDIT_OFFLINE="$OFFLINE" CLI_AUDIT_LINKS=0 CLI_AUDIT_EMOJI=0 CLI_AUDIT_TIMEOUT_SECONDS="${CLI_AUDIT_TIMEOUT_SECONDS:-3}" "$CLI" cli_audit.py)
 }
@@ -30,7 +33,6 @@ prompt_action() {
   # Preview command to be executed
   case "$tool" in
     rust)        printf "    will run: scripts/install_tool.sh rust reconcile\n" ;;
-    core)        printf "    will run: scripts/install_core.sh update\n" ;;
     python)      printf "    will run: scripts/install_tool.sh python update\n" ;;
     pip|pipx|poetry|httpie|semgrep)
                   printf "    will run: uv tool install --force --upgrade %s\n" "$tool" ;;
@@ -42,7 +44,7 @@ prompt_action() {
     kubectl)     printf "    will run: scripts/install_tool.sh kubectl\n" ;;
     terraform)   printf "    will run: scripts/install_tool.sh terraform\n" ;;
     ansible)     printf "    will run: scripts/install_tool.sh ansible update\n" ;;
-    *)           printf "    will run: scripts/install_core.sh reconcile %s\n" "$tool" ;;
+    *)           printf "    will run: scripts/install_tool.sh %s\n" "$tool" ;;
   esac
   local ans
   # Determine appropriate prompt based on context
@@ -452,10 +454,32 @@ if command -v uv >/dev/null 2>&1 || "$ROOT"/scripts/install_tool.sh uv reconcile
   done
 fi
 
-# Core tools (fd, fzf, rg, jq, yq, bat, delta, just, and npm/cargo/go tools)
-# Note: Python tools (semgrep, pre-commit, etc.) are handled separately in migration/Python utilities loops
-# Note: C-specific tools (cscope) removed as not relevant to this project
-CORE_TOOLS=(fd fzf ripgrep jq yq bat delta just curlie dive trivy gitleaks git-absorb git-branchless git-lfs eslint prettier shfmt shellcheck golangci-lint fx glab gam ctags entr parallel ast-grep direnv git gh tfsec ninja)
+# Core tools - process all tools from audit that have catalog entries
+# Excludes: Tools handled in dedicated sections above (runtimes, Python tools, cloud tools)
+# This dynamically discovers tools instead of hard-coding the list
+CORE_TOOLS=()
+while read -r line; do
+  # Skip header line
+  [[ "$line" =~ ^state ]] && continue
+
+  # Extract tool name (field 2)
+  tool_name="$(echo "$line" | awk -F'|' '{gsub(/^ +| +$/,"",$2); print $2}')"
+  [ -z "$tool_name" ] && continue
+
+  # Skip tools handled in dedicated sections
+  case "$tool_name" in
+    rust|python|node|go|docker|docker-compose|aws|kubectl|terraform|ansible) continue ;;
+    pip|pipx|poetry|httpie|semgrep|black|isort|flake8|bandit|pre-commit) continue ;;
+    npm|pnpm|yarn) continue ;;
+    uv) continue ;;
+  esac
+
+  # Only include if tool has catalog entry
+  if catalog_has_tool "$tool_name"; then
+    CORE_TOOLS+=("$tool_name")
+  fi
+done <<< "$AUDIT_OUTPUT"
+
 for t in "${CORE_TOOLS[@]}"; do
   ICON="$(json_field "$t" state_icon)"
   CURR="$(json_field "$t" installed)"
@@ -470,7 +494,7 @@ for t in "${CORE_TOOLS[@]}"; do
   fi
   # Prompt for update or migration
   if prompt_action "${ICON} $t" "$CURR" "$CURR_METHOD" "$(osc8 "$URL" "$LATE")" "$CURR_METHOD" "$t"; then
-    "$ROOT"/scripts/install_core.sh reconcile "$t" || true
+    "$ROOT"/scripts/install_tool.sh "$t" || true
     # Re-audit the single tool to reflect updated status inline
     AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" cli_audit.py || true)"
   fi
