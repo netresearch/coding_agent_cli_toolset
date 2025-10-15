@@ -1,10 +1,82 @@
-# Session Summary - Documentation Generation
+# Session Summary - Recent Sessions
 
-**Session Date:** 2025-10-09
+## Session 2025-10-13: Environment & Tool Detection Fixes
+
+**Session Type:** Bug fixes and environment configuration
+**Session ID:** Direct debugging and fixes following user reports
+
+### Session Overview
+
+Critical fixes to environment variable loading, tool detection, and user interface clarity based on user-reported issues with `.env` configuration and tool detection.
+
+### Issues Resolved
+
+1. **.env Variables Not Loaded** (Priority: 🔴 CRITICAL)
+   - **Problem:** `CLI_AUDIT_MAX_WORKERS=10` in `.env` ignored, only 4 workers used
+   - **Root Cause:** Makefile's `-include .env` only set Make variables, not subprocess environment
+   - **Fix:** Added `export` directive in Makefile after includes to propagate variables
+   - **Verification:** User increased to 40 workers, confirmed "40 workers" in output
+
+2. **Incorrect Default Value** (Priority: 🟡 IMPORTANT)
+   - **Problem:** Hardcoded default was "4" but documentation claimed "16"
+   - **Root Cause:** Inconsistency between code and documentation/configuration
+   - **Fix:** Changed `MAX_WORKERS` default from `"4"` to `"16"` in cli_audit.py:62
+   - **Impact:** Better default alignment with documented behavior
+
+3. **Tools Not Detected** (Priority: 🔴 CRITICAL)
+   - **Problem:** `gam --version` and `claude --version` worked, but audit showed NOT INSTALLED
+   - **Root Cause:** Tools in non-PATH locations:
+     - gam: `/home/sme/bin/gam7/gam`
+     - claude: `/home/sme/.claude/local/claude`
+   - **Fix:** Enhanced `find_paths()` with:
+     - `TOOL_SPECIFIC_PATHS` dict for known tool locations
+     - `EXTRA_SEARCH_PATHS` list for common directories
+     - Layered search strategy: PATH → tool-specific → extra → cargo
+   - **Verification:** Both tools now detected correctly in snapshot
+
+4. **Docker Terminology Clarification** (Priority: 🟢 RECOMMENDED)
+   - **Problem:** Guide labeled Docker CLI client as "Docker Engine"
+   - **Root Cause:** Misleading terminology confusing client vs server
+   - **Fix:** Updated scripts/guide.sh to use "Docker CLI" with explanatory notes
+   - **Impact:** Improved user experience and technical accuracy
+
+### Files Modified
+
+**Makefile** (lines 1-8)
+- Added `export` directive to propagate environment variables
+
+**cli_audit.py** (multiple sections)
+- Added HOME constant and search path lists (lines 43-56)
+- Fixed MAX_WORKERS default value (line 62)
+- Enhanced find_paths() function (lines 1049-1094)
+
+**scripts/guide.sh** (lines 355-372)
+- Changed "Docker Engine" → "Docker CLI"
+- Added clarifying notes about client vs server distinction
+
+### Commits
+
+1. `aa57210` - fix(cli_audit): resolve three critical issues in environment and detection
+2. `80abd30` - fix(guide): clarify Docker CLI vs Docker Engine terminology
+3. `34fa37f` - chore(snapshot): update tool audit cache with improved detection
+
+### Current State
+
+- **Working Tree:** Clean, all changes committed
+- **Branch:** main (12 commits ahead of origin/main)
+- **Tools Audited:** 64 tools
+- **Outdated:** 5 tools (fzf, yq, just, gam, docker)
+- **Missing:** 2 tools (git-branchless, golangci-lint)
+- **Environment:** CLI_AUDIT_MAX_WORKERS=40 (user configuration)
+
+---
+
+## Session 2025-10-09: Documentation Generation
+
 **Session Type:** Project indexing and comprehensive documentation generation
 **Session ID:** /sc:load + /sc:index with --ultrathink --comprehensive --validate
 
-## Session Overview
+### Session Overview
 
 Comprehensive documentation suite created for AI CLI Preparation project using /sc:load and /sc:index slash commands with deep analysis flags.
 
