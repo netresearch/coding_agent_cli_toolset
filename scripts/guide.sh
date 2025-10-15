@@ -528,15 +528,14 @@ DK_CURR="$(json_field docker installed)"
 DK_LATEST="$(json_field docker latest_upstream)"
 DK_URL="$(json_field docker latest_url)"
 DK_METHOD="$(json_field docker installed_method)"
-DK_PLANNED="$(json_field docker upstream_method)"
-if [ -n "$(json_bool docker is_up_to_date)" ] && [ "$DK_METHOD" = "$DK_PLANNED" ]; then
+if [ -n "$(json_bool docker is_up_to_date)" ] && [ -n "$DK_CURR" ]; then
   printf "\n"
   printf "==> %s %s\n" "$DK_ICON" "Docker CLI"
   printf "    installed: %s via %s\n" "${DK_CURR:-<none>}" "$DK_METHOD"
-  printf "    target:    %s via %s\n" "$(osc8 "$DK_URL" "${DK_LATEST:-<unknown>}")" "$DK_PLANNED"
+  printf "    target:    %s (same)\n" "$(osc8 "$DK_URL" "${DK_LATEST:-<unknown>}")"
   printf "    up-to-date; skipping.\n"
 else
-  if prompt_action "${DK_ICON} Docker CLI (client)" "$DK_CURR" "$DK_METHOD" "$(osc8 "$DK_URL" "$DK_LATEST")" "$DK_PLANNED" docker; then
+  if prompt_action "${DK_ICON} Docker CLI (client)" "$DK_CURR" "$DK_METHOD" "$(osc8 "$DK_URL" "$DK_LATEST")" "$DK_METHOD" docker; then
     echo "Note: This updates the Docker CLI client. Docker Engine (server) is managed separately."
     echo "      If using Docker Desktop, the engine is updated via Docker Desktop updates."
     "$ROOT"/scripts/install_docker.sh || true
@@ -549,15 +548,14 @@ DC_CURR="$(json_field docker-compose installed)"
 DC_LATEST="$(json_field docker-compose latest_upstream)"
 DC_URL="$(json_field docker-compose latest_url)"
 DC_METHOD="$(json_field docker-compose installed_method)"
-DC_PLANNED="$(json_field docker-compose upstream_method)"
-if [ -n "$(json_bool docker-compose is_up_to_date)" ] && [ "$DC_METHOD" = "$DC_PLANNED" ]; then
+if [ -n "$(json_bool docker-compose is_up_to_date)" ] && [ -n "$DC_CURR" ]; then
   printf "\n"
   printf "==> %s %s\n" "$DC_ICON" "Docker Compose"
   printf "    installed: %s via %s\n" "${DC_CURR:-<none>}" "$DC_METHOD"
-  printf "    target:    %s via %s\n" "$(osc8 "$DC_URL" "${DC_LATEST:-<unknown>}")" "$DC_PLANNED"
+  printf "    target:    %s (same)\n" "$(osc8 "$DC_URL" "${DC_LATEST:-<unknown>}")"
   printf "    up-to-date; skipping.\n"
 else
-  if prompt_action "${DC_ICON} Docker Compose" "$DC_CURR" "$DC_METHOD" "$(osc8 "$DC_URL" "$DC_LATEST")" "$DC_PLANNED" docker-compose; then
+  if prompt_action "${DC_ICON} Docker Compose" "$DC_CURR" "$DC_METHOD" "$(osc8 "$DC_URL" "$DC_LATEST")" "$DC_METHOD" docker-compose; then
     echo "Note: Docker Compose v2 is bundled as Docker plugin; ensure Docker is up to date."
   fi
 fi
@@ -568,15 +566,14 @@ AWS_CURR="$(json_field aws installed)"
 AWS_LATEST="$(json_field aws latest_upstream)"
 AWS_URL="$(json_field aws latest_url)"
 AWS_METHOD="$(json_field aws installed_method)"
-AWS_PLANNED="$(json_field aws upstream_method)"
-if [ -n "$(json_bool aws is_up_to_date)" ] && [ -n "$AWS_CURR" ] && [ "$AWS_METHOD" = "$AWS_PLANNED" ]; then
+if [ -n "$(json_bool aws is_up_to_date)" ] && [ -n "$AWS_CURR" ]; then
   printf "\n"
   printf "==> %s %s\n" "$AWS_ICON" "AWS CLI"
   printf "    installed: %s via %s\n" "${AWS_CURR:-<none>}" "$AWS_METHOD"
-  printf "    target:    %s via %s\n" "$(osc8 "$AWS_URL" "${AWS_LATEST:-<unknown>}")" "$AWS_PLANNED"
+  printf "    target:    %s (same)\n" "$(osc8 "$AWS_URL" "${AWS_LATEST:-<unknown>}")"
   printf "    up-to-date; skipping.\n"
 else
-  if prompt_action "${AWS_ICON} AWS CLI" "$AWS_CURR" "$AWS_METHOD" "$(osc8 "$AWS_URL" "$AWS_LATEST")" "$AWS_PLANNED" aws; then
+  if prompt_action "${AWS_ICON} AWS CLI" "$AWS_CURR" "$AWS_METHOD" "$(osc8 "$AWS_URL" "$AWS_LATEST")" "$AWS_METHOD" aws; then
     "$ROOT"/scripts/install_aws.sh || true
   fi
 fi
@@ -587,15 +584,14 @@ K8S_CURR="$(json_field kubectl installed)"
 K8S_LATEST="$(json_field kubectl latest_upstream)"
 K8S_URL="$(json_field kubectl latest_url)"
 K8S_METHOD="$(json_field kubectl installed_method)"
-K8S_PLANNED="$(json_field kubectl upstream_method)"
-if [ -n "$(json_bool kubectl is_up_to_date)" ] && [ "$K8S_METHOD" = "$K8S_PLANNED" ]; then
+if [ -n "$(json_bool kubectl is_up_to_date)" ] && [ -n "$K8S_CURR" ]; then
   printf "\n"
   printf "==> %s %s\n" "$K8S_ICON" "kubectl"
   printf "    installed: %s via %s\n" "${K8S_CURR:-<none>}" "$K8S_METHOD"
-  printf "    target:    %s via %s\n" "$(osc8 "$K8S_URL" "${K8S_LATEST:-<unknown>}")" "$K8S_PLANNED"
+  printf "    target:    %s (same)\n" "$(osc8 "$K8S_URL" "${K8S_LATEST:-<unknown>}")"
   printf "    up-to-date; skipping.\n"
 else
-  if prompt_action "${K8S_ICON} kubectl" "$K8S_CURR" "$K8S_METHOD" "$(osc8 "$K8S_URL" "$K8S_LATEST")" "$K8S_PLANNED" kubectl; then
+  if prompt_action "${K8S_ICON} kubectl" "$K8S_CURR" "$K8S_METHOD" "$(osc8 "$K8S_URL" "$K8S_LATEST")" "$K8S_METHOD" kubectl; then
     "$ROOT"/scripts/install_kubectl.sh update || true
   fi
 fi
@@ -606,15 +602,14 @@ TF_CURR="$(json_field terraform installed)"
 TF_LATEST="$(json_field terraform latest_upstream)"
 TF_URL="$(json_field terraform latest_url)"
 TF_METHOD="$(json_field terraform installed_method)"
-TF_PLANNED="$(json_field terraform upstream_method)"
-if [ -n "$(json_bool terraform is_up_to_date)" ] && [ "$TF_METHOD" = "$TF_PLANNED" ]; then
+if [ -n "$(json_bool terraform is_up_to_date)" ] && [ -n "$TF_CURR" ]; then
   printf "\n"
   printf "==> %s %s\n" "$TF_ICON" "Terraform"
   printf "    installed: %s via %s\n" "${TF_CURR:-<none>}" "$TF_METHOD"
-  printf "    target:    %s via %s\n" "$(osc8 "$TF_URL" "${TF_LATEST:-<unknown>}")" "$TF_PLANNED"
+  printf "    target:    %s (same)\n" "$(osc8 "$TF_URL" "${TF_LATEST:-<unknown>}")"
   printf "    up-to-date; skipping.\n"
 else
-  if prompt_action "${TF_ICON} Terraform" "$TF_CURR" "$TF_METHOD" "$(osc8 "$TF_URL" "$TF_LATEST")" "$TF_PLANNED" terraform; then
+  if prompt_action "${TF_ICON} Terraform" "$TF_CURR" "$TF_METHOD" "$(osc8 "$TF_URL" "$TF_LATEST")" "$TF_METHOD" terraform; then
     "$ROOT"/scripts/install_terraform.sh || true
   fi
 fi
@@ -625,15 +620,14 @@ ANS_CURR="$(json_field ansible installed)"
 ANS_LATEST="$(json_field ansible latest_upstream)"
 ANS_URL="$(json_field ansible latest_url)"
 ANS_METHOD="$(json_field ansible installed_method)"
-ANS_PLANNED="$(json_field ansible upstream_method)"
-if [ -n "$(json_bool ansible is_up_to_date)" ] && [ "$ANS_METHOD" = "$ANS_PLANNED" ]; then
+if [ -n "$(json_bool ansible is_up_to_date)" ] && [ -n "$ANS_CURR" ]; then
   printf "\n"
   printf "==> %s %s\n" "$ANS_ICON" "Ansible"
   printf "    installed: %s via %s\n" "${ANS_CURR:-<none>}" "$ANS_METHOD"
-  printf "    target:    %s via %s\n" "$(osc8 "$ANS_URL" "${ANS_LATEST:-<unknown>}")" "$ANS_PLANNED"
+  printf "    target:    %s (same)\n" "$(osc8 "$ANS_URL" "${ANS_LATEST:-<unknown>}")"
   printf "    up-to-date; skipping.\n"
 else
-  if prompt_action "${ANS_ICON} Ansible" "$ANS_CURR" "$ANS_METHOD" "$(osc8 "$ANS_URL" "$ANS_LATEST")" "$ANS_PLANNED" ansible; then
+  if prompt_action "${ANS_ICON} Ansible" "$ANS_CURR" "$ANS_METHOD" "$(osc8 "$ANS_URL" "$ANS_LATEST")" "$ANS_METHOD" ansible; then
     "$ROOT"/scripts/install_ansible.sh update || true
     AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" cli_audit.py || true)"
   fi
