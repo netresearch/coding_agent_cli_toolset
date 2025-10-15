@@ -280,14 +280,36 @@ osc8() {
   fi
 }
 
+display_method() {
+  # Convert upstream_method (version lookup source) to user-friendly display
+  # For tools tracked via GitHub, show the actual installation method
+  local tool="$1" upstream="$2"
+  case "$upstream" in
+    github)
+      # For GitHub-tracked tools, show the actual preferred installation method
+      case "$tool" in
+        rust) echo "rustup" ;;
+        uv) echo "official installer" ;;
+        python) echo "uv python" ;;
+        node) echo "nvm" ;;
+        go) echo "official installer" ;;
+        *) echo "$upstream" ;;
+      esac
+      ;;
+    *)
+      # For other sources, upstream_method already indicates installation method
+      echo "$upstream"
+      ;;
+  esac
+}
+
 # Rust first (for cargo-based tools) - use JSON for accuracy
-# Note: upstream_method for rust is version source (github), not installation method
 RUST_ICON="$(json_field rust state_icon)"
 RUST_INSTALLED="$(json_field rust installed)"
 RUST_METHOD="$(json_field rust installed_method)"
 RUST_LATEST="$(json_field rust latest_upstream)"
 RUST_URL="$(json_field rust latest_url)"
-RUST_PLANNED_METHOD="$(json_field rust upstream_method)"
+RUST_PLANNED_METHOD="$(display_method rust "$(json_field rust upstream_method)")"
 if [ -n "$(json_bool rust is_up_to_date)" ]; then
   printf "\n"
   printf "==> %s %s\n" "$RUST_ICON" "Rust (cargo)"
@@ -301,13 +323,12 @@ else
 fi
 
 # UV (ensure official binary) + Python stack (before Node/core tools)
-# Note: upstream_method for uv is version source (github), not installation method
 UV_ICON="$(json_field uv state_icon)"
 UV_CURR="$(json_field uv installed)"
 UV_METHOD="$(json_field uv installed_method)"
-UV_PLANNED="$(json_field uv upstream_method)"
 UV_LATEST="$(json_field uv latest_upstream)"
 UV_URL="$(json_field uv latest_url)"
+UV_PLANNED="$(display_method uv "$(json_field uv upstream_method)")"
 if [ -n "$(json_bool uv is_up_to_date)" ] && [ -n "$UV_CURR" ]; then
   printf "\n"
   printf "==> %s %s\n" "$UV_ICON" "uv"
@@ -322,13 +343,12 @@ else
 fi
 
 # Python stack (after ensuring uv)
-# Note: upstream_method for python is version source (github), not installation method
 PY_ICON="$(json_field python state_icon)"
 PY_CURR="$(json_field python installed)"
 PY_LATEST="$(json_field python latest_upstream)"
 PY_URL="$(json_field python latest_url)"
 PY_METHOD="$(json_field python installed_method)"
-PY_PLANNED="$(json_field python upstream_method)"
+PY_PLANNED="$(display_method python "$(json_field python upstream_method)")"
 if [ -n "$(json_bool python is_up_to_date)" ]; then
   printf "\n"
   printf "==> %s %s\n" "$PY_ICON" "Python stack"
@@ -347,15 +367,17 @@ NODE_ICON="$(json_field node state_icon)"
 NODE_CURR="$(json_field node installed)"
 NODE_LATEST="$(json_field node latest_upstream)"
 NODE_URL="$(json_field node latest_url)"
+NODE_METHOD="$(json_field node installed_method)"
+NODE_PLANNED="$(display_method node "$(json_field node upstream_method)")"
 # Treat stack as up-to-date only if node, npm, pnpm, and yarn are all up-to-date
 NODE_ALL_OK=""
 if [ -n "$(json_bool node is_up_to_date)" ] && [ -n "$(json_bool npm is_up_to_date)" ] && [ -n "$(json_bool pnpm is_up_to_date)" ] && [ -n "$(json_bool yarn is_up_to_date)" ]; then
   NODE_ALL_OK="1"
 fi
 if [ -n "$NODE_ALL_OK" ]; then
-  printf "\n"; printf "==> %s %s\n" "$NODE_ICON" "Node.js stack"; printf "    installed: %s via %s\n" "${NODE_CURR:-<none>}" "$(json_field node installed_method)"; printf "    target:    %s via %s\n" "$(osc8 "$NODE_URL" "${NODE_LATEST:-<unknown>}")" "$(json_field node upstream_method)"; printf "    up-to-date; skipping.\n"
+  printf "\n"; printf "==> %s %s\n" "$NODE_ICON" "Node.js stack"; printf "    installed: %s via %s\n" "${NODE_CURR:-<none>}" "$NODE_METHOD"; printf "    target:    %s via %s\n" "$(osc8 "$NODE_URL" "${NODE_LATEST:-<unknown>}")" "$NODE_PLANNED"; printf "    up-to-date; skipping.\n"
 else
-  if prompt_action "${NODE_ICON} Node.js stack" "$NODE_CURR" "$(json_field node installed_method)" "$(osc8 "$NODE_URL" "$NODE_LATEST")" "$(json_field node upstream_method)" node; then
+  if prompt_action "${NODE_ICON} Node.js stack" "$NODE_CURR" "$NODE_METHOD" "$(osc8 "$NODE_URL" "$NODE_LATEST")" "$NODE_PLANNED" node; then
     "$ROOT"/scripts/install_node.sh reconcile || true
     AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" cli_audit.py || true)"
   fi
@@ -389,11 +411,12 @@ GO_CURR_RAW="$(command -v go >/dev/null 2>&1 && go version 2>/dev/null | awk '{p
 GO_CURR="${GO_CURR_RAW#go}"
 GO_LATE="$(json_field go latest_upstream)"
 GO_URL="$(json_field go latest_url)"
+GO_PLANNED="$(display_method go "$(json_field go upstream_method)")"
 if [ -n "${GO_CURR}" ]; then GO_METHOD="go"; else GO_METHOD="none"; fi
 if [ -n "$(json_bool go is_up_to_date)" ]; then
-  printf "\n"; printf "==> %s %s\n" "$GO_ICON" "Go toolchain"; printf "    installed: %s via %s\n" "$GO_CURR" "$GO_METHOD"; printf "    target:    %s via %s\n" "$(osc8 "$GO_URL" "${GO_LATE:-<unknown>}")" "brew"; printf "    up-to-date; skipping.\n"
+  printf "\n"; printf "==> %s %s\n" "$GO_ICON" "Go toolchain"; printf "    installed: %s via %s\n" "$GO_CURR" "$GO_METHOD"; printf "    target:    %s via %s\n" "$(osc8 "$GO_URL" "${GO_LATE:-<unknown>}")" "$GO_PLANNED"; printf "    up-to-date; skipping.\n"
 else
-  if prompt_action "${GO_ICON} Go toolchain" "$GO_CURR" "$GO_METHOD" "$(osc8 "$GO_URL" "$GO_LATE")" "brew" go; then
+  if prompt_action "${GO_ICON} Go toolchain" "$GO_CURR" "$GO_METHOD" "$(osc8 "$GO_URL" "$GO_LATE")" "$GO_PLANNED" go; then
     "$ROOT"/scripts/install_go.sh || true
     AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" cli_audit.py || true)"
   fi
