@@ -864,7 +864,7 @@ TOOLS: tuple[Tool, ...] = (
     Tool("just", ("just",), "gh", ("casey", "just")),
     Tool("ninja", ("ninja",), "gh", ("ninja-build", "ninja")),
     # 6.5) Code navigation
-    Tool("cscope", ("cscope",), "skip", ()),
+    # Tool("cscope", ("cscope",), "skip", ()),  # C-only tool, not relevant for this project
     # 7) Cloud / infra
     Tool("aws", ("aws",), "gh", ("aws", "aws-cli")),
     Tool("kubectl", ("kubectl",), "gh", ("kubernetes", "kubernetes")),

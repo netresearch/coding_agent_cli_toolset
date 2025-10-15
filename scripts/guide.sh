@@ -313,7 +313,8 @@ fi
 
 # Core tools (fd, fzf, rg, jq, yq, bat, delta, just, and npm/cargo/go tools)
 # Note: Python tools (semgrep, pre-commit, etc.) are handled separately in migration/Python utilities loops
-CORE_TOOLS=(fd fzf ripgrep jq yq bat delta just curlie dive trivy gitleaks git-absorb git-branchless git-lfs eslint prettier shfmt shellcheck golangci-lint fx glab gam ctags entr parallel ast-grep direnv git gh tfsec ninja cscope)
+# Note: C-specific tools (cscope) removed as not relevant to this project
+CORE_TOOLS=(fd fzf ripgrep jq yq bat delta just curlie dive trivy gitleaks git-absorb git-branchless git-lfs eslint prettier shfmt shellcheck golangci-lint fx glab gam ctags entr parallel ast-grep direnv git gh tfsec ninja)
 for t in "${CORE_TOOLS[@]}"; do
   ICON="$(json_field "$t" state_icon)"
   CURR="$(json_field "$t" installed)"
