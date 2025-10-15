@@ -1,0 +1,7 @@
+{
+  "name": "codex",
+  "install_method": "uv_tool",
+  "description": "CLI tool for generating and managing code documentation",
+  "homepage": "https://github.com/codex-cli/codex",
+  "package_name": "codex"
+}

@@ -1,0 +1,7 @@
+{
+  "name": "parallel",
+  "install_method": "script",
+  "description": "GNU Parallel - shell tool for executing jobs in parallel",
+  "homepage": "https://www.gnu.org/software/parallel/",
+  "notes": "GNU Parallel is installed from GNU FTP server, not GitHub releases. Requires custom installation script."
+}

@@ -1,0 +1,14 @@
+{
+  "name": "glab",
+  "install_method": "github_release_binary",
+  "description": "GitLab CLI tool bringing GitLab to your command line",
+  "homepage": "https://github.com/profclems/glab",
+  "github_repo": "profclems/glab",
+  "binary_name": "glab",
+  "download_url_template": "https://github.com/profclems/glab/releases/download/{version}/glab_{version_nov}_Linux_{arch}.tar.gz",
+  "arch_map": {
+    "x86_64": "x86_64",
+    "aarch64": "arm64",
+    "armv7l": "armv6"
+  }
+}
