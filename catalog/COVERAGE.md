@@ -2,15 +2,16 @@
 
 This file documents which tools have catalog entries and which use dedicated install scripts.
 
-## Tools with Catalog Entries (45)
+## Tools with Catalog Entries (54)
 
 These tools use the catalog-based installation system with generic installers:
 
-- ansible, ast-grep, aws, bandit, bat, black, codex, curlie, dasel, delta
-- direnv, dive, entr, fd, flake8, fx, fzf, gh, git-absorb, git-branchless
-- git-lfs, gitleaks, glab, golangci-lint, httpie, isort, just, kubectl
-- ninja, parallel, pre-commit, prettier, rga, ripgrep, ruff, sd, semgrep
-- shellcheck, shfmt, terraform, tfsec, trivy, watchexec, xsv, yq
+- ansible, ast-grep, aws, bandit, bat, black, codex, composer, curlie, dasel
+- delta, direnv, dive, entr, fd, flake8, fx, fzf, gem, gh, git-absorb
+- git-branchless, git-lfs, gitleaks, glab, golangci-lint, httpie, isort, just
+- kubectl, ninja, npm, parallel, pip, pipx, pnpm, poetry, pre-commit, prettier
+- rga, ripgrep, ruff, sd, semgrep, shellcheck, shfmt, sponge, terraform, tfsec
+- trivy, watchexec, xsv, yarn, yq
 
 ## Tools with Dedicated Install Scripts
 
@@ -22,16 +23,9 @@ These have their own complex installers in `scripts/`:
 - **node** - `install_node.sh`
 
 ### Package Managers
-These are either installed with runtimes or have dedicated scripts:
-- **pip** - Installed with Python
-- **pipx** - Python tool
-- **uv** - `install_uv.sh`
-- **npm** - Installed with Node.js
-- **pnpm** - Node.js package manager
-- **yarn** - Node.js package manager
-- **gem** - Installed with Ruby
-- **composer** - PHP package manager
-- **poetry** - Python package manager
+Most now in catalog, one dedicated script:
+- **uv** - `install_uv.sh` (special bootstrap installer)
+- All others (pip, pipx, npm, pnpm, yarn, gem, composer, poetry, sponge) - Now in catalog!
 
 ### Docker Tools
 - **docker** - `install_docker.sh` (uses official Docker install script)
@@ -54,14 +48,18 @@ These are either installed with runtimes or have dedicated scripts:
 
 - **github_release_binary**: 31 tools
 - **uv_tool**: 8 tools (Python CLI tools)
+- **package_manager**: 10 tools (pip, pipx, poetry, npm, pnpm, yarn, gem, composer, sponge, entr)
 - **hashicorp_zip**: 1 tool (terraform)
 - **aws_installer**: 1 tool (aws)
 - **npm_global**: 1 tool (prettier)
 - **script**: 1 tool (parallel)
-- **package_manager**: 1 tool (entr)
-- **dedicated_script**: 14 tools (runtimes, package managers, docker, etc.)
-- **system_package**: 5 tools (git, ctags, sponge, rename variants)
+- **dedicated_script**: 10 tools (runtimes: go, rust, python, node; special: uv, docker, git, ctags, gam)
+- **system_package**: 2 tools (cscope, rename variants)
 
 ## Total: 69 tools tracked
+
+- **54 tools** have catalog entries
+- **10 tools** use dedicated scripts (runtimes + special cases)
+- **5 tools** are system packages only
 
 All installable tools either have catalog entries or use appropriate dedicated scripts.

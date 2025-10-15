@@ -1,0 +1,13 @@
+{
+  "name": "composer",
+  "install_method": "package_manager",
+  "description": "PHP dependency manager",
+  "homepage": "https://getcomposer.org/",
+  "binary_name": "composer",
+  "packages": {
+    "apt": "composer",
+    "brew": "composer",
+    "dnf": "composer",
+    "pacman": "composer"
+  }
+}

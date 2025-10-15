@@ -1,0 +1,14 @@
+{
+  "name": "gem",
+  "install_method": "package_manager",
+  "description": "Ruby package manager",
+  "homepage": "https://rubygems.org/",
+  "binary_name": "gem",
+  "packages": {
+    "apt": "ruby-rubygems",
+    "brew": "ruby",
+    "dnf": "rubygems",
+    "pacman": "rubygems"
+  },
+  "notes": "gem typically comes with Ruby. Installing ruby package will also install gem."
+}
