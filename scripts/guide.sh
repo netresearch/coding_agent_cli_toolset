@@ -45,13 +45,21 @@ prompt_action() {
     *)           printf "    will run: scripts/install_core.sh reconcile %s\n" "$tool" ;;
   esac
   local ans
+  # Determine appropriate prompt based on context
+  local prompt_text="Install/update? [y/N] "
+  # Check if this is a migration (version matches but method differs)
+  if [ "$current" = "$latest" ] && [ "$method" != "$planned" ]; then
+    prompt_text="Migrate installation method? [y/N] "
+  elif [ -z "$current" ] || [ "$current" = "<none>" ]; then
+    prompt_text="Install? [y/N] "
+  fi
   # Read from the real TTY to avoid broken pipes when stdout/stderr are piped
   if [ -t 0 ]; then
-    read -r -p "Install/update? [y/N] " ans || true
+    read -r -p "$prompt_text" ans || true
   else
     # Fallback: read from /dev/tty if available
     if [ -r /dev/tty ]; then
-      read -r -p "Install/update? [y/N] " ans </dev/tty || true
+      read -r -p "$prompt_text" ans </dev/tty || true
     else
       ans=""
     fi
@@ -303,7 +311,8 @@ if command -v uv >/dev/null 2>&1 || "$ROOT"/scripts/install_uv.sh reconcile >/de
 fi
 
 # Core tools (fd, fzf, rg, jq, yq, bat, delta, just, and npm/cargo/go tools)
-CORE_TOOLS=(fd fzf ripgrep jq yq bat delta just curlie dive trivy gitleaks git-absorb git-branchless git-lfs eslint prettier shfmt shellcheck golangci-lint fx glab gam ctags entr parallel ast-grep direnv git gh semgrep pre-commit tfsec ninja cscope)
+# Note: Python tools (semgrep, pre-commit, etc.) are handled separately in migration/Python utilities loops
+CORE_TOOLS=(fd fzf ripgrep jq yq bat delta just curlie dive trivy gitleaks git-absorb git-branchless git-lfs eslint prettier shfmt shellcheck golangci-lint fx glab gam ctags entr parallel ast-grep direnv git gh tfsec ninja cscope)
 for t in "${CORE_TOOLS[@]}"; do
   ICON="$(json_field "$t" state_icon)"
   CURR="$(json_field "$t" installed)"
