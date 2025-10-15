@@ -75,7 +75,7 @@ MAX_WORKERS: int = int(os.environ.get("CLI_AUDIT_MAX_WORKERS", "16"))  # Default
 DOCKER_INFO_ENABLED: bool = os.environ.get("CLI_AUDIT_DOCKER_INFO", "1") == "1"
 PROGRESS: bool = os.environ.get("CLI_AUDIT_PROGRESS", "0") == "1"
 OFFLINE_USE_CACHE: bool = os.environ.get("CLI_AUDIT_OFFLINE_USE_CACHE", "1") == "1"  # kept for compatibility, no effect
-SHOW_TIMINGS: bool = os.environ.get("CLI_AUDIT_TIMINGS", "1") == "1"
+SHOW_TIMINGS: bool = os.environ.get("CLI_AUDIT_TIMINGS", "0") == "1"  # Only enable during 'make update' to identify slow operations
 MANUAL_FIRST: bool = os.environ.get("CLI_AUDIT_MANUAL_FIRST", "0") == "1"
 DPKG_CACHE: dict[str, bool] = {}
 DPKG_OWNER_CACHE: dict[str, str] = {}
@@ -2326,7 +2326,8 @@ def audit_tool(tool: Tool) -> tuple[str, str, str, str, str, str, str, str]:
         installed_display = installed_num
     else:
         installed_display = installed_line
-    if SHOW_TIMINGS:
+    # Only add timings for display output, NOT for snapshot persistence
+    if SHOW_TIMINGS and not COLLECT_ONLY:
         # Show timing even when not installed
         if installed_display:
             installed_display = installed_display + f" ({_format_duration(t1_inst - t0_inst)})"
