@@ -110,11 +110,11 @@ audit-auto: ## Update snapshot if missing, then render
 
 update: ## Collect fresh version data with network calls and update snapshot (~10s)
 	@echo "→ Collecting fresh version data from upstream sources..." >&2
-	@bash -c 'set -o pipefail; CLI_AUDIT_COLLECT=1 $(PYTHON) cli_audit.py' || true
+	@bash -c 'set -o pipefail; CLI_AUDIT_COLLECT=1 CLI_AUDIT_TIMINGS=1 $(PYTHON) cli_audit.py' || true
 	@echo "✓ Snapshot updated. Run 'make audit' or 'make upgrade' to use it." >&2
 
 update-debug: ## Collect with verbose debug output (shows network calls)
-	@bash -c 'set -o pipefail; CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 $(PYTHON) cli_audit.py' || true
+	@bash -c 'set -o pipefail; CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 CLI_AUDIT_TIMINGS=1 $(PYTHON) cli_audit.py' || true
 
 upgrade: scripts-perms ## Run interactive upgrade guide (uses snapshot, no network calls)
 	@bash scripts/guide.sh
