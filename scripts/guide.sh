@@ -194,16 +194,18 @@ fi
 # UV (ensure official binary) + Python stack (before Node/core tools)
 UV_ICON="$(json_field uv state_icon)"
 UV_CURR="$(json_field uv installed)"
+UV_METHOD="$(json_field uv installed_method)"
+UV_PLANNED="$(json_field uv upstream_method)"
 UV_LATEST="$(json_field uv latest_upstream)"
 UV_URL="$(json_field uv latest_url)"
-if [ -n "$(json_bool uv is_up_to_date)" ] && [ -n "$UV_CURR" ]; then
+if [ -n "$(json_bool uv is_up_to_date)" ] && [ -n "$UV_CURR" ] && [ "$UV_METHOD" = "$UV_PLANNED" ]; then
   printf "\n"
   printf "==> %s %s\n" "$UV_ICON" "uv"
   printf "    installed: %s via %s\n" "${UV_CURR:-<none>}" "$(json_field uv installed_method)"
   printf "    target:    %s via %s\n" "$(osc8 "$UV_URL" "${UV_LATEST:-<unknown>}")" "$(json_field uv upstream_method)"
   printf "    up-to-date; skipping.\n"
 else
-  if prompt_action "${UV_ICON} uv" "$UV_CURR" "$(json_field uv installed_method)" "$(osc8 "$UV_URL" "$UV_LATEST")" "$(json_field uv upstream_method)" core; then
+  if prompt_action "${UV_ICON} uv" "$UV_CURR" "$UV_METHOD" "$(osc8 "$UV_URL" "$UV_LATEST")" "$UV_PLANNED" core; then
     "$ROOT"/scripts/install_uv.sh reconcile || true
     AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" cli_audit.py || true)"
   fi
