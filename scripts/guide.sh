@@ -463,9 +463,8 @@ for t in "${CORE_TOOLS[@]}"; do
   URL="$(json_field "$t" latest_url)"
   CURR_METHOD="$(json_field "$t" installed_method)"
   PLANNED_METHOD="$(json_field "$t" upstream_method)"
-  # Skip if up-to-date - for core tools, any valid installation method is acceptable (cargo, system, /usr/local/bin, etc.)
-  # We only care about version match, not method migration for these tools
-  if [ -n "$(json_bool "$t" is_up_to_date)" ] && [ -n "$CURR" ]; then
+  # Only skip if version is up-to-date AND method matches (or no migration needed)
+  if [ -n "$(json_bool "$t" is_up_to_date)" ] && [ "$CURR_METHOD" = "$PLANNED_METHOD" ]; then
     printf "\n"; printf "==> %s %s\n" "$ICON" "$t"; printf "    installed: %s via %s\n" "${CURR:-<none>}" "$CURR_METHOD"; printf "    target:    %s via %s\n" "$(osc8 "$URL" "${LATE:-<unknown>}")" "$PLANNED_METHOD"; printf "    up-to-date; skipping.\n"; continue
   fi
   # Prompt for update or migration
