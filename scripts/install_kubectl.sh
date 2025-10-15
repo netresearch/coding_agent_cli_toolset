@@ -3,6 +3,7 @@ set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$DIR/lib/common.sh"
+. "$DIR/lib/install_strategy.sh"
 
 TOOL="kubectl"
 before="$(kubectl version --client --short 2>/dev/null || true)"
@@ -17,6 +18,11 @@ case "$(uname -m)" in
   ppc64le) ARCH="ppc64le" ;;
   *) ARCH="amd64" ;;
 esac
+
+# Determine installation directory based on INSTALL_STRATEGY
+BIN_DIR="$(get_install_dir kubectl)"
+get_install_cmd "$BIN_DIR"
+mkdir -p "$BIN_DIR" 2>/dev/null || true
 
 # Resolve latest stable version from primary and fallback endpoints
 LATEST="$(curl -fsSL https://dl.k8s.io/release/stable.txt 2>/dev/null || true)"
@@ -52,7 +58,7 @@ fi
 
 chmod +x "$tmpfile"
 # Install atomically with proper permissions
-sudo install -m 0755 -T "$tmpfile" /usr/local/bin/kubectl
+$INSTALL -T "$tmpfile" "$BIN_DIR/kubectl"
 
 after="$(kubectl version --client --short 2>/dev/null || true)"
 path="$(command -v kubectl 2>/dev/null || true)"

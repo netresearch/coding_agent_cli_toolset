@@ -12,16 +12,43 @@ ONLY_TOOL="${2:-}"
 OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
 ARCH="$(uname -m)"
 PREFIX="${PREFIX:-$HOME/.local}"
-# Prefer /usr/local/bin to override system binaries when possible, but fall back
-# to user bin when we cannot write and passwordless sudo isn't available.
-if [ -d "/usr/local/bin" ] && [ -w "/usr/local/bin" ]; then
-  BIN_DIR="/usr/local/bin"
-elif [ -d "/usr/local/bin" ] && command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
-  BIN_DIR="/usr/local/bin"
-else
-  BIN_DIR="$PREFIX/bin"
-fi
+
+# Determine installation directory based on INSTALL_STRATEGY
+# CURRENT: Keep where currently installed (check $ONLY_TOOL location)
+# USER: ~/.local/bin (default, no sudo)
+# GLOBAL: /usr/local/bin (requires sudo)
+# PROJECT: ./.local/bin (project-local)
+INSTALL_STRATEGY="${INSTALL_STRATEGY:-USER}"
+
+case "$INSTALL_STRATEGY" in
+  CURRENT)
+    # Keep tool where it is currently installed
+    if [ -n "$ONLY_TOOL" ]; then
+      current_path="$(command -v "$ONLY_TOOL" 2>/dev/null || true)"
+      if [ -n "$current_path" ]; then
+        BIN_DIR="$(dirname "$current_path")"
+      else
+        # Not installed, fall back to USER
+        BIN_DIR="$PREFIX/bin"
+      fi
+    else
+      # No specific tool, fall back to USER
+      BIN_DIR="$PREFIX/bin"
+    fi
+    ;;
+  GLOBAL)
+    BIN_DIR="/usr/local/bin"
+    ;;
+  PROJECT)
+    BIN_DIR="./.local/bin"
+    ;;
+  USER|*)
+    BIN_DIR="$PREFIX/bin"
+    ;;
+esac
+
 mkdir -p "$BIN_DIR" 2>/dev/null || true
+
 # Installer helper (use sudo only if BIN_DIR is /usr/local/bin and passwordless sudo available)
 if [ "$BIN_DIR" = "/usr/local/bin" ]; then
   if [ -w "$BIN_DIR" ]; then INSTALL="install -m 0755"; else INSTALL="sudo install -m 0755"; fi

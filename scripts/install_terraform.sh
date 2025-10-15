@@ -3,6 +3,7 @@ set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$DIR/lib/common.sh"
+. "$DIR/lib/install_strategy.sh"
 
 OS="linux"
 ARCH_RAW="$(uname -m)"
@@ -11,6 +12,11 @@ case "$ARCH_RAW" in
   aarch64|arm64) ARCH="arm64" ;;
   *) ARCH="amd64" ;;
 esac
+
+# Determine installation directory based on INSTALL_STRATEGY
+BIN_DIR="$(get_install_dir terraform)"
+get_install_cmd "$BIN_DIR"
+mkdir -p "$BIN_DIR" 2>/dev/null || true
 
 # Prefer installing latest official release from HashiCorp; avoid early exit
 
@@ -34,9 +40,8 @@ if [ -n "$VER" ]; then
   if curl -fsSL "$URL" -o "$TMP/terraform.zip"; then
     unzip -q "$TMP/terraform.zip" -d "$TMP" || true
     if [ -f "$TMP/terraform" ]; then
-      # Install to /usr/local/bin with sudo if needed
-      if [ -w "/usr/local/bin" ]; then INST="install -m 0755"; else INST="sudo install -m 0755"; fi
-      $INST "$TMP/terraform" "/usr/local/bin/terraform"
+      # Install using strategy
+      $INSTALL "$TMP/terraform" "$BIN_DIR/terraform"
     fi
   fi
 fi
