@@ -1,0 +1,14 @@
+{
+  "name": "pnpm",
+  "install_method": "package_manager",
+  "description": "Fast, disk space efficient Node.js package manager",
+  "homepage": "https://pnpm.io/",
+  "binary_name": "pnpm",
+  "packages": {
+    "apt": "pnpm",
+    "brew": "pnpm",
+    "dnf": "pnpm",
+    "pacman": "pnpm"
+  },
+  "notes": "Can also be installed via npm: npm install -g pnpm"
+}

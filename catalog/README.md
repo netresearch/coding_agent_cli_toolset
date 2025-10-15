@@ -53,6 +53,18 @@ Install Python tools via `uv tool install`.
 
 **Example:** `semgrep.json`, `ruff.json`, `black.json`
 
+### `package_manager`
+Install tools via system package managers (apt, brew, dnf, pacman).
+
+**Required fields:**
+- `binary_name`: Name of the binary executable
+- `packages`: Object with package names per manager
+
+**Optional fields:**
+- `notes`: Installation notes (e.g., "comes with Python")
+
+**Example:** `pipx.json`, `yarn.json`, `sponge.json`
+
 ## Adding a New Tool
 
 1. Create `catalog/<tool>.json` with appropriate metadata
