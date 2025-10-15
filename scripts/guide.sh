@@ -178,14 +178,15 @@ RUST_INSTALLED="$(json_field rust installed)"
 RUST_METHOD="$(json_field rust installed_method)"
 RUST_LATEST="$(json_field rust latest_upstream)"
 RUST_URL="$(json_field rust latest_url)"
-if [ -n "$(json_bool rust is_up_to_date)" ]; then
+RUST_PLANNED_METHOD="$(json_field rust upstream_method)"
+if [ -n "$(json_bool rust is_up_to_date)" ] && [ "$RUST_METHOD" = "$RUST_PLANNED_METHOD" ]; then
   printf "\n"
   printf "==> %s %s\n" "$RUST_ICON" "Rust (cargo)"
   printf "    installed: %s via %s\n" "${RUST_INSTALLED:-<none>}" "${RUST_METHOD:-unknown}"
-  printf "    target:    %s via %s\n" "$(osc8 "$RUST_URL" "${RUST_LATEST:-<unknown>}")" "$(json_field rust upstream_method)"
+  printf "    target:    %s via %s\n" "$(osc8 "$RUST_URL" "${RUST_LATEST:-<unknown>}")" "$RUST_PLANNED_METHOD"
   printf "    up-to-date; skipping.\n"
 else
-  if prompt_action "${RUST_ICON} Rust (cargo)" "$RUST_INSTALLED" "$RUST_METHOD" "$(osc8 "$RUST_URL" "$RUST_LATEST")" "$(json_field rust upstream_method)" rust; then
+  if prompt_action "${RUST_ICON} Rust (cargo)" "$RUST_INSTALLED" "$RUST_METHOD" "$(osc8 "$RUST_URL" "$RUST_LATEST")" "$RUST_PLANNED_METHOD" rust; then
     "$ROOT"/scripts/install_rust.sh reconcile || true
   fi
 fi
@@ -318,10 +319,14 @@ for t in "${CORE_TOOLS[@]}"; do
   CURR="$(json_field "$t" installed)"
   LATE="$(json_field "$t" latest_upstream)"
   URL="$(json_field "$t" latest_url)"
-  if [ -n "$(json_bool "$t" is_up_to_date)" ]; then
-    printf "\n"; printf "==> %s %s\n" "$ICON" "$t"; printf "    installed: %s via %s\n" "${CURR:-<none>}" "$(json_field "$t" installed_method)"; printf "    target:    %s via %s\n" "$(osc8 "$URL" "${LATE:-<unknown>}")" "$(json_field "$t" upstream_method)"; printf "    up-to-date; skipping.\n"; continue
+  CURR_METHOD="$(json_field "$t" installed_method)"
+  PLANNED_METHOD="$(json_field "$t" upstream_method)"
+  # Only skip if version is up-to-date AND method matches (or no migration needed)
+  if [ -n "$(json_bool "$t" is_up_to_date)" ] && [ "$CURR_METHOD" = "$PLANNED_METHOD" ]; then
+    printf "\n"; printf "==> %s %s\n" "$ICON" "$t"; printf "    installed: %s via %s\n" "${CURR:-<none>}" "$CURR_METHOD"; printf "    target:    %s via %s\n" "$(osc8 "$URL" "${LATE:-<unknown>}")" "$PLANNED_METHOD"; printf "    up-to-date; skipping.\n"; continue
   fi
-  if prompt_action "${ICON} $t" "$CURR" "$(json_field "$t" installed_method)" "$(osc8 "$URL" "$LATE")" "$(json_field "$t" upstream_method)" "$t"; then
+  # Prompt for update or migration
+  if prompt_action "${ICON} $t" "$CURR" "$CURR_METHOD" "$(osc8 "$URL" "$LATE")" "$PLANNED_METHOD" "$t"; then
     "$ROOT"/scripts/install_core.sh reconcile "$t" || true
     # Re-audit the single tool to reflect updated status inline
     AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" cli_audit.py || true)"
@@ -366,14 +371,16 @@ DK_ICON="$(json_field docker state_icon)"
 DK_CURR="$(json_field docker installed)"
 DK_LATEST="$(json_field docker latest_upstream)"
 DK_URL="$(json_field docker latest_url)"
-if [ -n "$(json_bool docker is_up_to_date)" ]; then
+DK_METHOD="$(json_field docker installed_method)"
+DK_PLANNED="$(json_field docker upstream_method)"
+if [ -n "$(json_bool docker is_up_to_date)" ] && [ "$DK_METHOD" = "$DK_PLANNED" ]; then
   printf "\n"
   printf "==> %s %s\n" "$DK_ICON" "Docker CLI"
-  printf "    installed: %s via %s\n" "${DK_CURR:-<none>}" "$(json_field docker installed_method)"
-  printf "    target:    %s via %s\n" "$(osc8 "$DK_URL" "${DK_LATEST:-<unknown>}")" "$(json_field docker upstream_method)"
+  printf "    installed: %s via %s\n" "${DK_CURR:-<none>}" "$DK_METHOD"
+  printf "    target:    %s via %s\n" "$(osc8 "$DK_URL" "${DK_LATEST:-<unknown>}")" "$DK_PLANNED"
   printf "    up-to-date; skipping.\n"
 else
-  if prompt_action "${DK_ICON} Docker CLI (client)" "$DK_CURR" "$(json_field docker installed_method)" "$(osc8 "$DK_URL" "$DK_LATEST")" "$(json_field docker upstream_method)" docker; then
+  if prompt_action "${DK_ICON} Docker CLI (client)" "$DK_CURR" "$DK_METHOD" "$(osc8 "$DK_URL" "$DK_LATEST")" "$DK_PLANNED" docker; then
     echo "Note: This updates the Docker CLI client. Docker Engine (server) is managed separately."
     echo "      If using Docker Desktop, the engine is updated via Docker Desktop updates."
     "$ROOT"/scripts/install_docker.sh || true
