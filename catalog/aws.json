@@ -1,0 +1,8 @@
+{
+  "name": "aws",
+  "install_method": "aws_installer",
+  "description": "AWS Command Line Interface",
+  "homepage": "https://aws.amazon.com/cli/",
+  "installer_url": "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip",
+  "binary_name": "aws"
+}
