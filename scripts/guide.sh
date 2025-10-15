@@ -162,6 +162,114 @@ except Exception:
 PY
 }
 
+json_duplicates() {
+  # usage: json_duplicates TOOL -> prints duplicate count (or empty if 0/1)
+  local tool="$1"
+  AUDIT_JSON="$AUDIT_JSON" "$CLI" - "$tool" <<'PY'
+import sys, json, os
+data = os.environ.get("AUDIT_JSON", "").strip()
+tool = sys.argv[1]
+try:
+    arr = json.loads(data)
+    for item in arr:
+        if item.get("tool") == tool:
+            all_installs = item.get("all_installations", [])
+            if len(all_installs) > 1:
+                print(len(all_installs))
+            break
+except Exception:
+    pass
+PY
+}
+
+json_all_installations() {
+  # usage: json_all_installations TOOL -> prints "version|method|path" lines for each installation
+  local tool="$1"
+  AUDIT_JSON="$AUDIT_JSON" "$CLI" - "$tool" <<'PY'
+import sys, json, os
+data = os.environ.get("AUDIT_JSON", "").strip()
+tool = sys.argv[1]
+try:
+    arr = json.loads(data)
+    for item in arr:
+        if item.get("tool") == tool:
+            all_installs = item.get("all_installations", [])
+            for inst in all_installs:
+                version = inst.get("version", "")
+                method = inst.get("method", "")
+                path = inst.get("path", "")
+                print(f"{version}|{method}|{path}")
+            break
+except Exception:
+    pass
+PY
+}
+
+prompt_duplicate_removal() {
+  # usage: prompt_duplicate_removal TOOL ICON
+  local tool="$1" icon="$2"
+  local dup_count="$(json_duplicates "$tool")"
+
+  if [ -z "$dup_count" ] || [ "$dup_count" -le 1 ]; then
+    return 0  # No duplicates, nothing to do
+  fi
+
+  printf "\n"
+  printf "⚠️  Warning: %s %s has %s conflicting installations:\n" "$icon" "$tool" "$dup_count"
+
+  local idx=1
+  while IFS='|' read -r version method path; do
+    printf "    [%d] %s via %s  (%s)\n" "$idx" "$version" "$method" "$path"
+    ((idx++)) || true
+  done < <(json_all_installations "$tool")
+
+  printf "    Multiple installations can cause version conflicts and PATH issues.\n"
+  printf "    Recommendation: Keep only the preferred installation method.\n"
+
+  local ans
+  printf "Remove conflicting installations? [y/N] "
+  if [ -t 0 ]; then
+    read -r -p "" ans || true
+  else
+    if [ -r /dev/tty ]; then
+      read -r -p "" ans </dev/tty || true
+    else
+      ans=""
+    fi
+  fi
+
+  if [[ "$ans" =~ ^[Yy]$ ]]; then
+    # Get preferred installation (the first one selected by audit)
+    local preferred_path="$(json_field "$tool" installed_path_selected)"
+    printf "    Keeping: %s (preferred)\n" "$preferred_path"
+
+    # Remove all other installations
+    while IFS='|' read -r version method path; do
+      if [ "$path" != "$preferred_path" ]; then
+        printf "    Removing: %s via %s...\n" "$path" "$method"
+        # Remove based on method
+        if [[ "$method" == *"pipx"* ]]; then
+          pipx uninstall "$tool" >/dev/null 2>&1 || true
+        elif [[ "$method" == *"uv tool"* ]]; then
+          uv tool uninstall "$tool" >/dev/null 2>&1 || true
+        elif [[ "$method" == *"pip"* ]] || [[ "$method" == *"user"* ]]; then
+          python3 -m pip uninstall -y "$tool" >/dev/null 2>&1 || true
+          rm -f "$path" >/dev/null 2>&1 || true
+        else
+          # Generic removal - try to remove the binary
+          rm -f "$path" >/dev/null 2>&1 || true
+        fi
+      fi
+    done < <(json_all_installations "$tool")
+
+    printf "    Cleanup complete. Re-auditing...\n"
+    AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" cli_audit.py || true)"
+    return 0
+  fi
+
+  return 1
+}
+
 osc8() {
   local url="$1"; shift
   local text="$*"
@@ -292,6 +400,9 @@ fi
 if command -v uv >/dev/null 2>&1 || "$ROOT"/scripts/install_uv.sh reconcile >/dev/null 2>&1; then
   # Include all Python console CLIs we track (expandable). ansible is handled separately below.
   for t in pip pipx poetry httpie pre-commit bandit semgrep black isort flake8; do
+    # First check for duplicate installations and offer cleanup
+    prompt_duplicate_removal "$t" "$(json_field "$t" state_icon)" || true
+
     METHOD="$(json_field "$t" installed_method)"
     if [ -n "$METHOD" ] && [ -z "$(json_bool "$t" is_up_to_date)" ]; then
       : # keep normal outdated prompts elsewhere
