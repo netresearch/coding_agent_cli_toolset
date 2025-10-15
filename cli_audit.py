@@ -228,6 +228,10 @@ MANUAL_USED: dict[str, bool] = {}
 SELECTED_PATHS: dict[str, str] = {}
 SELECTED_REASON: dict[str, str] = {}
 
+# Track ALL installations found during deep scans (for duplicate detection)
+# Format: {tool_name: [(version, method, path), ...]}
+ALL_INSTALLATIONS: dict[str, list[tuple[str, str, str]]] = {}
+
 # Per-origin concurrency caps for network requests
 SEMAPHORES: dict[str, threading.BoundedSemaphore] = {
     "github.com": threading.BoundedSemaphore(value=int(os.environ.get("CLI_AUDIT_HOST_CAP_GITHUB", "4"))),
@@ -2206,7 +2210,9 @@ def audit_tool(tool: Tool) -> tuple[str, str, str, str, str, str, str, str]:
     tuples: list[tuple[str, str, str]] = []  # (num, line, path)
     any_found = False
     # Use shallow discovery for most tools (first match); deep only for special cases
-    deep_scan = (tool.name == "node")  # prefer to find both system and nvm variants
+    # Enable deep scan for tools likely to have multiple installations
+    python_cli_tools = {"semgrep", "pre-commit", "bandit", "black", "flake8", "isort", "ansible", "poetry", "pipx"}
+    deep_scan = (tool.name == "node") or (tool.name in python_cli_tools)  # prefer to find all installation variants
     chosen: tuple[str, str, str] | tuple[()] = ()
     # Prefer uv-managed Python as the authoritative interpreter when available
     if tool.name == "python":
@@ -2241,6 +2247,18 @@ def audit_tool(tool: Tool) -> tuple[str, str, str, str, str, str, str, str]:
                 chosen = choose_highest(tuples)
         else:
             chosen = ()
+
+    # Store ALL installations found during deep scan for duplicate detection
+    if deep_scan and tuples:
+        installations = []
+        for num, line, path in tuples:
+            try:
+                method, _ = _classify_install_method(path, tool.name)
+            except Exception:
+                method = detect_install_method(path, tool.name)
+            installations.append((num, method, path))
+        ALL_INSTALLATIONS[tool.name] = installations
+
     if not chosen:
         installed_line = "X"
         installed_num = ""
@@ -2667,6 +2685,16 @@ def main() -> int:
     if os.environ.get("CLI_AUDIT_JSON", "0") == "1":
         payload = []
         for name, installed, installed_method, latest, upstream_method, status, tool_url, latest_url in results:
+            # Build list of all installations for this tool (for duplicate detection)
+            all_installs = []
+            if name in ALL_INSTALLATIONS:
+                for version, method, path in ALL_INSTALLATIONS[name]:
+                    all_installs.append({
+                        "version": version,
+                        "method": method,
+                        "path": path,
+                    })
+
             payload.append({
                 "tool": name,
                 "category": category_for(name),
@@ -2686,6 +2714,9 @@ def main() -> int:
                 "latest_url": latest_url,
                 "state_icon": status_icon(status, installed),
                 "is_up_to_date": (status == "UP-TO-DATE"),
+                # New field: all installations found (for duplicate detection)
+                "all_installations": all_installs,
+                "has_duplicates": len(all_installs) > 1,
             })
         print(json.dumps(payload, ensure_ascii=False))
         return 0

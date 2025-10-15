@@ -1,6 +1,6 @@
 # AI CLI Preparation - Project Context (AI Agent Reference)
 
-**Last Updated:** 2025-10-09
+**Last Updated:** 2025-10-13
 **For:** AI Coding Agents (Claude Code, etc.)
 
 ## Quick Reference
@@ -10,7 +10,7 @@
 **Repository:** github.com/netresearch/coding_agent_cli_toolset
 **Primary Language:** Python 3.9+ (dev: 3.14.0rc2)
 **Architecture:** Offline-first, parallel, resilient tool version auditing
-**Tool Coverage:** 50+ developer tools across 10 categories
+**Tool Coverage:** 64 tools across 10 categories (50+ production, rest in development)
 
 ## Core Capabilities
 
@@ -18,8 +18,10 @@
 - Installation method detection (uv, pipx, npm, cargo, apt, homebrew, etc.)
 - Offline operation via committed cache (latest_versions.json)
 - Snapshot-based workflow (separate collection from rendering)
-- Parallel execution (16 workers, 3s timeout per tool)
+- Parallel execution (16 workers default, configurable via CLI_AUDIT_MAX_WORKERS)
+- Enhanced tool detection (searches PATH + common directories + tool-specific locations)
 - Role-based presets (agent-core, python-core, security-core, etc.)
+- Environment variable configuration via .env file (exported to subprocesses)
 
 ## File Structure
 
@@ -38,14 +40,31 @@ ai_cli_preparation/
 │   ├── install_go.sh
 │   └── ... (9 more)
 ├── docs/                         # Human-focused technical docs
-│   ├── INDEX.md
-│   ├── ARCHITECTURE.md
-│   ├── API_REFERENCE.md
-│   ├── DEVELOPER_GUIDE.md
-│   ├── TOOL_ECOSYSTEM.md
-│   ├── DEPLOYMENT.md
-│   └── TROUBLESHOOTING.md
+│   ├── Phase 1: Detection & Auditing
+│   │   ├── INDEX.md
+│   │   ├── ARCHITECTURE.md (updated with Phase 2)
+│   │   ├── API_REFERENCE.md
+│   │   ├── FUNCTION_REFERENCE.md
+│   │   ├── QUICK_REFERENCE.md
+│   │   ├── DEVELOPER_GUIDE.md
+│   │   ├── TOOL_ECOSYSTEM.md
+│   │   ├── DEPLOYMENT.md
+│   │   └── TROUBLESHOOTING.md
+│   ├── Phase 2: Installation & Upgrade
+│   │   ├── PHASE2_API_REFERENCE.md
+│   │   ├── CLI_REFERENCE.md
+│   │   ├── TESTING.md
+│   │   ├── ERROR_CATALOG.md
+│   │   └── INTEGRATION_EXAMPLES.md
+│   ├── Planning & Specifications
+│   │   ├── PRD.md
+│   │   ├── PHASE2_IMPLEMENTATION.md
+│   │   ├── CONFIGURATION_SPEC.md
+│   │   └── adr/ (6 ADRs)
 └── claudedocs/                   # AI agent context (this directory)
+    ├── project_context.md
+    ├── session_summary.md
+    └── session_initialization.md
 ```
 
 ## Key Components
@@ -61,13 +80,20 @@ class Tool:
 ```
 
 ### TOOLS Registry (cli_audit.py:738)
-Ordered tuple of 50+ Tool definitions, categorized:
+Ordered tuple of 64 Tool definitions, categorized:
 1. Runtimes (go, python, rust, node) + package managers
 2. Core dev tools (ripgrep, ast-grep, fzf, fd, jq, etc.)
 3. Security (semgrep, bandit, gitleaks, trivy)
 4. Formatters (black, eslint, prettier, shellcheck)
 5. Git tools (git, gh, glab, git-absorb)
 6. Cloud/infra (aws, kubectl, terraform, docker)
+7. AI agent tools (claude, codex, gam)
+
+**Enhanced Detection (2025-10-13):**
+- Searches beyond PATH for tools in non-standard locations
+- Tool-specific paths: gam in ~/bin/gam7/, claude in ~/.claude/local/
+- Common search paths: ~/bin, ~/.local/bin, /usr/local/bin
+- Cargo bin fallback for Rust tools
 
 ### Architecture Pattern
 ```
@@ -120,8 +146,10 @@ CLI_AUDIT_TRACE=1 python3 cli_audit.py
 - `CLI_AUDIT_OFFLINE=1` - Force offline (manual cache only)
 
 **Performance:**
-- `CLI_AUDIT_MAX_WORKERS=16` - Concurrency
+- `CLI_AUDIT_MAX_WORKERS=16` - Concurrency (default 16, loaded from .env if present)
 - `CLI_AUDIT_TIMEOUT_SECONDS=3` - Per-tool timeout
+
+**Note (2025-10-13):** Environment variables are now properly exported from Makefile to Python subprocesses. Set in .env file to configure globally.
 
 **Output:**
 - `CLI_AUDIT_JSON=1` - JSON output
@@ -185,17 +213,23 @@ CLI_AUDIT_TRACE=1 python3 cli_audit.py
 
 ## Current Git State
 
-**Branch:** main
-**Modified:** cli_audit.py, latest_versions.json
+**Branch:** main (12 commits ahead of origin/main)
+**Working Tree:** Clean
+**Modified:** .env (GITHUB_TOKEN + CLI_AUDIT_MAX_WORKERS=40), tools_snapshot.json
 **Untracked:** node_modules/
 **Remote:** git@github.com:netresearch/coding_agent_cli_toolset.git
 
-**Recent commits:**
+**Recent commits (2025-10-13):**
+- 34fa37f - chore(snapshot): update tool audit cache with improved detection
+- 80abd30 - fix(guide): clarify Docker CLI vs Docker Engine terminology
+- aa57210 - fix(cli_audit): resolve three critical issues in environment and detection
+- d092236 - feat(docker): detect client version explicitly, not server
+- 2237226 - fix(cli_audit): resolve three issues in make update
+
+**Recent commits (2025-10-09):**
 - 0c7ade3 - Snapshot-based collect/render modes
 - 3dd5082 - Lock ordering fixes (thread safety)
 - c160361 - Classification improvements (shebang detection)
-- 634c035 - HTTP robustness (retries, backoff)
-- 8c04e03 - Smoke testing
 
 ## Key Design Patterns
 
@@ -238,17 +272,35 @@ CLI_AUDIT_TRACE=1 python3 cli_audit.py
 ## Documentation Map
 
 **For Humans (docs/):**
-- INDEX.md - Documentation navigation
-- ARCHITECTURE.md - System design, data flows
-- API_REFERENCE.md - Functions, environment variables
+
+**Phase 1 (Detection & Auditing):**
+- INDEX.md - Documentation navigation hub
+- ARCHITECTURE.md - System design, data flows (updated with Phase 2)
+- API_REFERENCE.md - Phase 1 audit functions, environment variables
+- FUNCTION_REFERENCE.md - Function quick lookup
+- QUICK_REFERENCE.md - Command cheat sheet
 - DEVELOPER_GUIDE.md - Contributing, adding tools
 - TOOL_ECOSYSTEM.md - Complete 50+ tool catalog
 - DEPLOYMENT.md - Makefile targets, CI/CD
 - TROUBLESHOOTING.md - Common issues, debugging
 
+**Phase 2 (Installation & Upgrade):**
+- PHASE2_API_REFERENCE.md - Complete Phase 2 API (78 symbols across 11 modules)
+- CLI_REFERENCE.md - Command-line reference with 60+ environment variables
+- TESTING.md - Comprehensive testing guide for contributors
+- ERROR_CATALOG.md - Error categorization with troubleshooting (26 error codes)
+- INTEGRATION_EXAMPLES.md - Real-world CI/CD and workflow patterns
+
+**Planning & Specifications:**
+- PRD.md - Product requirements document
+- PHASE2_IMPLEMENTATION.md - Implementation roadmap
+- CONFIGURATION_SPEC.md - .cli-audit.yml schema
+- adr/ - Architecture Decision Records (6 ADRs)
+
 **For AI Agents (claudedocs/):**
 - project_context.md (this file) - Quick reference
-- session_summary.md - Current session state
+- session_summary.md - Session history
+- session_initialization.md - Session context
 
 ## Quick Troubleshooting
 

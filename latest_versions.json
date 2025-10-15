@@ -79,6 +79,7 @@
     "local_flag:jq": "--version",
     "local_flag:just": "--version",
     "local_flag:kubectl": "version --client",
+    "local_flag:ninja": "--version",
     "local_flag:node": "--version",
     "local_flag:npm": "--version",
     "local_flag:parallel": "--version",
