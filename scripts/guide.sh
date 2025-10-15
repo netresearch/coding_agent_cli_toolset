@@ -484,6 +484,10 @@ for t in pip pipx poetry httpie semgrep black; do
     LATE="$(json_field "$t" latest_upstream)"
     URL="$(json_field "$t" latest_url)"
     if prompt_action "${ICON} $t" "$CURR" "$(json_field "$t" installed_method)" "$(osc8 "$URL" "$LATE")" "$(json_field "$t" upstream_method)" "$t"; then
+      # Capture version before installation
+      local before_ver="$CURR"
+      local before_path="$(command -v "$t" 2>/dev/null || echo)"
+
       if command -v uv >/dev/null 2>&1; then
         uv tool install --force --upgrade "$t" >/dev/null 2>&1 || true
       else
@@ -504,7 +508,16 @@ for t in pip pipx poetry httpie semgrep black; do
           fi
         fi
       fi
+
+      # Re-audit and show result
       AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" cli_audit.py || true)"
+      local after_ver="$(json_field "$t" installed)"
+      local after_method="$(json_field "$t" installed_method)"
+      local after_path="$(json_field "$t" installed_path_selected)"
+
+      printf "[%s] before: %s\n" "$t" "${before_ver:-<none>}"
+      printf "[%s] after:  %s\n" "$t" "${after_ver:-<none>}"
+      printf "[%s] path:   %s\n" "$t" "${after_path:-<not found>}"
     fi
   fi
 done
