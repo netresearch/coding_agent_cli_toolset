@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Install/update/uninstall simple, language-agnostic tools.
+# ALL tools now use catalog system via install_tool.sh
+
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$DIR/lib/common.sh"
+
+ACTION="${1:-install}"
+ONLY_TOOL="${2:-}"
+
+# reconcile_one: Install or update a single tool via catalog
+reconcile_one() {
+  local t="$1"
+  "$DIR/install_tool.sh" "$t"
+}
+
+install_core_tools() {
+  for t in fd fzf ripgrep jq yq bat delta just; do
+    reconcile_one "$t"
+  done
+}
+
+update_core_tools() {
+  if have brew; then
+    brew upgrade fd fzf ripgrep jq yq bat git-delta just || true
+  fi
+  # For all tools, just call reconcile which will update them via catalog
+  for t in fd fzf ripgrep jq yq bat delta just; do
+    reconcile_one "$t"
+  done
+}
+
+uninstall_core_tools() {
+  if have brew; then brew uninstall -f fd fzf ripgrep jq yq bat git-delta just || true; fi
+  apt_remove_if_present fd-find fzf ripgrep jq yq bat || true
+}
+
+case "$ACTION" in
+  install) install_core_tools ;;
+  update) update_core_tools ;;
+  uninstall) uninstall_core_tools ;;
+  reconcile)
+    if [ -n "$ONLY_TOOL" ]; then
+      reconcile_one "$ONLY_TOOL"
+    else
+      for t in fd fzf ripgrep jq yq bat delta just; do reconcile_one "$t"; done
+    fi
+    ;;
+  *) echo "Usage: $0 {install|update|uninstall|reconcile}" ; exit 2 ;;
+esac

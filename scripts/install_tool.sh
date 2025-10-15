@@ -15,8 +15,9 @@ CATALOG_FILE="$DIR/../catalog/$TOOL.json"
 
 # Check if tool has catalog entry
 if [ ! -f "$CATALOG_FILE" ]; then
-  echo "[$TOOL] No catalog entry found, falling back to install_core.sh" >&2
-  exec "$DIR/install_core.sh" reconcile "$TOOL"
+  echo "[$TOOL] Error: No catalog entry found" >&2
+  echo "[$TOOL] Available tools: $(find "$DIR/../catalog" -name '*.json' -exec basename {} .json \; | tr '\n' ' ')" >&2
+  exit 1
 fi
 
 # Check if jq is available

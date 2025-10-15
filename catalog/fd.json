@@ -10,5 +10,6 @@
     "x86_64": "x86_64",
     "aarch64": "aarch64",
     "armv7l": "armv7"
-  }
+  },
+  "tags": ["core", "search", "file-utils"]
 }

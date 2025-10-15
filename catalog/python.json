@@ -1,0 +1,8 @@
+{
+  "name": "python",
+  "install_method": "dedicated_script",
+  "description": "Python programming language",
+  "homepage": "https://www.python.org",
+  "binary_name": "python3",
+  "script": "install_python.sh"
+}
