@@ -38,9 +38,9 @@ prompt_action() {
     go)          printf "    will run: scripts/install_go.sh\n" ;;
     docker)      printf "    will run: scripts/install_docker.sh\n" ;;
     docker-compose) printf "    will run: echo 'Ensure Docker is up to date (Compose v2 plugin)'\n" ;;
-    aws)         printf "    will run: scripts/install_aws.sh\n" ;;
-    kubectl)     printf "    will run: scripts/install_kubectl.sh update\n" ;;
-    terraform)   printf "    will run: scripts/install_terraform.sh\n" ;;
+    aws)         printf "    will run: scripts/install_tool.sh aws\n" ;;
+    kubectl)     printf "    will run: scripts/install_tool.sh kubectl\n" ;;
+    terraform)   printf "    will run: scripts/install_tool.sh terraform\n" ;;
     ansible)     printf "    will run: scripts/install_ansible.sh update\n" ;;
     *)           printf "    will run: scripts/install_core.sh reconcile %s\n" "$tool" ;;
   esac
@@ -574,7 +574,7 @@ if [ -n "$(json_bool aws is_up_to_date)" ] && [ -n "$AWS_CURR" ]; then
   printf "    up-to-date; skipping.\n"
 else
   if prompt_action "${AWS_ICON} AWS CLI" "$AWS_CURR" "$AWS_METHOD" "$(osc8 "$AWS_URL" "$AWS_LATEST")" "$AWS_METHOD" aws; then
-    "$ROOT"/scripts/install_aws.sh || true
+    "$ROOT"/scripts/install_tool.sh aws || true
   fi
 fi
 
@@ -592,7 +592,7 @@ if [ -n "$(json_bool kubectl is_up_to_date)" ] && [ -n "$K8S_CURR" ]; then
   printf "    up-to-date; skipping.\n"
 else
   if prompt_action "${K8S_ICON} kubectl" "$K8S_CURR" "$K8S_METHOD" "$(osc8 "$K8S_URL" "$K8S_LATEST")" "$K8S_METHOD" kubectl; then
-    "$ROOT"/scripts/install_kubectl.sh update || true
+    "$ROOT"/scripts/install_tool.sh kubectl || true
   fi
 fi
 
@@ -610,7 +610,7 @@ if [ -n "$(json_bool terraform is_up_to_date)" ] && [ -n "$TF_CURR" ]; then
   printf "    up-to-date; skipping.\n"
 else
   if prompt_action "${TF_ICON} Terraform" "$TF_CURR" "$TF_METHOD" "$(osc8 "$TF_URL" "$TF_LATEST")" "$TF_METHOD" terraform; then
-    "$ROOT"/scripts/install_terraform.sh || true
+    "$ROOT"/scripts/install_tool.sh terraform || true
   fi
 fi
 

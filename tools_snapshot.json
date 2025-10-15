@@ -1,7 +1,7 @@
 {
   "__meta__": {
     "count": 69,
-    "created_at": "2025-10-15T10:01:26Z",
+    "created_at": "2025-10-15T11:46:55Z",
     "offline": false,
     "partial_failures": 0,
     "schema_version": 1
@@ -42,7 +42,7 @@
       "classification_reason_selected": "path-contains-uv-python",
       "installed": "3.14.0",
       "installed_method": "uv python",
-      "installed_path_selected": "/home/sme/.venvs/dev/bin/python3",
+      "installed_path_selected": "/home/sme/.venvs/dev/bin/python",
       "installed_version": "3.14.0",
       "latest_upstream": "3.14.0",
       "latest_url": "https://github.com/python/cpython/releases/tag/v3.14.0",
@@ -924,10 +924,10 @@
     },
     {
       "category": "vcs",
-      "classification_reason_selected": "path-under-~/bin",
+      "classification_reason_selected": "path-under-~/.local/bin",
       "installed": "7.25.01",
-      "installed_method": "/home/sme/bin",
-      "installed_path_selected": "/home/sme/bin/gam7/gam",
+      "installed_method": "/home/sme/.local/bin",
+      "installed_path_selected": "/home/sme/.local/bin/gam",
       "installed_version": "7.25.01",
       "latest_upstream": "7.25.01",
       "latest_url": "https://github.com/GAM-team/GAM/releases/tag/v7.25.01",
@@ -1004,10 +1004,10 @@
       "installed_method": "/usr/local/bin",
       "installed_path_selected": "/usr/local/bin/terraform",
       "installed_version": "1.13.3",
-      "latest_upstream": "1.13.3",
-      "latest_url": "https://github.com/hashicorp/terraform/releases/tag/v1.13.3",
-      "latest_version": "1.13.3",
-      "status": "UP-TO-DATE",
+      "latest_upstream": "1.13.4",
+      "latest_url": "https://github.com/hashicorp/terraform/releases/tag/v1.13.4",
+      "latest_version": "1.13.4",
+      "status": "OUTDATED",
       "tool": "terraform",
       "tool_url": "https://github.com/hashicorp/terraform",
       "upstream_method": "github"
