@@ -29,19 +29,19 @@ prompt_action() {
   printf "    target:    %s via %s\n" "${latest:-<unknown>}" "${planned:-unknown}"
   # Preview command to be executed
   case "$tool" in
-    rust)        printf "    will run: scripts/install_rust.sh reconcile\n" ;;
+    rust)        printf "    will run: scripts/install_tool.sh rust reconcile\n" ;;
     core)        printf "    will run: scripts/install_core.sh update\n" ;;
-    python)      printf "    will run: scripts/install_python.sh update\n" ;;
+    python)      printf "    will run: scripts/install_tool.sh python update\n" ;;
     pip|pipx|poetry|httpie|semgrep)
                   printf "    will run: uv tool install --force --upgrade %s\n" "$tool" ;;
-    node)        printf "    will run: scripts/install_node.sh reconcile\n" ;;
-    go)          printf "    will run: scripts/install_go.sh\n" ;;
-    docker)      printf "    will run: scripts/install_docker.sh\n" ;;
+    node)        printf "    will run: scripts/install_tool.sh node reconcile\n" ;;
+    go)          printf "    will run: scripts/install_tool.sh go\n" ;;
+    docker)      printf "    will run: scripts/install_tool.sh docker\n" ;;
     docker-compose) printf "    will run: echo 'Ensure Docker is up to date (Compose v2 plugin)'\n" ;;
     aws)         printf "    will run: scripts/install_tool.sh aws\n" ;;
     kubectl)     printf "    will run: scripts/install_tool.sh kubectl\n" ;;
     terraform)   printf "    will run: scripts/install_tool.sh terraform\n" ;;
-    ansible)     printf "    will run: scripts/install_ansible.sh update\n" ;;
+    ansible)     printf "    will run: scripts/install_tool.sh ansible update\n" ;;
     *)           printf "    will run: scripts/install_core.sh reconcile %s\n" "$tool" ;;
   esac
   local ans
@@ -318,7 +318,7 @@ if [ -n "$(json_bool rust is_up_to_date)" ]; then
   printf "    up-to-date; skipping.\n"
 else
   if prompt_action "${RUST_ICON} Rust (cargo)" "$RUST_INSTALLED" "$RUST_METHOD" "$(osc8 "$RUST_URL" "$RUST_LATEST")" "$RUST_PLANNED_METHOD" rust; then
-    "$ROOT"/scripts/install_rust.sh reconcile || true
+    "$ROOT"/scripts/install_tool.sh rust reconcile || true
   fi
 fi
 
@@ -337,7 +337,7 @@ if [ -n "$(json_bool uv is_up_to_date)" ] && [ -n "$UV_CURR" ]; then
   printf "    up-to-date; skipping.\n"
 else
   if prompt_action "${UV_ICON} uv" "$UV_CURR" "$UV_METHOD" "$(osc8 "$UV_URL" "$UV_LATEST")" "$UV_PLANNED" core; then
-    "$ROOT"/scripts/install_uv.sh reconcile || true
+    "$ROOT"/scripts/install_tool.sh uv reconcile || true
     AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" cli_audit.py || true)"
   fi
 fi
@@ -357,7 +357,7 @@ if [ -n "$(json_bool python is_up_to_date)" ]; then
   printf "    up-to-date; skipping.\n"
 else
   if prompt_action "${PY_ICON} Python stack" "$PY_CURR" "$PY_METHOD" "$(osc8 "$PY_URL" "$PY_LATEST")" "$PY_PLANNED" python; then
-    UV_PYTHON_SPEC="$PY_LATEST" "$ROOT"/scripts/install_python.sh update || true
+    UV_PYTHON_SPEC="$PY_LATEST" "$ROOT"/scripts/install_tool.sh python update || true
     AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" cli_audit.py || true)"
   fi
 fi
@@ -378,7 +378,7 @@ if [ -n "$NODE_ALL_OK" ]; then
   printf "\n"; printf "==> %s %s\n" "$NODE_ICON" "Node.js stack"; printf "    installed: %s via %s\n" "${NODE_CURR:-<none>}" "$NODE_METHOD"; printf "    target:    %s via %s\n" "$(osc8 "$NODE_URL" "${NODE_LATEST:-<unknown>}")" "$NODE_PLANNED"; printf "    up-to-date; skipping.\n"
 else
   if prompt_action "${NODE_ICON} Node.js stack" "$NODE_CURR" "$NODE_METHOD" "$(osc8 "$NODE_URL" "$NODE_LATEST")" "$NODE_PLANNED" node; then
-    "$ROOT"/scripts/install_node.sh reconcile || true
+    "$ROOT"/scripts/install_tool.sh node reconcile || true
     AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" cli_audit.py || true)"
   fi
 fi
@@ -417,13 +417,13 @@ if [ -n "$(json_bool go is_up_to_date)" ]; then
   printf "\n"; printf "==> %s %s\n" "$GO_ICON" "Go toolchain"; printf "    installed: %s via %s\n" "$GO_CURR" "$GO_METHOD"; printf "    target:    %s via %s\n" "$(osc8 "$GO_URL" "${GO_LATE:-<unknown>}")" "$GO_PLANNED"; printf "    up-to-date; skipping.\n"
 else
   if prompt_action "${GO_ICON} Go toolchain" "$GO_CURR" "$GO_METHOD" "$(osc8 "$GO_URL" "$GO_LATE")" "$GO_PLANNED" go; then
-    "$ROOT"/scripts/install_go.sh || true
+    "$ROOT"/scripts/install_tool.sh go || true
     AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" cli_audit.py || true)"
   fi
 fi
 
 # Prefer uv for Python CLI tools: offer migration from pipx/user when detected
-if command -v uv >/dev/null 2>&1 || "$ROOT"/scripts/install_uv.sh reconcile >/dev/null 2>&1; then
+if command -v uv >/dev/null 2>&1 || "$ROOT"/scripts/install_tool.sh uv reconcile >/dev/null 2>&1; then
   # Include all Python console CLIs we track (expandable). ansible is handled separately below.
   for t in pip pipx poetry httpie pre-commit bandit semgrep black isort flake8; do
     # First check for duplicate installations and offer cleanup
@@ -491,7 +491,7 @@ for t in pip pipx poetry httpie semgrep black; do
       if command -v uv >/dev/null 2>&1; then
         uv tool install --force --upgrade "$t" >/dev/null 2>&1 || true
       else
-        "$ROOT"/scripts/install_uv.sh reconcile || true
+        "$ROOT"/scripts/install_tool.sh uv reconcile || true
         if command -v uv >/dev/null 2>&1; then
           uv tool install --force --upgrade "$t" >/dev/null 2>&1 || true
         else
@@ -538,7 +538,7 @@ else
   if prompt_action "${DK_ICON} Docker CLI (client)" "$DK_CURR" "$DK_METHOD" "$(osc8 "$DK_URL" "$DK_LATEST")" "$DK_METHOD" docker; then
     echo "Note: This updates the Docker CLI client. Docker Engine (server) is managed separately."
     echo "      If using Docker Desktop, the engine is updated via Docker Desktop updates."
-    "$ROOT"/scripts/install_docker.sh || true
+    "$ROOT"/scripts/install_tool.sh docker || true
   fi
 fi
 
@@ -628,7 +628,7 @@ if [ -n "$(json_bool ansible is_up_to_date)" ] && [ -n "$ANS_CURR" ]; then
   printf "    up-to-date; skipping.\n"
 else
   if prompt_action "${ANS_ICON} Ansible" "$ANS_CURR" "$ANS_METHOD" "$(osc8 "$ANS_URL" "$ANS_LATEST")" "$ANS_METHOD" ansible; then
-    "$ROOT"/scripts/install_ansible.sh update || true
+    "$ROOT"/scripts/install_tool.sh ansible update || true
     AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" cli_audit.py || true)"
   fi
 fi

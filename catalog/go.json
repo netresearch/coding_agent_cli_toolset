@@ -1,0 +1,8 @@
+{
+  "name": "go",
+  "install_method": "dedicated_script",
+  "description": "Go programming language",
+  "homepage": "https://go.dev",
+  "binary_name": "go",
+  "script": "install_go.sh"
+}

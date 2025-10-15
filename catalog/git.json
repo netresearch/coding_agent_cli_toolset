@@ -1,0 +1,9 @@
+{
+  "name": "git",
+  "install_method": "dedicated_script",
+  "description": "Distributed version control system",
+  "homepage": "https://git-scm.com",
+  "binary_name": "git",
+  "script": "install_core.sh",
+  "notes": "Requires PPA and optional source build"
+}

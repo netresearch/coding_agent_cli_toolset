@@ -1,0 +1,8 @@
+{
+  "name": "cscope",
+  "install_method": "dedicated_script",
+  "description": "Source code browsing tool",
+  "homepage": "http://cscope.sourceforge.net",
+  "binary_name": "cscope",
+  "script": "install_core.sh"
+}

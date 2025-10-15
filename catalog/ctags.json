@@ -1,0 +1,9 @@
+{
+  "name": "ctags",
+  "install_method": "dedicated_script",
+  "description": "Universal Ctags source code indexing tool",
+  "homepage": "https://github.com/universal-ctags/ctags",
+  "binary_name": "ctags",
+  "script": "install_core.sh",
+  "notes": "Builds universal-ctags from source with checkinstall"
+}
