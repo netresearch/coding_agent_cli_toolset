@@ -5,4 +5,9 @@
   "homepage": "https://github.com/astral-sh/uv",
   "binary_name": "uv",
   "script": "install_uv.sh"
+  ,"guide": {
+    "display_name": "uv",
+    "install_action": "reconcile",
+    "order": 20
+  }
 }

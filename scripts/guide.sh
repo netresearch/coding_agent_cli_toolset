@@ -11,59 +11,6 @@ CLI="${PYTHON:-python3}"
 # Load catalog query functions
 . "$DIR/lib/catalog.sh"
 
-# Special install commands for tools that need non-default behavior
-declare -A TOOL_INSTALL_CMD=(
-  [rust]="install_tool.sh rust reconcile"
-  [node]="install_tool.sh node reconcile"
-  [python]="install_tool.sh python update"  # UV_PYTHON_SPEC set dynamically
-  [ansible]="install_tool.sh ansible update"
-  [uv]="install_tool.sh uv reconcile"
-)
-
-# Display names for tools (override default)
-declare -A TOOL_DISPLAY_NAME=(
-  [rust]="Rust (cargo)"
-  [python]="Python stack"
-  [node]="Node.js stack"
-  [docker]="Docker CLI"
-  [docker-compose]="Docker Compose"
-  [kubectl]="kubectl"
-  [terraform]="Terraform"
-  [ansible]="Ansible"
-  [go]="Go toolchain"
-)
-
-# Tool processing order (lower numbers first)
-declare -A TOOL_ORDER=(
-  [rust]=10
-  [uv]=20
-  [python]=30
-  [node]=40
-  [npm]=41
-  [pnpm]=42
-  [yarn]=43
-  [go]=50
-  # Python tools
-  [pip]=100
-  [pipx]=101
-  [poetry]=102
-  [httpie]=103
-  [pre-commit]=104
-  [bandit]=105
-  [semgrep]=106
-  [black]=107
-  [isort]=108
-  [flake8]=109
-  # Cloud tools
-  [docker]=200
-  [docker-compose]=201
-  [aws]=202
-  [kubectl]=203
-  [terraform]=204
-  [ansible]=205
-  # Everything else defaults to 1000
-)
-
 ensure_perms() {
   chmod +x "$ROOT"/scripts/*.sh 2>/dev/null || true
   chmod +x "$ROOT"/scripts/lib/*.sh 2>/dev/null || true
@@ -134,7 +81,7 @@ osc8() {
   [ -n "$url" ] && printf '\e]8;;%s\e\\%s\e]8;;\e\\' "$url" "$text" || printf '%s' "$text"
 }
 
-# Generic tool processing function
+# Generic tool processing function - reads ALL metadata from catalog
 process_tool() {
   local tool="$1"
 
@@ -146,8 +93,9 @@ process_tool() {
   local method="$(json_field "$tool" installed_method)"
   local is_up_to_date="$(json_bool "$tool" is_up_to_date)"
 
-  # Get display name
-  local display="${TOOL_DISPLAY_NAME[$tool]:-$tool}"
+  # Get metadata from catalog (with defaults)
+  local display="$(catalog_get_guide_property "$tool" display_name "$tool")"
+  local install_action="$(catalog_get_guide_property "$tool" install_action "")"
 
   # Check if up-to-date
   if [ -n "$is_up_to_date" ] && [ -n "$installed" ]; then
@@ -163,8 +111,9 @@ process_tool() {
   printf "    installed: %s via %s\n" "${installed:-<none>}" "${method:-unknown}"
   printf "    target:    %s\n" "$(osc8 "$url" "${latest:-<unknown>}")"
 
-  # Determine install command
-  local install_cmd="${TOOL_INSTALL_CMD[$tool]:-install_tool.sh $tool}"
+  # Build install command from catalog metadata
+  local install_cmd="install_tool.sh $tool"
+  [ -n "$install_action" ] && install_cmd="install_tool.sh $tool $install_action"
   printf "    will run: scripts/%s\n" "$install_cmd"
 
   # Prompt
@@ -179,7 +128,7 @@ process_tool() {
   fi
 
   if [[ "$ans" =~ ^[Yy]$ ]]; then
-    # Handle special cases
+    # Handle python's special UV_PYTHON_SPEC requirement
     if [ "$tool" = "python" ]; then
       UV_PYTHON_SPEC="$latest" "$ROOT"/scripts/$install_cmd || true
     else
@@ -204,10 +153,10 @@ while read -r line; do
   fi
 done <<< "$AUDIT_OUTPUT"
 
-# Sort tools by processing order
+# Sort tools by processing order from catalog
 declare -A TOOL_LIST
 for tool in "${TOOLS_TO_PROCESS[@]}"; do
-  order="${TOOL_ORDER[$tool]:-1000}"
+  order="$(catalog_get_guide_property "$tool" order "1000")"
   TOOL_LIST[$order]="${TOOL_LIST[$order]:-} $tool"
 done
 

@@ -5,4 +5,9 @@
   "homepage": "https://www.docker.com",
   "binary_name": "docker",
   "script": "install_docker.sh"
+  ,"guide": {
+    "display_name": "Docker CLI",
+    "install_action": "install",
+    "order": 200
+  }
 }

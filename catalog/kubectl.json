@@ -15,4 +15,9 @@
     "s390x": "s390x",
     "ppc64le": "ppc64le"
   }
+  ,"guide": {
+    "display_name": "kubectl",
+    "install_action": "install",
+    "order": 203
+  }
 }

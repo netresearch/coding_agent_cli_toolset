@@ -5,4 +5,9 @@
   "homepage": "https://www.python.org",
   "binary_name": "python3",
   "script": "install_python.sh"
+  ,"guide": {
+    "display_name": "Python stack",
+    "install_action": "update",
+    "order": 30
+  }
 }

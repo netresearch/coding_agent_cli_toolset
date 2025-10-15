@@ -5,4 +5,9 @@
   "homepage": "https://aws.amazon.com/cli/",
   "installer_url": "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip",
   "binary_name": "aws"
+  ,"guide": {
+    "display_name": "AWS CLI",
+    "install_action": "install",
+    "order": 202
+  }
 }
