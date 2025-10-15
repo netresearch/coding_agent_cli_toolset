@@ -1543,6 +1543,8 @@ def _classify_install_method(path: str, tool_name: str) -> tuple[str, str]:
         except Exception:
             real = path
         p = real or path
+        # Keep original path for directory prefix checks (handles symlinks like /usr/local/bin/aws → /usr/local/aws-cli/...)
+        orig = path
         if tool_name == "python":
             if "/.venvs/" in p:
                 return "uv venv", "shebang-in-~/.venvs"
@@ -1620,7 +1622,8 @@ def _classify_install_method(path: str, tool_name: str) -> tuple[str, str]:
             return "rustup/cargo", "path-under-~/.cargo/bin"
         if any(t in p for t in ("/.local/share/pipx/venvs/", "/.local/pipx/venvs/")):
             return "pipx/user", "path-under-pipx-venvs"
-        if p.startswith(os.path.join(home, ".local", "bin")):
+        # Check both realpath and original path for ~/.local/bin (handles symlinks)
+        if p.startswith(os.path.join(home, ".local", "bin")) or orig.startswith(os.path.join(home, ".local", "bin")):
             # Refine ~/.local/bin classification via shebang to detect pipx/uv venv wrappers
             try:
                 with open(p, "rb") as f:
@@ -1639,6 +1642,9 @@ def _classify_install_method(path: str, tool_name: str) -> tuple[str, str]:
                 if any(t in py for t in ("/.local/share/uv/", "/.cache/uv/", "/.uv/")):
                     return "uv tool", "shebang-uv"
             return os.path.join(home, ".local", "bin"), "path-under-~/.local/bin"
+        # Check both realpath and original path for ~/bin (common user install location)
+        if p.startswith(os.path.join(home, "bin")) or orig.startswith(os.path.join(home, "bin")):
+            return os.path.join(home, "bin"), "path-under-~/bin"
         if "/snap/" in p:
             return "snap", "path-contains-snap"
         # Homebrew (macOS and Linuxbrew). Prefer env hints when available.
@@ -1647,7 +1653,8 @@ def _classify_install_method(path: str, tool_name: str) -> tuple[str, str]:
         if (hb_prefix and p.startswith(hb_prefix)) or (hb_cellar and hb_cellar in p) or \
            ("/home/linuxbrew/.linuxbrew" in p) or ("/opt/homebrew" in p) or ("/usr/local/Cellar" in p):
             return "homebrew", "brew-prefix-or-cellar"
-        if p.startswith("/usr/local/bin"):
+        # Check both realpath and original path for /usr/local/bin (handles symlinks like aws)
+        if p.startswith("/usr/local/bin") or orig.startswith("/usr/local/bin"):
             return "/usr/local/bin", "path-under-/usr/local/bin"
         if p.startswith("/usr/bin") or p.startswith("/bin"):
             global DPKG_CACHE
