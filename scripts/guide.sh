@@ -462,13 +462,14 @@ for t in "${CORE_TOOLS[@]}"; do
   LATE="$(json_field "$t" latest_upstream)"
   URL="$(json_field "$t" latest_url)"
   CURR_METHOD="$(json_field "$t" installed_method)"
-  PLANNED_METHOD="$(json_field "$t" upstream_method)"
-  # Only skip if version is up-to-date AND method matches (or no migration needed)
-  if [ -n "$(json_bool "$t" is_up_to_date)" ] && [ "$CURR_METHOD" = "$PLANNED_METHOD" ]; then
-    printf "\n"; printf "==> %s %s\n" "$ICON" "$t"; printf "    installed: %s via %s\n" "${CURR:-<none>}" "$CURR_METHOD"; printf "    target:    %s via %s\n" "$(osc8 "$URL" "${LATE:-<unknown>}")" "$PLANNED_METHOD"; printf "    up-to-date; skipping.\n"; continue
+  # For display purposes only - shows where version info comes from (github, pypi, etc.)
+  UPSTREAM_METHOD="$(json_field "$t" upstream_method)"
+  # Only skip if version is up-to-date (method is already correct if it's working at right version)
+  if [ -n "$(json_bool "$t" is_up_to_date)" ] && [ -n "$CURR" ]; then
+    printf "\n"; printf "==> %s %s\n" "$ICON" "$t"; printf "    installed: %s via %s\n" "${CURR:-<none>}" "$CURR_METHOD"; printf "    target:    %s (same)\n" "$(osc8 "$URL" "${LATE:-<unknown>}")"; printf "    up-to-date; skipping.\n"; continue
   fi
   # Prompt for update or migration
-  if prompt_action "${ICON} $t" "$CURR" "$CURR_METHOD" "$(osc8 "$URL" "$LATE")" "$PLANNED_METHOD" "$t"; then
+  if prompt_action "${ICON} $t" "$CURR" "$CURR_METHOD" "$(osc8 "$URL" "$LATE")" "$CURR_METHOD" "$t"; then
     "$ROOT"/scripts/install_core.sh reconcile "$t" || true
     # Re-audit the single tool to reflect updated status inline
     AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" cli_audit.py || true)"
