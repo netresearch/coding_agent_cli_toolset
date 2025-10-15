@@ -1,7 +1,7 @@
 {
   "__meta__": {
     "count": 69,
-    "created_at": "2025-10-15T08:44:15Z",
+    "created_at": "2025-10-15T10:01:26Z",
     "offline": false,
     "partial_failures": 0,
     "schema_version": 1
@@ -9,9 +9,9 @@
   "tools": [
     {
       "category": "runtimes",
-      "classification_reason_selected": "no-match",
+      "classification_reason_selected": "path-under-/usr/local/bin",
       "installed": "1.25.3",
-      "installed_method": "unknown",
+      "installed_method": "/usr/local/bin",
       "installed_path_selected": "/usr/local/bin/go",
       "installed_version": "1.25.3",
       "latest_upstream": "1.25.3",
@@ -924,9 +924,9 @@
     },
     {
       "category": "vcs",
-      "classification_reason_selected": "no-match",
+      "classification_reason_selected": "path-under-~/bin",
       "installed": "7.25.01",
-      "installed_method": "unknown",
+      "installed_method": "/home/sme/bin",
       "installed_path_selected": "/home/sme/bin/gam7/gam",
       "installed_version": "7.25.01",
       "latest_upstream": "7.25.01",
@@ -969,9 +969,9 @@
     },
     {
       "category": "cloud-infra",
-      "classification_reason_selected": "no-match",
+      "classification_reason_selected": "path-under-/usr/local/bin",
       "installed": "2.31.14",
-      "installed_method": "unknown",
+      "installed_method": "/usr/local/bin",
       "installed_path_selected": "/usr/local/bin/aws",
       "installed_version": "2.31.14",
       "latest_upstream": "2.31.15",
