@@ -126,3 +126,9 @@ auto-update-project: scripts-perms ## Update project dependencies (with confirma
 
 auto-update-all: scripts-perms ## Update system + user scopes (skip project)
 	SCOPE=all ./scripts/auto_update.sh update
+
+check-path: scripts-perms ## Check PATH configuration for package managers
+	@bash -c "source scripts/lib/path_check.sh && check_all_paths"
+
+fix-path: scripts-perms ## Fix PATH configuration issues automatically
+	@bash -c "source scripts/lib/path_check.sh && fix_all_paths"

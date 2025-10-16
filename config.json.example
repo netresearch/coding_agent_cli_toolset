@@ -1,0 +1,22 @@
+{
+  "_comment": "User configuration for ai_cli_preparation tool installation preferences",
+  "_location": "Copy this file to ~/.ai_cli_prep/config.json to customize",
+
+  "preferred_strategy": "auto",
+  "_preferred_strategy_options": [
+    "auto - Use catalog default priorities",
+    "github_first - Prefer GitHub releases > cargo > npm > apt",
+    "cargo_first - Prefer cargo > GitHub > npm > apt",
+    "npm_first - Prefer npm > GitHub > cargo > apt",
+    "apt_first - Prefer apt > brew > GitHub > cargo"
+  ],
+
+  "allow_sudo": true,
+  "_allow_sudo_comment": "Set to false if you don't have sudo access or don't want tools to use apt",
+
+  "overrides": {
+    "_comment": "Override installation method for specific tools",
+    "_example": "ripgrep: 'cargo' to force cargo installation for ripgrep",
+    "_available_methods": "github_release_binary, cargo, npm, gem, pip, pipx, apt, brew"
+  }
+}

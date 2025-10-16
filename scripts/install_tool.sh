@@ -1,13 +1,19 @@
 #!/usr/bin/env bash
 # Main orchestrator for tool installation
-# Reads catalog and delegates to appropriate installer
+# Reads catalog and delegates to appropriate installer or reconciliation system
 set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Source reconciliation libraries
+. "$DIR/lib/reconcile.sh"
+
 TOOL="${1:-}"
+ACTION="${2:-install}"
+
 if [ -z "$TOOL" ]; then
-  echo "Usage: $0 TOOL_NAME" >&2
+  echo "Usage: $0 TOOL_NAME [ACTION]" >&2
+  echo "Actions: install, update, reconcile, status, uninstall" >&2
   exit 1
 fi
 
@@ -34,7 +40,38 @@ if [ -z "$INSTALL_METHOD" ] || [ "$INSTALL_METHOD" = "null" ]; then
   exit 1
 fi
 
-# Delegate to appropriate installer
+# Check if tool uses reconciliation system (install_method == "auto")
+if [ "$INSTALL_METHOD" = "auto" ]; then
+  # Use reconciliation system
+  case "$ACTION" in
+    install|update|reconcile)
+      reconcile_tool "$CATALOG_FILE" "reconcile"
+      exit $?
+      ;;
+    status)
+      reconcile_tool "$CATALOG_FILE" "status"
+      exit $?
+      ;;
+    uninstall)
+      # Get current method and remove it
+      binary_name="$(jq -r '.binary_name // ""' "$CATALOG_FILE" 2>/dev/null || echo "$TOOL")"
+      current_method="$(detect_install_method "$TOOL" "$binary_name")"
+      if [ "$current_method" != "none" ]; then
+        remove_installation "$TOOL" "$current_method" "$binary_name"
+        echo "[$TOOL] Uninstalled (was via $current_method)"
+      else
+        echo "[$TOOL] Not installed"
+      fi
+      exit 0
+      ;;
+    *)
+      echo "[$TOOL] Error: Unknown action: $ACTION" >&2
+      exit 1
+      ;;
+  esac
+fi
+
+# Traditional path: delegate to appropriate installer
 INSTALLER_SCRIPT="$DIR/installers/${INSTALL_METHOD}.sh"
 
 if [ ! -f "$INSTALLER_SCRIPT" ]; then
