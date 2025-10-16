@@ -1496,6 +1496,23 @@ def extract_version_number(s: str) -> str:
     return m2.group(1) if m2 else ""
 
 
+def normalize_version_tag(tag: str) -> str:
+    """Normalize version tags to consistent format.
+
+    Converts:
+    - v3_4_7 -> v3.4.7 (Ruby convention: underscores to dots)
+    - v1.2.3 -> v1.2.3 (already normalized)
+    - 1.2.3 -> 1.2.3 (no v prefix is fine)
+
+    This ensures all stored versions use dots, not underscores.
+    """
+    if not tag:
+        return tag
+    # Replace underscores with dots in version numbers
+    # Pattern: match sequences like "3_4_7" and convert to "3.4.7"
+    return tag.replace("_", ".")
+
+
 def _format_duration(seconds: float) -> str:
     try:
         if seconds < 1:
@@ -1531,6 +1548,146 @@ def status_icon(status: str, installed_line: str) -> str:
     if status == "OUTDATED":
         return "🔼"
     return "❓"
+
+
+def detect_path_shadowing(tool_name: str) -> dict[str, str]:
+    """Detect if a tool is shadowed by another binary earlier in PATH,
+    or if there's a known conflicting package installed.
+
+    Returns dict with:
+        - shadowed: "yes" if tool is shadowed, "" otherwise
+        - shadowed_by: path to the shadowing binary
+        - shadowed_package: package name if available (dpkg)
+        - expected_path: path to the expected binary
+        - warning: human-readable warning message
+    """
+    result = {
+        "shadowed": "",
+        "shadowed_by": "",
+        "shadowed_package": "",
+        "expected_path": "",
+        "warning": ""
+    }
+
+    try:
+        # Known package conflicts (tool_name -> (conflicting_package, system_path))
+        KNOWN_CONFLICTS = {
+            "yarn": ("cmdtest", "/usr/bin/yarn"),
+        }
+
+        # Get the first binary in PATH
+        first_path = shutil.which(tool_name)
+        if not first_path:
+            return result
+
+        # Check for known package conflicts FIRST
+        if tool_name in KNOWN_CONFLICTS:
+            conflict_pkg, conflict_path = KNOWN_CONFLICTS[tool_name]
+            if os.path.isfile(conflict_path):
+                # Check if this conflicting binary exists
+                try:
+                    pkg_out = subprocess.run(
+                        ["dpkg", "-l", conflict_pkg],
+                        capture_output=True,
+                        text=True,
+                        timeout=2
+                    )
+                    if pkg_out.returncode == 0 and (f"ii  {conflict_pkg}" in pkg_out.stdout or f"\nii  {conflict_pkg}" in pkg_out.stdout):
+                        # Package is installed
+                        first_real = os.path.realpath(first_path)
+                        conflict_real = os.path.realpath(conflict_path)
+
+                        # If the conflicting binary is being used OR exists in PATH
+                        if first_real == conflict_real:
+                            result["shadowed"] = "yes"
+                            result["shadowed_by"] = conflict_real
+                            result["shadowed_package"] = conflict_pkg
+                            result["expected_path"] = f"(managed {tool_name} not in PATH)"
+                            result["warning"] = f"⚠️  Conflicting package '{conflict_pkg}' installed (remove with: sudo apt remove {conflict_pkg})"
+                        else:
+                            # Managed version is first, but conflict exists in system
+                            result["warning"] = f"⚠️  Conflicting package '{conflict_pkg}' installed but not active (recommended: sudo apt remove {conflict_pkg})"
+                except Exception:
+                    pass
+
+        # If we already found a conflict, return early
+        if result["shadowed"] or result["warning"]:
+            return result
+
+        # Get ALL binaries with this name in PATH
+        path_dirs = os.environ.get("PATH", "").split(os.pathsep)
+        all_paths = []
+        for directory in path_dirs:
+            candidate = os.path.join(directory, tool_name)
+            if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+                try:
+                    all_paths.append(os.path.realpath(candidate))
+                except Exception:
+                    all_paths.append(candidate)
+
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_paths = []
+        for p in all_paths:
+            if p not in seen:
+                seen.add(p)
+                unique_paths.append(p)
+
+        # If there's only one binary, no shadowing
+        if len(unique_paths) <= 1:
+            return result
+
+        # Check if the first binary is from a known managed location
+        # (nvm, cargo, uv, ~/.local/bin, etc.)
+        first_real = os.path.realpath(first_path)
+        home = os.path.expanduser("~")
+
+        managed_patterns = [
+            (os.path.join(home, ".nvm"), "nvm"),
+            (os.path.join(home, ".cargo", "bin"), "cargo"),
+            (os.path.join(home, ".local", "bin"), "local"),
+            (os.path.join(home, ".rbenv"), "rbenv"),
+            (os.path.join(home, ".pyenv"), "pyenv"),
+            ("/usr/local/bin", "usr-local"),
+        ]
+
+        first_is_managed = any(first_real.startswith(pattern) for pattern, _ in managed_patterns)
+
+        # If first binary is from /usr/bin or /bin, and there's a managed one later
+        if first_real.startswith(("/usr/bin/", "/bin/")):
+            for later_path in unique_paths[1:]:
+                if any(later_path.startswith(pattern) for pattern, _ in managed_patterns):
+                    # Found shadowing: system binary is hiding a managed one
+                    result["shadowed"] = "yes"
+                    result["shadowed_by"] = first_real
+                    result["expected_path"] = later_path
+
+                    # Try to identify the package
+                    try:
+                        pkg_out = subprocess.run(
+                            ["dpkg", "-S", first_real],
+                            capture_output=True,
+                            text=True,
+                            timeout=2
+                        )
+                        if pkg_out.returncode == 0 and pkg_out.stdout:
+                            pkg_name = pkg_out.stdout.split(":")[0].strip()
+                            result["shadowed_package"] = pkg_name
+                    except Exception:
+                        pass
+
+                    # Build warning message
+                    if result["shadowed_package"]:
+                        result["warning"] = f"⚠️  System binary ({result['shadowed_package']}) shadowing managed installation (remove with: sudo apt remove {result['shadowed_package']})"
+                    else:
+                        result["warning"] = "⚠️  System binary shadowing managed installation"
+
+                    break
+
+    except Exception:
+        pass
+
+    return result
 
 
 def _classify_install_method(path: str, tool_name: str) -> tuple[str, str]:
@@ -1823,7 +1980,7 @@ def latest_github(owner: str, repo: str) -> tuple[str, str]:
         final = resp.geturl()
         last = final.rsplit("/", 1)[-1]
         if last and last.lower() not in ("releases", "latest"):
-            tag = last.strip()
+            tag = normalize_version_tag(last.strip())
             result = (tag, extract_version_number(tag))
             set_manual_latest(repo, tag)
             set_hint(f"gh:{owner}/{repo}", "latest_redirect")
@@ -1833,7 +1990,7 @@ def latest_github(owner: str, repo: str) -> tuple[str, str]:
     # Fallback to GitHub API releases/latest (also non-prerelease)
     try:
         data = json.loads(http_get(f"https://api.github.com/repos/{owner}/{repo}/releases/latest"))
-        tag = (data.get("tag_name") or "").strip()
+        tag = normalize_version_tag((data.get("tag_name") or "").strip())
         if tag and tag.lower() not in ("releases", "latest"):
             result = (tag, extract_version_number(tag))
             set_manual_latest(repo, tag)
@@ -1928,7 +2085,7 @@ def latest_github(owner: str, repo: str) -> tuple[str, str]:
     try:
         data = json.loads(http_get(f"https://api.github.com/repos/{owner}/{repo}/tags?per_page=1"))
         if isinstance(data, list) and data:
-            tag = (data[0].get("name") or "").strip()
+            tag = normalize_version_tag((data[0].get("name") or "").strip())
             if tag:
                 result = (tag, extract_version_number(tag))
                 set_manual_latest(repo, tag)
@@ -1940,7 +2097,7 @@ def latest_github(owner: str, repo: str) -> tuple[str, str]:
         atom = http_get(f"https://github.com/{owner}/{repo}/releases.atom").decode("utf-8", "ignore")
         m = re.search(r"/releases/tag/([^<\"]+)", atom)
         if m:
-            tag = m.group(1).strip()
+            tag = normalize_version_tag(m.group(1).strip())
             if tag and tag.lower() not in ("releases", "latest"):
                 result = (tag, extract_version_number(tag))
                 set_manual_latest(repo, tag)
@@ -2669,6 +2826,16 @@ def main() -> int:
                     # Format: "# [1/64] uv (installed: 0.9.2 === latest: 0.9.2)"
                     version_info = f"installed: {inst_color}{inst_display}{RESET} {operator} latest: {latest_color}{latest_display}{RESET}"
                     print(f"# [{completed_tools}/{total_tools}] {name} ({version_info})", file=sys.stderr, flush=True)
+
+                    # Check for PATH shadowing and emit warning
+                    shadowing = detect_path_shadowing(name) if installed else {}
+                    warning = shadowing.get("warning", "")
+                    if warning:
+                        print(f"#   {warning}", file=sys.stderr, flush=True)
+                        if shadowing.get("expected_path"):
+                            print(f"#   Expected: {shadowing['expected_path']}", file=sys.stderr, flush=True)
+                        if shadowing.get("shadowed_by"):
+                            print(f"#   Found:    {shadowing['shadowed_by']}", file=sys.stderr, flush=True)
                 except Exception:
                     # Fallback to simple message if row parsing fails
                     name = row[0] if row and len(row) > 0 else "?"
@@ -2704,6 +2871,9 @@ def main() -> int:
                         "path": path,
                     })
 
+            # Detect PATH shadowing
+            shadowing = detect_path_shadowing(name) if installed else {}
+
             payload.append({
                 "tool": name,
                 "category": category_for(name),
@@ -2726,6 +2896,12 @@ def main() -> int:
                 # New field: all installations found (for duplicate detection)
                 "all_installations": all_installs,
                 "has_duplicates": len(all_installs) > 1,
+                # PATH shadowing detection
+                "shadowed": shadowing.get("shadowed", ""),
+                "shadowed_by": shadowing.get("shadowed_by", ""),
+                "shadowed_package": shadowing.get("shadowed_package", ""),
+                "expected_path": shadowing.get("expected_path", ""),
+                "shadowing_warning": shadowing.get("warning", ""),
             })
         print(json.dumps(payload, ensure_ascii=False))
         return 0
@@ -2769,6 +2945,23 @@ def main() -> int:
         unknown = sum(1 for r in results if r[5] == "UNKNOWN")
         offline_tag = " (offline)" if OFFLINE_MODE else ""
         print(f"\nReadiness{offline_tag}: {total} tools, {outdated} outdated, {missing} missing, {unknown} unknown", file=sys.stderr)
+
+        # Check PATH configuration for package managers
+        scripts_dir = os.path.join(os.path.dirname(__file__), "scripts", "lib")
+        path_check_script = os.path.join(scripts_dir, "path_check.sh")
+        if os.path.isfile(path_check_script):
+            try:
+                result = subprocess.run(
+                    ["bash", "-c", f"source {path_check_script} && check_all_paths"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                # If check_all_paths returns non-zero, it found issues
+                if result.returncode != 0 and result.stderr:
+                    print(result.stderr, file=sys.stderr, end="")
+            except Exception:
+                pass
     except Exception:
         pass
 

@@ -62,17 +62,23 @@ install_ruby() {
 update_ruby() {
   ensure_rbenv
 
-  # Get current and latest versions
-  local current_version latest_version
+  # Get current version
+  local current_version target_version
   current_version=$(rbenv global 2>/dev/null || echo "")
-  latest_version=$(get_latest_ruby_version)
+
+  # Use RUBY_VERSION if set, otherwise get latest from rbenv
+  if [ -n "${RUBY_VERSION:-}" ] && [ "$RUBY_VERSION" != "latest" ]; then
+    target_version="$RUBY_VERSION"
+  else
+    target_version=$(get_latest_ruby_version)
+    RUBY_VERSION="$target_version"
+  fi
 
   echo "Current Ruby: $current_version"
-  echo "Latest Ruby: $latest_version"
+  echo "Target Ruby: $target_version"
 
-  # Install latest if different
-  if [ "$current_version" != "$latest_version" ]; then
-    RUBY_VERSION="$latest_version"
+  # Install target if different
+  if [ "$current_version" != "$target_version" ]; then
     install_ruby
   else
     # Just update gems

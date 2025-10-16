@@ -1,6 +1,6 @@
 {
   "name": "bat",
-  "install_method": "github_release_binary",
+  "install_method": "auto",
   "description": "A cat clone with syntax highlighting and Git integration",
   "homepage": "https://github.com/sharkdp/bat",
   "github_repo": "sharkdp/bat",
@@ -10,6 +10,31 @@
     "x86_64": "x86_64",
     "aarch64": "aarch64",
     "armv7l": "armv7"
-  }
-  ,"tags": ["core"]
+  },
+  "available_methods": [
+    {
+      "method": "github_release_binary",
+      "priority": 1,
+      "config": {
+        "repo": "sharkdp/bat",
+        "asset_pattern": "bat-.*-x86_64-unknown-linux-musl.tar.gz"
+      }
+    },
+    {
+      "method": "cargo",
+      "priority": 2,
+      "config": {
+        "crate": "bat"
+      }
+    },
+    {
+      "method": "apt",
+      "priority": 3,
+      "config": {
+        "package": "bat"
+      }
+    }
+  ],
+  "requires": [],
+  "tags": ["core"]
 }

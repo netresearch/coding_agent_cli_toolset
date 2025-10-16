@@ -128,9 +128,11 @@ process_tool() {
   fi
 
   if [[ "$ans" =~ ^[Yy]$ ]]; then
-    # Handle python's special UV_PYTHON_SPEC requirement
+    # Handle tool-specific version environment variables
     if [ "$tool" = "python" ]; then
       UV_PYTHON_SPEC="$latest" "$ROOT"/scripts/$install_cmd || true
+    elif [ "$tool" = "ruby" ]; then
+      RUBY_VERSION="$latest" "$ROOT"/scripts/$install_cmd || true
     else
       "$ROOT"/scripts/$install_cmd || true
     fi
