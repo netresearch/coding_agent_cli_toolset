@@ -43,5 +43,6 @@ if [ ! -x "$SCRIPT_PATH" ]; then
   exit 1
 fi
 
-# Delegate to dedicated script
+# Delegate to dedicated script (skip TOOL argument, pass only ACTION)
+shift  # Remove TOOL from $@
 exec "$SCRIPT_PATH" "$@"

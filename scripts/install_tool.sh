@@ -48,5 +48,6 @@ if [ ! -x "$INSTALLER_SCRIPT" ]; then
   exit 1
 fi
 
-# Execute installer
-exec "$INSTALLER_SCRIPT" "$TOOL"
+# Execute installer with all remaining arguments
+shift  # Remove TOOL from $@
+exec "$INSTALLER_SCRIPT" "$TOOL" "$@"
