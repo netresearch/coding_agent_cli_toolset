@@ -16,11 +16,38 @@ ensure_rbenv_loaded() {
   fi
 }
 
+check_rbenv_ruby() {
+  ensure_rbenv_loaded
+
+  # Check if Ruby is rbenv-managed
+  local ruby_path
+  ruby_path="$(command -v ruby 2>/dev/null || echo '')"
+
+  case "$ruby_path" in
+    "$HOME/.rbenv/"*)
+      return 0  # rbenv-managed
+      ;;
+    *)
+      return 1  # not rbenv-managed (apt, system, or missing)
+      ;;
+  esac
+}
+
 update_gem() {
   ensure_rbenv_loaded
 
   if ! command -v gem >/dev/null 2>&1; then
     echo "[gem] Error: gem not found. Install Ruby first via 'make install-ruby' or 'scripts/install_ruby.sh'" >&2
+    return 1
+  fi
+
+  # Check if Ruby is rbenv-managed before trying to update gem
+  if ! check_rbenv_ruby; then
+    echo "[gem] Error: Ruby is not rbenv-managed (currently apt/system)" >&2
+    echo "[gem] Cannot update gem via 'gem update --system' for apt-managed Ruby" >&2
+    echo "[gem] Please install Ruby via rbenv first:" >&2
+    echo "[gem]   make install-ruby" >&2
+    echo "[gem]   or: scripts/install_ruby.sh reconcile" >&2
     return 1
   fi
 
@@ -57,6 +84,9 @@ reconcile_gem() {
 
   if ! command -v gem >/dev/null 2>&1; then
     echo "[gem] gem not found. Installing Ruby (which includes gem)..."
+    "$DIR/install_ruby.sh" reconcile || true
+  elif ! check_rbenv_ruby; then
+    echo "[gem] Ruby is not rbenv-managed. Installing Ruby via rbenv first..."
     "$DIR/install_ruby.sh" reconcile || true
   fi
 
