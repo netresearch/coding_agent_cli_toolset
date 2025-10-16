@@ -93,6 +93,20 @@ if ! [ -s "$tmpfile" ]; then
   exit 1
 fi
 
+# Clean up alternative installations (cargo, apt, brew) before installing
+if [ -f "$HOME/.cargo/bin/$BINARY_NAME" ]; then
+  echo "[$TOOL] Removing cargo-installed version at ~/.cargo/bin/$BINARY_NAME" >&2
+  rm -f "$HOME/.cargo/bin/$BINARY_NAME"
+fi
+
+# Check if apt-installed and suggest removal
+if command -v dpkg >/dev/null 2>&1 && dpkg -S "/usr/bin/$BINARY_NAME" >/dev/null 2>&1; then
+  PKG="$(dpkg -S "/usr/bin/$BINARY_NAME" | cut -d: -f1)"
+  echo "[$TOOL] Note: apt-installed version found in package '$PKG'" >&2
+  echo "[$TOOL] Removing apt package to prevent conflicts..." >&2
+  apt_remove_if_present "$PKG" || true
+fi
+
 # Install
 chmod +x "$tmpfile"
 $INSTALL -T "$tmpfile" "$BIN_DIR/$BINARY_NAME"
