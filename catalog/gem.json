@@ -1,14 +1,14 @@
 {
   "name": "gem",
-  "install_method": "package_manager",
-  "description": "Ruby package manager",
+  "install_method": "dedicated_script",
+  "description": "Ruby package manager (RubyGems)",
   "homepage": "https://rubygems.org/",
   "binary_name": "gem",
-  "packages": {
-    "apt": "ruby-rubygems",
-    "brew": "ruby",
-    "dnf": "rubygems",
-    "pacman": "rubygems"
-  },
-  "notes": "gem typically comes with Ruby. Installing ruby package will also install gem."
+  "script": "install_gem.sh",
+  "notes": "gem comes bundled with Ruby. Updates via 'gem update --system'. Requires Ruby to be installed via rbenv."
+  ,"guide": {
+    "display_name": "gem (RubyGems)",
+    "install_action": "update",
+    "order": 33
+  }
 }

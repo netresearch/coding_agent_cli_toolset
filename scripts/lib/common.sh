@@ -65,4 +65,21 @@ prefers_rustup() {
   is_path_under "$p" "$HOME/.cargo" || return 1
 }
 
+# rbenv helpers
+ensure_rbenv_loaded() {
+  # Add rbenv to PATH and initialize if available
+  if [ -d "$HOME/.rbenv" ]; then
+    export PATH="$HOME/.rbenv/bin:$PATH"
+    if command -v rbenv >/dev/null 2>&1; then
+      eval "$(rbenv init - bash)" || true
+    fi
+  fi
+}
+
+prefers_rbenv_ruby() {
+  local p
+  p="$(command -v ruby || true)"
+  is_path_under "$p" "$HOME/.rbenv" || return 1
+}
+
 
