@@ -1,14 +1,14 @@
 {
   "name": "yarn",
-  "install_method": "package_manager",
+  "install_method": "dedicated_script",
   "description": "Alternative Node.js package manager with offline mode and deterministic installs",
   "homepage": "https://yarnpkg.com/",
   "binary_name": "yarn",
-  "packages": {
-    "apt": "yarnpkg",
-    "brew": "yarn",
-    "dnf": "yarnpkg",
-    "pacman": "yarn"
-  },
-  "notes": "Can also be installed via npm: npm install -g yarn. Some distros use 'yarnpkg' package name to avoid conflicts."
+  "script": "install_yarn.sh",
+  "notes": "Installed via Node.js corepack or npm. Requires Node.js to be installed via nvm. Do NOT install via apt (conflicts with cmdtest package)."
+  ,"guide": {
+    "display_name": "Yarn",
+    "install_action": "update",
+    "order": 151
+  }
 }
