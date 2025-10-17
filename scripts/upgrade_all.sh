@@ -98,7 +98,25 @@ stage_1_refresh() {
 		log_skip "Version data refresh (dry-run)"
 	else
 		local start=$(date +%s)
-		if make update >> "$LOG_FILE" 2>&1; then
+		log_info "Fetching latest versions (this may take a minute)..."
+
+		# Run make update with progress indication
+		(
+			make update >> "$LOG_FILE" 2>&1 &
+			local pid=$!
+			local spinner='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+			local i=0
+			while kill -0 $pid 2>/dev/null; do
+				printf "\r  ${BLUE}→${RESET} Fetching... %s" "${spinner:i++%${#spinner}:1}"
+				sleep 0.1
+			done
+			wait $pid
+			local exit_code=$?
+			printf "\r"
+			return $exit_code
+		)
+
+		if [ $? -eq 0 ]; then
 			local end=$(date +%s)
 			local duration=$((end - start))
 			log_success "Fetched latest version data (${duration}s)"
@@ -289,7 +307,8 @@ stage_4_user_packages() {
 		log_info "Upgrading uv tools..."
 		if [ "$DRY_RUN" = "0" ]; then
 			local tools
-			tools="$(uv tool list 2>/dev/null | awk '{print $1}' || true)"
+			# Filter out binary lines (starting with dash) and keep only tool names
+			tools="$(uv tool list 2>/dev/null | grep -v '^-' | awk 'NF > 0 {print $1}' || true)"
 			if [ -n "$tools" ]; then
 				local count=$(echo "$tools" | wc -l)
 				log_info "Found $count uv tools to upgrade"
