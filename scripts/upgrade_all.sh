@@ -166,7 +166,12 @@ stage_2_managers() {
 
 	# Language-specific package managers
 	if command -v pip3 >/dev/null 2>&1; then
-		run_cmd "pip" python3 -m pip install --user --upgrade pip || log_skip "pip (failed)"
+		# Check if in virtualenv - skip --user flag if so
+		if [ -n "${VIRTUAL_ENV:-}" ]; then
+			run_cmd "pip" python3 -m pip install --upgrade pip || log_skip "pip (failed)"
+		else
+			run_cmd "pip" python3 -m pip install --user --upgrade pip || log_skip "pip (failed)"
+		fi
 	else
 		log_skip "pip (not installed)"
 	fi
@@ -178,7 +183,12 @@ stage_2_managers() {
 	fi
 
 	if command -v pipx >/dev/null 2>&1; then
-		run_cmd "pipx" pip3 install --user --upgrade pipx || log_skip "pipx (failed)"
+		# Check if in virtualenv - skip --user flag if so
+		if [ -n "${VIRTUAL_ENV:-}" ]; then
+			run_cmd "pipx" pip3 install --upgrade pipx || log_skip "pipx (failed)"
+		else
+			run_cmd "pipx" pip3 install --user --upgrade pipx || log_skip "pipx (failed)"
+		fi
 	else
 		log_skip "pipx (not installed)"
 	fi
