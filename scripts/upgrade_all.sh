@@ -556,7 +556,23 @@ stage_4_user_packages() {
 
 	# Pipx packages
 	if command -v pipx >/dev/null 2>&1; then
-		run_cmd "pipx packages" pipx upgrade-all || log_skip "pipx packages (failed)"
+		if [ "$DRY_RUN" = "1" ]; then
+			log_info "DRY-RUN: pipx upgrade-all"
+		else
+			local temp_log=$(mktemp)
+			if pipx upgrade-all >> "$LOG_FILE" 2>&1; then
+				log_success "pipx packages"
+			else
+				# Check if only failure was missing metadata (known issue)
+				if grep -q "missing internal pipx metadata" "$LOG_FILE" 2>/dev/null; then
+					local broken_pkg=$(grep -oP "Not upgrading \K\w+" "$LOG_FILE" 2>/dev/null | tail -1)
+					log_reconcile "pipx packages (partial: $broken_pkg has missing metadata, run: pipx uninstall $broken_pkg && pipx install $broken_pkg)"
+				else
+					log_fail "pipx packages (see $LOG_FILE for details)"
+				fi
+			fi
+			rm -f "$temp_log"
+		fi
 	else
 		log_skip "pipx (not installed)"
 	fi
