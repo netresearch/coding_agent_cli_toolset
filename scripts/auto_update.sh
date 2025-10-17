@@ -236,7 +236,8 @@ update_uv() {
   # Update all uv-managed tools
   if [ "$DRY_RUN" = "0" ]; then
     local tools
-    tools="$(uv tool list 2>/dev/null | awk '{print $1}' || true)"
+    # Filter out binary lines (starting with dash) and keep only tool names
+    tools="$(uv tool list 2>/dev/null | grep -v '^-' | awk 'NF > 0 {print $1}' || true)"
     if [ -n "$tools" ]; then
       log "UV: Upgrading $(echo "$tools" | wc -l) installed tools"
       while IFS= read -r tool; do
