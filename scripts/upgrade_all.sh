@@ -204,7 +204,12 @@ stage_2_managers() {
 	fi
 
 	if command -v composer >/dev/null 2>&1; then
-		run_cmd "composer" composer self-update || log_skip "composer (failed)"
+		# Check if composer is system-installed (can't self-update)
+		if [ "$(which composer)" = "/usr/bin/composer" ] || [ "$(which composer)" = "/usr/local/bin/composer" ]; then
+			log_skip "composer (system-managed, use apt/brew to update)"
+		else
+			run_cmd "composer" composer self-update || log_skip "composer (failed)"
+		fi
 	else
 		log_skip "composer (not installed)"
 	fi
