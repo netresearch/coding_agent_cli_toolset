@@ -201,11 +201,22 @@ stage_2_managers() {
 		# Check if pip module is actually available
 		if ! python3 -m pip --version >/dev/null 2>&1; then
 			log_skip "pip (python3 has no pip module)"
-		# Check if in virtualenv - skip --user flag if so
-		elif [ -n "${VIRTUAL_ENV:-}" ]; then
-			run_cmd "pip" python3 -m pip install --upgrade pip || log_skip "pip (failed)"
+		elif [ "$DRY_RUN" = "1" ]; then
+			log_info "DRY-RUN: pip upgrade"
 		else
-			run_cmd "pip" python3 -m pip install --user --upgrade pip || log_skip "pip (failed)"
+			local upgrade_success=0
+			# Check if in virtualenv - skip --user flag if so
+			if [ -n "${VIRTUAL_ENV:-}" ]; then
+				python3 -m pip install --upgrade pip >> "$LOG_FILE" 2>&1 && upgrade_success=1
+			else
+				python3 -m pip install --user --upgrade pip >> "$LOG_FILE" 2>&1 && upgrade_success=1
+			fi
+
+			if [ "$upgrade_success" = "1" ]; then
+				log_success_with_info "pip" "python3 -m pip --version | awk '{print \$2}'"
+			else
+				log_fail "pip (see $LOG_FILE for details)"
+			fi
 		fi
 	else
 		log_skip "pip (not installed)"
@@ -339,7 +350,15 @@ stage_2_managers() {
 	fi
 
 	if command -v gem >/dev/null 2>&1; then
-		run_cmd "gem" gem update --system || log_skip "gem (failed)"
+		if [ "$DRY_RUN" = "1" ]; then
+			log_info "DRY-RUN: gem update --system"
+		else
+			if gem update --system >> "$LOG_FILE" 2>&1; then
+				log_success_with_info "gem" "gem --version"
+			else
+				log_fail "gem (see $LOG_FILE for details)"
+			fi
+		fi
 	else
 		log_skip "gem (not installed)"
 	fi
@@ -348,25 +367,43 @@ stage_2_managers() {
 		# Check if composer is system-installed (can't self-update)
 		if [ "$(which composer)" = "/usr/bin/composer" ] || [ "$(which composer)" = "/usr/local/bin/composer" ]; then
 			log_skip "composer (system-managed, use apt/brew to update)"
+		elif [ "$DRY_RUN" = "1" ]; then
+			log_info "DRY-RUN: composer self-update"
 		else
-			run_cmd "composer" composer self-update || log_skip "composer (failed)"
+			if composer self-update >> "$LOG_FILE" 2>&1; then
+				log_success_with_info "composer" "composer --version | head -1 | awk '{print \$3}'"
+			else
+				log_fail "composer (see $LOG_FILE for details)"
+			fi
 		fi
 	else
 		log_skip "composer (not installed)"
 	fi
 
 	if command -v poetry >/dev/null 2>&1; then
-		# Try poetry self update first (Poetry 1.2+)
-		if poetry self update --help >/dev/null 2>&1; then
-			run_cmd "poetry" poetry self update || log_skip "poetry (failed)"
-		# Fallback to uv tool upgrade if poetry is managed by uv
-		elif command -v uv >/dev/null 2>&1 && uv tool list 2>/dev/null | grep -q "^poetry"; then
-			run_cmd "poetry" uv tool upgrade poetry || log_skip "poetry (failed)"
-		# Fallback to pipx upgrade if poetry is managed by pipx
-		elif command -v pipx >/dev/null 2>&1 && pipx list 2>/dev/null | grep -q "poetry"; then
-			run_cmd "poetry" pipx upgrade poetry || log_skip "poetry (failed)"
+		if [ "$DRY_RUN" = "1" ]; then
+			log_info "DRY-RUN: poetry upgrade"
 		else
-			log_skip "poetry (no automatic update method)"
+			local upgrade_success=0
+			# Try poetry self update first (Poetry 1.2+)
+			if poetry self update --help >/dev/null 2>&1; then
+				poetry self update >> "$LOG_FILE" 2>&1 && upgrade_success=1
+			# Fallback to uv tool upgrade if poetry is managed by uv
+			elif command -v uv >/dev/null 2>&1 && uv tool list 2>/dev/null | grep -q "^poetry"; then
+				uv tool upgrade poetry >> "$LOG_FILE" 2>&1 && upgrade_success=1
+			# Fallback to pipx upgrade if poetry is managed by pipx
+			elif command -v pipx >/dev/null 2>&1 && pipx list 2>/dev/null | grep -q "poetry"; then
+				pipx upgrade poetry >> "$LOG_FILE" 2>&1 && upgrade_success=1
+			else
+				log_skip "poetry (no automatic update method)"
+				upgrade_success=-1
+			fi
+
+			if [ "$upgrade_success" = "1" ]; then
+				log_success_with_info "poetry" "poetry --version | awk '{print \$3}'"
+			elif [ "$upgrade_success" = "0" ]; then
+				log_fail "poetry (see $LOG_FILE for details)"
+			fi
 		fi
 	else
 		log_skip "poetry (not installed)"
@@ -383,35 +420,95 @@ stage_3_runtimes() {
 
 	# Python
 	if [ -f "./scripts/install_python.sh" ]; then
-		run_cmd "Python runtime" ./scripts/install_python.sh update || log_skip "Python (upgrade failed or not managed)"
+		if [ "$DRY_RUN" = "1" ]; then
+			log_info "DRY-RUN: ./scripts/install_python.sh update"
+		else
+			if ./scripts/install_python.sh update >> "$LOG_FILE" 2>&1; then
+				if command -v python3 >/dev/null 2>&1; then
+					log_success_with_info "Python" "python3 --version | awk '{print \$2}'"
+				else
+					log_success "Python runtime"
+				fi
+			else
+				log_skip "Python (upgrade failed or not managed)"
+			fi
+		fi
 	else
 		log_skip "Python (install script not found)"
 	fi
 
 	# Node.js
 	if [ -f "./scripts/install_node.sh" ]; then
-		run_cmd "Node.js runtime" ./scripts/install_node.sh update || log_skip "Node.js (upgrade failed or not managed)"
+		if [ "$DRY_RUN" = "1" ]; then
+			log_info "DRY-RUN: ./scripts/install_node.sh update"
+		else
+			if ./scripts/install_node.sh update >> "$LOG_FILE" 2>&1; then
+				if command -v node >/dev/null 2>&1; then
+					log_success_with_info "Node.js" "node --version | sed 's/^v//'"
+				else
+					log_success "Node.js runtime"
+				fi
+			else
+				log_skip "Node.js (upgrade failed or not managed)"
+			fi
+		fi
 	else
 		log_skip "Node.js (install script not found)"
 	fi
 
 	# Go
 	if [ -f "./scripts/install_go.sh" ]; then
-		run_cmd "Go runtime" ./scripts/install_go.sh update || log_skip "Go (upgrade failed or not managed)"
+		if [ "$DRY_RUN" = "1" ]; then
+			log_info "DRY-RUN: ./scripts/install_go.sh update"
+		else
+			if ./scripts/install_go.sh update >> "$LOG_FILE" 2>&1; then
+				if command -v go >/dev/null 2>&1; then
+					log_success_with_info "Go" "go version | awk '{print \$3}' | sed 's/^go//'"
+				else
+					log_success "Go runtime"
+				fi
+			else
+				log_skip "Go (upgrade failed or not managed)"
+			fi
+		fi
 	else
 		log_skip "Go (install script not found)"
 	fi
 
 	# Ruby
 	if [ -f "./scripts/install_ruby.sh" ]; then
-		run_cmd "Ruby runtime" ./scripts/install_ruby.sh update || log_skip "Ruby (upgrade failed or not managed)"
+		if [ "$DRY_RUN" = "1" ]; then
+			log_info "DRY-RUN: ./scripts/install_ruby.sh update"
+		else
+			if ./scripts/install_ruby.sh update >> "$LOG_FILE" 2>&1; then
+				if command -v ruby >/dev/null 2>&1; then
+					log_success_with_info "Ruby" "ruby --version | awk '{print \$2}'"
+				else
+					log_success "Ruby runtime"
+				fi
+			else
+				log_skip "Ruby (upgrade failed or not managed)"
+			fi
+		fi
 	else
 		log_skip "Ruby (install script not found)"
 	fi
 
 	# Rust
 	if [ -f "./scripts/install_rust.sh" ]; then
-		run_cmd "Rust runtime" ./scripts/install_rust.sh update || log_skip "Rust (upgrade failed or not managed)"
+		if [ "$DRY_RUN" = "1" ]; then
+			log_info "DRY-RUN: ./scripts/install_rust.sh update"
+		else
+			if ./scripts/install_rust.sh update >> "$LOG_FILE" 2>&1; then
+				if command -v rustc >/dev/null 2>&1; then
+					log_success_with_info "Rust" "rustc --version | awk '{print \$2}'"
+				else
+					log_success "Rust runtime"
+				fi
+			else
+				log_skip "Rust (upgrade failed or not managed)"
+			fi
+		fi
 	else
 		log_skip "Rust (install script not found)"
 	fi
@@ -437,7 +534,15 @@ stage_4_user_packages() {
 				log_info "Found $count uv tools to upgrade"
 				while IFS= read -r tool; do
 					[ -z "$tool" ] && continue
-					run_cmd "uv tool: $tool" uv tool upgrade "$tool" || log_skip "uv tool: $tool (failed)"
+					if uv tool upgrade "$tool" >> "$LOG_FILE" 2>&1; then
+						if command -v "$tool" >/dev/null 2>&1; then
+							log_success_with_info "$tool" "$tool --version 2>/dev/null | head -1 | awk '{print \$NF}' || echo 'installed'"
+						else
+							log_success "uv tool: $tool"
+						fi
+					else
+						log_skip "uv tool: $tool (failed)"
+					fi
 				done <<< "$tools"
 			else
 				log_skip "uv (no tools installed)"
