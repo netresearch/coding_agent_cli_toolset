@@ -198,9 +198,15 @@ stage_2_managers() {
 
 	# Language-specific package managers
 	if command -v pip3 >/dev/null 2>&1; then
-		# Skip pip if uv is managing Python packages
+		# Skip pip if uv is managing Python packages, suggest migration
 		if command -v uv >/dev/null 2>&1; then
-			log_skip "pip (uv is managing Python packages)"
+			# Check if there are user-installed pip packages to migrate
+			local user_packages=$(python3 -m pip list --user --format=freeze 2>/dev/null | grep -v "^#" | wc -l)
+			if [ "$user_packages" -gt 0 ]; then
+				log_reconcile "pip ($user_packages user packages, run: make reconcile-pip-to-uv to migrate)"
+			else
+				log_skip "pip (uv is managing Python packages)"
+			fi
 		# Check if pip module is actually available
 		elif ! python3 -m pip --version >/dev/null 2>&1; then
 			log_skip "pip (python3 has no pip module)"
@@ -240,9 +246,15 @@ stage_2_managers() {
 	fi
 
 	if command -v pipx >/dev/null 2>&1; then
-		# Skip pipx if uv is managing Python tools
+		# Skip pipx if uv is managing Python tools, suggest migration
 		if command -v uv >/dev/null 2>&1; then
-			log_skip "pipx (uv is managing Python tools)"
+			# Check if there are pipx tools to migrate
+			local pipx_tools=$(pipx list --short 2>/dev/null | wc -l)
+			if [ "$pipx_tools" -gt 0 ]; then
+				log_reconcile "pipx ($pipx_tools tools installed, run: make reconcile-pipx-to-uv to migrate)"
+			else
+				log_skip "pipx (uv is managing Python tools)"
+			fi
 		elif [ "$DRY_RUN" = "1" ]; then
 			log_info "DRY-RUN: pip3 install --upgrade pipx"
 		else
@@ -564,7 +576,12 @@ stage_4_user_packages() {
 	if command -v pipx >/dev/null 2>&1; then
 		# Skip pipx packages if uv is managing Python tools
 		if command -v uv >/dev/null 2>&1; then
-			log_skip "pipx packages (uv tools handle this)"
+			local pipx_tools=$(pipx list --short 2>/dev/null | wc -l)
+			if [ "$pipx_tools" -gt 0 ]; then
+				log_reconcile "pipx packages ($pipx_tools tools, run: make reconcile-pipx-to-uv to migrate)"
+			else
+				log_skip "pipx packages (uv tools handle this)"
+			fi
 		elif [ "$DRY_RUN" = "1" ]; then
 			log_info "DRY-RUN: pipx upgrade-all"
 		else
