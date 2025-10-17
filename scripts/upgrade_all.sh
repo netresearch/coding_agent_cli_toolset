@@ -198,8 +198,11 @@ stage_2_managers() {
 
 	# Language-specific package managers
 	if command -v pip3 >/dev/null 2>&1; then
+		# Skip pip if uv is managing Python packages
+		if command -v uv >/dev/null 2>&1; then
+			log_skip "pip (uv is managing Python packages)"
 		# Check if pip module is actually available
-		if ! python3 -m pip --version >/dev/null 2>&1; then
+		elif ! python3 -m pip --version >/dev/null 2>&1; then
 			log_skip "pip (python3 has no pip module)"
 		elif [ "$DRY_RUN" = "1" ]; then
 			log_info "DRY-RUN: pip upgrade"
@@ -237,7 +240,10 @@ stage_2_managers() {
 	fi
 
 	if command -v pipx >/dev/null 2>&1; then
-		if [ "$DRY_RUN" = "1" ]; then
+		# Skip pipx if uv is managing Python tools
+		if command -v uv >/dev/null 2>&1; then
+			log_skip "pipx (uv is managing Python tools)"
+		elif [ "$DRY_RUN" = "1" ]; then
 			log_info "DRY-RUN: pip3 install --upgrade pipx"
 		else
 			# Check if in virtualenv - skip --user flag if so
@@ -556,7 +562,10 @@ stage_4_user_packages() {
 
 	# Pipx packages
 	if command -v pipx >/dev/null 2>&1; then
-		if [ "$DRY_RUN" = "1" ]; then
+		# Skip pipx packages if uv is managing Python tools
+		if command -v uv >/dev/null 2>&1; then
+			log_skip "pipx packages (uv tools handle this)"
+		elif [ "$DRY_RUN" = "1" ]; then
 			log_info "DRY-RUN: pipx upgrade-all"
 		else
 			local temp_log=$(mktemp)
