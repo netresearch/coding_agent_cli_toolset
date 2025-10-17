@@ -7,6 +7,9 @@ set -euo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$DIR/.." && pwd)"
 
+# Source common helpers
+. "$DIR/lib/common.sh"
+
 DRY_RUN="${DRY_RUN:-0}"
 LOG_DIR="$PROJECT_ROOT/logs"
 LOG_FILE="$LOG_DIR/upgrade-$(date +%Y%m%d-%H%M%S).log"
@@ -75,6 +78,11 @@ log_fail() {
 
 log_info() {
 	echo "  ${BLUE}→${RESET} $*" | tee -a "$LOG_FILE"
+}
+
+log_reconcile() {
+	echo "  ${YELLOW}⚙${RESET} $*" | tee -a "$LOG_FILE"
+	TOTAL_SKIPPED=$((TOTAL_SKIPPED + 1))
 }
 
 run_cmd() {
@@ -227,13 +235,20 @@ stage_2_managers() {
 	fi
 
 	if command -v npm >/dev/null 2>&1; then
-		if [ "$DRY_RUN" = "1" ]; then
-			log_info "DRY-RUN: npm install -g npm@latest"
+		local npm_path
+		npm_path="$(command -v npm)"
+		# Check if npm is system-managed (not nvm)
+		if [[ "$npm_path" == /usr/bin/npm ]] || [[ "$npm_path" == /usr/local/bin/npm ]]; then
+			log_reconcile "npm (system-managed at $npm_path, run: ./scripts/install_node.sh reconcile)"
 		else
-			if npm install -g npm@latest >> "$LOG_FILE" 2>&1; then
-				log_success_with_info "npm" "npm --version"
+			if [ "$DRY_RUN" = "1" ]; then
+				log_info "DRY-RUN: npm install -g npm@latest"
 			else
-				log_fail "npm (see $LOG_FILE for details)"
+				if npm install -g npm@latest >> "$LOG_FILE" 2>&1; then
+					log_success_with_info "npm" "npm --version"
+				else
+					log_fail "npm (see $LOG_FILE for details)"
+				fi
 			fi
 		fi
 	else
@@ -241,20 +256,27 @@ stage_2_managers() {
 	fi
 
 	if command -v pnpm >/dev/null 2>&1; then
-		if [ "$DRY_RUN" = "1" ]; then
-			log_info "DRY-RUN: pnpm upgrade"
+		local pnpm_path
+		pnpm_path="$(command -v pnpm)"
+		# Check if pnpm is system-managed (not nvm/corepack)
+		if [[ "$pnpm_path" == /usr/bin/pnpm ]] || [[ "$pnpm_path" == /usr/local/bin/pnpm ]]; then
+			log_reconcile "pnpm (system-managed at $pnpm_path, run: ./scripts/install_node.sh reconcile)"
 		else
-			local upgrade_success=0
-			if command -v corepack >/dev/null 2>&1; then
-				corepack prepare pnpm@latest --activate >> "$LOG_FILE" 2>&1 && upgrade_success=1
+			if [ "$DRY_RUN" = "1" ]; then
+				log_info "DRY-RUN: pnpm upgrade"
 			else
-				npm install -g pnpm@latest >> "$LOG_FILE" 2>&1 && upgrade_success=1
-			fi
+				local upgrade_success=0
+				if command -v corepack >/dev/null 2>&1; then
+					corepack prepare pnpm@latest --activate >> "$LOG_FILE" 2>&1 && upgrade_success=1
+				else
+					npm install -g pnpm@latest >> "$LOG_FILE" 2>&1 && upgrade_success=1
+				fi
 
-			if [ "$upgrade_success" = "1" ]; then
-				log_success_with_info "pnpm" "pnpm --version"
-			else
-				log_fail "pnpm (see $LOG_FILE for details)"
+				if [ "$upgrade_success" = "1" ]; then
+					log_success_with_info "pnpm" "pnpm --version"
+				else
+					log_fail "pnpm (see $LOG_FILE for details)"
+				fi
 			fi
 		fi
 	else
@@ -262,20 +284,27 @@ stage_2_managers() {
 	fi
 
 	if command -v yarn >/dev/null 2>&1; then
-		if [ "$DRY_RUN" = "1" ]; then
-			log_info "DRY-RUN: yarn upgrade"
+		local yarn_path
+		yarn_path="$(command -v yarn)"
+		# Check if yarn is system-managed (not nvm/corepack)
+		if [[ "$yarn_path" == /usr/bin/yarn ]] || [[ "$yarn_path" == /usr/local/bin/yarn ]]; then
+			log_reconcile "yarn (system-managed at $yarn_path, run: ./scripts/install_node.sh reconcile)"
 		else
-			local upgrade_success=0
-			if command -v corepack >/dev/null 2>&1; then
-				corepack prepare yarn@stable --activate >> "$LOG_FILE" 2>&1 && upgrade_success=1
+			if [ "$DRY_RUN" = "1" ]; then
+				log_info "DRY-RUN: yarn upgrade"
 			else
-				npm install -g yarn@latest >> "$LOG_FILE" 2>&1 && upgrade_success=1
-			fi
+				local upgrade_success=0
+				if command -v corepack >/dev/null 2>&1; then
+					corepack prepare yarn@stable --activate >> "$LOG_FILE" 2>&1 && upgrade_success=1
+				else
+					npm install -g yarn@latest >> "$LOG_FILE" 2>&1 && upgrade_success=1
+				fi
 
-			if [ "$upgrade_success" = "1" ]; then
-				log_success_with_info "yarn" "yarn --version"
-			else
-				log_fail "yarn (see $LOG_FILE for details)"
+				if [ "$upgrade_success" = "1" ]; then
+					log_success_with_info "yarn" "yarn --version"
+				else
+					log_fail "yarn (see $LOG_FILE for details)"
+				fi
 			fi
 		fi
 	else
