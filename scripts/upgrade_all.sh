@@ -52,6 +52,17 @@ log_success() {
 	TOTAL_UPGRADED=$((TOTAL_UPGRADED + 1))
 }
 
+log_success_with_info() {
+	local name="$1"
+	local version_cmd="$2"
+	local location
+	location="$(command -v "$name" 2>/dev/null || echo "unknown")"
+	local version
+	version="$(eval "$version_cmd" 2>/dev/null || echo "unknown")"
+	echo "  ${GREEN}✓${RESET} $name ($version at $location)" | tee -a "$LOG_FILE"
+	TOTAL_UPGRADED=$((TOTAL_UPGRADED + 1))
+}
+
 log_skip() {
 	echo "  ${YELLOW}⏭${RESET} $*" | tee -a "$LOG_FILE"
 	TOTAL_SKIPPED=$((TOTAL_SKIPPED + 1))
@@ -180,50 +191,107 @@ stage_2_managers() {
 	fi
 
 	if command -v uv >/dev/null 2>&1; then
-		run_cmd "uv" uv self update || log_skip "uv (failed)"
+		if [ "$DRY_RUN" = "1" ]; then
+			log_info "DRY-RUN: uv self update"
+		else
+			if uv self update >> "$LOG_FILE" 2>&1; then
+				log_success_with_info "uv" "uv --version | awk '{print \$2}'"
+			else
+				log_fail "uv (see $LOG_FILE for details)"
+			fi
+		fi
 	else
 		log_skip "uv (not installed)"
 	fi
 
 	if command -v pipx >/dev/null 2>&1; then
-		# Check if in virtualenv - skip --user flag if so
-		if [ -n "${VIRTUAL_ENV:-}" ]; then
-			run_cmd "pipx" pip3 install --upgrade pipx || log_skip "pipx (failed)"
+		if [ "$DRY_RUN" = "1" ]; then
+			log_info "DRY-RUN: pip3 install --upgrade pipx"
 		else
-			run_cmd "pipx" pip3 install --user --upgrade pipx || log_skip "pipx (failed)"
+			# Check if in virtualenv - skip --user flag if so
+			local upgrade_success=0
+			if [ -n "${VIRTUAL_ENV:-}" ]; then
+				pip3 install --upgrade pipx >> "$LOG_FILE" 2>&1 && upgrade_success=1
+			else
+				pip3 install --user --upgrade pipx >> "$LOG_FILE" 2>&1 && upgrade_success=1
+			fi
+
+			if [ "$upgrade_success" = "1" ]; then
+				log_success_with_info "pipx" "pipx --version"
+			else
+				log_fail "pipx (see $LOG_FILE for details)"
+			fi
 		fi
 	else
 		log_skip "pipx (not installed)"
 	fi
 
 	if command -v npm >/dev/null 2>&1; then
-		run_cmd "npm" npm install -g npm@latest || log_skip "npm (failed)"
+		if [ "$DRY_RUN" = "1" ]; then
+			log_info "DRY-RUN: npm install -g npm@latest"
+		else
+			if npm install -g npm@latest >> "$LOG_FILE" 2>&1; then
+				log_success_with_info "npm" "npm --version"
+			else
+				log_fail "npm (see $LOG_FILE for details)"
+			fi
+		fi
 	else
 		log_skip "npm (not installed)"
 	fi
 
 	if command -v pnpm >/dev/null 2>&1; then
-		if command -v corepack >/dev/null 2>&1; then
-			run_cmd "pnpm" corepack prepare pnpm@latest --activate || log_skip "pnpm (failed)"
+		if [ "$DRY_RUN" = "1" ]; then
+			log_info "DRY-RUN: pnpm upgrade"
 		else
-			run_cmd "pnpm" npm install -g pnpm@latest || log_skip "pnpm (failed)"
+			local upgrade_success=0
+			if command -v corepack >/dev/null 2>&1; then
+				corepack prepare pnpm@latest --activate >> "$LOG_FILE" 2>&1 && upgrade_success=1
+			else
+				npm install -g pnpm@latest >> "$LOG_FILE" 2>&1 && upgrade_success=1
+			fi
+
+			if [ "$upgrade_success" = "1" ]; then
+				log_success_with_info "pnpm" "pnpm --version"
+			else
+				log_fail "pnpm (see $LOG_FILE for details)"
+			fi
 		fi
 	else
 		log_skip "pnpm (not installed)"
 	fi
 
 	if command -v yarn >/dev/null 2>&1; then
-		if command -v corepack >/dev/null 2>&1; then
-			run_cmd "yarn" corepack prepare yarn@stable --activate || log_skip "yarn (failed)"
+		if [ "$DRY_RUN" = "1" ]; then
+			log_info "DRY-RUN: yarn upgrade"
 		else
-			run_cmd "yarn" npm install -g yarn@latest || log_skip "yarn (failed)"
+			local upgrade_success=0
+			if command -v corepack >/dev/null 2>&1; then
+				corepack prepare yarn@stable --activate >> "$LOG_FILE" 2>&1 && upgrade_success=1
+			else
+				npm install -g yarn@latest >> "$LOG_FILE" 2>&1 && upgrade_success=1
+			fi
+
+			if [ "$upgrade_success" = "1" ]; then
+				log_success_with_info "yarn" "yarn --version"
+			else
+				log_fail "yarn (see $LOG_FILE for details)"
+			fi
 		fi
 	else
 		log_skip "yarn (not installed)"
 	fi
 
 	if command -v cargo >/dev/null 2>&1 && command -v rustup >/dev/null 2>&1; then
-		run_cmd "rustup" rustup update || log_skip "rustup (failed)"
+		if [ "$DRY_RUN" = "1" ]; then
+			log_info "DRY-RUN: rustup update"
+		else
+			if rustup update >> "$LOG_FILE" 2>&1; then
+				log_success_with_info "rustup" "rustup --version | head -1 | awk '{print \$2}'"
+			else
+				log_fail "rustup (see $LOG_FILE for details)"
+			fi
+		fi
 	else
 		log_skip "rustup (not installed)"
 	fi
