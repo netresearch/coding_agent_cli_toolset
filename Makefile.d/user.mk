@@ -91,7 +91,7 @@ install-brew: scripts-perms ## Install Homebrew (macOS/Linux)
 install-rust: scripts-perms ## Install Rust via rustup
 	./scripts/install_rust.sh
 
-update-%: scripts-perms ## Update tool (e.g., make update-python)
+upgrade-%: scripts-perms ## Upgrade tool (e.g., make upgrade-python)
 	./scripts/install_$*.sh update
 
 uninstall-%: scripts-perms ## Uninstall tool (e.g., make uninstall-python)
@@ -100,32 +100,53 @@ uninstall-%: scripts-perms ## Uninstall tool (e.g., make uninstall-python)
 reconcile-%: scripts-perms ## Reconcile tool installation (e.g., make reconcile-node)
 	./scripts/install_$*.sh reconcile
 
-auto-update-detect: scripts-perms ## Detect all installed package managers
+detect-managers: scripts-perms ## Detect all installed package managers
 	./scripts/auto_update.sh detect
 
-auto-update: scripts-perms ## Auto-update all package managers and their packages
+upgrade-managed: scripts-perms ## Upgrade all package managers and their packages
 	SCOPE=all ./scripts/auto_update.sh update
 
-auto-update-dry-run: scripts-perms ## Show what would be updated without making changes
+upgrade-dry-run: scripts-perms ## Preview what would be upgraded without making changes
 	SCOPE=all ./scripts/auto_update.sh --dry-run update
 
-auto-update-system-only: scripts-perms ## Update only system package managers (apt, brew, snap, flatpak)
+upgrade-managed-system-only: scripts-perms ## Upgrade only system package managers (apt, brew, snap, flatpak)
 	@bash -c './scripts/auto_update.sh apt && ./scripts/auto_update.sh brew && ./scripts/auto_update.sh snap && ./scripts/auto_update.sh flatpak' || true
 
-auto-update-skip-system: scripts-perms ## Update all package managers except system ones
+upgrade-managed-skip-system: scripts-perms ## Upgrade all package managers except system ones
 	./scripts/auto_update.sh --skip-system update
 
-auto-update-system: scripts-perms ## Update only system-scoped packages (requires sudo)
+upgrade-managed-system: scripts-perms ## Upgrade only system-scoped packages (requires sudo)
 	SCOPE=system ./scripts/auto_update.sh update
 
-auto-update-user: scripts-perms ## Update only user-scoped packages (no sudo)
+upgrade-managed-user: scripts-perms ## Upgrade only user-scoped packages (no sudo)
 	SCOPE=user ./scripts/auto_update.sh update
 
-auto-update-project: scripts-perms ## Update project dependencies (with confirmation)
+upgrade-project-deps: scripts-perms ## Upgrade project dependencies (with confirmation)
 	SCOPE=project ./scripts/auto_update.sh update
 
-auto-update-all: scripts-perms ## Update system + user scopes (skip project)
+upgrade-managed-all: scripts-perms ## Upgrade system + user scopes (skip project)
 	SCOPE=all ./scripts/auto_update.sh update
+
+bootstrap: scripts-perms ## Initialize system (install Python if needed, setup environment)
+	@echo "→ Bootstrapping ai_cli_preparation..." >&2
+	@bash -c ' \
+		if ! command -v python3 >/dev/null 2>&1; then \
+			echo "⚠️  Python not found. Installing..." >&2; \
+			./scripts/install_python.sh || exit 1; \
+		fi; \
+		py_version=$$(python3 --version 2>&1 | sed "s/Python //"); \
+		echo "✓ Python $$py_version available" >&2; \
+		$(MAKE) check-path || $(MAKE) fix-path; \
+		$(MAKE) update; \
+		echo "✓ Bootstrap complete. Run '\''make audit'\'' to see installed tools." >&2'
+
+init: bootstrap ## Alias for bootstrap
+
+upgrade-all: scripts-perms ## Complete system upgrade: update data → upgrade managers → upgrade tools
+	@bash scripts/upgrade_all.sh
+
+upgrade-all-dry-run: scripts-perms ## Preview complete system upgrade without making changes
+	@DRY_RUN=1 bash scripts/upgrade_all.sh
 
 check-path: scripts-perms ## Check PATH configuration for package managers
 	@bash -c "source scripts/lib/path_check.sh && check_all_paths"
