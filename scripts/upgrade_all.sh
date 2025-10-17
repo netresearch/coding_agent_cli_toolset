@@ -112,6 +112,19 @@ stage_1_refresh() {
 
 	cd "$PROJECT_ROOT"
 
+	# Check if version data is fresh (updated within last hour)
+	local versions_file="$PROJECT_ROOT/latest_versions.json"
+	local cache_ttl=3600  # 1 hour in seconds
+
+	if [ -f "$versions_file" ]; then
+		local file_age=$(($(date +%s) - $(stat -c %Y "$versions_file" 2>/dev/null || stat -f %m "$versions_file" 2>/dev/null || echo 0)))
+		if [ "$file_age" -lt "$cache_ttl" ]; then
+			local age_minutes=$((file_age / 60))
+			log_skip "Version data is fresh (updated ${age_minutes}m ago, cache: 60m)"
+			return 0
+		fi
+	fi
+
 	if [ "$DRY_RUN" = "1" ]; then
 		log_info "DRY-RUN: make update"
 		log_skip "Version data refresh (dry-run)"
