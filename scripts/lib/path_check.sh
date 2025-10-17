@@ -107,34 +107,55 @@ declare -A PATH_REQUIREMENTS=(
 # Priority order rules: lower number = should come earlier in PATH
 # This ensures language version managers take precedence over system packages
 
+# Check if a tool is properly configured in RC file
+is_configured_in_rc() {
+  local init_cmd="$1"
+  local rc_file
+  rc_file=$(detect_shell_rc)
+
+  # Extract first significant line from init command
+  local first_line
+  first_line=$(echo -e "$init_cmd" | head -1)
+
+  # Check if it's in the RC file
+  grep -qF "${first_line}" "$rc_file" 2>/dev/null
+}
+
 # Check a single PATH requirement
 check_path_requirement() {
   local name="$1"
   local requirement="${PATH_REQUIREMENTS[$name]}"
-  
+
   IFS='|' read -r dir init_cmd description priority <<< "$requirement"
-  
+
   # Expand home directory
   dir="${dir/#\~/$HOME}"
-  
+
   local result=""
   local warning=""
   local fix=""
-  
+
   # Check if directory exists
   if [ ! -d "$dir" ]; then
     result="not_installed"
     return 0
   fi
-  
-  # Check if in PATH
+
+  # Check if already configured in RC file (more reliable than checking current PATH)
+  if is_configured_in_rc "$init_cmd"; then
+    result="ok"
+    echo "$result|$warning|$fix"
+    return 0
+  fi
+
+  # Not in RC file - check if in current PATH (might be manually set)
   if ! path_contains "$dir"; then
     result="missing"
-    warning="⚠️  $description missing from PATH"
+    warning="⚠️  $description not configured in shell RC file"
     fix="add_to_path|$name|$dir|$init_cmd"
   else
     result="ok"
-    
+
     # Check priority ordering (e.g., ~/.local/bin should come before /usr/bin)
     if [ "$name" = "local-bin" ] || [ "$name" = "cargo" ] || [ "$name" = "rbenv-shims" ]; then
       if ! path_order_ok "$dir" "/usr/bin"; then
@@ -144,7 +165,7 @@ check_path_requirement() {
       fi
     fi
   fi
-  
+
   echo "$result|$warning|$fix"
 }
 
