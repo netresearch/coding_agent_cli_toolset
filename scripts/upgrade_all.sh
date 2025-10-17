@@ -166,8 +166,11 @@ stage_2_managers() {
 
 	# Language-specific package managers
 	if command -v pip3 >/dev/null 2>&1; then
+		# Check if pip module is actually available
+		if ! python3 -m pip --version >/dev/null 2>&1; then
+			log_skip "pip (python3 has no pip module)"
 		# Check if in virtualenv - skip --user flag if so
-		if [ -n "${VIRTUAL_ENV:-}" ]; then
+		elif [ -n "${VIRTUAL_ENV:-}" ]; then
 			run_cmd "pip" python3 -m pip install --upgrade pip || log_skip "pip (failed)"
 		else
 			run_cmd "pip" python3 -m pip install --user --upgrade pip || log_skip "pip (failed)"
