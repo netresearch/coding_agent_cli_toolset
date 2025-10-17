@@ -134,6 +134,18 @@ stage_2_managers() {
 		log_skip "brew (not installed)"
 	fi
 
+	if command -v snap >/dev/null 2>&1; then
+		run_cmd "snap" sudo snap refresh || log_skip "snap (failed)"
+	else
+		log_skip "snap (not installed)"
+	fi
+
+	if command -v flatpak >/dev/null 2>&1; then
+		run_cmd "flatpak" flatpak update -y || log_skip "flatpak (failed)"
+	else
+		log_skip "flatpak (not installed)"
+	fi
+
 	# Language-specific package managers
 	if command -v pip3 >/dev/null 2>&1; then
 		run_cmd "pip" python3 -m pip install --user --upgrade pip || log_skip "pip (failed)"
@@ -141,10 +153,42 @@ stage_2_managers() {
 		log_skip "pip (not installed)"
 	fi
 
+	if command -v uv >/dev/null 2>&1; then
+		run_cmd "uv" uv self update || log_skip "uv (failed)"
+	else
+		log_skip "uv (not installed)"
+	fi
+
+	if command -v pipx >/dev/null 2>&1; then
+		run_cmd "pipx" pip3 install --user --upgrade pipx || log_skip "pipx (failed)"
+	else
+		log_skip "pipx (not installed)"
+	fi
+
 	if command -v npm >/dev/null 2>&1; then
 		run_cmd "npm" npm install -g npm@latest || log_skip "npm (failed)"
 	else
 		log_skip "npm (not installed)"
+	fi
+
+	if command -v pnpm >/dev/null 2>&1; then
+		if command -v corepack >/dev/null 2>&1; then
+			run_cmd "pnpm" corepack prepare pnpm@latest --activate || log_skip "pnpm (failed)"
+		else
+			run_cmd "pnpm" npm install -g pnpm@latest || log_skip "pnpm (failed)"
+		fi
+	else
+		log_skip "pnpm (not installed)"
+	fi
+
+	if command -v yarn >/dev/null 2>&1; then
+		if command -v corepack >/dev/null 2>&1; then
+			run_cmd "yarn" corepack prepare yarn@stable --activate || log_skip "yarn (failed)"
+		else
+			run_cmd "yarn" npm install -g yarn@latest || log_skip "yarn (failed)"
+		fi
+	else
+		log_skip "yarn (not installed)"
 	fi
 
 	if command -v cargo >/dev/null 2>&1 && command -v rustup >/dev/null 2>&1; then
@@ -157,6 +201,29 @@ stage_2_managers() {
 		run_cmd "gem" gem update --system || log_skip "gem (failed)"
 	else
 		log_skip "gem (not installed)"
+	fi
+
+	if command -v composer >/dev/null 2>&1; then
+		run_cmd "composer" composer self-update || log_skip "composer (failed)"
+	else
+		log_skip "composer (not installed)"
+	fi
+
+	if command -v poetry >/dev/null 2>&1; then
+		# Try poetry self update first (Poetry 1.2+)
+		if poetry self update --help >/dev/null 2>&1; then
+			run_cmd "poetry" poetry self update || log_skip "poetry (failed)"
+		# Fallback to uv tool upgrade if poetry is managed by uv
+		elif command -v uv >/dev/null 2>&1 && uv tool list 2>/dev/null | grep -q "^poetry"; then
+			run_cmd "poetry" uv tool upgrade poetry || log_skip "poetry (failed)"
+		# Fallback to pipx upgrade if poetry is managed by pipx
+		elif command -v pipx >/dev/null 2>&1 && pipx list 2>/dev/null | grep -q "poetry"; then
+			run_cmd "poetry" pipx upgrade poetry || log_skip "poetry (failed)"
+		else
+			log_skip "poetry (no automatic update method)"
+		fi
+	else
+		log_skip "poetry (not installed)"
 	fi
 }
 
@@ -205,47 +272,41 @@ stage_3_runtimes() {
 }
 
 # ============================================================================
-# Stage 4: Upgrade User Package Managers
+# Stage 4: Upgrade Packages Managed by Package Managers
 # ============================================================================
-stage_4_user_managers() {
-	log_stage 4 5 "Upgrading user package managers..."
+stage_4_user_packages() {
+	log_stage 4 5 "Upgrading packages managed by package managers..."
 
 	cd "$PROJECT_ROOT"
 
-	# UV
+	# UV tools
 	if command -v uv >/dev/null 2>&1; then
-		run_cmd "uv" uv self update || log_skip "uv (upgrade failed)"
+		log_info "Upgrading uv tools..."
+		if [ "$DRY_RUN" = "0" ]; then
+			local tools
+			tools="$(uv tool list 2>/dev/null | awk '{print $1}' || true)"
+			if [ -n "$tools" ]; then
+				local count=$(echo "$tools" | wc -l)
+				log_info "Found $count uv tools to upgrade"
+				while IFS= read -r tool; do
+					[ -z "$tool" ] && continue
+					run_cmd "uv tool: $tool" uv tool upgrade "$tool" || log_skip "uv tool: $tool (failed)"
+				done <<< "$tools"
+			else
+				log_skip "uv (no tools installed)"
+			fi
+		else
+			log_info "DRY-RUN: uv tool upgrade <all-tools>"
+		fi
 	else
 		log_skip "uv (not installed)"
 	fi
 
-	# Pipx
+	# Pipx packages
 	if command -v pipx >/dev/null 2>&1; then
-		run_cmd "pipx" pip3 install --user --upgrade pipx || log_skip "pipx (upgrade failed)"
+		run_cmd "pipx packages" pipx upgrade-all || log_skip "pipx packages (failed)"
 	else
 		log_skip "pipx (not installed)"
-	fi
-
-	# Pnpm
-	if command -v pnpm >/dev/null 2>&1; then
-		if command -v corepack >/dev/null 2>&1; then
-			run_cmd "pnpm" corepack prepare pnpm@latest --activate || log_skip "pnpm (upgrade failed)"
-		else
-			run_cmd "pnpm" npm install -g pnpm@latest || log_skip "pnpm (upgrade failed)"
-		fi
-	else
-		log_skip "pnpm (not installed)"
-	fi
-
-	# Yarn
-	if command -v yarn >/dev/null 2>&1; then
-		if command -v corepack >/dev/null 2>&1; then
-			run_cmd "yarn" corepack prepare yarn@stable --activate || log_skip "yarn (upgrade failed)"
-		else
-			run_cmd "yarn" npm install -g yarn@latest || log_skip "yarn (upgrade failed)"
-		fi
-	else
-		log_skip "yarn (not installed)"
 	fi
 
 	# Cargo install-update
@@ -255,10 +316,24 @@ stage_4_user_managers() {
 		fi
 
 		if command -v cargo-install-update >/dev/null 2>&1; then
-			run_cmd "cargo packages" cargo install-update -a || log_skip "cargo packages (upgrade failed)"
+			run_cmd "cargo packages" cargo install-update -a || log_skip "cargo packages (failed)"
 		fi
 	else
 		log_skip "cargo (not installed)"
+	fi
+
+	# Gem packages
+	if command -v gem >/dev/null 2>&1; then
+		run_cmd "gem packages" gem update || log_skip "gem packages (failed)"
+	else
+		log_skip "gem (not installed)"
+	fi
+
+	# Composer global packages
+	if command -v composer >/dev/null 2>&1; then
+		run_cmd "composer packages" composer global update || log_skip "composer packages (failed)"
+	else
+		log_skip "composer (not installed)"
 	fi
 }
 
@@ -312,7 +387,7 @@ main() {
 	stage_1_refresh || true
 	stage_2_managers || true
 	stage_3_runtimes || true
-	stage_4_user_managers || true
+	stage_4_user_packages || true
 	stage_5_tools || true
 
 	# Summary
