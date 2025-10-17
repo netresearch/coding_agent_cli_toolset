@@ -97,6 +97,12 @@ upgrade-%: scripts-perms ## Upgrade tool (e.g., make upgrade-python)
 uninstall-%: scripts-perms ## Uninstall tool (e.g., make uninstall-python)
 	./scripts/install_$*.sh uninstall
 
+reconcile-pip-to-uv: scripts-perms ## Migrate user pip packages to UV tools
+	@./scripts/reconcile_pip_to_uv.sh
+
+reconcile-pipx-to-uv: scripts-perms ## Migrate pipx tools to UV
+	@./scripts/reconcile_pipx_to_uv.sh
+
 reconcile-%: scripts-perms ## Reconcile tool installation (e.g., make reconcile-node)
 	./scripts/install_$*.sh reconcile
 
