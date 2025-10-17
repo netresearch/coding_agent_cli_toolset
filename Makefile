@@ -12,12 +12,13 @@ export
 	lint lint-code lint-types lint-security format format-check \
 	install install-dev install-core install-python install-node install-go \
 	install-aws install-kubectl install-terraform install-ansible install-docker \
-	install-brew install-rust update-% uninstall-% reconcile-% \
+	install-brew install-rust upgrade-% uninstall-% reconcile-% \
 	build build-dist build-wheel check-dist publish publish-test publish-prod \
 	clean clean-build clean-test clean-pyc clean-all \
-	scripts-perms audit-auto auto-update auto-update-detect auto-update-dry-run \
-	auto-update-system auto-update-user auto-update-project auto-update-all \
-	auto-update-system-only auto-update-skip-system
+	scripts-perms audit-auto detect-managers upgrade-managed upgrade-dry-run \
+	upgrade-managed-system upgrade-managed-user upgrade-project-deps upgrade-managed-all \
+	upgrade-managed-system-only upgrade-managed-skip-system bootstrap init \
+	upgrade-all upgrade-all-dry-run check-path fix-path
 
 # ============================================================================
 # HELP & OVERVIEW
