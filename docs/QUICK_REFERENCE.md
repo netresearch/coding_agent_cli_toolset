@@ -19,6 +19,15 @@ make audit-offline
 # Interactive upgrade guide
 make upgrade
 
+# Complete system upgrade (5 stages: data → managers → runtimes → user managers → tools)
+make upgrade-all
+
+# Preview system upgrade (dry-run)
+make upgrade-all-dry-run
+
+# Check PATH configuration
+make check-path
+
 # Single tool check
 python3 cli_audit.py --only ripgrep | python3 smart_column.py -s "|" -t
 ```

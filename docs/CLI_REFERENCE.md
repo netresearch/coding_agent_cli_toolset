@@ -41,6 +41,11 @@ make update      # Collect data (network required)
 make audit       # Render table (offline)
 make audit-auto  # Update if missing, then render
 
+# System-wide upgrade
+make upgrade-all         # Complete 5-stage system upgrade
+make upgrade-all-dry-run # Preview without making changes
+make check-path          # Validate PATH configuration
+
 # Installation (Makefile)
 make install-core
 make install-python
@@ -253,6 +258,37 @@ make audit-auto
 # Interactive upgrade guide
 make upgrade
 ```
+
+### System-Wide Upgrade
+
+```bash
+# Complete system upgrade (5 stages: data → managers → runtimes → user managers → tools)
+make upgrade-all
+
+# Preview upgrade without making changes (dry-run)
+make upgrade-all-dry-run
+
+# Check PATH configuration before upgrading
+make check-path
+```
+
+**5-Stage Workflow:**
+1. Refresh version data from upstream
+2. Upgrade system package managers (apt, brew, snap, flatpak)
+3. Upgrade language runtimes (Python, Node.js, Go, Ruby, Rust)
+4. Upgrade user package managers (uv, pipx, npm, pnpm, yarn, cargo, composer, poetry)
+5. Upgrade all CLI tools managed by each package manager
+
+**Features:**
+- UV migration (auto-migrates pip/pipx packages to uv tools)
+- System package detection (skips system-managed tools)
+- Comprehensive logging to `logs/upgrade-YYYYMMDD-HHMMSS.log`
+- Colored output with statistics summary
+
+**Environment Variables:**
+- `DRY_RUN=1` - Preview mode
+- `SKIP_SYSTEM=1` - Skip system package managers
+- `VERBOSE=1` - Detailed output
 
 ### Installation Scripts
 

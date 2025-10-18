@@ -69,6 +69,3 @@ help: ## Show complete help with all commands
 include Makefile.d/user.mk
 include Makefile.d/dev.mk
 include Makefile.d/maint.mk
-
-# Shortcuts must be last to act as catch-all
-include Makefile.d/shortcuts.mk

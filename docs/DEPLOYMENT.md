@@ -100,6 +100,103 @@ Interactive remediation guide (renamed from `guide`).
 make upgrade
 ```
 
+### System-Wide Upgrade Targets
+
+#### `make upgrade-all`
+Complete system upgrade in 5 orchestrated stages.
+
+**Workflow:**
+1. **Stage 1: Refresh Data** - Update version snapshot from upstream sources
+2. **Stage 2: Upgrade Package Managers** - Self-update system package managers (apt, brew, snap, flatpak)
+3. **Stage 3: Upgrade Language Runtimes** - Update core runtimes (Python, Node.js, Go, Ruby, Rust)
+4. **Stage 4: Upgrade User Package Managers** - Update language-specific managers (uv, pipx, npm, pnpm, yarn, cargo, composer, poetry)
+5. **Stage 5: Upgrade Tools** - Upgrade all CLI tools managed by each package manager
+
+**Features:**
+- Comprehensive logging to `logs/upgrade-YYYYMMDD-HHMMSS.log`
+- Colored terminal output with progress tracking
+- Version and location info for successful upgrades
+- UV migration support (auto-migrates pip/pipx packages to uv tools)
+- System package detection (skips system-managed tools, suggests reconcile)
+- Statistics summary (upgraded/failed/skipped counts)
+- Dry-run mode available
+
+**Use Case:** Complete development environment upgrade, ensuring all tools across all package managers are current.
+
+**Duration:** 5-15 minutes depending on number of outdated packages.
+
+```bash
+# Full system upgrade
+make upgrade-all
+
+# Preview what would be upgraded (dry-run)
+make upgrade-all-dry-run
+```
+
+**Output Example:**
+```
+[1/5] Stage 1: Refresh version data
+  ✓ Updated snapshot (64 tools checked)
+
+[2/5] Stage 2: Upgrade package managers
+  ✓ apt (upgraded 12 packages)
+  ⏭ homebrew (not installed)
+  ✓ snap (2.63 at /usr/bin/snap)
+
+[3/5] Stage 3: Upgrade language runtimes
+  ✓ python (3.12.7 → 3.12.8)
+  ✓ node (20.10.0 → 20.11.0)
+  ⏭ go (already latest: 1.22.0)
+
+[4/5] Stage 4: Upgrade user package managers
+  ✓ uv (0.4.30 → 0.5.0)
+  ✓ pipx (1.7.1 → 1.8.0)
+  → Migrating pip packages to uv...
+    ✓ black migrated to uv tool
+    ✓ ruff migrated to uv tool
+
+[5/5] Stage 5: Upgrade CLI tools
+  ✓ Upgraded 8 uv tools
+  ✓ Upgraded 15 npm packages
+  ✓ Upgraded 3 cargo binaries
+
+Summary: 45 upgraded, 12 skipped, 2 failed
+Duration: 8m 32s
+Log: logs/upgrade-20251018-073045.log
+```
+
+**Environment Variables:**
+- `DRY_RUN=1` - Preview mode without making changes
+- `SKIP_SYSTEM=1` - Skip system package managers (apt, brew, snap, flatpak)
+- `VERBOSE=1` - Detailed output for debugging
+
+**Advanced:**
+```bash
+# Direct script execution with options
+DRY_RUN=1 VERBOSE=1 bash scripts/upgrade_all.sh
+
+# Skip system package managers
+SKIP_SYSTEM=1 make upgrade-all
+
+# Check PATH configuration before upgrading
+make check-path
+```
+
+#### `make check-path`
+Validate PATH configuration for all package managers.
+
+**Behavior:**
+- Checks if package manager binaries are in PATH
+- Validates PATH ordering (user bins before system bins)
+- Identifies potential shadowing issues
+- Provides remediation suggestions
+
+**Use Case:** Diagnose PATH issues before or after system upgrade.
+
+```bash
+make check-path
+```
+
 ### Tool-Specific Audit Targets
 
 #### `make audit-TOOLNAME`

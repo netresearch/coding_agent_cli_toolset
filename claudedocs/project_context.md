@@ -1,16 +1,18 @@
 # AI CLI Preparation - Project Context (AI Agent Reference)
 
-**Last Updated:** 2025-10-13
+**Last Updated:** 2025-10-18
+**Version:** 2.0.0-alpha.6
 **For:** AI Coding Agents (Claude Code, etc.)
 
 ## Quick Reference
 
-**Purpose:** Environment audit tool ensuring AI coding agents have all necessary CLI tools installed and current
+**Purpose:** Environment audit and tool management system ensuring AI coding agents have all necessary CLI tools installed, current, and properly configured
 
 **Repository:** github.com/netresearch/coding_agent_cli_toolset
 **Primary Language:** Python 3.9+ (dev: 3.14.0rc2)
-**Architecture:** Offline-first, parallel, resilient tool version auditing
-**Tool Coverage:** 64 tools across 10 categories (50+ production, rest in development)
+**Architecture:** Offline-first, parallel, resilient tool version auditing with comprehensive upgrade orchestration
+**Tool Coverage:** 64 tools across 10 categories
+**Phase Status:** Phase 1 (Audit) Complete | Phase 2 (Install/Upgrade) Alpha
 
 ## Core Capabilities
 
@@ -121,8 +123,37 @@ make update
 # Interactive upgrade guide
 make upgrade
 
+# Complete system upgrade (5 stages)
+make upgrade-all
+
+# Preview system upgrade (dry-run)
+make upgrade-all-dry-run
+
 # Offline audit with hints
 make audit-offline
+```
+
+### System-Wide Upgrade (New in alpha.6)
+```bash
+# 5-Stage orchestrated upgrade workflow
+make upgrade-all
+# Stage 1: Refresh version data
+# Stage 2: Upgrade package managers (apt, brew, snap, flatpak)
+# Stage 3: Upgrade runtimes (Python, Node.js, Go, Ruby, Rust)
+# Stage 4: Upgrade user package managers (uv, pipx, npm, pnpm, yarn, cargo, etc.)
+# Stage 5: Upgrade all CLI tools
+
+# Features:
+# - UV migration (auto-migrates pip/pipx to uv tools)
+# - System package detection (skips apt/brew managed)
+# - Comprehensive logging (logs/upgrade-YYYYMMDD-HHMMSS.log)
+# - Dry-run mode available
+
+# Preview without making changes
+make upgrade-all-dry-run
+
+# Check PATH configuration
+make check-path
 ```
 
 ### Role-Based Audits
@@ -213,20 +244,25 @@ CLI_AUDIT_TRACE=1 python3 cli_audit.py
 
 ## Current Git State
 
-**Branch:** main (12 commits ahead of origin/main)
-**Working Tree:** Clean
-**Modified:** .env (GITHUB_TOKEN + CLI_AUDIT_MAX_WORKERS=40), tools_snapshot.json
+**Branch:** main
+**Working Tree:** Modified (documentation updates in progress)
+**Modified:** latest_versions.json, package.json, package-lock.json, tools_snapshot.json, docs/
 **Untracked:** node_modules/
 **Remote:** git@github.com:netresearch/coding_agent_cli_toolset.git
 
-**Recent commits (2025-10-13):**
+**Recent commits (2025-10-18 - upgrade-all feature):**
+- 9b784ed - chore: update version snapshots
+- 22c1603 - feat(upgrade-all): add UV migration for pip/pipx packages
+- 1b71b71 - feat(upgrade-all): skip pip/pipx when uv is managing Python packages
+- cceed18 - fix(upgrade-all): detect pipx packages with missing metadata and provide fix
+- 7d691cb - feat(upgrade-all): add comprehensive version and location info to all upgrade stages
+
+**Recent commits (2025-10-13 - environment fixes):**
 - 34fa37f - chore(snapshot): update tool audit cache with improved detection
 - 80abd30 - fix(guide): clarify Docker CLI vs Docker Engine terminology
 - aa57210 - fix(cli_audit): resolve three critical issues in environment and detection
-- d092236 - feat(docker): detect client version explicitly, not server
-- 2237226 - fix(cli_audit): resolve three issues in make update
 
-**Recent commits (2025-10-09):**
+**Recent commits (2025-10-09 - documentation):**
 - 0c7ade3 - Snapshot-based collect/render modes
 - 3dd5082 - Lock ordering fixes (thread safety)
 - c160361 - Classification improvements (shebang detection)
