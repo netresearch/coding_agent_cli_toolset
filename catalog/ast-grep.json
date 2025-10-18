@@ -5,7 +5,7 @@
   "homepage": "https://github.com/ast-grep/ast-grep",
   "github_repo": "ast-grep/ast-grep",
   "binary_name": "ast-grep",
-  "download_url_template": "https://github.com/ast-grep/ast-grep/releases/download/{version}/ast-grep-{arch}-unknown-linux-gnu.zip",
+  "download_url_template": "https://github.com/ast-grep/ast-grep/releases/download/{version}/app-{arch}-unknown-linux-gnu.zip",
   "arch_map": {
     "x86_64": "x86_64",
     "aarch64": "aarch64",

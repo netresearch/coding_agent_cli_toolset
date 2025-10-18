@@ -5,6 +5,7 @@ set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$DIR/lib/common.sh"
+. "$DIR/lib/install_strategy.sh"
 
 TOOL="${1:-}"
 if [ -z "$TOOL" ]; then
@@ -36,6 +37,9 @@ if command -v "$BINARY_NAME" >/dev/null 2>&1; then
     printf "[%s] after:  %s\n" "$TOOL" "${after:-<none>}"
     if [ -n "$path" ]; then printf "[%s] path:   %s\n" "$TOOL" "$path"; fi
     printf "[%s] note:   %s\n" "$TOOL" "Already available (bundled with runtime)"
+
+    # Refresh snapshot to record current version
+    refresh_snapshot "$TOOL"
     exit 0
   fi
 fi
@@ -44,7 +48,7 @@ fi
 installed=false
 
 if have brew; then
-  pkg="$(echo "$PACKAGES" | jq -r '.brew // .name' "$CATALOG_FILE")"
+  pkg="$(echo "$PACKAGES" | jq -r '.brew // empty')"
   if [ "$pkg" != "null" ] && [ -n "$pkg" ]; then
     brew install "$pkg" || brew upgrade "$pkg" || true
     installed=true
@@ -52,7 +56,7 @@ if have brew; then
 fi
 
 if ! $installed && have apt-get; then
-  pkg="$(echo "$PACKAGES" | jq -r '.apt // .name' "$CATALOG_FILE")"
+  pkg="$(echo "$PACKAGES" | jq -r '.apt // empty')"
   if [ "$pkg" != "null" ] && [ -n "$pkg" ]; then
     sudo apt-get update && sudo apt-get install -y "$pkg" || true
     installed=true
@@ -60,7 +64,7 @@ if ! $installed && have apt-get; then
 fi
 
 if ! $installed && have dnf; then
-  pkg="$(echo "$PACKAGES" | jq -r '.dnf // .rpm // .name' "$CATALOG_FILE")"
+  pkg="$(echo "$PACKAGES" | jq -r '.dnf // .rpm // empty')"
   if [ "$pkg" != "null" ] && [ -n "$pkg" ]; then
     sudo dnf install -y "$pkg" || true
     installed=true
@@ -68,7 +72,7 @@ if ! $installed && have dnf; then
 fi
 
 if ! $installed && have pacman; then
-  pkg="$(echo "$PACKAGES" | jq -r '.pacman // .arch // .name' "$CATALOG_FILE")"
+  pkg="$(echo "$PACKAGES" | jq -r '.pacman // .arch // empty')"
   if [ "$pkg" != "null" ] && [ -n "$pkg" ]; then
     sudo pacman -S --noconfirm "$pkg" || true
     installed=true
@@ -86,3 +90,8 @@ path="$(command -v "$BINARY_NAME" 2>/dev/null || true)"
 printf "[%s] before: %s\n" "$TOOL" "${before:-<none>}"
 printf "[%s] after:  %s\n" "$TOOL" "${after:-<none>}"
 if [ -n "$path" ]; then printf "[%s] path:   %s\n" "$TOOL" "$path"; fi
+
+# Refresh snapshot after successful installation
+# Need to source install_strategy.sh for refresh_snapshot function
+. "$(dirname "${BASH_SOURCE[0]}")/../lib/install_strategy.sh"
+refresh_snapshot "$TOOL"

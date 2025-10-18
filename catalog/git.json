@@ -1,9 +1,14 @@
 {
   "name": "git",
-  "install_method": "dedicated_script",
+  "install_method": "package_manager",
   "description": "Distributed version control system",
   "homepage": "https://git-scm.com",
   "binary_name": "git",
-  "script": "install_core.sh",
-  "notes": "Requires PPA and optional source build"
+  "packages": {
+    "apt": "git",
+    "brew": "git",
+    "dnf": "git",
+    "pacman": "git"
+  },
+  "notes": "For latest version on Ubuntu, use PPA: add-apt-repository ppa:git-core/ppa"
 }

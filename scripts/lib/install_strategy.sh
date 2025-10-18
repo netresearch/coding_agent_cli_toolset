@@ -59,3 +59,35 @@ get_install_cmd() {
     RM="rm -f"
   fi
 }
+
+# Refresh snapshot for a specific tool after installation
+# Usage: refresh_snapshot TOOL_NAME
+# Updates tools_snapshot.json with latest version of installed tool
+refresh_snapshot() {
+  local tool_name="${1:-}"
+
+  if [ -z "$tool_name" ]; then
+    echo "# Warning: No tool name provided to refresh_snapshot" >&2
+    return 1
+  fi
+
+  # Path to project root (scripts/lib -> scripts -> root)
+  local project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+  local audit_script="$project_root/cli_audit.py"
+
+  if [ ! -f "$audit_script" ]; then
+    echo "# Warning: cli_audit.py not found at $audit_script" >&2
+    return 1
+  fi
+
+  echo "# Refreshing snapshot for $tool_name..." >&2
+
+  # Run audit in merge mode for this specific tool
+  CLI_AUDIT_COLLECT=1 CLI_AUDIT_MERGE=1 python3 "$audit_script" --only "$tool_name" >/dev/null 2>&1 || {
+    echo "# Warning: Failed to refresh snapshot for $tool_name" >&2
+    return 1
+  }
+
+  echo "# ✓ Snapshot updated for $tool_name" >&2
+  return 0
+}

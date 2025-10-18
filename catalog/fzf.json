@@ -5,7 +5,7 @@
   "homepage": "https://github.com/junegunn/fzf",
   "github_repo": "junegunn/fzf",
   "binary_name": "fzf",
-  "download_url_template": "https://github.com/junegunn/fzf/releases/download/{version}/fzf-{version}-linux_{arch}.tar.gz",
+  "download_url_template": "https://github.com/junegunn/fzf/releases/download/{version}/fzf-{version_nov}-linux_{arch}.tar.gz",
   "arch_map": {
     "x86_64": "amd64",
     "aarch64": "arm64",
