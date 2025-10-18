@@ -25,12 +25,15 @@ VERSION_URL="$(jq -r '.version_url // empty' "$CATALOG_FILE")"
 DOWNLOAD_URL_TEMPLATE="$(jq -r '.download_url_template' "$CATALOG_FILE")"
 FALLBACK_URL_TEMPLATE="$(jq -r '.fallback_url_template // empty' "$CATALOG_FILE")"
 GITHUB_REPO="$(jq -r '.github_repo // empty' "$CATALOG_FILE")"
+PRESERVE_DIR="$(jq -r '.preserve_directory // empty' "$CATALOG_FILE")"
 
 # Get current version (try multiple version command formats)
-before="$(command -v "$BINARY_NAME" >/dev/null 2>&1 && \
-  ("$BINARY_NAME" --version 2>/dev/null || \
-   "$BINARY_NAME" version --client 2>/dev/null | head -1 || \
-   "$BINARY_NAME" version 2>/dev/null | head -1 || true))"
+before=""
+if command -v "$BINARY_NAME" >/dev/null 2>&1; then
+  before="$("$BINARY_NAME" --version 2>/dev/null || \
+           "$BINARY_NAME" version --client 2>/dev/null | head -1 || \
+           "$BINARY_NAME" version 2>/dev/null | head -1 || true)"
+fi
 
 # Detect OS and architecture
 OS="linux"
@@ -65,10 +68,23 @@ if [ -z "$LATEST" ]; then
   exit 1
 fi
 
+# Normalize version: strip tool name prefix if present
+# Some projects tag releases as "toolname-version" (e.g., jq-1.8.1)
+# but their download URLs expect just the version number
+# Example: jq tags as "jq-1.8.1" but URL is "...jq-{version}/..." where version=1.8.1
+if [[ "$LATEST" == "${BINARY_NAME}-"* ]]; then
+  LATEST="${LATEST#${BINARY_NAME}-}"
+fi
+
 # Build download URL
+# Support {version_nov} for version without 'v' prefix
+# Support {arch_suffix} for tools like ninja that use empty suffix for x86_64
+LATEST_NOV="${LATEST#v}"
 DOWNLOAD_URL="${DOWNLOAD_URL_TEMPLATE//\{version\}/$LATEST}"
+DOWNLOAD_URL="${DOWNLOAD_URL//\{version_nov\}/$LATEST_NOV}"
 DOWNLOAD_URL="${DOWNLOAD_URL//\{os\}/$OS}"
 DOWNLOAD_URL="${DOWNLOAD_URL//\{arch\}/$ARCH}"
+DOWNLOAD_URL="${DOWNLOAD_URL//\{arch_suffix\}/$ARCH}"
 
 # Download with retry and fallback
 tmpfile="/tmp/$BINARY_NAME.$$"
@@ -93,24 +109,128 @@ if ! [ -s "$tmpfile" ]; then
   exit 1
 fi
 
-# Clean up alternative installations (cargo, apt, brew) before installing
-if [ -f "$HOME/.cargo/bin/$BINARY_NAME" ]; then
-  echo "[$TOOL] Removing cargo-installed version at ~/.cargo/bin/$BINARY_NAME" >&2
-  rm -f "$HOME/.cargo/bin/$BINARY_NAME"
+# Extract if archive, otherwise use directly
+BINARY_PATH="$tmpfile"
+EXTRACT_DIR=""
+
+if [[ "$DOWNLOAD_URL" == *.tar.gz ]] || [[ "$DOWNLOAD_URL" == *.tgz ]]; then
+  # Extract tar.gz
+  EXTRACT_DIR="/tmp/${BINARY_NAME}-extract.$$"
+  mkdir -p "$EXTRACT_DIR"
+
+  if ! tar -xzf "$tmpfile" -C "$EXTRACT_DIR" 2>/dev/null; then
+    echo "[$TOOL] Error: Failed to extract tar.gz archive" >&2
+    rm -rf "$tmpfile" "$EXTRACT_DIR"
+    exit 1
+  fi
+
+  # Find the binary in extracted files
+  BINARY_PATH="$(find "$EXTRACT_DIR" -type f -name "$BINARY_NAME" -executable 2>/dev/null | head -1)"
+
+  if [ -z "$BINARY_PATH" ] || [ ! -f "$BINARY_PATH" ]; then
+    # Try without executable check (some archives don't preserve execute bit)
+    BINARY_PATH="$(find "$EXTRACT_DIR" -type f -name "$BINARY_NAME" 2>/dev/null | head -1)"
+  fi
+
+  if [ -z "$BINARY_PATH" ] || [ ! -f "$BINARY_PATH" ]; then
+    echo "[$TOOL] Error: Binary '$BINARY_NAME' not found in archive" >&2
+    echo "[$TOOL] Archive contents:" >&2
+    find "$EXTRACT_DIR" -type f 2>/dev/null | head -10 >&2
+    rm -rf "$tmpfile" "$EXTRACT_DIR"
+    exit 1
+  fi
+
+  rm -f "$tmpfile"
+elif [[ "$DOWNLOAD_URL" == *.tar.xz ]]; then
+  # Extract tar.xz
+  EXTRACT_DIR="/tmp/${BINARY_NAME}-extract.$$"
+  mkdir -p "$EXTRACT_DIR"
+
+  if ! tar -xJf "$tmpfile" -C "$EXTRACT_DIR" 2>/dev/null; then
+    echo "[$TOOL] Error: Failed to extract tar.xz archive" >&2
+    rm -rf "$tmpfile" "$EXTRACT_DIR"
+    exit 1
+  fi
+
+  # Find the binary in extracted files
+  BINARY_PATH="$(find "$EXTRACT_DIR" -type f -name "$BINARY_NAME" -executable 2>/dev/null | head -1)"
+
+  if [ -z "$BINARY_PATH" ] || [ ! -f "$BINARY_PATH" ]; then
+    # Try without executable check (some archives don't preserve execute bit)
+    BINARY_PATH="$(find "$EXTRACT_DIR" -type f -name "$BINARY_NAME" 2>/dev/null | head -1)"
+  fi
+
+  if [ -z "$BINARY_PATH" ] || [ ! -f "$BINARY_PATH" ]; then
+    echo "[$TOOL] Error: Binary '$BINARY_NAME' not found in archive" >&2
+    echo "[$TOOL] Archive contents:" >&2
+    find "$EXTRACT_DIR" -type f 2>/dev/null | head -10 >&2
+    rm -rf "$tmpfile" "$EXTRACT_DIR"
+    exit 1
+  fi
+
+  rm -f "$tmpfile"
+elif [[ "$DOWNLOAD_URL" == *.zip ]]; then
+  # Extract zip
+  EXTRACT_DIR="/tmp/${BINARY_NAME}-extract.$$"
+  mkdir -p "$EXTRACT_DIR"
+
+  if ! unzip -q "$tmpfile" -d "$EXTRACT_DIR" 2>/dev/null; then
+    echo "[$TOOL] Error: Failed to extract zip archive" >&2
+    rm -rf "$tmpfile" "$EXTRACT_DIR"
+    exit 1
+  fi
+
+  # Find the binary in extracted files
+  BINARY_PATH="$(find "$EXTRACT_DIR" -type f -name "$BINARY_NAME" -executable 2>/dev/null | head -1)"
+
+  if [ -z "$BINARY_PATH" ] || [ ! -f "$BINARY_PATH" ]; then
+    BINARY_PATH="$(find "$EXTRACT_DIR" -type f -name "$BINARY_NAME" 2>/dev/null | head -1)"
+  fi
+
+  if [ -z "$BINARY_PATH" ] || [ ! -f "$BINARY_PATH" ]; then
+    echo "[$TOOL] Error: Binary '$BINARY_NAME' not found in archive" >&2
+    echo "[$TOOL] Archive contents:" >&2
+    find "$EXTRACT_DIR" -type f 2>/dev/null | head -10 >&2
+    rm -rf "$tmpfile" "$EXTRACT_DIR"
+    exit 1
+  fi
+
+  rm -f "$tmpfile"
 fi
 
-# Check if apt-installed and suggest removal
-if command -v dpkg >/dev/null 2>&1 && dpkg -S "/usr/bin/$BINARY_NAME" >/dev/null 2>&1; then
-  PKG="$(dpkg -S "/usr/bin/$BINARY_NAME" | cut -d: -f1)"
-  echo "[$TOOL] Note: apt-installed version found in package '$PKG'" >&2
-  echo "[$TOOL] Removing apt package to prevent conflicts..." >&2
-  apt_remove_if_present "$PKG" || true
-fi
+# Note: We intentionally do NOT remove existing installations from apt/brew/cargo
+# The new version in ~/.local/bin will take precedence via PATH ordering
+# This allows:
+# - No sudo password prompts
+# - No disruption to package manager state
+# - Clean fallback if ~/.local/bin version is removed
+# - System packages can still satisfy dependencies for other tools
 
 # Install
-chmod +x "$tmpfile"
-$INSTALL -T "$tmpfile" "$BIN_DIR/$BINARY_NAME"
+if [ -n "$PRESERVE_DIR" ] && [ -n "$EXTRACT_DIR" ]; then
+  # Tool requires full directory structure (e.g., GAM with bundled Python)
+  LIB_DIR="$(dirname "$BIN_DIR")/lib"
+  mkdir -p "$LIB_DIR"
+
+  # Remove old installation
+  rm -rf "$LIB_DIR/$PRESERVE_DIR"
+
+  # Move entire directory to ~/.local/lib
+  mv "$EXTRACT_DIR/$PRESERVE_DIR" "$LIB_DIR/"
+
+  # Create symlink in bin directory
+  ln -sf "$LIB_DIR/$PRESERVE_DIR/$BINARY_NAME" "$BIN_DIR/$BINARY_NAME"
+else
+  # Standard binary installation
+  chmod +x "$BINARY_PATH"
+  $INSTALL -T "$BINARY_PATH" "$BIN_DIR/$BINARY_NAME"
+fi
+
+# Cleanup
 rm -f "$tmpfile"
+if [ -n "$EXTRACT_DIR" ] && [ -d "$EXTRACT_DIR" ]; then
+  rm -rf "$EXTRACT_DIR"
+fi
 
 # Report
 after="$(command -v "$BINARY_NAME" >/dev/null 2>&1 && \
@@ -121,3 +241,6 @@ path="$(command -v "$BINARY_NAME" 2>/dev/null || true)"
 printf "[%s] before: %s\n" "$TOOL" "${before:-<none>}"
 printf "[%s] after:  %s\n" "$TOOL" "${after:-<none>}"
 if [ -n "$path" ]; then printf "[%s] path:   %s\n" "$TOOL" "$path"; fi
+
+# Refresh snapshot after successful installation
+refresh_snapshot "$TOOL"

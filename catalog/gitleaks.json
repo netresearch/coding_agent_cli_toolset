@@ -5,7 +5,7 @@
   "homepage": "https://github.com/gitleaks/gitleaks",
   "github_repo": "gitleaks/gitleaks",
   "binary_name": "gitleaks",
-  "download_url_template": "https://github.com/gitleaks/gitleaks/releases/download/{version}/gitleaks_{version}_linux_{arch}.tar.gz",
+  "download_url_template": "https://github.com/gitleaks/gitleaks/releases/download/{version}/gitleaks_{version_nov}_linux_{arch}.tar.gz",
   "arch_map": {
     "x86_64": "x64",
     "aarch64": "arm64",

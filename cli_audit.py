@@ -94,6 +94,7 @@ STREAM_OUTPUT: bool = os.environ.get("CLI_AUDIT_STREAM", "0") == "1"
 # Snapshot / mode toggles (decouple collection from rendering)
 COLLECT_ONLY: bool = os.environ.get("CLI_AUDIT_COLLECT", "0") == "1"
 RENDER_ONLY: bool = os.environ.get("CLI_AUDIT_RENDER", "0") == "1"
+MERGE_MODE: bool = os.environ.get("CLI_AUDIT_MERGE", "0") == "1"
 SNAPSHOT_FILE: str = os.environ.get(
     "CLI_AUDIT_SNAPSHOT_FILE",
     os.path.join(os.path.dirname(__file__), "tools_snapshot.json"),
@@ -169,6 +170,44 @@ def load_snapshot(paths: Sequence[str] | None = None) -> dict[str, Any]:
     return {}
 
 def write_snapshot(tools_payload: list[dict[str, Any]], extra: dict[str, Any] | None = None) -> dict[str, Any]:
+    # In MERGE_MODE, load existing snapshot and update only the specified tools
+    if MERGE_MODE:
+        try:
+            with open(SNAPSHOT_FILE, "r", encoding="utf-8") as f:
+                existing = json.load(f)
+            existing_tools = existing.get("tools", [])
+
+            # Create a dict of new tools keyed by tool name
+            new_tools_dict = {t["tool"]: t for t in tools_payload}
+
+            # Update existing tools or keep them as-is
+            merged_tools = []
+            updated_names = set()
+            for tool in existing_tools:
+                tool_name = tool.get("tool")
+                if tool_name in new_tools_dict:
+                    # Replace with updated entry
+                    merged_tools.append(new_tools_dict[tool_name])
+                    updated_names.add(tool_name)
+                else:
+                    # Keep existing entry
+                    merged_tools.append(tool)
+
+            # Add any new tools that weren't in the existing snapshot
+            for tool_name, tool_data in new_tools_dict.items():
+                if tool_name not in updated_names:
+                    merged_tools.append(tool_data)
+
+            tools_payload = merged_tools
+        except FileNotFoundError:
+            # No existing snapshot, proceed with new payload
+            pass
+        except Exception as e:
+            if AUDIT_DEBUG:
+                print(f"# DEBUG: Merge mode failed to load existing snapshot: {e}", file=sys.stderr)
+            # Proceed with new payload on error
+            pass
+
     meta = {
         "schema_version": 1,
         "created_at": _now_iso(),
@@ -2987,11 +3026,16 @@ def main() -> int:
                     "latest_url": latest_url,
                 })
             # Always show completion message (not just when PROGRESS=1)
-            print(f"# Writing snapshot to {SNAPSHOT_FILE}...", file=sys.stderr)
+            action = "Merging" if MERGE_MODE else "Writing"
+            print(f"# {action} snapshot to {SNAPSHOT_FILE}...", file=sys.stderr)
             meta = write_snapshot(payload)
             try:
                 count = meta.get('count', len(payload))
-                print(f"# ✓ Snapshot saved: {count} tools audited", file=sys.stderr)
+                audited_count = len(payload)
+                if MERGE_MODE:
+                    print(f"# ✓ Snapshot merged: {audited_count} tools updated, {count} total", file=sys.stderr)
+                else:
+                    print(f"# ✓ Snapshot saved: {count} tools audited", file=sys.stderr)
                 print(f"# Run 'make audit' to view results", file=sys.stderr)
             except Exception:
                 print(f"# ✓ Snapshot saved to {SNAPSHOT_FILE}", file=sys.stderr)

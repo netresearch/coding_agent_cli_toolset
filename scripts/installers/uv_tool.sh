@@ -37,3 +37,8 @@ path="$(command -v "$TOOL" 2>/dev/null || true)"
 printf "[%s] before: %s\n" "$TOOL" "${before:-<none>}"
 printf "[%s] after:  %s\n" "$TOOL" "${after:-<none>}"
 if [ -n "$path" ]; then printf "[%s] path:   %s\n" "$TOOL" "$path"; fi
+
+# Refresh snapshot after successful installation
+# Source install_strategy.sh for refresh_snapshot function
+. "$(dirname "${BASH_SOURCE[0]}")/../lib/install_strategy.sh"
+refresh_snapshot "$TOOL"

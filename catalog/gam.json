@@ -1,9 +1,9 @@
 {
   "name": "gam",
-  "install_method": "dedicated_script",
+  "install_method": "uv_tool",
   "description": "Google Workspace admin management tool",
   "homepage": "https://github.com/GAM-team/GAM",
+  "github_repo": "GAM-team/GAM",
   "binary_name": "gam",
-  "script": "install_core.sh",
-  "notes": "Multi-directory installation with dependencies"
+  "package_name": "gam7"
 }

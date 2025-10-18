@@ -5,9 +5,10 @@
   "homepage": "https://github.com/tummychow/git-absorb",
   "github_repo": "tummychow/git-absorb",
   "binary_name": "git-absorb",
-  "download_url_template": "https://github.com/tummychow/git-absorb/releases/download/{version_nov}/git-absorb-{version_nov}-x86_64-unknown-linux-musl.tar.gz",
+  "download_url_template": "https://github.com/tummychow/git-absorb/releases/download/{version_nov}/git-absorb-{version_nov}-{arch}-unknown-linux-musl.tar.gz",
   "arch_map": {
-    "x86_64": "x86_64-unknown-linux-musl"
+    "x86_64": "x86_64",
+    "armv7l": "arm"
   },
   "notes": "Only x86_64 builds available; arm builds use different target triple"
 }
