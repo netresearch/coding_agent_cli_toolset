@@ -37,3 +37,7 @@ node_modules/
 
 # AI agent session context (not committed)
 claudedocs/
+
+# Runtime directories
+config/
+logs/
