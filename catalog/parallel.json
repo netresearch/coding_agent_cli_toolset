@@ -1,7 +1,14 @@
 {
   "name": "parallel",
-  "install_method": "script",
+  "install_method": "package_manager",
   "description": "GNU Parallel - shell tool for executing jobs in parallel",
   "homepage": "https://www.gnu.org/software/parallel/",
-  "notes": "GNU Parallel is installed from GNU FTP server, not GitHub releases. Requires custom installation script."
+  "binary_name": "parallel",
+  "packages": {
+    "apt": "parallel",
+    "brew": "parallel",
+    "dnf": "parallel",
+    "pacman": "parallel"
+  },
+  "notes": "GNU Parallel available via system package managers"
 }
