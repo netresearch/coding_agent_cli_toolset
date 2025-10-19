@@ -10,5 +10,5 @@
     "dnf": "parallel",
     "pacman": "parallel"
   },
-  "notes": "GNU Parallel available via system package managers"
+  "notes": "Installed via package manager. Note: System packages are typically 1-2 years behind upstream releases. For the latest version, install from https://www.gnu.org/software/parallel/"
 }
