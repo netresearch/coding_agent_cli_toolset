@@ -3,5 +3,7 @@
   "install_method": "uv_tool",
   "description": "CLI tool for generating and managing code documentation",
   "homepage": "https://github.com/codex-cli/codex",
-  "package_name": "codex"
+  "package_name": "codex",
+  "python_version": "3.13",
+  "notes": "Requires Python 3.13 or earlier due to pkgutil.get_loader() removal in Python 3.14"
 }
