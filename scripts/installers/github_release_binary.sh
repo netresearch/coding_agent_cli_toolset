@@ -30,9 +30,9 @@ PRESERVE_DIR="$(jq -r '.preserve_directory // empty' "$CATALOG_FILE")"
 # Get current version (try multiple version command formats)
 before=""
 if command -v "$BINARY_NAME" >/dev/null 2>&1; then
-  before="$("$BINARY_NAME" --version 2>/dev/null || \
-           "$BINARY_NAME" version --client 2>/dev/null | head -1 || \
-           "$BINARY_NAME" version 2>/dev/null | head -1 || true)"
+  before="$(timeout 2 "$BINARY_NAME" --version </dev/null 2>/dev/null || \
+           timeout 2 "$BINARY_NAME" version --client </dev/null 2>/dev/null | head -1 || \
+           timeout 2 "$BINARY_NAME" version </dev/null 2>/dev/null | head -1 || true)"
 fi
 
 # Detect OS and architecture
@@ -234,9 +234,9 @@ fi
 
 # Report
 after="$(command -v "$BINARY_NAME" >/dev/null 2>&1 && \
-  ("$BINARY_NAME" --version 2>/dev/null || \
-   "$BINARY_NAME" version --client 2>/dev/null | head -1 || \
-   "$BINARY_NAME" version 2>/dev/null | head -1 || true))"
+  (timeout 2 "$BINARY_NAME" --version </dev/null 2>/dev/null || \
+   timeout 2 "$BINARY_NAME" version --client </dev/null 2>/dev/null | head -1 || \
+   timeout 2 "$BINARY_NAME" version </dev/null 2>/dev/null | head -1 || true))"
 path="$(command -v "$BINARY_NAME" 2>/dev/null || true)"
 printf "[%s] before: %s\n" "$TOOL" "${before:-<none>}"
 printf "[%s] after:  %s\n" "$TOOL" "${after:-<none>}"

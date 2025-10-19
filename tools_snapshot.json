@@ -1,7 +1,7 @@
 {
   "__meta__": {
     "count": 70,
-    "created_at": "2025-10-18T19:18:54Z",
+    "created_at": "2025-10-19T09:37:16Z",
     "offline": false,
     "partial_failures": 0,
     "schema_version": 1
@@ -369,15 +369,15 @@
     },
     {
       "category": "editors",
-      "classification_reason_selected": "",
-      "installed": "",
-      "installed_method": "",
-      "installed_path_selected": "",
-      "installed_version": "",
+      "classification_reason_selected": "dpkg-query",
+      "installed": "0.69",
+      "installed_method": "apt/dpkg",
+      "installed_path_selected": "/usr/bin/sponge",
+      "installed_version": "0.69",
       "latest_upstream": "",
       "latest_url": "",
       "latest_version": "",
-      "status": "NOT INSTALLED",
+      "status": "UNKNOWN",
       "tool": "sponge",
       "tool_url": "",
       "upstream_method": ""

@@ -25,7 +25,7 @@ PACKAGES="$(jq -r '.packages // {}' "$CATALOG_FILE")"
 NOTES="$(jq -r '.notes // empty' "$CATALOG_FILE")"
 
 # Get current version
-before="$(command -v "$BINARY_NAME" >/dev/null 2>&1 && "$BINARY_NAME" --version 2>/dev/null | head -1 || true)"
+before="$(command -v "$BINARY_NAME" >/dev/null 2>&1 && timeout 2 "$BINARY_NAME" --version </dev/null 2>/dev/null | head -1 || true)"
 
 # Check if tool is already available (e.g., comes with runtime)
 if command -v "$BINARY_NAME" >/dev/null 2>&1; then
@@ -85,7 +85,7 @@ if ! $installed; then
 fi
 
 # Report
-after="$(command -v "$BINARY_NAME" >/dev/null 2>&1 && "$BINARY_NAME" --version 2>/dev/null | head -1 || true)"
+after="$(command -v "$BINARY_NAME" >/dev/null 2>&1 && timeout 2 "$BINARY_NAME" --version </dev/null 2>/dev/null | head -1 || true)"
 path="$(command -v "$BINARY_NAME" 2>/dev/null || true)"
 printf "[%s] before: %s\n" "$TOOL" "${before:-<none>}"
 printf "[%s] after:  %s\n" "$TOOL" "${after:-<none>}"
