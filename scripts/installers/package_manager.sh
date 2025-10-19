@@ -23,9 +23,16 @@ fi
 BINARY_NAME="$(jq -r '.binary_name // .name' "$CATALOG_FILE")"
 PACKAGES="$(jq -r '.packages // {}' "$CATALOG_FILE")"
 NOTES="$(jq -r '.notes // empty' "$CATALOG_FILE")"
+VERSION_CMD="$(jq -r '.version_command // empty' "$CATALOG_FILE")"
 
 # Get current version
-before="$(command -v "$BINARY_NAME" >/dev/null 2>&1 && timeout 2 "$BINARY_NAME" --version </dev/null 2>/dev/null | head -1 || true)"
+if [ -n "$VERSION_CMD" ]; then
+  # Use custom version command if specified
+  before="$(eval "$VERSION_CMD" 2>/dev/null || true)"
+else
+  # Default version detection
+  before="$(command -v "$BINARY_NAME" >/dev/null 2>&1 && timeout 2 "$BINARY_NAME" --version </dev/null 2>/dev/null | head -1 || true)"
+fi
 
 # Check if tool is already available (e.g., comes with runtime)
 if command -v "$BINARY_NAME" >/dev/null 2>&1; then
@@ -85,7 +92,13 @@ if ! $installed; then
 fi
 
 # Report
-after="$(command -v "$BINARY_NAME" >/dev/null 2>&1 && timeout 2 "$BINARY_NAME" --version </dev/null 2>/dev/null | head -1 || true)"
+if [ -n "$VERSION_CMD" ]; then
+  # Use custom version command if specified
+  after="$(eval "$VERSION_CMD" 2>/dev/null || true)"
+else
+  # Default version detection
+  after="$(command -v "$BINARY_NAME" >/dev/null 2>&1 && timeout 2 "$BINARY_NAME" --version </dev/null 2>/dev/null | head -1 || true)"
+fi
 path="$(command -v "$BINARY_NAME" 2>/dev/null || true)"
 printf "[%s] before: %s\n" "$TOOL" "${before:-<none>}"
 printf "[%s] after:  %s\n" "$TOOL" "${after:-<none>}"
