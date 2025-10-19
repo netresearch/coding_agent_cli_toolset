@@ -18,6 +18,7 @@ fi
 
 # Parse catalog
 PACKAGE_NAME="$(jq -r '.package_name' "$CATALOG_FILE")"
+PYTHON_VERSION="$(jq -r '.python_version // empty' "$CATALOG_FILE")"
 
 # Ensure uv is available
 if ! command -v uv >/dev/null 2>&1; then
@@ -26,10 +27,15 @@ if ! command -v uv >/dev/null 2>&1; then
 fi
 
 # Get current version
-before="$(command -v "$TOOL" >/dev/null 2>&1 && "$TOOL" --version 2>/dev/null || true)"
+before="$(command -v "$TOOL" >/dev/null 2>&1 && timeout 2 "$TOOL" --version </dev/null 2>/dev/null || true)"
 
-# Install or upgrade
-uv tool install --force --upgrade "$PACKAGE_NAME" || true
+# Install or upgrade with optional Python version pinning
+if [ -n "$PYTHON_VERSION" ]; then
+  echo "[$TOOL] Installing with Python $PYTHON_VERSION..."
+  uv tool install --force --upgrade --python "$PYTHON_VERSION" "$PACKAGE_NAME" || true
+else
+  uv tool install --force --upgrade "$PACKAGE_NAME" || true
+fi
 
 # Report
 after="$(command -v "$TOOL" >/dev/null 2>&1 && "$TOOL" --version 2>/dev/null || true)"
