@@ -48,11 +48,20 @@ install_official_uv() {
 
 self_update_uv() {
   command -v uv >/dev/null 2>&1 || return 0
-  uv self update --no-progress >/dev/null 2>&1 || true
+  local before after
+  before="$(uv --version 2>/dev/null | awk '{print $2}' || echo 'unknown')"
+  uv self update --no-progress 2>&1 | grep -v "^info:" || true
+  after="$(uv --version 2>/dev/null | awk '{print $2}' || echo 'unknown')"
+  if [ "$before" != "$after" ]; then
+    echo "uv upgraded: $before → $after"
+  else
+    echo "uv already at latest version: $after"
+  fi
 }
 
 upgrade_uv_tools() {
   command -v uv >/dev/null 2>&1 || return 0
+  echo "Checking uv-managed tools..."
   uv tool upgrade --all || true
 }
 
