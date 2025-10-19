@@ -1,14 +1,8 @@
 {
   "name": "npm",
-  "install_method": "package_manager",
+  "install_method": "npm_self_update",
   "description": "Node.js package manager",
   "homepage": "https://www.npmjs.com/",
   "binary_name": "npm",
-  "packages": {
-    "apt": "npm",
-    "brew": "node",
-    "dnf": "npm",
-    "pacman": "npm"
-  },
-  "notes": "npm comes bundled with Node.js. Installing nodejs/node package will also install npm."
+  "notes": "npm comes bundled with Node.js but can be upgraded independently using 'npm install -g npm@latest'"
 }
