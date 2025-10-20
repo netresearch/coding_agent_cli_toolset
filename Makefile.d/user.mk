@@ -159,3 +159,6 @@ check-path: scripts-perms ## Check PATH configuration for package managers
 
 fix-path: scripts-perms ## Fix PATH configuration issues automatically
 	@bash -c "source scripts/lib/path_check.sh && fix_all_paths"
+
+check-python-managers: ## Check for multiple Python package managers and recommend consolidation
+	@bash scripts/check_python_package_managers.sh
