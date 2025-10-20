@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # upgrade_all.sh - Orchestrated full system upgrade
-# 5-stage workflow: refresh data → upgrade managers → upgrade runtimes → upgrade user managers → upgrade tools
+# 6-stage workflow: refresh data → upgrade managers → upgrade runtimes → upgrade user packages → upgrade tools → health checks
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$DIR/.." && pwd)"
@@ -635,7 +635,7 @@ stage_4_user_packages() {
 # Stage 5: Upgrade CLI Tools
 # ============================================================================
 stage_5_tools() {
-	log_stage 5 5 "Upgrading CLI tools..."
+	log_stage 5 6 "Upgrading CLI tools..."
 
 	cd "$PROJECT_ROOT"
 
@@ -654,6 +654,39 @@ stage_5_tools() {
 
 	log_info "For tool-specific upgrades, run: make upgrade-<tool>"
 	log_info "For interactive guide, run: make upgrade"
+}
+
+# ============================================================================
+# Stage 6: Package Manager Health Checks
+# ============================================================================
+stage_6_health_checks() {
+	log_stage 6 6 "Running package manager health checks..."
+
+	cd "$PROJECT_ROOT"
+
+	# Python package manager health check
+	log_info "Checking Python package managers..."
+	if [ "$DRY_RUN" = "1" ]; then
+		log_info "DRY-RUN: make check-python-managers"
+	else
+		if make check-python-managers >> "$LOG_FILE" 2>&1; then
+			log_success "Python package managers (no conflicts)"
+		else
+			log_reconcile "Python package managers (conflicts detected, see log for guidance)"
+		fi
+	fi
+
+	# Node.js package manager health check
+	log_info "Checking Node.js package managers..."
+	if [ "$DRY_RUN" = "1" ]; then
+		log_info "DRY-RUN: make check-node-managers"
+	else
+		if make check-node-managers >> "$LOG_FILE" 2>&1; then
+			log_success "Node.js package managers (no conflicts)"
+		else
+			log_reconcile "Node.js package managers (conflicts detected, see log for guidance)"
+		fi
+	fi
 }
 
 # ============================================================================
@@ -683,6 +716,7 @@ main() {
 	stage_3_runtimes || true
 	stage_4_user_packages || true
 	stage_5_tools || true
+	stage_6_health_checks || true
 
 	# Summary
 	local end_time=$(date +%s)
