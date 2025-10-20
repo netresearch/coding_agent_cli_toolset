@@ -162,3 +162,6 @@ fix-path: scripts-perms ## Fix PATH configuration issues automatically
 
 check-python-managers: ## Check for multiple Python package managers and recommend consolidation
 	@bash scripts/check_python_package_managers.sh
+
+check-node-managers: ## Check for multiple Node.js package managers and recommend consolidation
+	@bash scripts/check_node_package_managers.sh

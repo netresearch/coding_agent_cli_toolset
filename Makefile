@@ -18,7 +18,7 @@ export
 	scripts-perms audit-auto detect-managers upgrade-managed upgrade-dry-run \
 	upgrade-managed-system upgrade-managed-user upgrade-project-deps upgrade-managed-all \
 	upgrade-managed-system-only upgrade-managed-skip-system bootstrap init \
-	upgrade-all upgrade-all-dry-run check-path fix-path check-python-managers
+	upgrade-all upgrade-all-dry-run check-path fix-path check-python-managers check-node-managers
 
 # ============================================================================
 # HELP & OVERVIEW
