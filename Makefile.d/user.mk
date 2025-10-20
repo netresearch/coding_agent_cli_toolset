@@ -49,6 +49,11 @@ update: ## Collect fresh version data with network calls and update snapshot (~1
 	@echo "→ Collecting fresh version data from upstream sources..." >&2
 	@bash -c 'set -o pipefail; CLI_AUDIT_COLLECT=1 CLI_AUDIT_TIMINGS=1 $(PYTHON) cli_audit.py' || true
 	@echo "✓ Snapshot updated. Run 'make audit' or 'make upgrade' to use it." >&2
+	@echo "" >&2
+	@echo "→ Running system health checks..." >&2
+	@$(MAKE) check-path || true
+	@$(MAKE) check-python-managers || true
+	@$(MAKE) check-node-managers || true
 
 update-debug: ## Collect with verbose debug output (shows network calls)
 	@bash -c 'set -o pipefail; CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 CLI_AUDIT_TIMINGS=1 $(PYTHON) cli_audit.py' || true
