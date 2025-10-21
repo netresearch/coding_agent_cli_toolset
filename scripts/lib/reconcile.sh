@@ -264,8 +264,13 @@ reconcile_tool() {
 
   # Reconcile mode: align current with best
   if [ "$current_method" = "$best_method" ]; then
-    echo "[$tool] ✓ Already installed via best method: $best_method" >&2
-    return 0
+    # If action is "reconcile" (not update/install), skip if already via best method
+    if [ "$action" = "reconcile" ]; then
+      echo "[$tool] ✓ Already installed via best method: $best_method" >&2
+      return 0
+    fi
+    # For update/install action, continue to reinstall/upgrade even if via best method
+    echo "[$tool] Upgrading (currently via $best_method)" >&2
   fi
 
   if [ "$current_method" = "none" ]; then

@@ -9,5 +9,6 @@
     "pacman": "entr",
     "brew": "entr"
   },
-  "notes": "entr does not publish GitHub releases; install via system package manager"
+  "notes": "entr does not publish GitHub releases; install via system package manager",
+  "pinned_version": "5.5"
 }
