@@ -113,7 +113,12 @@ process_tool() {
 
   # Build install command from catalog metadata
   local install_cmd="install_tool.sh $tool"
-  [ -n "$install_action" ] && install_cmd="install_tool.sh $tool $install_action"
+  if [ -n "$install_action" ]; then
+    install_cmd="install_tool.sh $tool $install_action"
+  elif [ -n "$installed" ]; then
+    # Tool is already installed, use "update" action
+    install_cmd="install_tool.sh $tool update"
+  fi
   printf "    will run: scripts/%s\n" "$install_cmd"
 
   # Prompt with options explained

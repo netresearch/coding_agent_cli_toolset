@@ -45,7 +45,8 @@ if [ "$INSTALL_METHOD" = "auto" ]; then
   # Use reconciliation system
   case "$ACTION" in
     install|update|reconcile)
-      reconcile_tool "$CATALOG_FILE" "reconcile"
+      # Pass the actual action to reconcile_tool
+      reconcile_tool "$CATALOG_FILE" "$ACTION"
       exit $?
       ;;
     status)

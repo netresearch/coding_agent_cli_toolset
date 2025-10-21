@@ -10,5 +10,6 @@
     "dnf": "parallel",
     "pacman": "parallel"
   },
-  "notes": "Installed via package manager. Note: System packages are typically 1-2 years behind upstream releases. For the latest version, install from https://www.gnu.org/software/parallel/"
+  "notes": "Installed via package manager. Note: System packages are typically 1-2 years behind upstream releases. For the latest version, install from https://www.gnu.org/software/parallel/",
+  "pinned_version": "20231122"
 }

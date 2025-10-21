@@ -7,5 +7,6 @@
   "packages": {
     "apt": "universal-ctags",
     "brew": "universal-ctags"
-  }
+  },
+  "pinned_version": "5.9.0"
 }
