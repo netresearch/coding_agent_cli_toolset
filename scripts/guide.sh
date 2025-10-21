@@ -116,8 +116,16 @@ process_tool() {
   [ -n "$install_action" ] && install_cmd="install_tool.sh $tool $install_action"
   printf "    will run: scripts/%s\n" "$install_cmd"
 
-  # Prompt
-  local prompt_text="Install/update? [y/N] "
+  # Prompt with options explained
+  if [ -n "$installed" ]; then
+    printf "    Options:\n"
+    printf "      y = Install/upgrade now\n"
+    printf "      N = Skip (ask again next time)\n"
+    printf "      s = Skip version %s (ask again if newer available)\n" "$latest"
+    printf "      p = Pin to %s (don't ask for upgrades)\n" "$installed"
+  fi
+
+  local prompt_text="Install/update? [y/N/s/p] "
   [ -z "$installed" ] && prompt_text="Install? [y/N] "
 
   local ans=""
@@ -127,31 +135,43 @@ process_tool() {
     read -r -p "$prompt_text" ans </dev/tty || true
   fi
 
-  if [[ "$ans" =~ ^[Yy]$ ]]; then
-    # Handle tool-specific version environment variables
-    local upgrade_success=0
-    if [ "$tool" = "python" ]; then
-      UV_PYTHON_SPEC="$latest" "$ROOT"/scripts/$install_cmd && upgrade_success=1 || true
-    elif [ "$tool" = "ruby" ]; then
-      RUBY_VERSION="$latest" "$ROOT"/scripts/$install_cmd && upgrade_success=1 || true
-    else
-      "$ROOT"/scripts/$install_cmd && upgrade_success=1 || true
-    fi
+  case "$ans" in
+    [Yy])
+      # Handle tool-specific version environment variables
+      local upgrade_success=0
+      if [ "$tool" = "python" ]; then
+        UV_PYTHON_SPEC="$latest" "$ROOT"/scripts/$install_cmd && upgrade_success=1 || true
+      elif [ "$tool" = "ruby" ]; then
+        RUBY_VERSION="$latest" "$ROOT"/scripts/$install_cmd && upgrade_success=1 || true
+      else
+        "$ROOT"/scripts/$install_cmd && upgrade_success=1 || true
+      fi
 
-    # Re-audit
-    AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" cli_audit.py || true)"
+      # Re-audit
+      AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" cli_audit.py || true)"
 
-    # Check if upgrade succeeded by comparing versions
-    local new_installed="$(json_field "$tool" installed)"
-    if [ "$upgrade_success" = "0" ] || [ "$new_installed" = "$installed" ]; then
-      # Upgrade failed or version didn't change
-      printf "\n    ⚠️  Upgrade did not succeed (version unchanged)\n"
-      prompt_pin_version "$tool" "$installed"
-    fi
-  else
-    # User declined upgrade
-    prompt_pin_version "$tool" "$installed"
-  fi
+      # Check if upgrade succeeded by comparing versions
+      local new_installed="$(json_field "$tool" installed)"
+      if [ "$upgrade_success" = "0" ] || [ "$new_installed" = "$installed" ]; then
+        # Upgrade failed or version didn't change
+        printf "\n    ⚠️  Upgrade did not succeed (version unchanged)\n"
+        prompt_pin_version "$tool" "$installed"
+      fi
+      ;;
+    [Ss])
+      # Skip this specific version
+      printf "    Skipping version %s (will prompt again if newer version available)\n" "$latest"
+      "$ROOT"/scripts/pin_version.sh "$tool" "$latest" || true
+      ;;
+    [Pp])
+      # Pin to current version
+      printf "    Pinning to current version %s\n" "$installed"
+      "$ROOT"/scripts/pin_version.sh "$tool" "$installed" || true
+      ;;
+    *)
+      # User declined (N or empty)
+      ;;
+  esac
 }
 
 # Prompt user to pin version when upgrade is declined or fails
