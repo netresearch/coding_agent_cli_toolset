@@ -129,16 +129,49 @@ process_tool() {
 
   if [[ "$ans" =~ ^[Yy]$ ]]; then
     # Handle tool-specific version environment variables
+    local upgrade_success=0
     if [ "$tool" = "python" ]; then
-      UV_PYTHON_SPEC="$latest" "$ROOT"/scripts/$install_cmd || true
+      UV_PYTHON_SPEC="$latest" "$ROOT"/scripts/$install_cmd && upgrade_success=1 || true
     elif [ "$tool" = "ruby" ]; then
-      RUBY_VERSION="$latest" "$ROOT"/scripts/$install_cmd || true
+      RUBY_VERSION="$latest" "$ROOT"/scripts/$install_cmd && upgrade_success=1 || true
     else
-      "$ROOT"/scripts/$install_cmd || true
+      "$ROOT"/scripts/$install_cmd && upgrade_success=1 || true
     fi
 
     # Re-audit
     AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" cli_audit.py || true)"
+
+    # Check if upgrade succeeded by comparing versions
+    local new_installed="$(json_field "$tool" installed)"
+    if [ "$upgrade_success" = "0" ] || [ "$new_installed" = "$installed" ]; then
+      # Upgrade failed or version didn't change
+      printf "\n    ⚠️  Upgrade did not succeed (version unchanged)\n"
+      prompt_pin_version "$tool" "$installed"
+    fi
+  else
+    # User declined upgrade
+    prompt_pin_version "$tool" "$installed"
+  fi
+}
+
+# Prompt user to pin version when upgrade is declined or fails
+prompt_pin_version() {
+  local tool="$1"
+  local current_version="$2"
+
+  [ -z "$current_version" ] && current_version="<current>"
+
+  printf "    Pin to version %s to stop upgrade prompts? [y/N] " "$current_version"
+
+  local pin_ans=""
+  if [ -t 0 ]; then
+    read -r pin_ans || true
+  elif [ -r /dev/tty ]; then
+    read -r pin_ans </dev/tty || true
+  fi
+
+  if [[ "$pin_ans" =~ ^[Yy]$ ]]; then
+    "$ROOT"/scripts/pin_version.sh "$tool" "$current_version" || true
   fi
 }
 

@@ -2500,6 +2500,20 @@ def audit_tool(tool: Tool) -> tuple[str, str, str, str, str, str, str, str]:
         else:
             status = "UNKNOWN"
 
+        # Check if tool is pinned to current version
+        if status == "OUTDATED" and inst_num:
+            catalog_file = PROJECT_ROOT / "catalog" / f"{tool.name}.json"
+            if catalog_file.exists():
+                try:
+                    with open(catalog_file, "r", encoding="utf-8") as f:
+                        catalog_data = json.load(f)
+                        pinned_version = catalog_data.get("pinned_version", "")
+                        if pinned_version and extract_version_number(pinned_version) == inst_num:
+                            # Tool is pinned to installed version - treat as up-to-date
+                            status = "UP-TO-DATE"
+                except Exception:
+                    pass  # Catalog read failed, continue with original status
+
     # Sanitize latest display to numeric (like installed)
     if latest_num:
         latest_display = latest_num
