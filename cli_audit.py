@@ -2502,8 +2502,9 @@ def audit_tool(tool: Tool) -> tuple[str, str, str, str, str, str, str, str]:
 
         # Check if tool is pinned to current version
         if status == "OUTDATED" and inst_num:
-            catalog_file = PROJECT_ROOT / "catalog" / f"{tool.name}.json"
-            if catalog_file.exists():
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            catalog_file = os.path.join(script_dir, "catalog", f"{tool.name}.json")
+            if os.path.exists(catalog_file):
                 try:
                     with open(catalog_file, "r", encoding="utf-8") as f:
                         catalog_data = json.load(f)
