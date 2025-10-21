@@ -11,5 +11,6 @@
     "dnf": "moreutils",
     "pacman": "moreutils"
   },
-  "notes": "sponge is part of the moreutils package, which includes other useful tools like chronic, combine, errno, ifdata, ifne, isutf8, lckdo, parallel, pee, ts, vidir, vipe, and zrun."
+  "notes": "sponge is part of the moreutils package, which includes other useful tools like chronic, combine, errno, ifdata, ifne, isutf8, lckdo, parallel, pee, ts, vidir, vipe, and zrun.",
+  "pinned_version": "0.69"
 }
