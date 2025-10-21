@@ -96,6 +96,8 @@ process_tool() {
   # Get metadata from catalog (with defaults)
   local display="$(catalog_get_guide_property "$tool" display_name "$tool")"
   local install_action="$(catalog_get_guide_property "$tool" install_action "")"
+  local description="$(catalog_get_property "$tool" description)"
+  local homepage="$(catalog_get_property "$tool" homepage)"
 
   # Check if up-to-date
   if [ -n "$is_up_to_date" ] && [ -n "$installed" ]; then
@@ -108,6 +110,8 @@ process_tool() {
 
   # Prompt for installation/update
   printf "\n==> %s %s\n" "$icon" "$display"
+  [ -n "$description" ] && printf "    %s\n" "$description"
+  [ -n "$homepage" ] && printf "    Homepage: %s\n" "$(osc8 "$homepage" "$homepage")"
   printf "    installed: %s via %s\n" "${installed:-<none>}" "${method:-unknown}"
   printf "    target:    %s\n" "$(osc8 "$url" "${latest:-<unknown>}")"
 
