@@ -36,7 +36,7 @@
     "gh:phiresky/ripgrep-all": "latest_redirect",
     "gh:prettier/prettier": "latest_redirect",
     "gh:profclems/glab": "latest_redirect",
-    "gh:python/cpython": "atom",
+    "gh:python/cpython": "atom_filtered",
     "gh:rs/curlie": "latest_redirect",
     "gh:ruby/ruby": "latest_redirect",
     "gh:rubygems/rubygems": "latest_redirect",
