@@ -2515,6 +2515,21 @@ def audit_tool(tool: Tool) -> tuple[str, str, str, str, str, str, str, str]:
                 except Exception:
                     pass  # Catalog read failed, continue with original status
 
+    # Check if tool is marked as "never install"
+    if status == "NOT INSTALLED":
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        catalog_file = os.path.join(script_dir, "catalog", f"{tool.name}.json")
+        if os.path.exists(catalog_file):
+            try:
+                with open(catalog_file, "r", encoding="utf-8") as f:
+                    catalog_data = json.load(f)
+                    pinned_version = catalog_data.get("pinned_version", "")
+                    if pinned_version == "never":
+                        # Tool is marked as never install - treat as up-to-date to suppress prompts
+                        status = "UP-TO-DATE"
+            except Exception:
+                pass  # Catalog read failed, continue with original status
+
     # Sanitize latest display to numeric (like installed)
     if latest_num:
         latest_display = latest_num

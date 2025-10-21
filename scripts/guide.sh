@@ -117,16 +117,18 @@ process_tool() {
   printf "    will run: scripts/%s\n" "$install_cmd"
 
   # Prompt with options explained
+  printf "    Options:\n"
+  printf "      y = Install/upgrade now\n"
+  printf "      N = Skip (ask again next time)\n"
   if [ -n "$installed" ]; then
-    printf "    Options:\n"
-    printf "      y = Install/upgrade now\n"
-    printf "      N = Skip (ask again next time)\n"
     printf "      s = Skip version %s (ask again if newer available)\n" "$latest"
     printf "      p = Pin to %s (don't ask for upgrades)\n" "$installed"
+  else
+    printf "      s = Skip version %s (ask again if newer available)\n" "$latest"
+    printf "      p = Never install (permanently skip this tool)\n"
   fi
 
   local prompt_text="Install/update? [y/N/s/p] "
-  [ -z "$installed" ] && prompt_text="Install? [y/N] "
 
   local ans=""
   if [ -t 0 ]; then
@@ -164,9 +166,15 @@ process_tool() {
       "$ROOT"/scripts/pin_version.sh "$tool" "$latest" || true
       ;;
     [Pp])
-      # Pin to current version
-      printf "    Pinning to current version %s\n" "$installed"
-      "$ROOT"/scripts/pin_version.sh "$tool" "$installed" || true
+      if [ -n "$installed" ]; then
+        # Pin to current version
+        printf "    Pinning to current version %s\n" "$installed"
+        "$ROOT"/scripts/pin_version.sh "$tool" "$installed" || true
+      else
+        # Never install - pin to "never"
+        printf "    Marking as 'never install' (permanently skip this tool)\n"
+        "$ROOT"/scripts/pin_version.sh "$tool" "never" || true
+      fi
       ;;
     *)
       # User declined (N or empty)

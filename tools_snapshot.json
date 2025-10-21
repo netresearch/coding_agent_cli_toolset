@@ -1,7 +1,7 @@
 {
   "__meta__": {
     "count": 70,
-    "created_at": "2025-10-21T05:58:11Z",
+    "created_at": "2025-10-21T06:01:02Z",
     "offline": false,
     "partial_failures": 0,
     "schema_version": 1
@@ -44,10 +44,10 @@
       "installed_method": "uv python",
       "installed_path_selected": "/home/cybot/.venvs/dev/bin/python",
       "installed_version": "3.14.0",
-      "latest_upstream": "3.14.0",
-      "latest_url": "https://github.com/python/cpython/releases/tag/v3.14.0",
-      "latest_version": "3.14.0",
-      "status": "UP-TO-DATE",
+      "latest_upstream": "3.15.0",
+      "latest_url": "https://github.com/python/cpython/releases/tag/v3.15.0a1",
+      "latest_version": "3.15.0",
+      "status": "OUTDATED",
       "tool": "python",
       "tool_url": "https://github.com/python/cpython",
       "upstream_method": "github"
@@ -197,7 +197,7 @@
       "latest_upstream": "3.4.7",
       "latest_url": "https://github.com/ruby/ruby/releases/tag/v3.4.7",
       "latest_version": "3.4.7",
-      "status": "NOT INSTALLED",
+      "status": "UP-TO-DATE",
       "tool": "ruby",
       "tool_url": "https://github.com/ruby/ruby",
       "upstream_method": "github"
