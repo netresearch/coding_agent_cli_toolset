@@ -3,7 +3,7 @@
     "gh:BurntSushi/ripgrep": "latest_redirect",
     "gh:GAM-team/GAM": "latest_redirect",
     "gh:TomWright/dasel": "latest_redirect",
-    "gh:antonmedv/fx": "latest_redirect",
+    "gh:antonmedv/fx": "releases_api",
     "gh:aquasecurity/tfsec": "latest_redirect",
     "gh:aquasecurity/trivy": "latest_redirect",
     "gh:arxanas/git-branchless": "latest_redirect",
