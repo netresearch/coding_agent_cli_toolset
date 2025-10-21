@@ -1,7 +1,7 @@
 {
   "__meta__": {
     "count": 70,
-    "created_at": "2025-10-21T06:04:16Z",
+    "created_at": "2025-10-21T06:26:10Z",
     "offline": false,
     "partial_failures": 0,
     "schema_version": 1
@@ -14,13 +14,13 @@
       "installed_method": "unknown",
       "installed_path_selected": "/usr/local/go/bin/go",
       "installed_version": "1.25.3",
-      "latest_upstream": "1.25.3",
-      "latest_url": "https://github.com/golang/go/releases/tag/go1.25.3",
-      "latest_version": "1.25.3",
-      "status": "UP-TO-DATE",
+      "latest_upstream": "1.25.2",
+      "latest_url": "https://github.com/golang/go/releases/tag/1.25.2",
+      "latest_version": "1.25.2",
+      "status": "OUTDATED",
       "tool": "go",
       "tool_url": "https://github.com/golang/go",
-      "upstream_method": "github"
+      "upstream_method": "manual"
     },
     {
       "category": "runtimes",
@@ -44,10 +44,10 @@
       "installed_method": "uv python",
       "installed_path_selected": "/home/cybot/.venvs/dev/bin/python",
       "installed_version": "3.14.0",
-      "latest_upstream": "3.15.0",
-      "latest_url": "https://github.com/python/cpython/releases/tag/v3.15.0a1",
-      "latest_version": "3.15.0",
-      "status": "OUTDATED",
+      "latest_upstream": "3.14.0",
+      "latest_url": "https://github.com/python/cpython/releases/tag/v3.14.0",
+      "latest_version": "3.14.0",
+      "status": "UP-TO-DATE",
       "tool": "python",
       "tool_url": "https://github.com/python/cpython",
       "upstream_method": "github"
@@ -197,7 +197,7 @@
       "latest_upstream": "3.4.7",
       "latest_url": "https://github.com/ruby/ruby/releases/tag/v3.4.7",
       "latest_version": "3.4.7",
-      "status": "UP-TO-DATE",
+      "status": "NOT INSTALLED",
       "tool": "ruby",
       "tool_url": "https://github.com/ruby/ruby",
       "upstream_method": "github"
@@ -257,7 +257,7 @@
       "latest_upstream": "6.2.0",
       "latest_url": "https://github.com/universal-ctags/ctags/releases/tag/v6.2.0",
       "latest_version": "6.2.0",
-      "status": "OUTDATED",
+      "status": "UP-TO-DATE",
       "tool": "ctags",
       "tool_url": "https://github.com/universal-ctags/ctags",
       "upstream_method": "github"
@@ -437,7 +437,7 @@
       "latest_upstream": "5.7",
       "latest_url": "https://github.com/eradman/entr/releases/tag/5.7",
       "latest_version": "5.7",
-      "status": "OUTDATED",
+      "status": "UP-TO-DATE",
       "tool": "entr",
       "tool_url": "https://github.com/eradman/entr",
       "upstream_method": "github"
@@ -467,7 +467,7 @@
       "latest_upstream": "20250922",
       "latest_url": "https://ftp.gnu.org/gnu/parallel/",
       "latest_version": "20250922",
-      "status": "OUTDATED",
+      "status": "UP-TO-DATE",
       "tool": "parallel",
       "tool_url": "https://ftp.gnu.org/gnu/parallel/",
       "upstream_method": "gnu-ftp"
@@ -1034,10 +1034,10 @@
       "installed_method": "unknown",
       "installed_path_selected": "/usr/bin/docker",
       "installed_version": "28.5.1",
-      "latest_upstream": "29.0.0",
-      "latest_url": "https://github.com/docker/cli/releases/tag/v29.0.0-rc.1",
-      "latest_version": "29.0.0",
-      "status": "OUTDATED",
+      "latest_upstream": "28.5.1",
+      "latest_url": "https://github.com/docker/cli/releases/tag/v28.5.1",
+      "latest_version": "28.5.1",
+      "status": "UP-TO-DATE",
       "tool": "docker",
       "tool_url": "https://github.com/docker/cli",
       "upstream_method": "github"
