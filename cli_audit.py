@@ -2134,40 +2134,29 @@ def latest_github(owner: str, repo: str) -> tuple[str, str]:
         pass
     try:
         atom = http_get(f"https://github.com/{owner}/{repo}/releases.atom").decode("utf-8", "ignore")
-        # For Python, filter out pre-release tags (alpha, beta, rc) from atom feed
-        if owner == "python" and repo == "cpython":
-            # Find all stable tags in atom feed and pick the highest version
-            best: tuple[tuple[int, ...], str, str] | None = None
-            for match in re.finditer(r"/releases/tag/([^<\"]+)", atom):
-                tag = normalize_version_tag(match.group(1).strip())
-                # Accept only stable final release tags like v3.14.0 or v3.12.7
-                # Exclude rc, alpha, beta, a, b suffixes
-                if tag and re.match(r"^v\d+\.\d+\.\d+$", tag):
-                    ver = extract_version_number(tag)
-                    if ver:
-                        try:
-                            nums = tuple(int(x) for x in ver.split("."))
-                            tup = (nums, tag, ver)
-                            if best is None or tup[0] > best[0]:
-                                best = tup
-                        except Exception:
-                            continue
-            if best is not None:
-                _, tag, ver = best
-                result = (tag, ver)
-                set_manual_latest(repo, tag)
-                set_hint(f"gh:{owner}/{repo}", "atom_filtered")
-                return result
-        else:
-            # For other repos, take first tag from atom feed
-            m = re.search(r"/releases/tag/([^<\"]+)", atom)
-            if m:
-                tag = normalize_version_tag(m.group(1).strip())
-                if tag and tag.lower() not in ("releases", "latest"):
-                    result = (tag, extract_version_number(tag))
-                    set_manual_latest(repo, tag)
-                    set_hint(f"gh:{owner}/{repo}", "atom")
-                    return result
+        # Filter out pre-release tags (alpha, beta, rc) from atom feed for all repos
+        # Find all stable tags and pick the highest version
+        best: tuple[tuple[int, ...], str, str] | None = None
+        for match in re.finditer(r"/releases/tag/([^<\"]+)", atom):
+            tag = normalize_version_tag(match.group(1).strip())
+            # Accept only stable final release tags like v3.14.0, v28.5.1
+            # Exclude rc, alpha, beta, a, b suffixes (e.g., v29.0.0-rc.1, v3.15.0a1)
+            if tag and re.match(r"^v?\d+\.\d+(\.\d+)?$", tag):
+                ver = extract_version_number(tag)
+                if ver:
+                    try:
+                        nums = tuple(int(x) for x in ver.split("."))
+                        tup = (nums, tag, ver)
+                        if best is None or tup[0] > best[0]:
+                            best = tup
+                    except Exception:
+                        continue
+        if best is not None:
+            _, tag, ver = best
+            result = (tag, ver)
+            set_manual_latest(repo, tag)
+            set_hint(f"gh:{owner}/{repo}", "atom_filtered")
+            return result
     except Exception:
         pass
     return "", ""
