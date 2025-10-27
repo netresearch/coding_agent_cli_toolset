@@ -56,6 +56,14 @@ if [ -n "$VERSION_URL" ]; then
   LATEST="$(curl -fsSL "$VERSION_URL" 2>/dev/null || true)"
 fi
 
+# Try GitLab project if available
+GITLAB_PROJECT="$(jq -r '.gitlab_project // empty' "$CATALOG_FILE")"
+if [ -z "$LATEST" ] && [ -n "$GITLAB_PROJECT" ]; then
+  ENCODED_PROJECT="${GITLAB_PROJECT//\//%2F}"
+  LATEST="$(curl -fsSL "https://gitlab.com/api/v4/projects/${ENCODED_PROJECT}/releases?per_page=1" 2>/dev/null | \
+    jq -r '.[0].tag_name // empty' 2>/dev/null || true)"
+fi
+
 # Fallback to GitHub releases if no version URL
 if [ -z "$LATEST" ] && [ -n "$GITHUB_REPO" ]; then
   LATEST="$(curl -fsSIL -H "User-Agent: cli-audit" -o /dev/null -w '%{url_effective}' \

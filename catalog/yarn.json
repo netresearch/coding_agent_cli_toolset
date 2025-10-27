@@ -5,10 +5,11 @@
   "homepage": "https://yarnpkg.com/",
   "binary_name": "yarn",
   "script": "install_yarn.sh",
-  "notes": "Installed via Node.js corepack or npm. Requires Node.js to be installed via nvm. Do NOT install via apt (conflicts with cmdtest package)."
-  ,"guide": {
+  "notes": "Installed via Node.js corepack or npm. Requires Node.js to be installed via nvm. Do NOT install via apt (conflicts with cmdtest package).",
+  "guide": {
     "display_name": "Yarn",
     "install_action": "update",
     "order": 151
-  }
+  },
+  "pinned_version": "never"
 }

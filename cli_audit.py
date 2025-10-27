@@ -827,7 +827,7 @@ except Exception:
 class Tool:
     name: str
     candidates: tuple[str, ...]
-    source_kind: str  # "gh" | "pypi" | "crates" | "npm" | "gnu" | "skip"
+    source_kind: str  # "gh" | "gitlab" | "pypi" | "crates" | "npm" | "gnu" | "skip"
     source_args: tuple[str, ...]  # e.g., (owner, repo) or (package,) or (crate,) or (npm_pkg,) or (gnu_project,)
 
 
@@ -902,7 +902,7 @@ TOOLS: tuple[Tool, ...] = (
     # 5) VCS & platforms
     Tool("git", ("git",), "gh", ("git", "git")),
     Tool("gh", ("gh",), "gh", ("cli", "cli")),
-    Tool("glab", ("glab",), "gh", ("profclems", "glab")),
+    Tool("glab", ("glab",), "gitlab", ("gitlab-org", "cli")),
     Tool("gam", ("gam",), "gh", ("GAM-team", "GAM")),
     # 6) Task runners & build systems
     Tool("just", ("just",), "gh", ("casey", "just")),
@@ -1892,6 +1892,8 @@ def upstream_method_for(tool: Tool) -> str:
         return "npm (nvm)"
     if kind == "gh":
         return "github"
+    if kind == "gitlab":
+        return "gitlab"
     if kind == "gnu":
         return "gnu-ftp"
     return ""
@@ -1904,6 +1906,9 @@ def tool_homepage_url(tool: Tool) -> str:
         if kind == "gh":
             owner, repo = args  # type: ignore[misc]
             return f"https://github.com/{owner}/{repo}"
+        if kind == "gitlab":
+            group, project = args  # type: ignore[misc]
+            return f"https://gitlab.com/{group}/{project}"
         if kind == "pypi":
             (pkg,) = args  # type: ignore[misc]
             return f"https://pypi.org/project/{pkg}/"
@@ -1930,6 +1935,11 @@ def latest_target_url(tool: Tool, latest_tag: str, latest_num: str) -> str:
             if latest_tag:
                 return f"https://github.com/{owner}/{repo}/releases/tag/{latest_tag}"
             return f"https://github.com/{owner}/{repo}/releases/latest"
+        if kind == "gitlab":
+            group, project = args  # type: ignore[misc]
+            if latest_tag:
+                return f"https://gitlab.com/{group}/{project}/-/releases/{latest_tag}"
+            return f"https://gitlab.com/{group}/{project}/-/releases"
         if kind == "pypi":
             (pkg,) = args  # type: ignore[misc]
             return f"https://pypi.org/project/{pkg}/"
@@ -2162,6 +2172,92 @@ def latest_github(owner: str, repo: str) -> tuple[str, str]:
     return "", ""
 
 
+def latest_gitlab(group: str, project: str) -> tuple[str, str]:
+    """
+    Fetch the latest release from GitLab using the GitLab API.
+    Args:
+        group: GitLab group/namespace (e.g., "gitlab-org")
+        project: Project name (e.g., "cli")
+    Returns:
+        (tag_name, version_number) tuple or ("", "") if not found
+    """
+    if OFFLINE_MODE:
+        return "", ""
+
+    # GitLab API requires URL-encoded project path
+    project_path = f"{group}%2F{project}"
+
+    # Try releases API first (excludes pre-releases by default)
+    try:
+        url = f"https://gitlab.com/api/v4/projects/{project_path}/releases"
+        if AUDIT_DEBUG:
+            print(f"# DEBUG: GitLab API {url} (timeout={TIMEOUT_SECONDS}s)", file=sys.stderr, flush=True)
+
+        data = json.loads(http_get(url))
+
+        if isinstance(data, list) and data:
+            # GitLab releases API returns releases in descending order by default
+            # First release is the latest
+            release = data[0]
+            tag = normalize_version_tag((release.get("tag_name") or "").strip())
+
+            if tag:
+                result = (tag, extract_version_number(tag))
+                set_manual_latest(project, tag)
+                set_hint(f"gitlab:{group}/{project}", "releases_api")
+                if AUDIT_DEBUG:
+                    print(f"# DEBUG: GitLab found release: {tag}", file=sys.stderr, flush=True)
+                return result
+    except Exception as e:
+        if AUDIT_DEBUG:
+            print(f"# DEBUG: GitLab releases API failed: {e}", file=sys.stderr, flush=True)
+        pass
+
+    # Fallback to tags API
+    try:
+        url = f"https://gitlab.com/api/v4/projects/{project_path}/repository/tags?per_page=20"
+        if AUDIT_DEBUG:
+            print(f"# DEBUG: GitLab tags API {url}", file=sys.stderr, flush=True)
+
+        data = json.loads(http_get(url))
+
+        if isinstance(data, list):
+            # Filter stable releases and find highest version
+            best: tuple[tuple[int, ...], str, str] | None = None
+
+            for item in data:
+                tag_name = (item.get("name") or "").strip()
+                tag = normalize_version_tag(tag_name)
+
+                # Accept only stable final release tags (v1.2.3, 1.2.3)
+                # Exclude rc, alpha, beta, pre, dev suffixes
+                if tag and re.match(r"^v?\d+\.\d+(\.\d+)?$", tag):
+                    ver = extract_version_number(tag)
+                    if ver:
+                        try:
+                            nums = tuple(int(x) for x in ver.split("."))
+                            tup = (nums, tag, ver)
+                            if best is None or tup[0] > best[0]:
+                                best = tup
+                        except Exception:
+                            continue
+
+            if best is not None:
+                _, tag, ver = best
+                result = (tag, ver)
+                set_manual_latest(project, tag)
+                set_hint(f"gitlab:{group}/{project}", "tags_api")
+                if AUDIT_DEBUG:
+                    print(f"# DEBUG: GitLab found tag: {tag}", file=sys.stderr, flush=True)
+                return result
+    except Exception as e:
+        if AUDIT_DEBUG:
+            print(f"# DEBUG: GitLab tags API failed: {e}", file=sys.stderr, flush=True)
+        pass
+
+    return "", ""
+
+
 def latest_pypi(package: str) -> tuple[str, str]:
     if OFFLINE_MODE:
         return "", ""
@@ -2365,6 +2461,18 @@ def get_latest(tool: Tool) -> tuple[str, str]:
             return man_tag, man_num
         MANUAL_USED[tool.name] = False
         return tag, num
+    if kind == "gitlab":
+        group, project = args  # type: ignore[misc]
+        tag, num = latest_gitlab(group, project)
+        if tag or num:
+            MANUAL_USED[tool.name] = False
+            set_manual_method(tool.name, "gitlab")
+            return tag, num
+        if manual_available:
+            MANUAL_USED[tool.name] = True
+            return man_tag, man_num
+        MANUAL_USED[tool.name] = False
+        return tag, num
     if kind == "pypi":
         (pkg,) = args  # type: ignore[misc]
         tag, num = latest_pypi(pkg)
@@ -2530,20 +2638,9 @@ def audit_tool(tool: Tool) -> tuple[str, str, str, str, str, str, str, str]:
                 except Exception:
                     pass  # Catalog read failed, continue with original status
 
-    # Check if tool is marked as "never install"
-    if status == "NOT INSTALLED":
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        catalog_file = os.path.join(script_dir, "catalog", f"{tool.name}.json")
-        if os.path.exists(catalog_file):
-            try:
-                with open(catalog_file, "r", encoding="utf-8") as f:
-                    catalog_data = json.load(f)
-                    pinned_version = catalog_data.get("pinned_version", "")
-                    if pinned_version == "never":
-                        # Tool is marked as never install - treat as up-to-date to suppress prompts
-                        status = "UP-TO-DATE"
-            except Exception:
-                pass  # Catalog read failed, continue with original status
+    # Note: Tools with pinned_version="never" are filtered out in guide.sh,
+    # so we don't need to change their status here. Keep them as NOT INSTALLED
+    # to avoid confusion (showing ✅ icon when tool isn't actually installed).
 
     # Sanitize latest display to numeric (like installed)
     if latest_num:

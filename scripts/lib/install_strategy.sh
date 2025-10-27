@@ -82,6 +82,9 @@ refresh_snapshot() {
 
   echo "# Refreshing snapshot for $tool_name..." >&2
 
+  # Brief delay to ensure binary is fully updated and PATH is refreshed
+  sleep 0.5
+
   # Run audit in merge mode for this specific tool
   CLI_AUDIT_COLLECT=1 CLI_AUDIT_MERGE=1 python3 "$audit_script" --only "$tool_name" >/dev/null 2>&1 || {
     echo "# Warning: Failed to refresh snapshot for $tool_name" >&2
