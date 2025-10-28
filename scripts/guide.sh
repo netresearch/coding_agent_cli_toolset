@@ -165,8 +165,18 @@ process_tool() {
       local new_installed="$(json_field "$tool" installed)"
       if [ "$upgrade_success" = "0" ] || [ "$new_installed" = "$installed" ]; then
         # Upgrade failed or version didn't change
-        printf "\n    ⚠️  Upgrade did not succeed (version unchanged)\n"
+        printf "
+    ⚠️  Upgrade did not succeed (version unchanged)
+"
         prompt_pin_version "$tool" "$installed"
+      else
+        # Upgrade succeeded - remove any existing pin to avoid stale pins
+        if catalog_has_tool "$tool"; then
+          local existing_pin="$(catalog_get_property "$tool" pinned_version)"
+          if [ -n "$existing_pin" ] && [ "$existing_pin" != "never" ]; then
+            "$ROOT"/scripts/unpin_version.sh "$tool" || true
+          fi
+        fi
       fi
       ;;
     [Ss])

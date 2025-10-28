@@ -2623,7 +2623,7 @@ def audit_tool(tool: Tool) -> tuple[str, str, str, str, str, str, str, str]:
         else:
             status = "UNKNOWN"
 
-        # Check if tool is pinned to current version
+        # Check if tool is pinned - suppress upgrade if installed >= pinned
         if status == "OUTDATED" and inst_num:
             script_dir = os.path.dirname(os.path.abspath(__file__))
             catalog_file = os.path.join(script_dir, "catalog", f"{tool.name}.json")
@@ -2632,9 +2632,22 @@ def audit_tool(tool: Tool) -> tuple[str, str, str, str, str, str, str, str]:
                     with open(catalog_file, "r", encoding="utf-8") as f:
                         catalog_data = json.load(f)
                         pinned_version = catalog_data.get("pinned_version", "")
-                        if pinned_version and extract_version_number(pinned_version) == inst_num:
-                            # Tool is pinned to installed version - treat as up-to-date
-                            status = "UP-TO-DATE"
+                        if pinned_version and pinned_version != "never":
+                            # Use version comparison: installed >= pinned → suppress upgrade
+                            try:
+                                from packaging import version as pkg_version
+                                pinned_num = extract_version_number(pinned_version)
+                                if pinned_num and inst_num:
+                                    pinned_ver = pkg_version.parse(pinned_num.lstrip("v"))
+                                    inst_ver = pkg_version.parse(inst_num.lstrip("v"))
+                                    if inst_ver >= pinned_ver:
+                                        # Installed version meets or exceeds pin - suppress upgrade
+                                        status = "UP-TO-DATE"
+                            except Exception:
+                                # Fallback to exact match if version parsing fails
+                                pinned_num = extract_version_number(pinned_version)
+                                if pinned_num == inst_num:
+                                    status = "UP-TO-DATE"
                 except Exception:
                     pass  # Catalog read failed, continue with original status
 
