@@ -38,12 +38,12 @@ echo "[composer] Installing to $INSTALL_DIR/composer..."
 if [ -w "$INSTALL_DIR" ]; then
   # User has write access
   cp "$TMP_FILE" "$INSTALL_DIR/composer"
-  chmod +x "$INSTALL_DIR/composer"
+  chmod 755 "$INSTALL_DIR/composer"
 elif command -v sudo >/dev/null 2>&1; then
   # Need sudo
   echo "[composer] Requires sudo to install to $INSTALL_DIR"
   sudo cp "$TMP_FILE" "$INSTALL_DIR/composer"
-  sudo chmod +x "$INSTALL_DIR/composer"
+  sudo chmod 755 "$INSTALL_DIR/composer"
 else
   echo "[composer] Error: Cannot write to $INSTALL_DIR and sudo not available" >&2
   echo "[composer] Try: COMPOSER_INSTALL_DIR=~/.local/bin $0" >&2
