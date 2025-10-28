@@ -919,7 +919,7 @@ TOOLS: tuple[Tool, ...] = (
     Tool("git", ("git",), "gh", ("git", "git")),
     Tool("gh", ("gh",), "gh", ("cli", "cli")),
     Tool("glab", ("glab",), "gitlab", ("gitlab-org", "cli")),
-    Tool("gam", ("gam",), "gh", ("GAM-team", "GAM")),
+    Tool("gam", ("gam",), "pypi", ("gam7",)),
     # 6) Task runners & build systems
     Tool("just", ("just",), "gh", ("casey", "just")),
     Tool("ninja", ("ninja",), "gh", ("ninja-build", "ninja")),
@@ -1467,6 +1467,35 @@ def get_version_line(path: str, tool_name: str) -> str:
                 pass
         if AUDIT_DEBUG:
             print(f"# DEBUG: codex _is_uv_tool={_is_uv_tool('codex')}, fallback to 'installed'", file=sys.stderr)
+        return "installed"
+    if tool_name == "gam":
+        # gam binary fails with missing googleapiclient dependency - use uv tool list instead
+        if _is_uv_tool("gam"):
+            try:
+                # Need full output, not just first line from run_with_timeout
+                proc = subprocess.run(
+                    ["uv", "tool", "list"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    timeout=TIMEOUT_SECONDS,
+                    check=False,
+                )
+                out = proc.stdout or ""
+                if AUDIT_DEBUG:
+                    print(f"# DEBUG: gam uv tool list lines: {len(out.splitlines())}", file=sys.stderr)
+                for line in out.splitlines():
+                    if line.strip().startswith("gam7"):
+                        version_line = line.strip()
+                        if AUDIT_DEBUG:
+                            print(f"# DEBUG: gam version from uv: {version_line}", file=sys.stderr)
+                        return version_line
+            except Exception as e:
+                if AUDIT_DEBUG:
+                    print(f"# DEBUG: gam version extraction failed: {e}", file=sys.stderr)
+                pass
+        if AUDIT_DEBUG:
+            print(f"# DEBUG: gam _is_uv_tool={_is_uv_tool('gam')}, fallback to 'installed'", file=sys.stderr)
         return "installed"
     if tool_name == "entr":
         # Prefer -v, then -V, then bare; ignore error/usage and require a version token
