@@ -1,7 +1,7 @@
 {
   "__meta__": {
     "count": 70,
-    "created_at": "2025-10-28T11:12:59Z",
+    "created_at": "2025-10-28T11:52:12Z",
     "offline": false,
     "partial_failures": 0,
     "schema_version": 1
@@ -864,18 +864,18 @@
     },
     {
       "category": "ai-assistants",
-      "classification_reason_selected": "",
-      "installed": "",
-      "installed_method": "",
-      "installed_path_selected": "",
-      "installed_version": "",
-      "latest_upstream": "0.50.0",
-      "latest_url": "https://www.npmjs.com/package/@openai/codex",
-      "latest_version": "0.50.0",
-      "status": "NOT INSTALLED",
+      "classification_reason_selected": "uv-list-match",
+      "installed": "1.8.16",
+      "installed_method": "uv tool",
+      "installed_path_selected": "/home/sme/.local/bin/codex",
+      "installed_version": "1.8.16",
+      "latest_upstream": "1.8.16",
+      "latest_url": "https://pypi.org/project/codex/",
+      "latest_version": "1.8.16",
+      "status": "UP-TO-DATE",
       "tool": "codex",
-      "tool_url": "https://www.npmjs.com/package/@openai/codex",
-      "upstream_method": "npm (nvm)"
+      "tool_url": "https://pypi.org/project/codex/",
+      "upstream_method": "uv tool"
     },
     {
       "category": "ai-assistants",
@@ -939,18 +939,18 @@
     },
     {
       "category": "vcs",
-      "classification_reason_selected": "",
-      "installed": "",
-      "installed_method": "",
-      "installed_path_selected": "",
-      "installed_version": "",
-      "latest_upstream": "7.27.04",
-      "latest_url": "https://github.com/GAM-team/GAM/releases/tag/v7.27.04",
-      "latest_version": "7.27.04",
-      "status": "NOT INSTALLED",
+      "classification_reason_selected": "uv-list-match",
+      "installed": "7.27.4",
+      "installed_method": "uv tool",
+      "installed_path_selected": "/home/sme/.local/bin/gam",
+      "installed_version": "7.27.4",
+      "latest_upstream": "7.27.4",
+      "latest_url": "https://pypi.org/project/gam7/",
+      "latest_version": "7.27.4",
+      "status": "UP-TO-DATE",
       "tool": "gam",
-      "tool_url": "https://github.com/GAM-team/GAM",
-      "upstream_method": "github"
+      "tool_url": "https://pypi.org/project/gam7/",
+      "upstream_method": "uv tool"
     },
     {
       "category": "task-runners",

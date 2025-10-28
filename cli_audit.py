@@ -689,10 +689,19 @@ def _load_uv_tools() -> None:
                 names.add(str(k))
         else:
             # Fallback: plain text list, one name per line (best-effort)
+            # Format: "package_name v1.2.3" followed by "- binary_name" lines
             for line in (out or "").splitlines():
-                tok = line.strip().split()[0:1]
-                if tok and tok[0] not in ("-", ""):
-                    names.add(tok[0])
+                stripped = line.strip()
+                if stripped.startswith("- "):
+                    # Binary name line (e.g., "- gam")
+                    binary_name = stripped[2:].strip()
+                    if binary_name:
+                        names.add(binary_name)
+                else:
+                    # Package name line (e.g., "gam7 v7.27.4")
+                    tok = stripped.split()[0:1]
+                    if tok and tok[0] not in ("-", ""):
+                        names.add(tok[0])
             if AUDIT_DEBUG:
                 print(f"# DEBUG: Plain text parsing found {len(names)} tools from {len((out or '').splitlines())} lines", file=sys.stderr)
         # Normalize to lower-case tool invocation names
