@@ -5,5 +5,5 @@
   "homepage": "https://github.com/codex-cli/codex",
   "package_name": "codex",
   "python_version": "3.13",
-  "notes": "Requires Python 3.13 or earlier due to pkgutil.get_loader() removal in Python 3.14"
+  "notes": "Codex is a web server app - use uv tool list for version detection. Running codex --version starts the full server and hangs."
 }

@@ -655,12 +655,24 @@ def _load_uv_tools() -> None:
     try:
         if not shutil.which("uv"):
             return
-        # Prefer JSON output when supported
-        out = run_with_timeout(["uv", "tool", "list", "--json"]) or ""
+        # Get full output from uv tool list (not just first line like run_with_timeout)
+        try:
+            proc = subprocess.run(
+                ["uv", "tool", "list"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                timeout=TIMEOUT_SECONDS,
+                check=False,
+            )
+            out = proc.stdout or ""
+        except Exception:
+            out = ""
         names: set[str] = set()
         parsed: Any = None
+        # Try JSON parsing first (newer uv versions might support it)
         try:
-            parsed = json.loads(out) if out else None
+            parsed = json.loads(out) if out and not out.startswith("error:") else None
         except Exception:
             parsed = None
         if isinstance(parsed, list):
@@ -679,10 +691,14 @@ def _load_uv_tools() -> None:
             # Fallback: plain text list, one name per line (best-effort)
             for line in (out or "").splitlines():
                 tok = line.strip().split()[0:1]
-                if tok:
+                if tok and tok[0] not in ("-", ""):
                     names.add(tok[0])
+            if AUDIT_DEBUG:
+                print(f"# DEBUG: Plain text parsing found {len(names)} tools from {len((out or '').splitlines())} lines", file=sys.stderr)
         # Normalize to lower-case tool invocation names
-        UV_TOOLS = {n.strip().lower() for n in names if n.strip()}
+        UV_TOOLS = {n.strip().lower() for n in names if n.strip() and n.strip() != "-"}
+        if AUDIT_DEBUG:
+            print(f"# DEBUG: UV_TOOLS loaded: {sorted(UV_TOOLS)[:10]}", file=sys.stderr)
     except Exception as e:
         # Best-effort only
         if AUDIT_DEBUG:
@@ -897,7 +913,7 @@ TOOLS: tuple[Tool, ...] = (
     # 4) JSON/YAML viewers
     Tool("fx", ("fx",), "gh", ("antonmedv", "fx")),
     # 4.5) AI assistants
-    Tool("codex", ("codex",), "npm", ("@openai/codex",)),
+    Tool("codex", ("codex",), "pypi", ("codex",)),
     Tool("claude", ("claude",), "npm", ("@anthropic-ai/claude-code",)),
     # 5) VCS & platforms
     Tool("git", ("git",), "gh", ("git", "git")),
@@ -1422,6 +1438,35 @@ def get_version_line(path: str, tool_name: str) -> str:
         return line
     if tool_name == "sponge":
         # Do not attempt any flags; sponge reads stdin and can block
+        return "installed"
+    if tool_name == "codex":
+        # codex --version starts full web server and hangs - use uv tool list instead
+        if _is_uv_tool("codex"):
+            try:
+                # Need full output, not just first line from run_with_timeout
+                proc = subprocess.run(
+                    ["uv", "tool", "list"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    timeout=TIMEOUT_SECONDS,
+                    check=False,
+                )
+                out = proc.stdout or ""
+                if AUDIT_DEBUG:
+                    print(f"# DEBUG: codex uv tool list lines: {len(out.splitlines())}", file=sys.stderr)
+                for line in out.splitlines():
+                    if line.strip().startswith("codex"):
+                        version_line = line.strip()
+                        if AUDIT_DEBUG:
+                            print(f"# DEBUG: codex version from uv: {version_line}", file=sys.stderr)
+                        return version_line
+            except Exception as e:
+                if AUDIT_DEBUG:
+                    print(f"# DEBUG: codex version extraction failed: {e}", file=sys.stderr)
+                pass
+        if AUDIT_DEBUG:
+            print(f"# DEBUG: codex _is_uv_tool={_is_uv_tool('codex')}, fallback to 'installed'", file=sys.stderr)
         return "installed"
     if tool_name == "entr":
         # Prefer -v, then -V, then bare; ignore error/usage and require a version token
