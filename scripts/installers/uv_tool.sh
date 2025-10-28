@@ -26,8 +26,13 @@ if ! command -v uv >/dev/null 2>&1; then
   exit 1
 fi
 
-# Get current version
-before="$(command -v "$TOOL" >/dev/null 2>&1 && timeout 2 "$TOOL" --version </dev/null 2>/dev/null || true)"
+# Get current version (skip for tools that hang on --version)
+if [ "$TOOL" = "codex" ] || [ "$TOOL" = "gam" ]; then
+  # codex/gam binaries hang on --version - will use uv tool list instead
+  before="<none>"
+else
+  before="$(command -v "$TOOL" >/dev/null 2>&1 && timeout 2 "$TOOL" --version </dev/null 2>/dev/null || true)"
+fi
 
 # Install or upgrade with optional Python version pinning
 if [ -n "$PYTHON_VERSION" ]; then
@@ -38,7 +43,12 @@ else
 fi
 
 # Report
-after="$(command -v "$TOOL" >/dev/null 2>&1 && "$TOOL" --version 2>/dev/null || true)"
+if [ "$TOOL" = "codex" ] || [ "$TOOL" = "gam" ]; then
+  # codex/gam binaries hang on --version - use uv tool list instead
+  after="$(uv tool list 2>/dev/null | grep -E "^(codex|gam7) " | head -1 || echo "<failed>")"
+else
+  after="$(command -v "$TOOL" >/dev/null 2>&1 && timeout 2 "$TOOL" --version 2>/dev/null || true)"
+fi
 path="$(command -v "$TOOL" 2>/dev/null || true)"
 printf "[%s] before: %s\n" "$TOOL" "${before:-<none>}"
 printf "[%s] after:  %s\n" "$TOOL" "${after:-<none>}"
