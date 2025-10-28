@@ -3058,6 +3058,27 @@ def main() -> int:
                     inst_display = inst_val if inst_val else "n/a"
                     latest_display = latest_val if latest_val else "n/a"
 
+                    # Check for pinned/skipped version markers
+                    pinned_marker = ""
+                    skipped_marker = ""
+                    try:
+                        script_dir = os.path.dirname(os.path.abspath(__file__))
+                        catalog_file = os.path.join(script_dir, "catalog", f"{name}.json")
+                        if os.path.exists(catalog_file):
+                            with open(catalog_file, "r", encoding="utf-8") as f:
+                                catalog_data = json.load(f)
+                                pinned_version = catalog_data.get("pinned_version", "")
+                                if pinned_version and pinned_version != "never":
+                                    # Mark as pinned
+                                    pinned_marker = " (p)"
+                                    # Check if latest matches pinned (skip marker)
+                                    pinned_num = extract_version_number(pinned_version)
+                                    latest_num = extract_version_number(latest_val) if latest_val else ""
+                                    if pinned_num and latest_num and pinned_num == latest_num:
+                                        skipped_marker = " (s)"
+                    except Exception:
+                        pass
+
                     if inst_val and latest_val:
                         if status == "UP-TO-DATE":
                             operator = "==="
@@ -3101,7 +3122,8 @@ def main() -> int:
                         latest_color = RED
 
                     # Format: "# [1/64] uv (installed: 0.9.2 === latest: 0.9.2)"
-                    version_info = f"installed: {inst_color}{inst_display}{RESET} {operator} latest: {latest_color}{latest_display}{RESET}"
+                    # Add markers: (p) for pinned, (s) for skipped version
+                    version_info = f"installed: {inst_color}{inst_display}{pinned_marker}{RESET} {operator} latest: {latest_color}{latest_display}{skipped_marker}{RESET}"
                     print(f"# [{completed_tools}/{total_tools}] {name} ({version_info})", file=sys.stderr, flush=True)
 
                     # Check for PATH shadowing and emit warning
