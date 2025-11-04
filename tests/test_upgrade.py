@@ -273,15 +273,15 @@ class TestConfirmBreakingChange:
         result = confirm_breaking_change("warning message")
         assert result is False
 
-    @patch("cli_audit.upgrade.input", return_value="y")
-    @patch("cli_audit.upgrade.sys.stdin.isatty", return_value=True)
+    @patch("cli_audit.breaking_changes.input", return_value="y")
+    @patch("cli_audit.breaking_changes.sys.stdin.isatty", return_value=True)
     def test_confirm_breaking_change_yes(self, mock_isatty, mock_input):
         """Test user confirmation with 'y'."""
         result = confirm_breaking_change("warning message")
         assert result is True
 
-    @patch("cli_audit.upgrade.input", return_value="n")
-    @patch("cli_audit.upgrade.sys.stdin.isatty", return_value=True)
+    @patch("cli_audit.breaking_changes.input", return_value="n")
+    @patch("cli_audit.breaking_changes.sys.stdin.isatty", return_value=True)
     def test_confirm_breaking_change_no(self, mock_isatty, mock_input):
         """Test user rejection with 'n'."""
         result = confirm_breaking_change("warning message")

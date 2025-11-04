@@ -185,8 +185,8 @@ jobs:
 
       - name: Test CLI execution
         run: |
-          python cli_audit.py --help
-          CLI_AUDIT_JSON=1 python cli_audit.py --only python-core | jq '.'
+          python audit.py --help
+          CLI_AUDIT_JSON=1 python audit.py --only python-core | jq '.'
 
       - name: Test programmatic API
         run: |
