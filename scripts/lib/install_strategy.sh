@@ -73,10 +73,10 @@ refresh_snapshot() {
 
   # Path to project root (scripts/lib -> scripts -> root)
   local project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-  local audit_script="$project_root/cli_audit.py"
+  local audit_script="$project_root/audit.py"
 
   if [ ! -f "$audit_script" ]; then
-    echo "# Warning: cli_audit.py not found at $audit_script" >&2
+    echo "# Warning: audit.py not found at $audit_script" >&2
     return 1
   fi
 
@@ -86,7 +86,7 @@ refresh_snapshot() {
   sleep 0.5
 
   # Run audit in merge mode for this specific tool
-  CLI_AUDIT_COLLECT=1 CLI_AUDIT_MERGE=1 python3 "$audit_script" --only "$tool_name" >/dev/null 2>&1 || {
+  CLI_AUDIT_COLLECT=1 CLI_AUDIT_MERGE=1 python3 "$audit_script" "$tool_name" >/dev/null 2>&1 || {
     echo "# Warning: Failed to refresh snapshot for $tool_name" >&2
     return 1
   }

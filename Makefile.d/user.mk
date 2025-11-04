@@ -20,19 +20,19 @@ audit: ## Render audit from snapshot (no network, <100ms)
 				echo "   Consider running '\''make update'\'' for fresh version data." >&2; \
 			fi; \
 		fi; \
-		set -o pipefail; CLI_AUDIT_RENDER=1 CLI_AUDIT_GROUP=0 CLI_AUDIT_HINTS=1 CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 $(PYTHON) cli_audit.py | \
+		set -o pipefail; CLI_AUDIT_RENDER=1 CLI_AUDIT_GROUP=0 CLI_AUDIT_HINTS=1 CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 $(PYTHON) audit.py | \
 		$(PYTHON) smart_column.py -s "|" -t --right 3,5 --header' || true
 
 audit-offline: ## Offline audit with hints (fast local scan)
-	@bash -c 'set -o pipefail; CLI_AUDIT_OFFLINE=1 CLI_AUDIT_RENDER=1 CLI_AUDIT_GROUP=0 CLI_AUDIT_HINTS=1 CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 $(PYTHON) cli_audit.py | \
+	@bash -c 'set -o pipefail; CLI_AUDIT_OFFLINE=1 CLI_AUDIT_RENDER=1 CLI_AUDIT_GROUP=0 CLI_AUDIT_HINTS=1 CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 $(PYTHON) audit.py | \
 	$(PYTHON) smart_column.py -s "|" -t --right 3,5 --header' || true
 
 audit-%: scripts-perms ## Audit single tool (e.g., make audit-ripgrep)
-	@bash -c 'set -o pipefail; CLI_AUDIT_RENDER=1 CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 $(PYTHON) cli_audit.py --only $* | \
+	@bash -c 'set -o pipefail; CLI_AUDIT_RENDER=1 CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 $(PYTHON) audit.py $* | \
 	$(PYTHON) smart_column.py -s "|" -t --right 3,5 --header' || true
 
 audit-offline-%: scripts-perms ## Offline audit subset (e.g., make audit-offline-python-core)
-	@bash -c 'set -o pipefail; CLI_AUDIT_OFFLINE=1 CLI_AUDIT_RENDER=1 CLI_AUDIT_GROUP=0 CLI_AUDIT_HINTS=1 CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 $(PYTHON) cli_audit.py --only $* | \
+	@bash -c 'set -o pipefail; CLI_AUDIT_OFFLINE=1 CLI_AUDIT_RENDER=1 CLI_AUDIT_GROUP=0 CLI_AUDIT_HINTS=1 CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 $(PYTHON) audit.py $* | \
 	$(PYTHON) smart_column.py -s "|" -t --right 3,5 --header' || true
 
 SNAP_FILE?=$(shell python3 -c "import os;print(os.environ.get('CLI_AUDIT_SNAPSHOT_FILE','tools_snapshot.json'))")
@@ -40,14 +40,14 @@ SNAP_FILE?=$(shell python3 -c "import os;print(os.environ.get('CLI_AUDIT_SNAPSHO
 audit-auto: ## Update snapshot if missing, then render
 	@if [ ! -f "$(SNAP_FILE)" ]; then \
 		echo "# snapshot missing: $(SNAP_FILE); running update..."; \
-		CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 CLI_AUDIT_PROGRESS=1 $(PYTHON) cli_audit.py || true; \
+		CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 CLI_AUDIT_PROGRESS=1 $(PYTHON) audit.py --update || true; \
 	fi; \
-	CLI_AUDIT_RENDER=1 CLI_AUDIT_GROUP=0 CLI_AUDIT_HINTS=1 CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 $(PYTHON) cli_audit.py | \
+	CLI_AUDIT_RENDER=1 CLI_AUDIT_GROUP=0 CLI_AUDIT_HINTS=1 CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 $(PYTHON) audit.py | \
 	$(PYTHON) smart_column.py -s "|" -t --right 3,5 --header || true
 
 update: ## Collect fresh version data with network calls and update snapshot (~10s)
 	@echo "→ Collecting fresh version data from upstream sources..." >&2
-	@bash -c 'set -o pipefail; CLI_AUDIT_COLLECT=1 CLI_AUDIT_TIMINGS=1 $(PYTHON) cli_audit.py' || true
+	@bash -c 'set -o pipefail; CLI_AUDIT_COLLECT=1 CLI_AUDIT_TIMINGS=1 $(PYTHON) audit.py --update' || true
 	@echo "✓ Snapshot updated. Run 'make audit' or 'make upgrade' to use it." >&2
 	@echo "" >&2
 	@echo "→ Running system health checks..." >&2
@@ -56,7 +56,7 @@ update: ## Collect fresh version data with network calls and update snapshot (~1
 	@$(MAKE) check-node-managers || true
 
 update-debug: ## Collect with verbose debug output (shows network calls)
-	@bash -c 'set -o pipefail; CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 CLI_AUDIT_TIMINGS=1 $(PYTHON) cli_audit.py' || true
+	@bash -c 'set -o pipefail; CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 CLI_AUDIT_TIMINGS=1 $(PYTHON) audit.py --update --verbose' || true
 
 upgrade: scripts-perms ## Run interactive upgrade guide (uses snapshot, no network calls)
 	@bash scripts/guide.sh
