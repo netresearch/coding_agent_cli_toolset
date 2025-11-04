@@ -1,4 +1,4 @@
-<!-- Managed by agent: keep sections & order; edit content, not structure. Last updated: 2025-10-09 -->
+<!-- Managed by agent: keep sections & order; edit content, not structure. Last updated: 2025-11-03 -->
 
 # Installation Scripts - Agent Guide
 
@@ -6,7 +6,7 @@
 
 ## Overview
 
-13+ Bash scripts for installing developer tools with multiple actions:
+25+ Bash scripts for installing developer tools with multiple actions:
 - **install**: Fresh installation (default action)
 - **update**: Upgrade to latest version
 - **uninstall**: Remove installation
@@ -350,7 +350,7 @@ update_rust() {
 
 **Reconcile fails:**
 1. Check current installation: `which <tool>`
-2. Check installation method: `cli_audit.py --only <tool>`
+2. Check installation method: `python3 audit.py --only <tool>` or `make audit`
 3. Manually remove old version first: `apt remove <tool>` or `cargo uninstall <tool>`
 
 **Documentation:**
