@@ -5,6 +5,7 @@
   "homepage": "https://github.com/tummychow/git-absorb",
   "github_repo": "tummychow/git-absorb",
   "binary_name": "git-absorb",
+  "version_flag": "--version",
   "download_url_template": "https://github.com/tummychow/git-absorb/releases/download/{version_nov}/git-absorb-{version_nov}-{arch}-unknown-linux-musl.tar.gz",
   "arch_map": {
     "x86_64": "x86_64",
