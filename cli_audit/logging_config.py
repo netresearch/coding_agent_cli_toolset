@@ -54,7 +54,7 @@ def setup_logging(
 
     # Console handler (unless quiet)
     if not quiet:
-        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler = logging.StreamHandler(sys.stderr)
         console_handler.setLevel(getattr(logging, effective_level))
 
         # Format with colors for console

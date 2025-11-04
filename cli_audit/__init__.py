@@ -1,21 +1,44 @@
 """
 AI CLI Preparation - Tool version auditing and installation management.
 
-Phase 1: Detection and auditing (complete)
-Phase 2.1: Foundation - Environment, config, package managers, install plans (complete)
-Phase 2.2: Core Installation - Single tool installation with retry and validation (complete)
-Phase 2.3: Bulk Operations - Parallel installation with progress tracking (complete)
-Phase 2.4: Upgrade Management - Version comparison, breaking changes, rollback (complete)
-Phase 2.5: Reconciliation - Detect and manage multiple tool installations (complete)
+Core Modules:
+- Detection and Auditing: Version collection, catalog, snapshot management
+- Foundation: Environment detection, config, package managers, install plans
+- Installation: Tool installation with retry, validation, parallel operations
+- Upgrade Management: Version comparison, breaking change detection, rollback
+- Reconciliation: Multiple installation detection and conflict resolution
 """
 
-__version__ = "2.0.0-alpha.6"
+__version__ = "2.0.0"
 __author__ = "AI CLI Preparation Contributors"
 
 # Version info for backward compatibility
 VERSION = __version__
 
-# Phase 2.1 exports
+# Detection and Auditing
+from .catalog import ToolCatalog, ToolCatalogEntry
+from .collectors import (
+    collect_github,
+    collect_gitlab,
+    collect_pypi,
+    collect_npm,
+    collect_crates,
+    normalize_version_tag,
+    extract_version_number,
+    get_github_rate_limit,
+)
+from .tools import Tool, all_tools, filter_tools, get_tool, tool_homepage_url, latest_target_url
+from .detection import (
+    find_paths,
+    get_version_line,
+    extract_version_number,
+    detect_install_method,
+    audit_tool_installation,
+)
+from .snapshot import load_snapshot, write_snapshot, render_from_snapshot, get_snapshot_path
+from .render import status_icon, osc8, render_table, print_summary
+
+# Foundation
 from .environment import Environment, detect_environment, get_environment_from_config
 from .config import (
     Config,
@@ -29,7 +52,7 @@ from .config import (
 from .package_managers import PackageManager, select_package_manager, get_available_package_managers
 from .install_plan import InstallPlan, InstallStep, generate_install_plan, dry_run_install
 
-# Phase 2.2 exports
+# Installation
 from .installer import (
     InstallResult,
     StepResult,
@@ -41,7 +64,7 @@ from .installer import (
     validate_installation,
 )
 
-# Phase 2.3 exports
+# Bulk Operations
 from .bulk import (
     ToolSpec,
     ProgressTracker,
@@ -63,7 +86,7 @@ from .breaking_changes import (
     filter_by_breaking_changes,
 )
 
-# Phase 2.4 exports
+# Upgrade Management
 from .upgrade import (
     UpgradeBackup,
     UpgradeResult,
@@ -83,7 +106,7 @@ from .upgrade import (
     cleanup_backup,
 )
 
-# Phase 2.5 exports
+# Reconciliation
 from .reconcile import (
     Installation,
     ReconciliationResult,
@@ -108,6 +131,17 @@ __all__ = [
     # Version
     "__version__",
     "VERSION",
+    # Detection and Auditing
+    "ToolCatalog",
+    "ToolCatalogEntry",
+    "collect_github",
+    "collect_gitlab",
+    "collect_pypi",
+    "collect_npm",
+    "collect_crates",
+    "normalize_version_tag",
+    "extract_version_number",
+    "get_github_rate_limit",
     # Breaking changes
     "is_major_upgrade",
     "check_breaking_change_policy",
@@ -115,7 +149,7 @@ __all__ = [
     "confirm_breaking_change",
     "confirm_bulk_breaking_changes",
     "filter_by_breaking_changes",
-    # Phase 2.1
+    # Foundation
     "Environment",
     "detect_environment",
     "get_environment_from_config",
@@ -133,7 +167,7 @@ __all__ = [
     "InstallStep",
     "generate_install_plan",
     "dry_run_install",
-    # Phase 2.2
+    # Installation
     "InstallResult",
     "StepResult",
     "InstallError",
@@ -142,7 +176,7 @@ __all__ = [
     "execute_step_with_retry",
     "verify_checksum",
     "validate_installation",
-    # Phase 2.3
+    # Bulk Operations
     "ToolSpec",
     "ProgressTracker",
     "BulkInstallResult",
@@ -151,7 +185,7 @@ __all__ = [
     "resolve_dependencies",
     "generate_rollback_script",
     "execute_rollback",
-    # Phase 2.4
+    # Upgrade Management
     "UpgradeBackup",
     "UpgradeResult",
     "UpgradeCandidate",
@@ -168,7 +202,7 @@ __all__ = [
     "create_upgrade_backup",
     "restore_from_backup",
     "cleanup_backup",
-    # Phase 2.5
+    # Reconciliation
     "Installation",
     "ReconciliationResult",
     "BulkReconciliationResult",
