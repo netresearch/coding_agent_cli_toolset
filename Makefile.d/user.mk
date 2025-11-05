@@ -20,23 +20,23 @@ audit: ## Render audit from snapshot (no network, <100ms)
 				echo "   Consider running '\''make update'\'' for fresh version data." >&2; \
 			fi; \
 		fi; \
-		set -o pipefail; CLI_AUDIT_RENDER=1 CLI_AUDIT_GROUP=0 CLI_AUDIT_HINTS=1 CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 $(PYTHON) audit.py | \
+		set -o pipefail; CLI_AUDIT_RENDER=1 CLI_AUDIT_GROUP=0 CLI_AUDIT_HINTS=1 CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 CLI_AUDIT_COLOR=1 $(PYTHON) audit.py | \
 		$(PYTHON) smart_column.py -s "|" -t --right 3,5 --header' || true
 
 audit-offline: ## Offline audit with hints (fast local scan)
-	@bash -c 'set -o pipefail; CLI_AUDIT_OFFLINE=1 CLI_AUDIT_RENDER=1 CLI_AUDIT_GROUP=0 CLI_AUDIT_HINTS=1 CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 $(PYTHON) audit.py | \
+	@bash -c 'set -o pipefail; CLI_AUDIT_OFFLINE=1 CLI_AUDIT_RENDER=1 CLI_AUDIT_GROUP=0 CLI_AUDIT_HINTS=1 CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 CLI_AUDIT_COLOR=1 $(PYTHON) audit.py | \
 	$(PYTHON) smart_column.py -s "|" -t --right 3,5 --header' || true
 
 outdated: ## Show only missing and outdated tools
-	@bash -c 'set -o pipefail; CLI_AUDIT_RENDER=1 CLI_AUDIT_GROUP=0 CLI_AUDIT_HINTS=1 CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 CLI_AUDIT_FILTER_STATUS="NOT INSTALLED,OUTDATED" $(PYTHON) audit.py | \
+	@bash -c 'set -o pipefail; CLI_AUDIT_RENDER=1 CLI_AUDIT_GROUP=0 CLI_AUDIT_HINTS=1 CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 CLI_AUDIT_COLOR=1 CLI_AUDIT_FILTER_STATUS="NOT INSTALLED,OUTDATED" $(PYTHON) audit.py | \
 	$(PYTHON) smart_column.py -s "|" -t --right 3,5 --header' || true
 
 audit-%: scripts-perms ## Audit single tool (e.g., make audit-ripgrep)
-	@bash -c 'set -o pipefail; CLI_AUDIT_RENDER=1 CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 $(PYTHON) audit.py $* | \
+	@bash -c 'set -o pipefail; CLI_AUDIT_RENDER=1 CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 CLI_AUDIT_COLOR=1 $(PYTHON) audit.py $* | \
 	$(PYTHON) smart_column.py -s "|" -t --right 3,5 --header' || true
 
 audit-offline-%: scripts-perms ## Offline audit subset (e.g., make audit-offline-python-core)
-	@bash -c 'set -o pipefail; CLI_AUDIT_OFFLINE=1 CLI_AUDIT_RENDER=1 CLI_AUDIT_GROUP=0 CLI_AUDIT_HINTS=1 CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 $(PYTHON) audit.py $* | \
+	@bash -c 'set -o pipefail; CLI_AUDIT_OFFLINE=1 CLI_AUDIT_RENDER=1 CLI_AUDIT_GROUP=0 CLI_AUDIT_HINTS=1 CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 CLI_AUDIT_COLOR=1 $(PYTHON) audit.py $* | \
 	$(PYTHON) smart_column.py -s "|" -t --right 3,5 --header' || true
 
 SNAP_FILE?=$(shell python3 -c "import os;print(os.environ.get('CLI_AUDIT_SNAPSHOT_FILE','tools_snapshot.json'))")

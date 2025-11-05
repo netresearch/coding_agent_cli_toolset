@@ -12,6 +12,15 @@ from typing import Any
 # Environment options
 USE_EMOJI = os.environ.get("CLI_AUDIT_EMOJI", "1") == "1"
 ENABLE_LINKS = os.environ.get("CLI_AUDIT_LINKS", "1") == "1"
+USE_COLOR = os.environ.get("CLI_AUDIT_COLOR", "1") == "1"
+
+# ANSI color codes
+GREEN = "\033[32m"
+BOLD_GREEN = "\033[1;32m"
+YELLOW = "\033[33m"
+BLUE = "\033[34m"
+RED = "\033[31m"
+RESET = "\033[0m"
 
 
 def status_icon(status: str, installed: str) -> str:
@@ -45,6 +54,21 @@ def status_icon(status: str, installed: str) -> str:
     if status == "CONFLICT":
         return "⚠️"
     return "❓"
+
+
+def colorize(text: str, color: str) -> str:
+    """Apply color to text.
+
+    Args:
+        text: Text to colorize
+        color: ANSI color code
+
+    Returns:
+        Colored text or plain text if colors disabled
+    """
+    if not USE_COLOR or not text:
+        return text
+    return f"{color}{text}{RESET}"
 
 
 def osc8(url: str, text: str) -> str:
@@ -92,9 +116,30 @@ def render_table(tools: list[dict[str, Any]], show_hints: bool = False) -> None:
         # Icon
         icon = status_icon(status, installed)
 
+        # Determine colors based on status
+        if status == "UP-TO-DATE":
+            inst_color = GREEN
+            latest_color = GREEN
+        elif status == "OUTDATED":
+            inst_color = YELLOW
+            latest_color = BOLD_GREEN  # Latest is newer, make it bold green
+        elif status == "CONFLICT":
+            inst_color = YELLOW
+            latest_color = BOLD_GREEN
+        else:  # NOT INSTALLED, UNKNOWN
+            inst_color = BLUE
+            latest_color = BLUE
+
         # Hyperlinks
         name_display = osc8(tool_url, name) if tool_url else name
-        latest_display = osc8(latest_url, latest) if latest_url else latest
+
+        # Apply colors to installed and latest (before adding markers/hints)
+        installed_display = colorize(installed, inst_color)
+        latest_display = colorize(latest, latest_color)
+
+        # Apply hyperlinks (after colorization, hyperlinks wrap the colored text)
+        if latest_url:
+            latest_display = osc8(latest_url, latest_display)
 
         # Add pinned/skip markers
         markers = []
@@ -113,10 +158,10 @@ def render_table(tools: list[dict[str, Any]], show_hints: bool = False) -> None:
                 latest_display = f"{latest_display}  [{hint}]"
 
         # Add CONFLICT message to installed display
-        if status == "CONFLICT" and installed.startswith("CONFLICT:"):
-            installed = installed.replace("CONFLICT: ", "")  # Show clean message
+        if status == "CONFLICT" and installed_display.startswith("CONFLICT:"):
+            installed_display = installed_display.replace("CONFLICT: ", "")  # Show clean message
 
-        print("|".join((icon, name_display, installed, latest_display)))
+        print("|".join((icon, name_display, installed_display, latest_display)))
 
 
 def print_summary(snapshot: dict[str, Any], tools: list[dict[str, Any]]) -> None:
