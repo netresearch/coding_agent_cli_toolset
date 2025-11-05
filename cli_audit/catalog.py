@@ -82,7 +82,7 @@ class ToolCatalog:
             except Exception as e:
                 logger.error(f"Failed to load {json_file}: {e}")
 
-        logger.info(f"Loaded {len(self._entries)} catalog entries")
+        logger.debug(f"Loaded {len(self._entries)} catalog entries")
 
     def get(self, tool_name: str) -> ToolCatalogEntry | None:
         """Get catalog entry for a tool.
