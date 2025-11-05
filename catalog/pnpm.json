@@ -3,7 +3,7 @@
   "install_method": "auto",
   "description": "Fast, disk space efficient Node.js package manager",
   "homepage": "https://pnpm.io/",
-  "npm_package": "pnpm",
+  "package_name": "pnpm",
   "binary_name": "pnpm",
   "packages": {
     "apt": "pnpm",

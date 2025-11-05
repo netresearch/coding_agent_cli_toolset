@@ -3,6 +3,7 @@
   "install_method": "package_manager",
   "description": "Distributed version control system",
   "homepage": "https://git-scm.com",
+  "github_repo": "git/git",
   "binary_name": "git",
   "packages": {
     "apt": "git",

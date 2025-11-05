@@ -66,11 +66,20 @@ class ToolCatalogEntry:
                     return ("gitlab", (parts[0], parts[1]))
                 return ("gh", (parts[0], parts[1]))
 
-        # Priority 2: Package name + install method
+        # Priority 2: Package name + homepage hints
         if self.package_name:
-            if "npm" in self.install_method:
+            homepage_lower = self.homepage.lower()
+            # Check homepage for package source hints
+            if "npmjs.com" in homepage_lower or "yarnpkg.com" in homepage_lower or "pnpm.io" in homepage_lower:
                 return ("npm", (self.package_name,))
-            elif "pip" in self.install_method or self.install_method == "pipx":
+            elif "pypi.org" in homepage_lower or "python.org" in homepage_lower or "pypa.io" in homepage_lower:
+                return ("pypi", (self.package_name,))
+            elif "crates.io" in homepage_lower:
+                return ("crates", (self.package_name,))
+            # Fallback: check install_method
+            elif "npm" in self.install_method:
+                return ("npm", (self.package_name,))
+            elif "pip" in self.install_method or "pipx" in self.install_method or "uv_tool" in self.install_method:
                 return ("pypi", (self.package_name,))
             elif "cargo" in self.install_method or "crates" in self.install_method:
                 return ("crates", (self.package_name,))

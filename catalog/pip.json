@@ -3,6 +3,7 @@
   "install_method": "package_manager",
   "description": "Python package installer",
   "homepage": "https://pip.pypa.io/",
+  "package_name": "pip",
   "binary_name": "pip",
   "packages": {
     "apt": "python3-pip",

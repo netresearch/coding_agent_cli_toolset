@@ -3,6 +3,7 @@
   "install_method": "dedicated_script",
   "description": "Rust programming language and toolchain",
   "homepage": "https://www.rust-lang.org",
+  "github_repo": "rust-lang/rust",
   "binary_name": "rustc",
   "script": "install_rust.sh",
   "guide": {
