@@ -100,7 +100,7 @@ TOOLS: tuple[Tool, ...] = (
     Tool("kubectl", ("kubectl",), "gh", ("kubernetes", "kubernetes"), "cloud-infra", "make install-kubectl"),
     Tool("terraform", ("terraform",), "gh", ("hashicorp", "terraform"), "cloud-infra", "make install-terraform"),
     Tool("docker", ("docker",), "gh", ("docker", "cli"), "cloud-infra", "make install-docker"),
-    Tool("docker-compose", ("docker-compose", "docker"), "gh", ("docker", "compose"), "cloud-infra", "make install-docker"),
+    Tool("docker-compose", ("docker",), "gh", ("docker", "compose"), "cloud-infra", "make install-docker"),
 )
 
 # Tool lookup map for fast access

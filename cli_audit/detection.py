@@ -187,41 +187,6 @@ def get_version_line(path: str, tool_name: str, version_flag: str | None = None,
         # sponge reads stdin and can block - catalog has version_command to query dpkg
         return "installed"
 
-    if tool_name == "docker-compose":
-        base = os.path.basename(path)
-        if base == "docker":
-            # Plugin form
-            line = run_with_timeout([path, "compose", "version"])
-            if line:
-                return line
-        # Legacy binary
-        line = run_with_timeout([path, "version"])
-        if line:
-            return line
-
-    if tool_name == "entr":
-        # entr shows version in stderr when run with no args
-        try:
-            proc = subprocess.run(
-                [path],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                stdin=subprocess.DEVNULL,
-                text=True,
-                timeout=0.5,
-                check=False,
-                env={**os.environ, "TERM": "dumb"},
-            )
-            # Version is in stderr: "release: 5.7"
-            stderr = proc.stderr or ""
-            for line in stderr.splitlines():
-                line = ANSI_ESCAPE_RE.sub('', line.strip())
-                if line.startswith("release:"):
-                    return line
-        except Exception:
-            pass
-
-
     if tool_name == "fx":
         # fx is a Node.js tool with no --version flag
         # Try to read version from package.json
