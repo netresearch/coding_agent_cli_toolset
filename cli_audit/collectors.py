@@ -118,7 +118,7 @@ def collect_github(owner: str, repo: str, offline_cache: dict[str, tuple[str, st
             if last_segment and last_segment.lower() not in ("releases", "latest"):
                 tag = normalize_version_tag(last_segment)
                 version = extract_version_number(tag)
-                logger.info(f"GitHub {owner}/{repo}: {tag} via redirect")
+                logger.debug(f"GitHub {owner}/{repo}: {tag} via redirect")
                 return tag, version
     except Exception as e:
         logger.debug(f"GitHub redirect failed for {owner}/{repo}: {e}")
@@ -130,7 +130,7 @@ def collect_github(owner: str, repo: str, offline_cache: dict[str, tuple[str, st
 
         if tag:
             version = extract_version_number(tag)
-            logger.info(f"GitHub {owner}/{repo}: {tag} via API")
+            logger.debug(f"GitHub {owner}/{repo}: {tag} via API")
             return tag, version
     except Exception as e:
         logger.debug(f"GitHub API failed for {owner}/{repo}: {e}")
@@ -162,7 +162,7 @@ def collect_github(owner: str, repo: str, offline_cache: dict[str, tuple[str, st
 
         if best is not None:
             _, tag, version = best
-            logger.info(f"GitHub {owner}/{repo}: {tag} via Atom feed (filtered stable)")
+            logger.debug(f"GitHub {owner}/{repo}: {tag} via Atom feed (filtered stable)")
             return tag, version
     except Exception as e:
         logger.debug(f"GitHub Atom feed failed for {owner}/{repo}: {e}")
@@ -171,7 +171,7 @@ def collect_github(owner: str, repo: str, offline_cache: dict[str, tuple[str, st
     if offline_cache:
         key = f"gh:{owner}/{repo}"
         if key in offline_cache:
-            logger.info(f"GitHub {owner}/{repo}: Using offline cache")
+            logger.debug(f"GitHub {owner}/{repo}: Using offline cache")
             return offline_cache[key]
 
     logger.warning(f"GitHub {owner}/{repo}: No version found")
@@ -200,7 +200,7 @@ def collect_gitlab(group: str, project: str, offline_cache: dict[str, tuple[str,
             tag = normalize_version_tag(data[0].get("tag_name", ""))
             if tag:
                 version = extract_version_number(tag)
-                logger.info(f"GitLab {group}/{project}: {tag}")
+                logger.debug(f"GitLab {group}/{project}: {tag}")
                 return tag, version
     except Exception as e:
         logger.debug(f"GitLab API failed for {group}/{project}: {e}")
@@ -209,7 +209,7 @@ def collect_gitlab(group: str, project: str, offline_cache: dict[str, tuple[str,
     if offline_cache:
         key = f"gitlab:{group}/{project}"
         if key in offline_cache:
-            logger.info(f"GitLab {group}/{project}: Using offline cache")
+            logger.debug(f"GitLab {group}/{project}: Using offline cache")
             return offline_cache[key]
 
     logger.warning(f"GitLab {group}/{project}: No version found")
@@ -232,14 +232,14 @@ def collect_pypi(package: str, offline_cache: dict[str, tuple[str, str]] | None 
 
         if version:
             version_num = extract_version_number(version)
-            logger.info(f"PyPI {package}: {version}")
+            logger.debug(f"PyPI {package}: {version}")
             return version, version_num
     except Exception as e:
         logger.debug(f"PyPI failed for {package}: {e}")
 
     # Use offline cache if available
     if offline_cache and package in offline_cache:
-        logger.info(f"PyPI {package}: Using offline cache")
+        logger.debug(f"PyPI {package}: Using offline cache")
         return offline_cache[package]
 
     logger.warning(f"PyPI {package}: No version found")
@@ -263,14 +263,14 @@ def collect_npm(package: str, offline_cache: dict[str, tuple[str, str]] | None =
 
         if version:
             version_num = extract_version_number(version)
-            logger.info(f"npm {package}: {version}")
+            logger.debug(f"npm {package}: {version}")
             return version, version_num
     except Exception as e:
         logger.debug(f"npm failed for {package}: {e}")
 
     # Use offline cache if available
     if offline_cache and package in offline_cache:
-        logger.info(f"npm {package}: Using offline cache")
+        logger.debug(f"npm {package}: Using offline cache")
         return offline_cache[package]
 
     logger.warning(f"npm {package}: No version found")
@@ -293,14 +293,14 @@ def collect_crates(crate: str, offline_cache: dict[str, tuple[str, str]] | None 
 
         if version:
             version_num = extract_version_number(version)
-            logger.info(f"crates.io {crate}: {version}")
+            logger.debug(f"crates.io {crate}: {version}")
             return version, version_num
     except Exception as e:
         logger.debug(f"crates.io failed for {crate}: {e}")
 
     # Use offline cache if available
     if offline_cache and crate in offline_cache:
-        logger.info(f"crates.io {crate}: Using offline cache")
+        logger.debug(f"crates.io {crate}: Using offline cache")
         return offline_cache[crate]
 
     logger.warning(f"crates.io {crate}: No version found")
