@@ -5,6 +5,7 @@
   "homepage": "https://github.com/GAM-team/GAM",
   "github_repo": "GAM-team/GAM",
   "binary_name": "gam",
+  "version_flag": "version",
   "package_name": "gam7",
   "notes": "Version detected via uv tool list. Binary requires googleapiclient dependencies and cannot run standalone for version check."
 }

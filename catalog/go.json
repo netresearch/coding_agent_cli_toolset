@@ -4,6 +4,7 @@
   "description": "Go programming language",
   "homepage": "https://go.dev",
   "binary_name": "go",
+  "version_flag": "version",
   "script": "install_go.sh"
   ,"guide": {
     "display_name": "Go toolchain",

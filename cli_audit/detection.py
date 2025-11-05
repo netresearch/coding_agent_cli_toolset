@@ -144,36 +144,48 @@ def extract_version_number(s: str) -> str:
     return m2.group(1) if m2 else ""
 
 
-def get_version_line(path: str, tool_name: str, version_args: list[str] | None = None) -> str:
+def get_version_line(path: str, tool_name: str, version_flag: str | None = None, version_command: str | None = None) -> str:
     """Get version string for installed tool.
 
     Args:
         path: Path to executable
         tool_name: Tool name for special-case handling
-        version_args: Custom version arguments from catalog (e.g., ["version"])
+        version_flag: Custom version flag/arg from catalog (e.g., "version", "--version")
+        version_command: Custom shell command from catalog (ignores path)
 
     Returns:
         Version line string or empty string
     """
-    # If catalog specifies custom version args, use them first
-    if version_args:
-        line = run_with_timeout([path] + version_args)
+    # Priority 1: If catalog specifies custom shell command, run it directly
+    if version_command:
+        try:
+            proc = subprocess.run(
+                version_command,
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+                text=True,
+                timeout=TIMEOUT_SECONDS,
+                check=False,
+                env={**os.environ, "TERM": "dumb"},
+            )
+            line = (proc.stdout or "").strip()
+            if line:
+                return line
+        except Exception:
+            pass
+
+    # Priority 2: If catalog specifies custom version flag, use it
+    if version_flag:
+        line = run_with_timeout([path, version_flag])
         if line:
             return line
 
-    # Special cases
-    if tool_name == "go":
-        line = run_with_timeout([path, "version"])
-        return line if line else ""
-
+    # Priority 3: Special cases (only truly complex cases that can't be handled by catalog)
     if tool_name == "sponge":
-        # sponge reads stdin and can block
+        # sponge reads stdin and can block - catalog has version_command to query dpkg
         return "installed"
-
-    if tool_name == "git-absorb":
-        # git-absorb outputs WARN messages without --version flag
-        line = run_with_timeout([path, "--version"])
-        return line if line else ""
 
     if tool_name == "docker-compose":
         base = os.path.basename(path)
@@ -227,13 +239,6 @@ def get_version_line(path: str, tool_name: str, version_args: list[str] | None =
                 except Exception:
                     pass
         return "installed"
-
-    if tool_name == "gam":
-        # gam often has import errors - try version command specifically
-        line = run_with_timeout([path, "version"])
-        if line and not line.startswith("Traceback"):
-            return line
-        return ""
 
     # Generic version flags
     for flags in VERSION_FLAG_SETS:
@@ -322,7 +327,7 @@ def choose_highest(candidates: list[tuple[str, str, str]]) -> tuple[str, str, st
 
 
 def audit_tool_installation(
-    tool_name: str, candidates: tuple[str, ...], deep: bool = False, version_args: list[str] | None = None
+    tool_name: str, candidates: tuple[str, ...], deep: bool = False, version_flag: str | None = None, version_command: str | None = None
 ) -> tuple[str, str, str, str]:
     """Audit a single tool's installation.
 
@@ -330,7 +335,8 @@ def audit_tool_installation(
         tool_name: Tool name
         candidates: Binary names to search for
         deep: If True, find all installations
-        version_args: Custom version arguments from catalog (e.g., ["version"])
+        version_flag: Custom version flag from catalog (e.g., "version", "--version")
+        version_command: Custom shell command from catalog
 
     Returns:
         Tuple of (version_num, version_line, path, install_method)
@@ -339,7 +345,7 @@ def audit_tool_installation(
 
     for cand in candidates:
         for path in find_paths(cand, deep=deep):
-            line = get_version_line(path, tool_name, version_args)
+            line = get_version_line(path, tool_name, version_flag, version_command)
             if line:
                 num = extract_version_number(line)
                 tuples.append((num, line, path))
