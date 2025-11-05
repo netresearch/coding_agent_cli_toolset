@@ -662,7 +662,7 @@
       "latest_url": "https://github.com/docker/compose/releases/tag/2.40.3",
       "latest_version": "2.40.3",
       "status": "UP-TO-DATE",
-      "tool": "docker-compose",
+      "tool": "compose",
       "tool_url": "https://github.com/docker/compose",
       "upstream_method": "gh"
     },
