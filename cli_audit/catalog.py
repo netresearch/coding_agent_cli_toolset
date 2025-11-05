@@ -28,6 +28,9 @@ class ToolCatalogEntry:
     script: str = ""
     pinned_version: str = ""
     notes: str = ""
+    candidates: list[str] | None = None  # NEW: Binary names to search for (defaults to [binary_name])
+    category: str = ""  # NEW: Tool category (runtimes, search, editors, etc.)
+    hint: str = ""  # NEW: Installation hint (e.g., "make install-core")
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "ToolCatalogEntry":
@@ -43,6 +46,69 @@ class ToolCatalogEntry:
             script=data.get("script", ""),
             pinned_version=data.get("pinned_version", ""),
             notes=data.get("notes", ""),
+            candidates=data.get("candidates"),  # NEW
+            category=data.get("category", ""),  # NEW
+            hint=data.get("hint", ""),  # NEW
+        )
+
+    def _derive_source(self) -> tuple[str, tuple[str, ...]]:
+        """Derive source_kind and source_args from catalog metadata.
+
+        Returns:
+            Tuple of (source_kind, source_args)
+        """
+        # Priority 1: GitHub repo
+        if self.github_repo:
+            parts = self.github_repo.split("/", 1)
+            if len(parts) == 2:
+                # Check if it's GitLab
+                if "gitlab" in self.homepage.lower():
+                    return ("gitlab", (parts[0], parts[1]))
+                return ("gh", (parts[0], parts[1]))
+
+        # Priority 2: Package name + install method
+        if self.package_name:
+            if "npm" in self.install_method:
+                return ("npm", (self.package_name,))
+            elif "pip" in self.install_method or self.install_method == "pipx":
+                return ("pypi", (self.package_name,))
+            elif "cargo" in self.install_method or "crates" in self.install_method:
+                return ("crates", (self.package_name,))
+
+        # Priority 3: Detect GNU tools
+        if "gnu.org" in self.homepage:
+            return ("gnu", (self.name,))
+
+        # Default: skip (no version collection)
+        return ("skip", ())
+
+    def to_tool(self) -> "Tool":
+        """Convert catalog entry to Tool instance.
+
+        Returns:
+            Tool instance
+        """
+        from cli_audit.tools import Tool
+
+        # Derive source information
+        source_kind, source_args = self._derive_source()
+
+        # Determine candidates: use candidates field, or binary_name, or tool name as fallback
+        if self.candidates:
+            candidates = tuple(self.candidates)
+        elif self.binary_name:
+            candidates = (self.binary_name,)
+        else:
+            # Fallback: use tool name as binary name
+            candidates = (self.name,)
+
+        return Tool(
+            name=self.name,
+            candidates=candidates,
+            source_kind=source_kind,
+            source_args=source_args,
+            category=self.category or "other",
+            hint=self.hint or "",
         )
 
 
@@ -175,3 +241,13 @@ class ToolCatalog:
             List of tool names
         """
         return list(self._entries.keys())
+
+    def all_tool_definitions(self) -> list["Tool"]:
+        """Get all tools as Tool instances.
+
+        Returns:
+            List of Tool instances generated from catalog
+        """
+        from cli_audit.tools import Tool
+
+        return [entry.to_tool() for entry in self._entries.values()]
