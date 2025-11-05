@@ -234,7 +234,7 @@ while read -r line; do
 
   # Only process tools with catalog entries
   if catalog_has_tool "$tool_name"; then
-    # Check if tool is pinned to a version >= latest available or "never"
+    # Check if tool is pinned
     pinned_version="$(catalog_get_property "$tool_name" pinned_version)"
 
     # Skip if pinned to "never" (permanently skip installation)
@@ -242,34 +242,9 @@ while read -r line; do
       continue
     fi
 
-    latest_version="$(json_field "$tool_name" latest_version)"
-
-    if [ -n "$pinned_version" ] && [ -n "$latest_version" ]; then
-      # Compare versions: skip if latest <= pinned
-      # Simple numeric comparison for semantic versions
-      if "$CLI" - "$pinned_version" "$latest_version" <<'PY'
-import sys
-try:
-    pinned, latest = sys.argv[1], sys.argv[2]
-    # Strip 'v' prefix if present
-    pinned = pinned.lstrip('v')
-    latest = latest.lstrip('v')
-    # Split into parts and compare
-    p_parts = [int(x) for x in pinned.split('.')[:3]]
-    l_parts = [int(x) for x in latest.split('.')[:3]]
-    # Pad with zeros if needed
-    while len(p_parts) < 3: p_parts.append(0)
-    while len(l_parts) < 3: l_parts.append(0)
-    # Exit 0 (success) if latest <= pinned (should skip)
-    sys.exit(0 if tuple(l_parts) <= tuple(p_parts) else 1)
-except Exception:
-    # On error, don't skip (exit 1)
-    sys.exit(1)
-PY
-      then
-        # Skip this tool - pinned version is >= latest available
-        continue
-      fi
+    # Skip if pinned to any specific version (don't prompt for upgrades)
+    if [ -n "$pinned_version" ]; then
+      continue
     fi
 
     TOOLS_TO_PROCESS+=("$tool_name")
