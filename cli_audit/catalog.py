@@ -62,6 +62,7 @@ class ToolCatalog:
             self.catalog_dir = Path(catalog_dir)
 
         self._entries: dict[str, ToolCatalogEntry] = {}
+        self._raw_data: dict[str, dict[str, Any]] = {}
         self._load_catalog()
 
     def _load_catalog(self) -> None:
@@ -76,6 +77,7 @@ class ToolCatalog:
                     data = json.load(f)
                     entry = ToolCatalogEntry.from_dict(data)
                     self._entries[entry.name] = entry
+                    self._raw_data[entry.name] = data  # Store raw JSON
                     logger.debug(f"Loaded catalog entry: {entry.name}")
             except Exception as e:
                 logger.error(f"Failed to load {json_file}: {e}")
@@ -92,6 +94,28 @@ class ToolCatalog:
             ToolCatalogEntry or None if not found
         """
         return self._entries.get(tool_name)
+
+    def has_tool(self, tool_name: str) -> bool:
+        """Check if a tool exists in the catalog.
+
+        Args:
+            tool_name: Tool name
+
+        Returns:
+            True if tool exists in catalog
+        """
+        return tool_name in self._entries
+
+    def get_raw_data(self, tool_name: str) -> dict[str, Any]:
+        """Get raw JSON data for a tool.
+
+        Args:
+            tool_name: Tool name
+
+        Returns:
+            Raw catalog JSON data or empty dict if not found
+        """
+        return self._raw_data.get(tool_name, {})
 
     def is_pinned(self, tool_name: str) -> bool:
         """Check if a tool has a pinned version.

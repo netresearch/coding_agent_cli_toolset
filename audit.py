@@ -121,10 +121,18 @@ def audit_tool(tool: Tool, offline_cache: dict[str, tuple[str, str]] | None = No
     Returns:
         Dictionary with audit results
     """
+    # Load catalog metadata for version detection
+    from cli_audit.catalog import ToolCatalog
+    catalog = ToolCatalog()
+    version_args = None
+    if catalog.has_tool(tool.name):
+        catalog_data = catalog.get_raw_data(tool.name)
+        version_args = catalog_data.get("version_args")
+
     # Detect installed version
     deep_scan = tool.name in {"node", "python", "semgrep", "pre-commit", "bandit", "black", "flake8", "isort"}
     version_num, version_line, path, install_method = audit_tool_installation(
-        tool.name, tool.candidates, deep=deep_scan
+        tool.name, tool.candidates, deep=deep_scan, version_args=version_args
     )
 
     installed = version_num if version_num else (version_line if version_line != "X" else "")

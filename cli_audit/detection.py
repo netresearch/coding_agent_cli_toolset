@@ -144,16 +144,23 @@ def extract_version_number(s: str) -> str:
     return m2.group(1) if m2 else ""
 
 
-def get_version_line(path: str, tool_name: str) -> str:
+def get_version_line(path: str, tool_name: str, version_args: list[str] | None = None) -> str:
     """Get version string for installed tool.
 
     Args:
         path: Path to executable
         tool_name: Tool name for special-case handling
+        version_args: Custom version arguments from catalog (e.g., ["version"])
 
     Returns:
         Version line string or empty string
     """
+    # If catalog specifies custom version args, use them first
+    if version_args:
+        line = run_with_timeout([path] + version_args)
+        if line:
+            return line
+
     # Special cases
     if tool_name == "go":
         line = run_with_timeout([path, "version"])
@@ -202,20 +209,6 @@ def get_version_line(path: str, tool_name: str) -> str:
         except Exception:
             pass
 
-    if tool_name == "curlie":
-        # Real curlie uses "curlie version" subcommand (no dashes)
-        # Output: "curlie 1.8.2 (2025-03-07T08:52:36Z)"
-        line = run_with_timeout([path, "version"])
-        if line and "curlie" in line.lower():
-            # Real curlie binary
-            return line
-
-        # Fallback: try --version for apt/distro curl symlink
-        line = run_with_timeout([path, "--version"])
-        if line and "curl" in line.lower() and "curlie" not in line.lower():
-            # Fake curlie (apt/distro package) - mark as wrong binary
-            return "CONFLICT: apt curl masquerading as curlie"
-        return ""
 
     if tool_name == "fx":
         # fx is a Node.js tool with no --version flag
@@ -329,7 +322,7 @@ def choose_highest(candidates: list[tuple[str, str, str]]) -> tuple[str, str, st
 
 
 def audit_tool_installation(
-    tool_name: str, candidates: tuple[str, ...], deep: bool = False
+    tool_name: str, candidates: tuple[str, ...], deep: bool = False, version_args: list[str] | None = None
 ) -> tuple[str, str, str, str]:
     """Audit a single tool's installation.
 
@@ -337,6 +330,7 @@ def audit_tool_installation(
         tool_name: Tool name
         candidates: Binary names to search for
         deep: If True, find all installations
+        version_args: Custom version arguments from catalog (e.g., ["version"])
 
     Returns:
         Tuple of (version_num, version_line, path, install_method)
@@ -345,7 +339,7 @@ def audit_tool_installation(
 
     for cand in candidates:
         for path in find_paths(cand, deep=deep):
-            line = get_version_line(path, tool_name)
+            line = get_version_line(path, tool_name, version_args)
             if line:
                 num = extract_version_number(line)
                 tuples.append((num, line, path))
