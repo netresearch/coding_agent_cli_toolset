@@ -203,13 +203,16 @@ def get_version_line(path: str, tool_name: str) -> str:
             pass
 
     if tool_name == "curlie":
-        # Real curlie shows: "curlie 1.8.2\n(curl 8.5.0)"
-        # Fake/distro curlie shows only: "curl 8.5.0..."
-        line = run_with_timeout([path, "--version"])
+        # Real curlie uses "curlie version" subcommand (no dashes)
+        # Output: "curlie 1.8.2 (2025-03-07T08:52:36Z)"
+        line = run_with_timeout([path, "version"])
         if line and "curlie" in line.lower():
             # Real curlie binary
             return line
-        elif line and "curl" in line.lower():
+
+        # Fallback: try --version for apt/distro curl symlink
+        line = run_with_timeout([path, "--version"])
+        if line and "curl" in line.lower() and "curlie" not in line.lower():
             # Fake curlie (apt/distro package) - mark as wrong binary
             return "CONFLICT: apt curl masquerading as curlie"
         return ""
