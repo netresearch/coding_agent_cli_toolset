@@ -27,6 +27,10 @@ audit-offline: ## Offline audit with hints (fast local scan)
 	@bash -c 'set -o pipefail; CLI_AUDIT_OFFLINE=1 CLI_AUDIT_RENDER=1 CLI_AUDIT_GROUP=0 CLI_AUDIT_HINTS=1 CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 $(PYTHON) audit.py | \
 	$(PYTHON) smart_column.py -s "|" -t --right 3,5 --header' || true
 
+outdated: ## Show only missing and outdated tools
+	@bash -c 'set -o pipefail; CLI_AUDIT_RENDER=1 CLI_AUDIT_GROUP=0 CLI_AUDIT_HINTS=1 CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 CLI_AUDIT_FILTER_STATUS="NOT INSTALLED,OUTDATED" $(PYTHON) audit.py | \
+	$(PYTHON) smart_column.py -s "|" -t --right 3,5 --header' || true
+
 audit-%: scripts-perms ## Audit single tool (e.g., make audit-ripgrep)
 	@bash -c 'set -o pipefail; CLI_AUDIT_RENDER=1 CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 $(PYTHON) audit.py $* | \
 	$(PYTHON) smart_column.py -s "|" -t --right 3,5 --header' || true
@@ -51,9 +55,9 @@ update: ## Collect fresh version data with network calls and update snapshot (~1
 	@echo "✓ Snapshot updated. Run 'make audit' or 'make upgrade' to use it." >&2
 	@echo "" >&2
 	@echo "→ Running system health checks..." >&2
-	@$(MAKE) check-path || true
-	@$(MAKE) check-python-managers || true
-	@$(MAKE) check-node-managers || true
+	@$(MAKE) check-path 2>/dev/null || true
+	@$(MAKE) check-python-managers 2>/dev/null || true
+	@$(MAKE) check-node-managers 2>/dev/null || true
 
 update-debug: ## Collect with verbose debug output (shows network calls)
 	@bash -c 'set -o pipefail; CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 CLI_AUDIT_TIMINGS=1 $(PYTHON) audit.py --update --verbose' || true

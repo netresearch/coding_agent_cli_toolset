@@ -39,6 +39,7 @@ SHOW_HINTS = os.environ.get("CLI_AUDIT_HINTS", "1") == "1"
 COLLECT_MODE = os.environ.get("CLI_AUDIT_COLLECT", "0") == "1"
 RENDER_MODE = os.environ.get("CLI_AUDIT_RENDER", "0") == "1"
 JSON_MODE = os.environ.get("CLI_AUDIT_JSON", "0") == "1"
+FILTER_STATUS = os.environ.get("CLI_AUDIT_FILTER_STATUS", "")  # e.g., "NOT INSTALLED,OUTDATED"
 
 
 def normalize_version(version: str) -> str:
@@ -216,6 +217,11 @@ def cmd_audit(args: argparse.Namespace) -> int:
         selected = set(args.tools) if args.tools else None
         tools = render_from_snapshot(snapshot, selected)
 
+    # Apply status filter if specified
+    if FILTER_STATUS:
+        allowed_statuses = {s.strip().upper() for s in FILTER_STATUS.split(",")}
+        tools = [t for t in tools if t.get("status", "").upper() in allowed_statuses]
+
     # JSON output mode
     if JSON_MODE:
         # Enrich tools with additional fields for guide.sh compatibility
@@ -330,6 +336,7 @@ def cmd_update(args: argparse.Namespace) -> int:
                     GREEN = "\033[32m"
                     BOLD_GREEN = "\033[1;32m"
                     YELLOW = "\033[33m"
+                    BLUE = "\033[34m"
                     RED = "\033[31m"
                     RESET = "\033[0m"
 
@@ -346,9 +353,9 @@ def cmd_update(args: argparse.Namespace) -> int:
                         inst_color = YELLOW
                         latest_color = BOLD_GREEN
                         op = "⚠️"
-                    else:
-                        inst_color = RED
-                        latest_color = RED
+                    else:  # NOT INSTALLED, UNKNOWN
+                        inst_color = BLUE  # Blue for not-installed
+                        latest_color = BLUE
                         op = "?"
 
                     inst_display = inst if inst else "n/a"
