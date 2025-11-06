@@ -315,6 +315,13 @@ def audit_tool_installation(
                 num = extract_version_number(line)
                 tuples.append((num, line, path))
 
+    # If no paths found but version_command exists, try standalone version detection
+    if not tuples and version_command:
+        line = get_version_line("", tool_name, version_flag, version_command)
+        if line:
+            num = extract_version_number(line)
+            tuples.append((num, line, "<version_command>"))
+
     if not tuples:
         return ("", "X", "", "")
 
@@ -323,6 +330,11 @@ def audit_tool_installation(
         return ("", "X", "", "")
 
     version_num, version_line, path = chosen
-    install_method = detect_install_method(path, tool_name)
+
+    # Handle version_command detection (no physical path)
+    if path == "<version_command>":
+        install_method = "version_command"
+    else:
+        install_method = detect_install_method(path, tool_name)
 
     return (version_num, version_line, path, install_method)
