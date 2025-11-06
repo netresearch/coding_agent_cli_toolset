@@ -31,88 +31,83 @@ if command -v bun >/dev/null 2>&1; then
   has_bun=true
 fi
 
-# Count how many are installed
+# Count how many NON-npm managers are installed (npm doesn't count, it's bundled with Node)
 count=0
 managers=()
-if $has_npm; then count=$((count + 1)); managers+=("npm"); fi
 if $has_yarn; then count=$((count + 1)); managers+=("yarn"); fi
 if $has_pnpm; then count=$((count + 1)); managers+=("pnpm"); fi
 if $has_bun; then count=$((count + 1)); managers+=("bun"); fi
 
-# If only one is installed, check if it's the recommended one
-if [ "$count" -eq 1 ]; then
-  if $has_pnpm; then
-    echo -e "${GREEN}✓ Only pnpm is installed - recommended configuration!${NC}"
-    echo "  pnpm is fast, disk-efficient, and strictly follows package.json"
-    exit 0
-  elif $has_bun; then
-    echo -e "${GREEN}✓ Only bun is installed - excellent choice!${NC}"
-    echo "  bun is extremely fast and includes runtime + bundler"
-    exit 0
-  elif $has_npm; then
-    echo -e "${YELLOW}ℹ npm is installed (bundled with Node.js)${NC}"
-    echo ""
-    echo -e "${BLUE}Recommendation: Consider pnpm for better performance and disk efficiency${NC}"
-    echo ""
-    echo "Why pnpm?"
-    echo "  • 2x faster than npm"
-    echo "  • Saves disk space with content-addressable storage"
-    echo "  • Strict dependency resolution (no phantom dependencies)"
-    echo "  • Drop-in replacement for npm"
-    echo ""
-    echo "Install pnpm:"
-    echo "  npm install -g pnpm"
-    echo ""
-    exit 0
-  else
-    echo -e "${GREEN}✓ Only ${managers[0]} is installed${NC}"
-    exit 0
-  fi
+# Check for conflicting lock files in current directory
+has_package_lock=false
+has_yarn_lock=false
+has_pnpm_lock=false
+has_bun_lock=false
+
+if [ -f "package-lock.json" ]; then has_package_lock=true; fi
+if [ -f "yarn.lock" ]; then has_yarn_lock=true; fi
+if [ -f "pnpm-lock.yaml" ]; then has_pnpm_lock=true; fi
+if [ -f "bun.lockb" ]; then has_bun_lock=true; fi
+
+lock_count=0
+if $has_package_lock; then lock_count=$((lock_count + 1)); fi
+if $has_yarn_lock; then lock_count=$((lock_count + 1)); fi
+if $has_pnpm_lock; then lock_count=$((lock_count + 1)); fi
+if $has_bun_lock; then lock_count=$((lock_count + 1)); fi
+
+# If multiple lock files exist in current directory, warn about project-level conflict
+if [ "$lock_count" -gt 1 ]; then
+  echo -e "${RED}⚠ Multiple package manager lock files detected in current directory:${NC}"
+  if $has_package_lock; then echo "  - package-lock.json (npm)"; fi
+  if $has_yarn_lock; then echo "  - yarn.lock (yarn)"; fi
+  if $has_pnpm_lock; then echo "  - pnpm-lock.yaml (pnpm)"; fi
+  if $has_bun_lock; then echo "  - bun.lockb (bun)"; fi
+  echo ""
+  echo -e "${RED}Problem: This project has conflicting lock files!${NC}"
+  echo "  • Delete all but ONE lock file"
+  echo "  • Reinstall dependencies with chosen package manager"
+  echo "  • Add others to .gitignore"
+  echo ""
+  exit 1
 fi
 
-# If multiple managers are installed, warn
+# If only npm or npm + one other manager, that's fine (npm is unavoidable)
+if [ "$count" -eq 0 ]; then
+  if $has_npm; then
+    echo -e "${GREEN}✓ npm installed (bundled with Node.js)${NC}"
+  else
+    echo -e "${RED}⚠ No Node.js package manager found${NC}"
+    echo "Install Node.js to get npm"
+    exit 1
+  fi
+  exit 0
+fi
+
+if [ "$count" -eq 1 ]; then
+  # npm + one other manager is the common, recommended setup
+  echo -e "${GREEN}✓ Package managers: npm (Node.js bundled) + ${managers[0]}${NC}"
+  exit 0
+fi
+
+# If multiple NON-npm managers installed, provide guidance (not an error, just info)
 if [ "$count" -gt 1 ]; then
-  echo -e "${YELLOW}⚠ Multiple Node.js package managers detected:${NC}"
+  echo -e "${BLUE}ℹ Multiple Node.js package managers available:${NC}"
+  if $has_npm; then
+    version=$(npm --version 2>/dev/null || echo "unknown")
+    echo "  - npm ($version) [bundled with Node.js]"
+  fi
   for mgr in "${managers[@]}"; do
     version=""
     case $mgr in
-      npm) version=$($mgr --version 2>/dev/null || echo "unknown") ;;
-      yarn) version=$($mgr --version 2>/dev/null || echo "unknown") ;;
-      pnpm) version=$($mgr --version 2>/dev/null || echo "unknown") ;;
-      bun) version=$($mgr --version 2>/dev/null || echo "unknown") ;;
+      yarn) version=$(yarn --version 2>/dev/null || echo "unknown") ;;
+      pnpm) version=$(pnpm --version 2>/dev/null || echo "unknown") ;;
+      bun) version=$(bun --version 2>/dev/null || echo "unknown") ;;
     esac
     echo "  - $mgr ($version)"
   done
   echo ""
-  echo -e "${RED}Problems with multiple managers:${NC}"
-  echo "  • Lock file conflicts (package-lock.json vs pnpm-lock.yaml vs yarn.lock)"
-  echo "  • Different dependency resolution algorithms"
-  echo "  • Wasted disk space from multiple caches"
-  echo "  • Team confusion about which manager to use"
+  echo -e "${BLUE}Tip: Use one package manager per project (check lock files)${NC}"
   echo ""
-  echo -e "${BLUE}Recommendation: Choose ONE package manager per project${NC}"
-  echo ""
-  echo "Recommended priority:"
-  echo "  1. pnpm   - Fast, disk-efficient, strict (recommended for most projects)"
-  echo "  2. bun    - Extremely fast, includes runtime (good for new projects)"
-  echo "  3. npm    - Default, bundled with Node.js (keep for compatibility)"
-  echo "  4. yarn   - Classic choice (consider migrating to pnpm or bun)"
-  echo ""
-  echo "Project-specific guidance:"
-  echo "  • Check for existing lock files to see what your project uses"
-  echo "  • Use .npmrc or package.json 'packageManager' field to enforce choice"
-  echo "  • Consider 'pnpm' as default for new projects"
-  echo ""
-  echo "Note: npm comes bundled with Node.js and should typically be kept installed."
-  echo "You can use other managers alongside npm, but choose ONE for each project."
-  echo ""
-
-  exit 1
 fi
 
-# If none are installed (unlikely if Node.js is installed)
-echo -e "${RED}⚠ No Node.js package manager found${NC}"
-echo "Install Node.js to get npm, then optionally install pnpm:"
-echo "  nvm install --lts"
-echo "  npm install -g pnpm"
-exit 1
+exit 0
