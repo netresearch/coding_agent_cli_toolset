@@ -55,14 +55,14 @@ def extract_version_number(s: str) -> str:
     """Extract version number from a string.
 
     Args:
-        s: String potentially containing version (e.g., "v1.2.3", "tool-1.2.3")
+        s: String potentially containing version (e.g., "v1.2.3", "tool-1.2.3", "20251023")
 
     Returns:
-        Version number (e.g., "1.2.3") or empty string if not found
+        Version number (e.g., "1.2.3", "20251023") or empty string if not found
     """
     s = normalize_version_tag(s)
-    # Match version patterns like 1.2.3, 1.2, 1.2.3.4
-    match = re.search(r"\d+(?:\.\d+)+", s)
+    # Match version patterns: 1.2.3, 1.2, 1.2.3.4, 20251023 (date-based)
+    match = re.search(r"\d+(?:\.\d+)*", s)
     return match.group(0) if match else ""
 
 

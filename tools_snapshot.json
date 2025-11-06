@@ -1,8 +1,8 @@
 {
   "__meta__": {
-    "collected_at": "2025-11-06T11:04:19Z",
+    "collected_at": "2025-11-06T12:07:35Z",
     "count": 1,
-    "created_at": "2025-11-06T11:04:19Z",
+    "created_at": "2025-11-06T12:07:35Z",
     "offline": false,
     "partial_failures": 0,
     "schema_version": 1
@@ -11,16 +11,16 @@
     {
       "category": "other",
       "hint": "",
-      "installed": "1.8.17",
-      "installed_method": "uv",
-      "installed_version": "1.8.17",
-      "latest_upstream": "1.8.17",
-      "latest_url": "https://pypi.org/project/codex/",
-      "latest_version": "1.8.17",
+      "installed": "20251023",
+      "installed_method": "version_command",
+      "installed_version": "20251023",
+      "latest_upstream": "20251023",
+      "latest_url": "https://github.com/rbenv/ruby-build/releases/tag/20251023",
+      "latest_version": "20251023",
       "status": "UP-TO-DATE",
-      "tool": "codex",
-      "tool_url": "https://pypi.org/project/codex/",
-      "upstream_method": "pypi"
+      "tool": "ruby-build",
+      "tool_url": "https://github.com/rbenv/ruby-build",
+      "upstream_method": "gh"
     }
   ]
 }
