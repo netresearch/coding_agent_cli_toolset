@@ -5,6 +5,13 @@ set -euo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$DIR/lib/install_strategy.sh"
 
+# Load nvm if available (needed for node-based package managers)
+export NVM_DIR="$HOME/.nvm"
+if [ -s "$NVM_DIR/nvm.sh" ]; then
+  . "$NVM_DIR/nvm.sh" --no-use
+  nvm use default >/dev/null 2>&1 || true
+fi
+
 TOOL="${1:-}"
 if [ -z "$TOOL" ]; then
   echo "Usage: $0 TOOL_NAME" >&2
