@@ -1,8 +1,8 @@
 {
   "__meta__": {
-    "collected_at": "2025-11-06T10:11:22Z",
+    "collected_at": "2025-11-06T10:22:20Z",
     "count": 73,
-    "created_at": "2025-11-06T10:11:22Z",
+    "created_at": "2025-11-06T10:22:20Z",
     "offline": false,
     "partial_failures": 0,
     "schema_version": 1
@@ -277,20 +277,6 @@
     {
       "category": "other",
       "hint": "",
-      "installed": "9.37.0",
-      "installed_method": "manual",
-      "installed_version": "9.37.0",
-      "latest_upstream": "9.39.1",
-      "latest_url": "https://github.com/eslint/eslint/releases/tag/9.39.1",
-      "latest_version": "9.39.1",
-      "status": "OUTDATED",
-      "tool": "eslint",
-      "tool_url": "https://github.com/eslint/eslint",
-      "upstream_method": "gh"
-    },
-    {
-      "category": "other",
-      "hint": "",
       "installed": "24.11.0",
       "installed_method": "nvm",
       "installed_version": "24.11.0",
@@ -496,20 +482,6 @@
       "status": "UP-TO-DATE",
       "tool": "shfmt",
       "tool_url": "https://github.com/mvdan/sh",
-      "upstream_method": "gh"
-    },
-    {
-      "category": "other",
-      "hint": "",
-      "installed": "2.40.2",
-      "installed_method": "system",
-      "installed_version": "2.40.2",
-      "latest_upstream": "2.40.3",
-      "latest_url": "https://github.com/docker/compose/releases/tag/2.40.3",
-      "latest_version": "2.40.3",
-      "status": "OUTDATED",
-      "tool": "compose",
-      "tool_url": "https://github.com/docker/compose",
       "upstream_method": "gh"
     },
     {
@@ -781,20 +753,6 @@
     {
       "category": "other",
       "hint": "",
-      "installed": "",
-      "installed_method": "",
-      "installed_version": "",
-      "latest_upstream": "0.14.3",
-      "latest_url": "https://pypi.org/project/ruff/",
-      "latest_version": "0.14.3",
-      "status": "NOT INSTALLED",
-      "tool": "ruff",
-      "tool_url": "https://pypi.org/project/ruff/",
-      "upstream_method": "pypi"
-    },
-    {
-      "category": "other",
-      "hint": "",
       "installed": "1.8.6",
       "installed_method": "uv",
       "installed_version": "1.8.6",
@@ -1029,6 +987,48 @@
       "tool": "terraform",
       "tool_url": "https://github.com/hashicorp/terraform",
       "upstream_method": "gh"
+    },
+    {
+      "category": "other",
+      "hint": "",
+      "installed": "9.37.0",
+      "installed_method": "manual",
+      "installed_version": "9.37.0",
+      "latest_upstream": "9.39.1",
+      "latest_url": "https://github.com/eslint/eslint/releases/tag/9.39.1",
+      "latest_version": "9.39.1",
+      "status": "OUTDATED",
+      "tool": "eslint",
+      "tool_url": "https://github.com/eslint/eslint",
+      "upstream_method": "gh"
+    },
+    {
+      "category": "other",
+      "hint": "",
+      "installed": "2.40.2",
+      "installed_method": "system",
+      "installed_version": "2.40.2",
+      "latest_upstream": "2.40.3",
+      "latest_url": "https://github.com/docker/compose/releases/tag/2.40.3",
+      "latest_version": "2.40.3",
+      "status": "OUTDATED",
+      "tool": "compose",
+      "tool_url": "https://github.com/docker/compose",
+      "upstream_method": "gh"
+    },
+    {
+      "category": "other",
+      "hint": "",
+      "installed": "0.14.3",
+      "installed_method": "uv",
+      "installed_version": "0.14.3",
+      "latest_upstream": "0.14.3",
+      "latest_url": "https://pypi.org/project/ruff/",
+      "latest_version": "0.14.3",
+      "status": "UP-TO-DATE",
+      "tool": "ruff",
+      "tool_url": "https://pypi.org/project/ruff/",
+      "upstream_method": "pypi"
     }
   ]
 }

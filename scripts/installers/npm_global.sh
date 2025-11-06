@@ -20,9 +20,18 @@ fi
 # Parse catalog
 PACKAGE_NAME="$(jq -r '.package_name // .name' "$CATALOG_FILE")"
 
-# Ensure npm is available
-if ! command -v npm >/dev/null 2>&1; then
-  echo "[$TOOL] Error: npm not found. Please install Node.js and npm first." >&2
+# Detect available package manager (pnpm > npm > yarn)
+PKG_MANAGER=""
+if command -v pnpm >/dev/null 2>&1; then
+  PKG_MANAGER="pnpm"
+elif command -v npm >/dev/null 2>&1; then
+  PKG_MANAGER="npm"
+elif command -v yarn >/dev/null 2>&1; then
+  PKG_MANAGER="yarn"
+fi
+
+if [ -z "$PKG_MANAGER" ]; then
+  echo "[$TOOL] Error: No package manager found (pnpm, npm, or yarn required)" >&2
   exit 1
 fi
 
@@ -33,11 +42,27 @@ if command -v "$TOOL" >/dev/null 2>&1; then
 fi
 
 # Install or upgrade globally
-echo "[$TOOL] Installing npm package globally: $PACKAGE_NAME" >&2
-npm install -g "$PACKAGE_NAME" || {
-  echo "[$TOOL] Error: npm install failed" >&2
-  exit 1
-}
+echo "[$TOOL] Installing package globally via $PKG_MANAGER: $PACKAGE_NAME" >&2
+case "$PKG_MANAGER" in
+  pnpm)
+    pnpm add -g "$PACKAGE_NAME" || {
+      echo "[$TOOL] Error: pnpm install failed" >&2
+      exit 1
+    }
+    ;;
+  npm)
+    npm install -g "$PACKAGE_NAME" || {
+      echo "[$TOOL] Error: npm install failed" >&2
+      exit 1
+    }
+    ;;
+  yarn)
+    yarn global add "$PACKAGE_NAME" || {
+      echo "[$TOOL] Error: yarn install failed" >&2
+      exit 1
+    }
+    ;;
+esac
 
 # Report
 after=""
