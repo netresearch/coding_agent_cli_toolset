@@ -31,6 +31,7 @@ class ToolCatalogEntry:
     candidates: list[str] | None = None  # NEW: Binary names to search for (defaults to [binary_name])
     category: str = ""  # NEW: Tool category (runtimes, search, editors, etc.)
     hint: str = ""  # NEW: Installation hint (e.g., "make install-core")
+    _raw_data: dict[str, Any] | None = None  # NEW: Raw catalog JSON for extended fields
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "ToolCatalogEntry":
@@ -49,6 +50,7 @@ class ToolCatalogEntry:
             candidates=data.get("candidates"),  # NEW
             category=data.get("category", ""),  # NEW
             hint=data.get("hint", ""),  # NEW
+            _raw_data=data,  # NEW: Store raw data
         )
 
     def _derive_source(self) -> tuple[str, tuple[str, ...]]:
@@ -89,9 +91,14 @@ class ToolCatalogEntry:
             elif "cargo" in self.install_method or "crates" in self.install_method:
                 return ("crates", (self.package_name,))
 
-        # Priority 3: Detect GNU tools
+        # Priority 3: GNU FTP releases (check raw data for ftp_url field)
+        if self._raw_data and self._raw_data.get("ftp_url"):
+            return ("gnu", (self.name, self._raw_data["ftp_url"]))
+
+        # Priority 4: Detect GNU tools from homepage
         if "gnu.org" in self.homepage:
-            return ("gnu", (self.name,))
+            # Construct default FTP URL
+            return ("gnu", (self.name, f"https://ftp.gnu.org/gnu/{self.name}/"))
 
         # Default: skip (no version collection)
         return ("skip", ())

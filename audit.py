@@ -103,6 +103,9 @@ def collect_latest_version(tool: Tool, offline_cache: dict[str, tuple[str, str]]
         elif tool.source_kind == "crates" and tool.source_args:
             crate = tool.source_args[0]
             return collectors.collect_crates(crate, offline_cache)
+        elif tool.source_kind == "gnu" and len(tool.source_args) >= 2:
+            tool_name, ftp_url = tool.source_args[0], tool.source_args[1]
+            return collectors.collect_gnu(tool_name, ftp_url, offline_cache)
         else:
             return ("", "")
     except Exception as e:

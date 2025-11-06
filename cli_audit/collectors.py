@@ -307,6 +307,72 @@ def collect_crates(crate: str, offline_cache: dict[str, tuple[str, str]] | None 
     return "", ""
 
 
+def collect_gnu(tool_name: str, ftp_url: str, offline_cache: dict[str, tuple[str, str]] | None = None) -> tuple[str, str]:
+    """Collect latest version from GNU FTP mirror.
+
+    Args:
+        tool_name: Tool name
+        ftp_url: GNU FTP URL (e.g., "https://ftp.gnu.org/gnu/parallel/")
+        offline_cache: Optional offline cache for fallback
+
+    Returns:
+        Tuple of (version, version_number) or ("", "") if not found
+    """
+    try:
+        # Fetch FTP directory listing
+        response = http_get(ftp_url, timeout=5).decode("utf-8", errors="ignore")
+
+        # Extract tarball filenames matching: tool-YYYYMMDD.tar.* or tool-X.Y.Z.tar.*
+        # Example patterns:
+        #   parallel-20251022.tar.gz
+        #   make-4.4.1.tar.gz
+        pattern = re.compile(rf'{re.escape(tool_name)}-(\d{{8}}|\d+(?:\.\d+)+)\.tar\.')
+        versions = []
+
+        for match in pattern.finditer(response):
+            version = match.group(1)
+            versions.append(version)
+
+        if not versions:
+            logger.debug(f"GNU FTP {tool_name}: No versions found in {ftp_url}")
+            # Try offline cache
+            if offline_cache and tool_name in offline_cache:
+                logger.debug(f"GNU FTP {tool_name}: Using offline cache")
+                return offline_cache[tool_name]
+            return "", ""
+
+        # Sort versions
+        # For date-based versions (8 digits): sort as integers
+        # For semver versions: sort using version comparison
+        if all(len(v) == 8 and v.isdigit() for v in versions):
+            # Date-based versions (YYYYMMDD)
+            latest = max(versions, key=lambda v: int(v))
+        else:
+            # Semantic versions - sort by version components
+            def version_key(v: str) -> tuple:
+                try:
+                    return tuple(int(x) for x in v.split('.'))
+                except ValueError:
+                    return (0,)
+
+            latest = max(versions, key=version_key)
+
+        version_num = extract_version_number(latest) if not latest.isdigit() else latest
+        logger.debug(f"GNU FTP {tool_name}: {latest}")
+        return latest, version_num
+
+    except Exception as e:
+        logger.debug(f"GNU FTP failed for {tool_name}: {e}")
+
+    # Use offline cache if available
+    if offline_cache and tool_name in offline_cache:
+        logger.debug(f"GNU FTP {tool_name}: Using offline cache")
+        return offline_cache[tool_name]
+
+    logger.warning(f"GNU FTP {tool_name}: No version found")
+    return "", ""
+
+
 def get_github_rate_limit() -> dict[str, Any]:
     """Get GitHub API rate limit status.
 
