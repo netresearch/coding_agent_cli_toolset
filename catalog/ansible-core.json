@@ -4,7 +4,7 @@
   "description": "Ansible core automation engine",
   "homepage": "https://ansible.com",
   "github_repo": "ansible/ansible",
-  "binary_name": "ansible-core",
+  "binary_name": "ansible",
   "package_name": "ansible-core",
   "guide": {
     "display_name": "Ansible Core",
