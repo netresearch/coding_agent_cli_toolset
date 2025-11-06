@@ -52,7 +52,11 @@ audit-auto: ## Update snapshot if missing, then render
 update: ## Collect fresh version data with network calls and update snapshot (~10s)
 	@echo "→ Collecting fresh version data from upstream sources..." >&2
 	@bash -c 'set -o pipefail; CLI_AUDIT_COLLECT=1 CLI_AUDIT_TIMINGS=1 $(PYTHON) audit.py --update' || true
-	@echo "✓ Snapshot updated. Run 'make audit' or 'make upgrade' to use it." >&2
+	@echo "✓ Snapshot updated. Next steps:" >&2
+	@echo "  • make audit              - View tool status" >&2
+	@echo "  • make upgrade            - Interactive upgrade guide" >&2
+	@echo "  • make upgrade-dry-run    - Preview package manager upgrades" >&2
+	@echo "  • make upgrade-managed    - Upgrade all package managers" >&2
 	@echo "" >&2
 	@echo "→ Running system health checks..." >&2
 	@$(MAKE) check-path 2>/dev/null || true
