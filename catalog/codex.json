@@ -5,5 +5,6 @@
   "homepage": "https://github.com/codex-cli/codex",
   "package_name": "codex",
   "python_version": "3.13",
-  "notes": "Codex is a web server app - use uv tool list for version detection. Running codex --version starts the full server and hangs."
+  "version_command": "uv tool list | grep '^codex ' | awk '{print $2}'",
+  "notes": "Codex is a web server app - running codex --version starts the full server. Use uv tool list for version detection."
 }
