@@ -7,7 +7,7 @@
 
 AI CLI Preparation is a specialized environment audit tool designed to ensure AI coding agents (like Claude Code) have access to all necessary developer tools. This documentation provides comprehensive technical details for developers, contributors, and integrators.
 
-**Architecture:** Modular design with 18 specialized Python modules and 67 JSON tool catalog entries, evolved from a 3,387-line monolith to a maintainable, extensible system.
+**Architecture:** Modular design with 18 specialized Python modules and 73 JSON tool catalog entries, evolved from a 3,387-line monolith to a maintainable, extensible system.
 
 **Project Status:**
 - **Phase 1 (Detection & Auditing):** ✅ Complete - Modular refactoring complete (v2.0.0)
@@ -34,7 +34,7 @@ AI CLI Preparation is a specialized environment audit tool designed to ensure AI
 
 2. **[CATALOG_GUIDE.md](CATALOG_GUIDE.md)** - JSON Catalog System ⭐ **NEW**
    - Tool definition schema and structure
-   - 67 JSON catalog entries
+   - 73 JSON catalog entries
    - Creating and managing catalog entries
    - ToolCatalog API and usage patterns
    - Community contribution workflows
@@ -47,12 +47,12 @@ AI CLI Preparation is a specialized environment audit tool designed to ensure AI
    - Common workflows and patterns
    - jq queries and debugging commands
 
-4. **[API_REFERENCE.md](API_REFERENCE.md)** - Modular API Documentation
-   - 18-module API reference
-   - Tool dataclass specification
-   - Core audit functions by category
-   - Configuration via environment variables
-   - Cache file formats and schemas
+4. **[API_REFERENCE.md](API_REFERENCE.md)** - Comprehensive API Documentation
+   - Complete API reference covering 100+ public APIs
+   - All 18 modules with detailed examples
+   - Detection, installation, upgrade, reconciliation APIs
+   - Configuration and environment variables
+   - Advanced usage patterns and integration examples
 
 5. **[FUNCTION_REFERENCE.md](FUNCTION_REFERENCE.md)** - Function Reference Card
    - Categorized function quick lookup
@@ -273,7 +273,7 @@ Documentation improvements are welcome! Please:
 
 - **v2.0.0 (2025-11-03)**: Modular architecture release
   - 18 specialized Python modules
-  - 67 JSON tool catalog entries
+  - 73 JSON tool catalog entries
   - New entry point: audit.py
   - Backward-compatible API via __init__.py
 

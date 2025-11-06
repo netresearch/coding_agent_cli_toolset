@@ -7,7 +7,7 @@
 
 Version 2.0 represents a major architectural evolution from a 3,387-line monolithic `cli_audit.py` to a modular design with:
 - **18 specialized Python modules** (6,608 total lines)
-- **67 JSON tool catalog entries**
+- **73 JSON tool catalog entries**
 - **New entry point:** `audit.py` (50 lines)
 - **Backward-compatible API** via `__init__.py` exports
 
@@ -73,7 +73,7 @@ cli_audit/
 - Required code changes to add tools
 
 **After (v2.0):**
-- Tools defined in `catalog/*.json` files (67 entries)
+- Tools defined in `catalog/*.json` files (73 entries)
 - Add tools by creating JSON files (no code changes)
 - Python TOOLS tuple remains as fallback
 
@@ -88,7 +88,7 @@ cli_audit/
 - `tests/` directory
 
 **New:**
-- `catalog/` directory (67 JSON files)
+- `catalog/` directory (73 JSON files)
 - `cli_audit/` package (18 Python modules)
 - `audit.py` entry point
 
