@@ -57,6 +57,11 @@ class ToolCatalogEntry:
         Returns:
             Tuple of (source_kind, source_args)
         """
+        # Priority 0: Skip version checking for pure package_manager tools
+        # These are OS-managed and can't be manually upgraded
+        if self.install_method == "package_manager" and not self.github_repo and not self.package_name:
+            return ("skip", ())
+
         # Priority 1: GitHub repo
         if self.github_repo:
             parts = self.github_repo.split("/", 1)
