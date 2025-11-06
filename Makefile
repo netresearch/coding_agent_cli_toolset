@@ -1,5 +1,8 @@
 PYTHON ?= python3
 
+# Suppress "Entering directory" / "Leaving directory" messages
+MAKEFLAGS += --no-print-directory
+
 # Load defaults in precedence order: .env.default < .env (highest)
 -include .env.default
 -include .env
