@@ -292,6 +292,10 @@ def cmd_audit(args: argparse.Namespace) -> int:
     # Print summary
     print_summary(snapshot, tools)
 
+    # Suggest package manager upgrades
+    from cli_audit.catalog import suggest_package_manager_upgrades
+    suggest_package_manager_upgrades()
+
     return 0
 
 
@@ -434,6 +438,10 @@ def cmd_update(args: argparse.Namespace) -> int:
                 print(f"⚠️  GitHub rate limit: {remaining}/{limit} remaining", file=sys.stderr)
             else:
                 print(f"✓ GitHub rate limit: {remaining}/{limit} remaining", file=sys.stderr)
+
+        # Suggest package manager upgrades
+        from cli_audit.catalog import suggest_package_manager_upgrades
+        suggest_package_manager_upgrades()
 
         # Reset terminal state (reset colors + ensure echo mode)
         # \033[0m = reset colors/attributes

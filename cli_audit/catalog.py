@@ -265,3 +265,88 @@ class ToolCatalog:
         from cli_audit.tools import Tool
 
         return [entry.to_tool() for entry in self._entries.values()]
+
+    def get_package_manager_tools(self) -> list[ToolCatalogEntry]:
+        """Get tools that use package_manager install method.
+
+        Returns:
+            List of ToolCatalogEntry instances with install_method=package_manager
+        """
+        return [
+            entry
+            for entry in self._entries.values()
+            if entry.install_method == "package_manager"
+        ]
+
+
+def detect_package_manager() -> tuple[str, str] | None:
+    """Detect the current OS package manager and upgrade command.
+
+    Returns:
+        Tuple of (package_manager_name, upgrade_command) or None if not detected
+    """
+    import platform
+    import shutil
+
+    # Check for package managers in order of preference
+    if shutil.which("apt"):
+        return ("apt", "sudo apt update && sudo apt upgrade")
+    elif shutil.which("dnf"):
+        return ("dnf", "sudo dnf upgrade")
+    elif shutil.which("yum"):
+        return ("yum", "sudo yum update")
+    elif shutil.which("pacman"):
+        return ("pacman", "sudo pacman -Syu")
+    elif shutil.which("zypper"):
+        return ("zypper", "sudo zypper update")
+    elif shutil.which("brew"):
+        return ("brew", "brew upgrade")
+    elif shutil.which("apk"):
+        return ("apk", "sudo apk upgrade")
+
+    return None
+
+
+def suggest_package_manager_upgrades(catalog: ToolCatalog | None = None) -> None:
+    """Print package manager upgrade suggestions.
+
+    Args:
+        catalog: ToolCatalog instance (creates new one if None)
+    """
+    import sys
+
+    if catalog is None:
+        catalog = ToolCatalog()
+
+    # Detect package manager
+    pm_info = detect_package_manager()
+    if not pm_info:
+        return  # No package manager detected, silently skip
+
+    pm_name, upgrade_cmd = pm_info
+
+    # Get tools managed by package managers
+    pm_tools = catalog.get_package_manager_tools()
+    if not pm_tools:
+        return  # No package-manager tools in catalog
+
+    # Check which tools have package_name or github_repo (these check upstream separately)
+    os_only_tools = [
+        t.name
+        for t in pm_tools
+        if not t.github_repo and not t.package_name
+    ]
+
+    if not os_only_tools:
+        return  # All package_manager tools check upstream separately
+
+    print("", file=sys.stderr)
+    print("=" * 80, file=sys.stderr)
+    print("📦 Package Manager Updates", file=sys.stderr)
+    print("=" * 80, file=sys.stderr)
+    print(f"Some tools are OS-managed and updated via {pm_name}:", file=sys.stderr)
+    print(f"  {', '.join(sorted(os_only_tools))}", file=sys.stderr)
+    print("", file=sys.stderr)
+    print(f"To update OS-managed packages, run:", file=sys.stderr)
+    print(f"  {upgrade_cmd}", file=sys.stderr)
+    print("", file=sys.stderr)
