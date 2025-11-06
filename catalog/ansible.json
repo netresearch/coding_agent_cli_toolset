@@ -3,7 +3,7 @@
   "install_method": "uv_tool",
   "description": "Radically simple IT automation",
   "homepage": "https://github.com/ansible/ansible",
-  "package_name": "ansible",
+  "package_name": "ansible-core",
   "notes": "Installation handled by install_ansible.sh which uses uv tool or pipx"
   ,"guide": {
     "display_name": "Ansible",
