@@ -37,6 +37,7 @@ node_modules/
 
 # AI agent session context (not committed)
 claudedocs/
+.serena/
 
 # Runtime directories
 config/
