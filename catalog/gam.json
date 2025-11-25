@@ -5,7 +5,6 @@
   "homepage": "https://github.com/GAM-team/GAM",
   "github_repo": "GAM-team/GAM",
   "binary_name": "gam",
-  "package_name": "gam7",
-  "version_command": "uv tool list | grep '^gam7 ' | awk '{print $2}'",
-  "notes": "Running gam version outputs Python version first which confuses detection. Use uv tool list instead."
+  "version_flag": "version",
+  "package_name": "gam7"
 }
