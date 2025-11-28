@@ -32,7 +32,7 @@ htmlcov/
 # Local overrides
 *.local
 
-# Node.js (minimal usage for Claude Code dependency)
+# Node.js
 node_modules/
 
 # AI agent session context (not committed)
