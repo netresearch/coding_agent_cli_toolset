@@ -34,7 +34,6 @@ ai_cli_preparation/
 ├── latest_versions.json          # Manual cache + hints
 ├── tools_snapshot.json           # Audit results snapshot
 ├── Makefile                      # Build targets
-├── package.json                  # Claude Code dependency
 ├── scripts/                      # Installation scripts
 │   ├── install_core.sh
 │   ├── install_python.sh
@@ -194,7 +193,7 @@ CLI_AUDIT_TRACE=1 python3 cli_audit.py
 
 ## Integration Points
 
-**Claude Code Dependency:** package.json includes @anthropic-ai/claude-code ^2.0.11
+**Claude Code:** Tracked via catalog/claude.json (not as npm dependency)
 
 **Use Case:** Ensures Claude Code and other AI agents have access to all necessary developer tools (ripgrep for code search, ast-grep for semantic search, jq for JSON parsing, git/gh for version control, etc.)
 
@@ -246,8 +245,7 @@ CLI_AUDIT_TRACE=1 python3 cli_audit.py
 
 **Branch:** main
 **Working Tree:** Modified (documentation updates in progress)
-**Modified:** latest_versions.json, package.json, package-lock.json, tools_snapshot.json, docs/
-**Untracked:** node_modules/
+**Modified:** latest_versions.json, tools_snapshot.json, docs/
 **Remote:** git@github.com:netresearch/coding_agent_cli_toolset.git
 
 **Recent commits (2025-10-18 - upgrade-all feature):**
