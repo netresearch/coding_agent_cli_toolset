@@ -7,7 +7,7 @@ name = "cli_audit"
 version = "2.0.0-alpha.6"
 description = "Tool version auditing and installation management for AI coding agents"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.14"
 license = {text = "MIT"}
 authors = [
     {name = "AI CLI Preparation Contributors"}
@@ -18,10 +18,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.14",
 ]
 dependencies = [
     "packaging>=25.0",
@@ -55,7 +52,7 @@ Repository = "https://github.com/your-org/ai_cli_preparation"
 
 [tool.black]
 line-length = 127
-target-version = ['py39', 'py310', 'py311', 'py312']
+target-version = ['py314']
 include = '\.pyi?$'
 extend-exclude = '''
 /(
@@ -116,7 +113,7 @@ exclude_lines = [
 ]
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.14"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
