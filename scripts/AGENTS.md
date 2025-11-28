@@ -1,4 +1,4 @@
-<!-- Managed by agent: keep sections & order; edit content, not structure. Last updated: 2025-11-03 -->
+<!-- Managed by agent: keep sections & order; edit content, not structure. Last updated: 2025-11-29 -->
 
 # Installation Scripts - Agent Guide
 
@@ -350,7 +350,7 @@ update_rust() {
 
 **Reconcile fails:**
 1. Check current installation: `which <tool>`
-2. Check installation method: `python3 audit.py --only <tool>` or `make audit`
+2. Check installation method: `python3 audit.py <tool>` or `make audit`
 3. Manually remove old version first: `apt remove <tool>` or `cargo uninstall <tool>`
 
 **Documentation:**

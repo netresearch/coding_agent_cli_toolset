@@ -1,8 +1,8 @@
 {
   "__meta__": {
-    "collected_at": "2025-11-28T23:08:26Z",
+    "collected_at": "2025-11-28T23:11:19Z",
     "count": 74,
-    "created_at": "2025-11-28T23:08:26Z",
+    "created_at": "2025-11-28T23:11:19Z",
     "offline": false,
     "partial_failures": 0,
     "schema_version": 1
@@ -907,20 +907,6 @@
     {
       "category": "other",
       "hint": "",
-      "installed": "1.13.5",
-      "installed_method": "manual",
-      "installed_version": "1.13.5",
-      "latest_upstream": "1.14.0",
-      "latest_url": "https://github.com/hashicorp/terraform/releases/tag/1.14.0",
-      "latest_version": "1.14.0",
-      "status": "OUTDATED",
-      "tool": "terraform",
-      "tool_url": "https://github.com/hashicorp/terraform",
-      "upstream_method": "gh"
-    },
-    {
-      "category": "other",
-      "hint": "",
       "installed": "4.48.1",
       "installed_method": "manual",
       "installed_version": "4.48.1",
@@ -1042,6 +1028,20 @@
       "status": "UP-TO-DATE",
       "tool": "kubectl",
       "tool_url": "https://github.com/kubernetes/kubernetes",
+      "upstream_method": "gh"
+    },
+    {
+      "category": "other",
+      "hint": "",
+      "installed": "1.14.0",
+      "installed_method": "manual",
+      "installed_version": "1.14.0",
+      "latest_upstream": "1.14.0",
+      "latest_url": "https://github.com/hashicorp/terraform/releases/tag/1.14.0",
+      "latest_version": "1.14.0",
+      "status": "UP-TO-DATE",
+      "tool": "terraform",
+      "tool_url": "https://github.com/hashicorp/terraform",
       "upstream_method": "gh"
     }
   ]

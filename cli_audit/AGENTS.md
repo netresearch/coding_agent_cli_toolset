@@ -1,4 +1,4 @@
-<!-- Managed by agent: keep sections & order; edit content, not structure. Last updated: 2025-11-03 -->
+<!-- Managed by agent: keep sections & order; edit content, not structure. Last updated: 2025-11-29 -->
 
 # cli_audit/ — Python Package
 
@@ -10,7 +10,7 @@ The `cli_audit` package provides the core functionality for AI CLI Preparation:
 
 **Phase 1: Detection & Auditing (6 modules)**
 - `tools.py` — Tool definitions and metadata
-- `catalog.py` — JSON catalog management (67 entries)
+- `catalog.py` — JSON catalog management (74 entries)
 - `detection.py` — Installation detection, version extraction
 - `collectors.py` — Upstream version collection (GitHub, PyPI, npm, crates)
 - `snapshot.py` — Snapshot-based caching
@@ -268,7 +268,7 @@ except json.JSONDecodeError as e:
 **Debugging:**
 ```bash
 # Enable debug logging
-CLI_AUDIT_DEBUG=1 python3 audit.py --only ripgrep
+CLI_AUDIT_DEBUG=1 python3 audit.py ripgrep
 
 # Test specific module
 python3 -c "from cli_audit.catalog import ToolCatalog; c = ToolCatalog(); print(len(c))"

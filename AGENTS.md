@@ -1,4 +1,4 @@
-<!-- Managed by agent: keep sections & order; edit content, not structure. Last updated: 2025-11-03 -->
+<!-- Managed by agent: keep sections & order; edit content, not structure. Last updated: 2025-11-29 -->
 
 # AGENTS.md (root)
 
@@ -17,7 +17,7 @@
 
 **AI CLI Preparation v2.0** - Tool version auditing and installation management for AI coding agents.
 
-**Architecture:** Modular design with 18 specialized Python modules, 67 JSON tool catalogs, and comprehensive testing.
+**Architecture:** Modular design with 18 specialized Python modules, 74 JSON tool catalogs, and comprehensive testing.
 
 - **Phase 1 (Complete):** Detection & auditing with modular refactoring
 - **Phase 2 (Complete):** Installation & upgrade management
@@ -52,15 +52,17 @@ make audit                   # Verify core workflows
 make audit               # Render from snapshot (<100ms)
 make update              # Collect fresh versions (~7s)
 make upgrade             # Interactive upgrade guide
+make upgrade-all         # Complete 5-stage system upgrade
 
 python3 audit.py         # Direct invocation
-python3 audit.py --only ripgrep  # Single tool audit
+python3 audit.py ripgrep # Single tool audit
+python3 audit.py --update ripgrep  # Update single tool
 ```
 
 **Key files:**
-- `audit.py` — Entry point (50 lines)
-- `cli_audit/` — 18 Python modules (6,608 lines)
-- `catalog/` — 67 JSON tool definitions
+- `audit.py` — Entry point
+- `cli_audit/` — 18 Python modules (~7K lines)
+- `catalog/` — 74 JSON tool definitions
 - `latest_versions.json` — Version cache
 - `tools_snapshot.json` — Snapshot data
 
