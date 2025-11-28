@@ -23,7 +23,7 @@
 
 **Shared utilities:** `lib/` directory (colors, logging, common functions)
 
-## Setup
+## Setup & environment
 
 **Requirements:**
 - Bash 4.0+
@@ -43,7 +43,7 @@ DEBUG=1                                      # Verbose output
 make scripts-perms  # Ensure all scripts are executable
 ```
 
-## Build & Tests
+## Build & tests
 
 **Run individual script:**
 ```bash
@@ -79,7 +79,7 @@ DEBUG=1 ./scripts/install_python.sh
 bash -x ./scripts/install_python.sh  # Trace execution
 ```
 
-## Code Style
+## Code style & conventions
 
 **Shell standards:**
 - Bash 4.0+ features allowed
@@ -165,7 +165,7 @@ if [[ "${FORCE_INSTALL:-0}" != "1" ]]; then
 fi
 ```
 
-## Security
+## Security & safety
 
 **Download verification:**
 ```bash
@@ -213,7 +213,7 @@ fi
 - Use environment variables: `${GITHUB_TOKEN:-}`
 - Document required env vars in script comments
 
-## PR/Commit Checklist
+## PR/commit checklist
 
 **Before commit:**
 - [ ] Run `shellcheck <script>` (if available)
@@ -237,7 +237,7 @@ fi
 - `fix(install-python): handle uv bootstrap failure`
 - `docs(scripts): update README with reconcile action`
 
-## Good vs Bad Examples
+## Good vs. bad examples
 
 **Good: Robust download with fallback**
 ```bash
@@ -326,7 +326,7 @@ update_rust() {
 }
 ```
 
-## When Stuck
+## When stuck
 
 **Script fails silently:**
 1. Add debug: `bash -x ./scripts/install_<tool>.sh`
@@ -358,7 +358,7 @@ update_rust() {
 - Troubleshooting: [../docs/TROUBLESHOOTING.md](../docs/TROUBLESHOOTING.md)
 - Architecture: [../docs/DEPLOYMENT.md](../docs/DEPLOYMENT.md#installation-scripts)
 
-## House Rules
+## House rules
 
 **Installation preferences** (Phase 2 planning):
 - User-level preferred: `~/.local/bin` (workstations)
