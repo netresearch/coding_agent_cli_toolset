@@ -5,6 +5,7 @@ Tests for bulk installation operations.
 from __future__ import annotations
 
 import os
+import sys
 import tempfile
 import threading
 import time
@@ -28,6 +29,12 @@ from cli_audit.bulk import (
 from cli_audit.config import Config, Preferences, ToolConfig
 from cli_audit.environment import Environment
 from cli_audit.installer import InstallResult, StepResult
+
+# Skip marker for Windows (rollback scripts are Unix shell scripts)
+skip_on_windows = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Rollback scripts use Unix shell syntax"
+)
 
 
 class TestToolSpec:
@@ -457,6 +464,7 @@ class TestGroupByPackageManager:
         assert len(groups["uv"]) == 2
 
 
+@skip_on_windows
 class TestGenerateRollbackScript:
     """Tests for generate_rollback_script function."""
 
@@ -572,6 +580,7 @@ class TestGenerateRollbackScript:
 class TestExecuteRollback:
     """Tests for execute_rollback function."""
 
+    @skip_on_windows
     def test_execute_rollback_success(self):
         """Test successful rollback execution."""
         # Create a simple rollback script
@@ -610,6 +619,7 @@ class TestExecuteRollback:
 class TestBulkInstall:
     """Tests for bulk_install main function."""
 
+    @skip_on_windows
     @patch("cli_audit.bulk.install_tool")
     @patch("cli_audit.bulk.get_missing_tools")
     def test_bulk_install_explicit_success(self, mock_get_missing, mock_install):
@@ -727,6 +737,7 @@ class TestBulkInstall:
         assert result.tools_attempted == ("ripgrep", "black")
         assert len(result.successes) == 0
 
+    @skip_on_windows
     @patch("cli_audit.bulk.install_tool")
     def test_bulk_install_fail_fast(self, mock_install):
         """Test bulk install with fail-fast mode with dependencies."""
@@ -787,6 +798,7 @@ class TestBulkInstall:
         assert len(result.failures) == 1
         assert call_count == 2  # Should have stopped after second tool
 
+    @skip_on_windows
     @patch("cli_audit.bulk.install_tool")
     def test_bulk_install_parallel(self, mock_install):
         """Test parallel bulk install."""
@@ -834,6 +846,7 @@ class TestBulkInstall:
         assert len(result.successes) == 4
         assert install_count == 4
 
+    @skip_on_windows
     @patch("cli_audit.bulk.install_tool")
     @patch("cli_audit.bulk.execute_rollback")
     def test_bulk_install_atomic_rollback(self, mock_rollback, mock_install):
