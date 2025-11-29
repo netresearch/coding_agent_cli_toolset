@@ -5,11 +5,18 @@ Tests for reconciliation operations.
 from __future__ import annotations
 
 import os
+import sys
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch, mock_open
 
 import pytest
+
+# Skip marker for Windows (Unix-style paths and PATH separator differences)
+skip_on_windows = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Uses Unix-style paths and PATH separator (:)"
+)
 
 from cli_audit.reconcile import (
     Installation,
@@ -124,6 +131,7 @@ class TestClassifyInstallMethod:
 class TestDetectInstallations:
     """Tests for installation detection."""
 
+    @skip_on_windows
     @patch("cli_audit.reconcile.validate_installation")
     @patch("cli_audit.reconcile.shutil.which")
     @patch("os.path.exists")
@@ -163,6 +171,7 @@ class TestDetectInstallations:
         assert installations[0].version == "14.1.0"
         assert installations[0].active is True
 
+    @skip_on_windows
     @patch("cli_audit.reconcile.validate_installation")
     @patch("cli_audit.reconcile.shutil.which")
     @patch("os.path.exists")
@@ -543,6 +552,7 @@ class TestBulkReconcile:
 class TestPathVerification:
     """Tests for PATH verification."""
 
+    @skip_on_windows
     def test_verify_path_ordering_correct(self, monkeypatch):
         """Test PATH ordering when correct."""
         monkeypatch.setenv("PATH", "/home/user/.cargo/bin:/home/user/.local/bin:/usr/local/bin:/usr/bin")
@@ -574,6 +584,7 @@ class TestPathVerification:
                 issues = verify_path_ordering()
                 assert len(issues) == 0
 
+    @skip_on_windows
     def test_verify_path_ordering_incorrect(self, monkeypatch):
         """Test PATH ordering when incorrect."""
         monkeypatch.setenv("PATH", "/usr/bin:/home/user/.cargo/bin")

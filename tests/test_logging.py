@@ -3,10 +3,17 @@ Tests for logging configuration module.
 """
 
 import logging
+import sys
 import tempfile
 from pathlib import Path
 
 import pytest
+
+# Skip marker for Windows (file locking issues with temp files)
+skip_on_windows = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Windows file locking prevents temp file cleanup"
+)
 
 from cli_audit.logging_config import (
     setup_logging,
@@ -46,6 +53,7 @@ class TestSetupLogging:
         ]
         assert len(console_handlers) == 0
 
+    @skip_on_windows
     def test_setup_logging_with_file(self):
         """Test logging to file."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -64,6 +72,7 @@ class TestSetupLogging:
             content = log_file.read_text()
             assert "Test message" in content
 
+    @skip_on_windows
     def test_setup_logging_creates_log_directory(self):
         """Test that log directory is created if it doesn't exist."""
         with tempfile.TemporaryDirectory() as tmpdir:
