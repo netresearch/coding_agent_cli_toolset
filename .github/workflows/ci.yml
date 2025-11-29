@@ -63,7 +63,7 @@ jobs:
 
       - name: Run unit tests
         run: |
-          pytest tests/unit -v --cov=cli_audit --cov-report=xml --cov-report=term
+          pytest tests/ --ignore=tests/integration -v --cov=cli_audit --cov-report=xml --cov-report=term
 
       - name: Run integration tests
         run: |
