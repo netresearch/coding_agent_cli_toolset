@@ -8,10 +8,10 @@ Supports serialization to JSON, shell scripts, and human-readable tables.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Sequence
 
-from .package_managers import PackageManager, get_package_manager
+from .package_managers import get_package_manager
 
 
 @dataclass(frozen=True)
@@ -188,7 +188,9 @@ class InstallPlan:
             lines.append(f"Dependencies:       {', '.join(self.dependencies)}")
         if self.disk_space_mb:
             lines.append(f"Disk Space:         {self.disk_space_mb} MB")
-        lines.append(f"Estimated Time:     {self.estimated_total_time}s (~{self.estimated_total_time // 60}m {self.estimated_total_time % 60}s)")
+        mins = self.estimated_total_time // 60
+        secs = self.estimated_total_time % 60
+        lines.append(f"Estimated Time:     {self.estimated_total_time}s (~{mins}m {secs}s)")
         lines.append("")
 
         # Warnings

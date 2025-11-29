@@ -9,15 +9,14 @@ Implements the package manager hierarchy:
 
 from __future__ import annotations
 
-import os
 import subprocess
-from dataclasses import dataclass, field
-from typing import Sequence
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
+from typing import Sequence
 
 from .common import vlog
-from .config import Config, Preferences
+from .config import Config
 from .environment import Environment
 
 
@@ -274,7 +273,7 @@ def get_available_package_managers(
     managers_to_check = PACKAGE_MANAGERS
     if languages:
         lang_set = set(languages)
-        managers_to_check = tuple(
+        managers_to_check = tuple(  # type: ignore[assignment]
             pm for pm in PACKAGE_MANAGERS
             if not pm.languages or lang_set.intersection(pm.languages)
         )

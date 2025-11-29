@@ -4,6 +4,8 @@ Local tool detection and version extraction.
 Phase 2.0: Detection and Auditing - Local Detection
 """
 
+from __future__ import annotations
+
 import os
 import re
 import shutil
@@ -292,7 +294,11 @@ def choose_highest(candidates: list[tuple[str, str, str]]) -> tuple[str, str, st
 
 
 def audit_tool_installation(
-    tool_name: str, candidates: tuple[str, ...], deep: bool = False, version_flag: str | None = None, version_command: str | None = None
+    tool_name: str,
+    candidates: tuple[str, ...],
+    deep: bool = False,
+    version_flag: str | None = None,
+    version_command: str | None = None,
 ) -> tuple[str, str, str, str]:
     """Audit a single tool's installation.
 

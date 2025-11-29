@@ -16,31 +16,30 @@ __author__ = "AI CLI Preparation Contributors"
 VERSION = __version__
 
 # Detection and Auditing
-from .catalog import ToolCatalog, ToolCatalogEntry
-from .collectors import (
+from .catalog import ToolCatalog, ToolCatalogEntry  # noqa: E402
+from .collectors import (  # noqa: E402
     collect_github,
     collect_gitlab,
     collect_pypi,
     collect_npm,
     collect_crates,
     normalize_version_tag,
-    extract_version_number,
     get_github_rate_limit,
 )
-from .tools import Tool, all_tools, filter_tools, get_tool, tool_homepage_url, latest_target_url
-from .detection import (
+from .tools import Tool, all_tools, filter_tools, get_tool, tool_homepage_url, latest_target_url  # noqa: E402
+from .detection import (  # noqa: E402
     find_paths,
     get_version_line,
     extract_version_number,
     detect_install_method,
     audit_tool_installation,
 )
-from .snapshot import load_snapshot, write_snapshot, render_from_snapshot, get_snapshot_path
-from .render import status_icon, osc8, render_table, print_summary
+from .snapshot import load_snapshot, write_snapshot, render_from_snapshot, get_snapshot_path  # noqa: E402
+from .render import status_icon, osc8, render_table, print_summary  # noqa: E402
 
 # Foundation
-from .environment import Environment, detect_environment, get_environment_from_config
-from .config import (
+from .environment import Environment, detect_environment, get_environment_from_config  # noqa: E402
+from .config import (  # noqa: E402
     Config,
     ToolConfig,
     Preferences,
@@ -49,11 +48,11 @@ from .config import (
     load_config_file,
     validate_config,
 )
-from .package_managers import PackageManager, select_package_manager, get_available_package_managers
-from .install_plan import InstallPlan, InstallStep, generate_install_plan, dry_run_install
+from .package_managers import PackageManager, select_package_manager, get_available_package_managers  # noqa: E402
+from .install_plan import InstallPlan, InstallStep, generate_install_plan, dry_run_install  # noqa: E402
 
 # Installation
-from .installer import (
+from .installer import (  # noqa: E402
     InstallResult,
     StepResult,
     InstallError,
@@ -65,7 +64,7 @@ from .installer import (
 )
 
 # Bulk Operations
-from .bulk import (
+from .bulk import (  # noqa: E402
     ToolSpec,
     ProgressTracker,
     BulkInstallResult,
@@ -77,7 +76,7 @@ from .bulk import (
 )
 
 # Breaking change detection
-from .breaking_changes import (
+from .breaking_changes import (  # noqa: E402
     is_major_upgrade,
     check_breaking_change_policy,
     format_breaking_change_warning,
@@ -87,27 +86,25 @@ from .breaking_changes import (
 )
 
 # Upgrade Management
-from .upgrade import (
+from .upgrade import (  # noqa: E402
     UpgradeBackup,
     UpgradeResult,
     UpgradeCandidate,
     BulkUpgradeResult,
     compare_versions,
-    is_major_upgrade,
     get_available_version,
     check_upgrade_available,
     clear_version_cache,
     upgrade_tool,
     bulk_upgrade,
     get_upgrade_candidates,
-    filter_by_breaking_changes,
     create_upgrade_backup,
     restore_from_backup,
     cleanup_backup,
 )
 
 # Reconciliation
-from .reconcile import (
+from .reconcile import (  # noqa: E402
     Installation,
     ReconciliationResult,
     BulkReconciliationResult,
@@ -122,7 +119,7 @@ from .reconcile import (
 )
 
 # Logging configuration
-from .logging_config import (
+from .logging_config import (  # noqa: E402
     setup_logging,
     get_logger,
 )

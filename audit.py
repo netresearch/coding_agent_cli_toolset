@@ -12,25 +12,25 @@ Usage:
     audit.py --upgrade    # Upgrade outdated tools
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import os
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from pathlib import Path
-import threading
 
 # Add current directory to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Import modules
-from cli_audit.tools import Tool, all_tools, filter_tools, tool_homepage_url, latest_target_url
-from cli_audit.detection import audit_tool_installation, extract_version_number
-from cli_audit.snapshot import load_snapshot, write_snapshot, render_from_snapshot, get_snapshot_path
-from cli_audit.render import render_table, print_summary, status_icon
-from cli_audit.collectors import get_github_rate_limit
-from cli_audit import collectors
-from cli_audit.logging_config import setup_logging
+from cli_audit.tools import Tool, all_tools, filter_tools, tool_homepage_url, latest_target_url  # noqa: E402
+from cli_audit.detection import audit_tool_installation  # noqa: E402
+from cli_audit.snapshot import load_snapshot, write_snapshot, render_from_snapshot, get_snapshot_path  # noqa: E402
+from cli_audit.render import render_table, print_summary, status_icon  # noqa: E402
+from cli_audit.collectors import get_github_rate_limit  # noqa: E402
+from cli_audit import collectors  # noqa: E402
+from cli_audit.logging_config import setup_logging  # noqa: E402
 
 # Configuration from environment
 OFFLINE_MODE = os.environ.get("CLI_AUDIT_OFFLINE", "0") == "1"
@@ -165,12 +165,20 @@ def audit_tool(tool: Tool, offline_cache: dict[str, tuple[str, str]] | None = No
     tool_url = tool_homepage_url(tool)
     latest_url = latest_target_url(tool, latest_tag, latest_num)
 
+    # Generate classification reason
+    if install_method:
+        classification_reason = f"Detected via path analysis: {install_method}"
+    else:
+        classification_reason = "No installation detected"
+
     return {
         "tool": tool.name,
         "category": tool.category,
         "installed": installed,
         "installed_method": install_method,
         "installed_version": version_num,
+        "installed_path_selected": path,
+        "classification_reason_selected": classification_reason,
         "latest_upstream": latest,
         "latest_version": latest_num,
         "upstream_method": tool.source_kind,
@@ -243,12 +251,22 @@ def cmd_audit(args: argparse.Namespace) -> int:
             enriched = tool.copy()
             status = tool.get("status", "UNKNOWN")
             installed = tool.get("installed", "")
+            install_method = tool.get("installed_method", "")
 
             # Add state_icon field
             enriched["state_icon"] = status_icon(status, installed)
 
             # Add is_up_to_date boolean field
-            enriched["is_up_to_date"] = (status == "UP-TO-DATE")
+            enriched["is_up_to_date"] = (status == "UP-TO-DATE")  # type: ignore[assignment]
+
+            # Add path and classification fields (for backward compatibility with old snapshots)
+            if "installed_path_selected" not in enriched:
+                enriched["installed_path_selected"] = ""
+            if "classification_reason_selected" not in enriched:
+                if install_method:
+                    enriched["classification_reason_selected"] = f"Detected via path analysis: {install_method}"
+                else:
+                    enriched["classification_reason_selected"] = "No installation detected"
 
             enriched_tools.append(enriched)
 
@@ -326,7 +344,8 @@ def cmd_update(args: argparse.Namespace) -> int:
             print(f"✓ GitHub rate limit: {remaining}/{limit} remaining", file=sys.stderr)
 
     print(f"# Collecting fresh data for {total} tools...", file=sys.stderr)
-    print(f"# Estimated time: ~{int((total / MAX_WORKERS) * 3 * 1.5)}s (timeout=3s per tool, {MAX_WORKERS} workers)", file=sys.stderr)
+    est_time = int((total / MAX_WORKERS) * 3 * 1.5)
+    print(f"# Estimated time: ~{est_time}s (timeout=3s per tool, {MAX_WORKERS} workers)", file=sys.stderr)
     print("", file=sys.stderr)
 
     # Parallel audit with progress tracking
@@ -354,7 +373,6 @@ def cmd_update(args: argparse.Namespace) -> int:
                     BOLD_GREEN = "\033[1;32m"
                     YELLOW = "\033[33m"
                     BLUE = "\033[34m"
-                    RED = "\033[31m"
                     RESET = "\033[0m"
 
                     # Color the installed version based on status
@@ -388,12 +406,11 @@ def cmd_update(args: argparse.Namespace) -> int:
                         markers.append("SKIP")
 
                     marker_str = f" [{' '.join(markers)}]" if markers else ""
+                    inst_fmt = f"{inst_color}{inst_display}{RESET}"
+                    latest_fmt = f"{latest_color}{latest_display}{RESET}"
+                    msg = f"# [{completed}/{total}] {tool.name} (installed: {inst_fmt} {op} latest: {latest_fmt}){marker_str}"
 
-                    print(
-                        f"# [{completed}/{total}] {tool.name} (installed: {inst_color}{inst_display}{RESET} {op} latest: {latest_color}{latest_display}{RESET}){marker_str}",
-                        file=sys.stderr,
-                        flush=True
-                    )
+                    print(msg, file=sys.stderr, flush=True)
 
                 except Exception as e:
                     completed += 1
@@ -406,6 +423,8 @@ def cmd_update(args: argparse.Namespace) -> int:
                         "installed": "",
                         "installed_method": "",
                         "installed_version": "",
+                        "installed_path_selected": "",
+                        "classification_reason_selected": "Detection failed",
                         "latest_upstream": "",
                         "latest_version": "",
                         "upstream_method": tool.source_kind,

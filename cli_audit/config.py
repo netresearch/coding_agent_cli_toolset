@@ -10,7 +10,6 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any
 
 from .common import vlog
@@ -254,19 +253,39 @@ class Config:
         merged_pkg_mgrs.update(self.preferences.package_managers)
 
         # Merge bulk preferences (prefer this config's values if non-default)
+        self_bulk = self.preferences.bulk
+        other_bulk = other.preferences.bulk
         merged_bulk = BulkPreferences(
-            fail_fast=self.preferences.bulk.fail_fast if self.preferences.bulk.fail_fast else other.preferences.bulk.fail_fast,
-            auto_rollback=self.preferences.bulk.auto_rollback if self.preferences.bulk.auto_rollback else other.preferences.bulk.auto_rollback,
-            generate_rollback_script=self.preferences.bulk.generate_rollback_script,
+            fail_fast=self_bulk.fail_fast if self_bulk.fail_fast else other_bulk.fail_fast,
+            auto_rollback=self_bulk.auto_rollback if self_bulk.auto_rollback else other_bulk.auto_rollback,
+            generate_rollback_script=self_bulk.generate_rollback_script,
         )
 
         # Create merged preferences (prefer this config's values)
+        self_prefs = self.preferences
+        other_prefs = other.preferences
         merged_preferences = Preferences(
-            reconciliation=self.preferences.reconciliation if self.preferences.reconciliation != "parallel" else other.preferences.reconciliation,
-            breaking_changes=self.preferences.breaking_changes if self.preferences.breaking_changes != "warn" else other.preferences.breaking_changes,
-            auto_upgrade=self.preferences.auto_upgrade,
-            timeout_seconds=self.preferences.timeout_seconds if self.preferences.timeout_seconds != 5 else other.preferences.timeout_seconds,
-            max_workers=self.preferences.max_workers if self.preferences.max_workers != 16 else other.preferences.max_workers,
+            reconciliation=(
+                self_prefs.reconciliation
+                if self_prefs.reconciliation != "parallel"
+                else other_prefs.reconciliation
+            ),
+            breaking_changes=(
+                self_prefs.breaking_changes
+                if self_prefs.breaking_changes != "warn"
+                else other_prefs.breaking_changes
+            ),
+            auto_upgrade=self_prefs.auto_upgrade,
+            timeout_seconds=(
+                self_prefs.timeout_seconds
+                if self_prefs.timeout_seconds != 5
+                else other_prefs.timeout_seconds
+            ),
+            max_workers=(
+                self_prefs.max_workers
+                if self_prefs.max_workers != 16
+                else other_prefs.max_workers
+            ),
             package_managers=merged_pkg_mgrs,
             bulk=merged_bulk,
         )

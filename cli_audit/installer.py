@@ -13,13 +13,11 @@ import shutil
 import subprocess
 import time
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Sequence
 
 from .common import vlog
 from .config import Config
 from .environment import Environment
-from .install_plan import InstallPlan, InstallStep, generate_install_plan
+from .install_plan import InstallStep, generate_install_plan
 from .package_managers import select_package_manager
 
 
@@ -182,7 +180,7 @@ def calculate_backoff_delay(attempt: int, base_delay: float = 1.0, max_delay: fl
 
     # Add jitter (±20%)
     jitter = delay * 0.2 * (random.random() * 2 - 1)
-    return max(0.1, delay + jitter)
+    return max(0.1, delay + jitter)  # type: ignore[no-any-return]
 
 
 def execute_step(

@@ -12,11 +12,11 @@ import os
 import re
 import shutil
 import subprocess
-import sys
+import sys  # noqa: F401 - used by test patches
 import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Sequence
 
 from .breaking_changes import (
@@ -285,7 +285,8 @@ def get_available_version(
                 url = f"https://pypi.org/pypi/{tool_name}/json"
                 with urllib.request.urlopen(url, timeout=10) as response:
                     data = json.loads(response.read())
-                    version_str = data.get("info", {}).get("version")
+                    pypi_version: str | None = data.get("info", {}).get("version")
+                    version_str = pypi_version
                     if version_str:
                         _version_cache[cache_key] = (version_str, time.time())
                         return version_str
@@ -334,7 +335,8 @@ def get_available_version(
                 import json
                 data = json.loads(result.stdout)
                 if data and len(data) > 0:
-                    version_str = data[0].get("versions", {}).get("stable")
+                    go_version: str | None = data[0].get("versions", {}).get("stable")
+                    version_str = go_version
                     if version_str:
                         _version_cache[cache_key] = (version_str, time.time())
                         return version_str
@@ -384,7 +386,6 @@ def check_upgrade_available(
 
 def clear_version_cache():
     """Clear the version query cache."""
-    global _version_cache
     _version_cache.clear()
 
 
@@ -724,7 +725,7 @@ def upgrade_tool(
     backup = None
     if not skip_backup:
         try:
-            backup = create_upgrade_backup(tool_name, binary_path, current_version, pm_name, verbose)
+            backup = create_upgrade_backup(tool_name, binary_path or "", current_version or "", pm_name, verbose)
             vlog(f"Created backup: {backup.backup_path}", verbose)
         except Exception as e:
             vlog(f"Backup creation failed: {e}", verbose)
@@ -758,7 +759,7 @@ def upgrade_tool(
             )
         else:
             # Auto-rollback on failure
-            vlog(f"Upgrade failed, attempting rollback...", verbose)
+            vlog("Upgrade failed, attempting rollback...", verbose)
             rollback_success = False
             if backup:
                 rollback_success = restore_from_backup(backup, verbose)

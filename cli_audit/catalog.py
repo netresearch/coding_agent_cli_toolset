@@ -4,12 +4,17 @@ Tool catalog management and pin/skip functionality.
 Phase 2.0: Detection and Auditing - Catalog Management
 """
 
+from __future__ import annotations
+
 import json
 import logging
-import os
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from cli_audit.tools import Tool
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +108,7 @@ class ToolCatalogEntry:
         # Default: skip (no version collection)
         return ("skip", ())
 
-    def to_tool(self) -> "Tool":
+    def to_tool(self) -> Tool:  # noqa: F821
         """Convert catalog entry to Tool instance.
 
         Returns:
@@ -263,14 +268,12 @@ class ToolCatalog:
         """
         return list(self._entries.keys())
 
-    def all_tool_definitions(self) -> list["Tool"]:
+    def all_tool_definitions(self) -> list[Tool]:  # noqa: F821
         """Get all tools as Tool instances.
 
         Returns:
             List of Tool instances generated from catalog
         """
-        from cli_audit.tools import Tool
-
         return [entry.to_tool() for entry in self._entries.values()]
 
     def get_package_manager_tools(self) -> list[ToolCatalogEntry]:
@@ -292,9 +295,6 @@ def detect_package_manager() -> tuple[str, str] | None:
     Returns:
         Tuple of (package_manager_name, upgrade_command) or None if not detected
     """
-    import platform
-    import shutil
-
     # Check for package managers in order of preference
     if shutil.which("apt"):
         return ("apt", "sudo apt update && sudo apt upgrade")
@@ -354,6 +354,6 @@ def suggest_package_manager_upgrades(catalog: ToolCatalog | None = None) -> None
     print(f"Some tools are OS-managed and updated via {pm_name}:", file=sys.stderr)
     print(f"  {', '.join(sorted(os_only_tools))}", file=sys.stderr)
     print("", file=sys.stderr)
-    print(f"To update OS-managed packages, run:", file=sys.stderr)
+    print("To update OS-managed packages, run:", file=sys.stderr)
     print(f"  {upgrade_cmd}", file=sys.stderr)
     print("", file=sys.stderr)

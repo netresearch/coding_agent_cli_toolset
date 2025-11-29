@@ -10,8 +10,7 @@ Detects whether running in:
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
-from typing import Sequence
+from dataclasses import dataclass
 
 from .common import is_ci_environment, get_active_user_count, get_system_uptime_days, vlog
 

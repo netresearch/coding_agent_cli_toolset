@@ -7,10 +7,11 @@ package repositories and version control systems.
 Phase 2.0: Detection and Auditing - Version Collection
 """
 
+from __future__ import annotations
+
 import json
 import logging
 import re
-import time
 import urllib.request
 from typing import Any
 
@@ -87,7 +88,7 @@ def http_get(url: str, timeout: int = 3, headers: dict[str, str] | None = None) 
 
         req = urllib.request.Request(url, headers=default_headers)
         with urllib.request.urlopen(req, timeout=timeout) as response:
-            return response.read()
+            return response.read()  # type: ignore[no-any-return]
     except Exception as e:
         raise NetworkError(f"Failed to fetch {url}: {e}") from e
 

@@ -4,6 +4,8 @@ Snapshot management for tool audit results.
 Phase 2.0: Detection and Auditing - Snapshot Management
 """
 
+from __future__ import annotations
+
 import datetime
 import json
 import os
@@ -74,8 +76,8 @@ def write_snapshot(
     # Create metadata
     meta = {
         "schema_version": 1,
-        "created_at": datetime.datetime.now(datetime.UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
-        "collected_at": datetime.datetime.now(datetime.UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "created_at": datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "collected_at": datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         "offline": offline,
         "count": len(tools),
         "partial_failures": sum(
@@ -113,7 +115,7 @@ def render_from_snapshot(
     Returns:
         List of tool dictionaries
     """
-    tools = snapshot.get("tools", [])
+    tools: list[dict[str, Any]] = snapshot.get("tools", [])
     if not selected:
         return tools
 

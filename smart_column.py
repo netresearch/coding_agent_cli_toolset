@@ -31,12 +31,14 @@ CSI_RE = re.compile(r'\x1b\[[0-?]*[ -/]*[@-~]')
 OSC8_OPEN_RE = re.compile(r'\x1b\]8;[^\\]*\\')
 OSC8_CLOSE_RE = re.compile(r'\x1b\]8;;\\')
 
+
 def strip_control_for_width(s: str) -> str:
     # Remove only the control sequences, not the link text
     s = OSC8_OPEN_RE.sub('', s)
     s = OSC8_CLOSE_RE.sub('', s)
     s = CSI_RE.sub('', s)
     return s
+
 
 # --- wcwidth / wcswidth ---
 def _fallback_wcwidth(char: str) -> int:
@@ -62,30 +64,33 @@ def _fallback_wcwidth(char: str) -> int:
     # A lightweight heuristic: characters in the Emoji_Presentation block tend to be wide.
     # Without the emoji property, we approximate via a few ranges.
     o = ord(char)
-    if (
-        0x1F300 <= o <= 0x1F5FF or   # Misc Symbols and Pictographs
-        0x1F600 <= o <= 0x1F64F or   # Emoticons
-        0x1F680 <= o <= 0x1F6FF or   # Transport and Map
-        0x1F900 <= o <= 0x1F9FF or   # Supplemental Symbols and Pictographs
-        0x1FA70 <= o <= 0x1FAFF or   # Symbols and Pictographs Extended-A
-        0x2600  <= o <= 0x26FF  or   # Misc symbols
-        0x2700  <= o <= 0x27BF       # Dingbats
-    ):
+    if (0x1F300 <= o <= 0x1F5FF      # Misc Symbols and Pictographs
+            or 0x1F600 <= o <= 0x1F64F   # Emoticons
+            or 0x1F680 <= o <= 0x1F6FF   # Transport and Map
+            or 0x1F900 <= o <= 0x1F9FF   # Supplemental Symbols and Pictographs
+            or 0x1FA70 <= o <= 0x1FAFF   # Symbols and Pictographs Extended-A
+            or 0x2600 <= o <= 0x26FF     # Misc symbols
+            or 0x2700 <= o <= 0x27BF):   # Dingbats
         return 2
     # Default
     return 1
 
+
 try:
     # Use wcwidth if available
-    from wcwidth import wcswidth as _lib_wcswidth, wcwidth as _lib_wcwidth
+    from wcwidth import wcswidth as _lib_wcswidth, wcwidth as _lib_wcwidth  # type: ignore[import-not-found]
+
     def wcswidth(s: str) -> int:
-        return _lib_wcswidth(s)
+        return _lib_wcswidth(s)  # type: ignore[no-any-return]
+
     def wcwidth(c: str) -> int:
-        return _lib_wcwidth(c)
+        return _lib_wcwidth(c)  # type: ignore[no-any-return]
+
     _USING_LIB_WCWIDTH = True
 except Exception:
     def wcwidth(c: str) -> int:
         return _fallback_wcwidth(c)
+
     def wcswidth(s: str) -> int:
         width = 0
         for ch in s:
@@ -94,26 +99,35 @@ except Exception:
                 return -1
             width += w
         return width
+
     _USING_LIB_WCWIDTH = False
 
 # Numeric detection
 NUM_RE = re.compile(r'^[ \t]*[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?[ \t]*$')
 
+
 def looks_numeric(s: str) -> bool:
     return bool(NUM_RE.match(s))
 
+
 def parse_args():
     ap = argparse.ArgumentParser(description="ANSI/OSC8/emoji-aware column formatter")
-    ap.add_argument('-s', '--separator', required=True, help="Input field separator (single character or escape, e.g. $'\\t')")
+    ap.add_argument('-s', '--separator', required=True,
+                    help="Input field separator (single character or escape, e.g. $'\\t')")
     ap.add_argument('-t', '--table', action='store_true', help="Format as a table (align columns)")
-    ap.add_argument('--header', action='store_true', help="Treat first row as header and draw a separator rule")
-    ap.add_argument('--right', default='', help="Comma-separated 1-based column indices to right-align (e.g. '3,5')")
+    ap.add_argument('--header', action='store_true',
+                    help="Treat first row as header and draw a separator rule")
+    ap.add_argument('--right', default='',
+                    help="Comma-separated 1-based column indices to right-align (e.g. '3,5')")
     ap.add_argument('--num-right', action='store_true', help="Right-align cells that look numeric")
     ap.add_argument('--pad', type=int, default=2, help="Spaces between columns (default: 2)")
     ap.add_argument('--no-trim', action='store_true', help="Do not trim outer whitespace on fields")
-    ap.add_argument('--collapse', action='store_true', help="Collapse repeated separators (treat as regex +)")
-    ap.add_argument('--debug-width', action='store_true', help="Print computed widths to stderr for debugging")
+    ap.add_argument('--collapse', action='store_true',
+                    help="Collapse repeated separators (treat as regex +)")
+    ap.add_argument('--debug-width', action='store_true',
+                    help="Print computed widths to stderr for debugging")
     return ap.parse_args()
+
 
 def decode_separator(raw: str) -> str:
     # Allow bash-style $'\t' or escaped sequences like '\t'
@@ -123,6 +137,7 @@ def decode_separator(raw: str) -> str:
         body = raw
     return bytes(body, 'utf-8').decode('unicode_escape')
 
+
 def split_line(line: str, sep: str, collapse: bool) -> list[str]:
     if collapse:
         # Treat separator as a literal char and split on 1+ occurrences
@@ -130,6 +145,7 @@ def split_line(line: str, sep: str, collapse: bool) -> list[str]:
         return re.split(pattern, line.rstrip('\n'))
     else:
         return line.rstrip('\n').split(sep)
+
 
 def compute_col_widths(rows: list[list[str]]) -> list[int]:
     if not rows:
@@ -145,6 +161,7 @@ def compute_col_widths(rows: list[list[str]]) -> list[int]:
             if w > widths[i]:
                 widths[i] = w
     return widths
+
 
 def format_rows(rows, widths, pad, right_cols, num_right, header):
     out_lines = []
@@ -169,6 +186,7 @@ def format_rows(rows, widths, pad, right_cols, num_right, header):
             rule_cells = ['-' * w for w in widths]
             out_lines.append((' ' * pad).join(rule_cells))
     return out_lines
+
 
 def main():
     # Avoid "Exception ignored in ... BrokenPipeError" when downstream closes the pipe
@@ -216,6 +234,7 @@ def main():
         except Exception:
             pass
         os._exit(0)
+
 
 def _sigint_handler(signum, frame):
     """Handle SIGINT (Ctrl-C) with immediate clean exit."""

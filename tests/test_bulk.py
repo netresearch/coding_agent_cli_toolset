@@ -771,15 +771,6 @@ class TestBulkInstall:
         })
         env = Environment(mode="workstation", confidence=1.0)
 
-        # Manually create specs with dependencies
-        from cli_audit.bulk import ToolSpec
-
-        specs = [
-            ToolSpec("tool1", "tool1"),
-            ToolSpec("tool2", "tool2", dependencies=("tool1",)),
-            ToolSpec("tool3", "tool3", dependencies=("tool2",)),
-        ]
-
         # We need to test the actual bulk_install, but with dependency resolution
         # Since bulk_install generates specs internally, let's just verify fail_fast stops execution
         result = bulk_install(

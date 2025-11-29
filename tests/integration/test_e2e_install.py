@@ -281,7 +281,7 @@ class TestRollbackScenarios:
         config = Config()
         env = Environment(mode="workstation", confidence=1.0)
 
-        result = bulk_install(
+        bulk_install(
             mode="explicit",
             tool_names=["tool_a", "tool_b"],
             config=config,

@@ -7,11 +7,10 @@ This module now loads tool definitions from the catalog/ directory.
 The catalog is the single source of truth for tool metadata.
 """
 
-import json
-import os
+from __future__ import annotations
+
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any
+
 
 @dataclass(frozen=True)
 class Tool:
@@ -25,7 +24,7 @@ class Tool:
 
 
 # Load tools from catalog (single source of truth)
-from cli_audit.catalog import ToolCatalog
+from cli_audit.catalog import ToolCatalog  # noqa: E402
 
 _catalog = ToolCatalog()
 TOOLS: tuple[Tool, ...] = tuple(_catalog.all_tool_definitions())

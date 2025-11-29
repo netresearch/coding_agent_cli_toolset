@@ -187,7 +187,7 @@ def resolve_dependencies(specs: Sequence[ToolSpec], verbose: bool = False) -> li
     # Build dependency graph
     spec_map = {spec.tool_name: spec for spec in specs}
     in_degree = {spec.tool_name: 0 for spec in specs}
-    adjacency = {spec.tool_name: [] for spec in specs}
+    adjacency: dict[str, list[str]] = {spec.tool_name: [] for spec in specs}
 
     for spec in specs:
         for dep in spec.dependencies:
@@ -197,10 +197,11 @@ def resolve_dependencies(specs: Sequence[ToolSpec], verbose: bool = False) -> li
 
     # Topological sort by levels
     levels: list[list[ToolSpec]] = []
-    remaining = set(spec_map.keys())
+    # Use list to preserve original order (sets don't maintain insertion order)
+    remaining = list(spec_map.keys())
 
     while remaining:
-        # Find tools with no unmet dependencies
+        # Find tools with no unmet dependencies (preserving original order)
         ready = [tool for tool in remaining if in_degree[tool] == 0]
         if not ready:
             # Circular dependency detected

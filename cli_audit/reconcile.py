@@ -22,7 +22,6 @@ from .common import vlog
 from .config import Config
 from .environment import Environment
 from .installer import validate_installation
-from .package_managers import select_package_manager
 from .upgrade import compare_versions
 
 
@@ -296,7 +295,7 @@ def _classify_via_queries(path: str, tool_name: str, verbose: bool) -> str:
                 check=False,
             )
             if result.returncode == 0:
-                vlog(f"  Classified as apt via dpkg query", verbose)
+                vlog("  Classified as apt via dpkg query", verbose)
                 return 'apt'
         except Exception:
             pass
@@ -312,7 +311,7 @@ def _classify_via_queries(path: str, tool_name: str, verbose: bool) -> str:
                 check=False,
             )
             if result.returncode == 0:
-                vlog(f"  Classified as dnf/rpm via rpm query", verbose)
+                vlog("  Classified as dnf/rpm via rpm query", verbose)
                 return 'dnf'
         except Exception:
             pass
@@ -337,7 +336,7 @@ def _classify_via_queries(path: str, tool_name: str, verbose: bool) -> str:
                     check=False,
                 )
                 if formula_result.returncode == 0 and path in formula_result.stdout:
-                    vlog(f"  Classified as brew via brew list", verbose)
+                    vlog("  Classified as brew via brew list", verbose)
                     return 'brew'
         except Exception:
             pass
@@ -353,7 +352,7 @@ def _classify_via_queries(path: str, tool_name: str, verbose: bool) -> str:
                 check=False,
             )
             if result.returncode == 0 and tool_name in result.stdout:
-                vlog(f"  Classified as cargo via cargo install --list", verbose)
+                vlog("  Classified as cargo via cargo install --list", verbose)
                 return 'cargo'
         except Exception:
             pass
@@ -369,7 +368,7 @@ def _classify_via_queries(path: str, tool_name: str, verbose: bool) -> str:
                 check=False,
             )
             if result.returncode == 0 and tool_name in result.stdout:
-                vlog(f"  Classified as pipx via pipx list", verbose)
+                vlog("  Classified as pipx via pipx list", verbose)
                 return 'pipx'
         except Exception:
             pass
@@ -385,7 +384,7 @@ def _classify_via_queries(path: str, tool_name: str, verbose: bool) -> str:
                 check=False,
             )
             if result.returncode == 0 and tool_name in result.stdout:
-                vlog(f"  Classified as uv via uv tool list", verbose)
+                vlog("  Classified as uv via uv tool list", verbose)
                 return 'uv'
         except Exception:
             pass
@@ -428,7 +427,6 @@ def _classify_via_path(path: str) -> str:
 
 def clear_detection_cache():
     """Clear the installation detection cache."""
-    global _detection_cache
     _detection_cache.clear()
 
 
@@ -514,14 +512,14 @@ def sort_by_preference(
         # Sort by version descending using compare_versions
         # compare_versions returns: <0 if v1 < v2, 0 if equal, >0 if v1 > v2
         # We want descending (newer first), so negate the comparison
-        items.sort(key=cmp_to_key(lambda a, b: -compare_versions(a[2], b[2])))
+        items.sort(key=cmp_to_key(lambda a, b: -compare_versions(a[2], b[2])))  # type: ignore[index]
         result.extend(items)
 
     # Extract sorted installations
     sorted_installs = [inst for _, inst, _, _ in result]
 
     if verbose and len(sorted_installs) > 1:
-        vlog(f"Sorted installations by preference:", verbose)
+        vlog("Sorted installations by preference:", verbose)
         for idx, inst in enumerate(sorted_installs, 1):
             tier = get_preference_tier(inst)
             vlog(f"  [{idx}] Tier {tier}: {inst.method} - {inst.path}", verbose)
@@ -637,10 +635,10 @@ def _reconcile_parallel(
     # Check if preferred is active
     action = "none"
     if preferred.active:
-        vlog(f"  ✓ PATH ordering ensures preferred is active", verbose)
+        vlog("  ✓ PATH ordering ensures preferred is active", verbose)
         action = "none"
     else:
-        vlog(f"  ⚠️  PATH ordering issue: preferred is not active", verbose)
+        vlog("  ⚠️  PATH ordering issue: preferred is not active", verbose)
         if path_issues:
             for issue in path_issues:
                 vlog(f"    {issue}", verbose)
