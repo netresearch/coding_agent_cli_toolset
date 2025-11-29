@@ -4,11 +4,18 @@ End-to-end integration tests for installation workflows.
 Tests complete installation scenarios from detection through execution.
 """
 
+import sys
 import pytest
 import tempfile
 import shutil
 from pathlib import Path
 from unittest.mock import patch, MagicMock
+
+# Skip marker for Windows (rollback scripts use Unix paths and shell syntax)
+skip_on_windows = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Rollback scripts use Unix paths (/tmp) and shell syntax"
+)
 
 from cli_audit import (
     install_tool,
@@ -120,6 +127,7 @@ class TestSingleToolInstallation:
 class TestBulkInstallation:
     """Integration tests for bulk installation workflows."""
 
+    @skip_on_windows
     @patch("cli_audit.bulk.install_tool")
     @patch("cli_audit.bulk.get_missing_tools")
     def test_bulk_install_explicit_tools(self, mock_get_missing, mock_install):
@@ -157,6 +165,7 @@ class TestBulkInstallation:
         assert len(result.failures) == 0
         assert result.duration_seconds > 0
 
+    @skip_on_windows
     @patch("cli_audit.bulk.install_tool")
     def test_bulk_install_with_fail_fast(self, mock_install):
         """Test bulk installation with fail-fast enabled."""
