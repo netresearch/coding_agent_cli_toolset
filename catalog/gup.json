@@ -1,0 +1,42 @@
+{
+  "name": "gup",
+  "install_method": "auto",
+  "description": "Update Go binaries installed via 'go install' to their latest versions",
+  "homepage": "https://github.com/nao1215/gup",
+  "github_repo": "nao1215/gup",
+  "binary_name": "gup",
+  "version_flag": "version",
+  "download_url_template": "https://github.com/nao1215/gup/releases/download/{version}/gup-{version}-linux-amd64.tar.gz",
+  "arch_map": {
+    "x86_64": "amd64",
+    "aarch64": "arm64",
+    "armv7l": "armv6"
+  },
+  "available_methods": [
+    {
+      "method": "go",
+      "priority": 1,
+      "config": {
+        "package": "github.com/nao1215/gup"
+      }
+    },
+    {
+      "method": "github_release_binary",
+      "priority": 2,
+      "config": {
+        "repo": "nao1215/gup",
+        "asset_pattern": "gup-.*-linux-amd64.tar.gz"
+      }
+    },
+    {
+      "method": "brew",
+      "priority": 3,
+      "config": {
+        "tap": "nao1215/tap",
+        "package": "gup"
+      }
+    }
+  ],
+  "requires": ["go"],
+  "tags": ["go", "package-manager", "updater"]
+}

@@ -83,6 +83,10 @@ detect_go() {
   command -v go >/dev/null 2>&1
 }
 
+detect_gup() {
+  command -v gup >/dev/null 2>&1
+}
+
 detect_gem() {
   command -v gem >/dev/null 2>&1
 }
@@ -357,7 +361,14 @@ update_go() {
   if ! detect_go; then return; fi
   log "Go: Updating installed binaries"
 
-  # Go doesn't have a built-in package manager for updating binaries
+  # Use gup if available for automatic updates
+  if detect_gup; then
+    log "Go: Using gup to update all Go binaries"
+    update_gup
+    return
+  fi
+
+  # Fallback: Go doesn't have a built-in package manager for updating binaries
   # List common go-installed tools and suggest updating
   local gobin gopath
   gobin="$(go env GOBIN 2>/dev/null || true)"
@@ -368,11 +379,25 @@ update_go() {
   fi
 
   if [ -n "$gobin" ] && [ -d "$gobin" ]; then
-    vlog "Go: Binaries in $gobin (manual upgrade needed: go install <package>@latest)"
-    log "Go: Update via go install <package>@latest for each tool"
+    vlog "Go: Binaries in $gobin"
+    log "Go: Install gup for automatic updates: go install github.com/nao1215/gup@latest"
+    log "Go: Or update manually via: go install <package>@latest for each tool"
   fi
 
-  log "Go: Manual updates required"
+  log "Go: Manual updates required (install gup for automation)"
+}
+
+update_gup() {
+  if ! detect_gup; then return; fi
+  log "Gup: Updating all Go binaries installed via 'go install'"
+
+  # Update gup itself first
+  run_cmd "Gup: Self-update" go install github.com/nao1215/gup@latest
+
+  # Update all Go binaries
+  run_cmd "Gup: Update all Go binaries" gup update
+
+  log "Gup: Complete"
 }
 
 update_gem() {
@@ -521,6 +546,11 @@ get_manager_stats() {
       local gobin="$(go env GOBIN 2>/dev/null || echo "$(go env GOPATH 2>/dev/null)/bin")"
       pkg_count="$([ -d "$gobin" ] && ls -1 "$gobin" 2>/dev/null | wc -l | tr -d '[:space:]' || echo "0")"
       ;;
+    gup)
+      location="$(command -v gup 2>/dev/null || echo "N/A")"
+      version="$(gup version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown")"
+      pkg_count="$(gup list 2>/dev/null | tail -n +2 | wc -l | tr -d '[:space:]' || echo "0")"
+      ;;
     gem)
       location="$(command -v gem 2>/dev/null || echo "N/A")"
       version="$(gem --version 2>/dev/null || echo "unknown")"
@@ -667,6 +697,9 @@ show_manager_update_hint() {
     go)
       echo "  • $mgr: Download latest from https://go.dev/dl/ and install"
       ;;
+    gup)
+      echo "  • $mgr: Run 'go install github.com/nao1215/gup@latest && gup update' or './scripts/auto_update.sh gup'"
+      ;;
     gem)
       echo "  • $mgr: Run 'gem update --system' or './scripts/auto_update.sh gem'"
       ;;
@@ -698,7 +731,7 @@ show_detected() {
   log "Detecting installed package managers with scope information..."
   echo ""
 
-  local all_managers=(apt snap brew flatpak cargo rustup uv pipx pip npm pnpm yarn go gem composer poetry conda mamba bundler jspm nuget gcloud az)
+  local all_managers=(apt snap brew flatpak cargo rustup uv pipx pip npm pnpm yarn go gup gem composer poetry conda mamba bundler jspm nuget gcloud az)
   local found_managers=0
   local found_scopes=0
   local outdated_managers=()
@@ -904,7 +937,8 @@ Commands:
   npm       Update only NPM packages
   pnpm      Update only PNPM packages
   yarn      Update only Yarn packages
-  go        Show Go update instructions
+  go        Update Go binaries (uses gup if available)
+  gup       Update all Go binaries via gup (github.com/nao1215/gup)
   gem       Update only RubyGems packages
   snap      Update only Snap packages
   flatpak   Update only Flatpak packages
@@ -1010,6 +1044,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     go)
       update_go
+      exit 0
+      ;;
+    gup)
+      update_gup
       exit 0
       ;;
     gem)

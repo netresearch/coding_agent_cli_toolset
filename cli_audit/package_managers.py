@@ -180,7 +180,15 @@ PACKAGE_MANAGERS = (
         languages=("node", "javascript"),
     ),
 
-    # Go package manager
+    # Go package managers
+    PackageManager(
+        name="gup",
+        display_name="gup",
+        check_command=("gup", "version"),
+        install_command_template=("go", "install", "{package}@latest"),
+        category="vendor",
+        languages=("go",),
+    ),
     PackageManager(
         name="go",
         display_name="go install",
@@ -311,7 +319,7 @@ def get_default_hierarchy(language: str) -> list[str]:
         "rust": ["rustup", "cargo"],
         "node": ["nvm", "npm"],
         "javascript": ["nvm", "npm", "yarn", "pnpm"],
-        "go": ["go"],
+        "go": ["gup", "go"],
     }
     return hierarchies.get(language, [])
 
