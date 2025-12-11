@@ -5,6 +5,7 @@
   "homepage": "https://docs.docker.com/compose/",
   "github_repo": "docker/compose",
   "binary_name": "docker",
+  "plugin_name": "compose",
   "version_command": "docker compose version 2>&1 | head -1",
   "notes": "Docker Compose v2 is a plugin for Docker CLI. Can be installed separately as a plugin or bundled with Docker Desktop."
 }
