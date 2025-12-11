@@ -1,0 +1,30 @@
+{
+  "__meta__": {
+    "baseline_updated_at": "2025-12-11T12:59:11Z",
+    "schema_version": 2,
+    "source": "github/pypi/npm/crates API"
+  },
+  "versions": {
+    "bat": {
+      "latest_tag": "0.26.1",
+      "latest_url": "https://github.com/sharkdp/bat/releases/tag/0.26.1",
+      "latest_version": "0.26.1",
+      "tool_url": "https://github.com/sharkdp/bat",
+      "upstream_method": "gh"
+    },
+    "fd": {
+      "latest_tag": "10.3.0",
+      "latest_url": "https://github.com/sharkdp/fd/releases/tag/10.3.0",
+      "latest_version": "10.3.0",
+      "tool_url": "https://github.com/sharkdp/fd",
+      "upstream_method": "gh"
+    },
+    "ripgrep": {
+      "latest_tag": "15.1.0",
+      "latest_url": "https://github.com/BurntSushi/ripgrep/releases/tag/15.1.0",
+      "latest_version": "15.1.0",
+      "tool_url": "https://github.com/BurntSushi/ripgrep",
+      "upstream_method": "gh"
+    }
+  }
+}

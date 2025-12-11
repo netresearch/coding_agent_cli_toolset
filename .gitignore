@@ -32,6 +32,9 @@ htmlcov/
 # Local overrides
 *.local
 
+# Machine-specific audit state (Phase 2.1 split files)
+local_state.json
+
 # Node.js
 node_modules/
 

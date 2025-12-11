@@ -62,7 +62,7 @@ get_install_cmd() {
 
 # Refresh snapshot for a specific tool after installation
 # Usage: refresh_snapshot TOOL_NAME
-# Updates tools_snapshot.json with latest version of installed tool
+# Updates local_state.json and tools_snapshot.json with latest version of installed tool
 refresh_snapshot() {
   local tool_name="${1:-}"
 
@@ -86,6 +86,14 @@ refresh_snapshot() {
   sleep 0.5
 
   # Run audit in merge mode for this specific tool
+  # Uses --update-local for fast local-only detection (no network calls)
+  # Falls back to legacy mode if split files aren't available
+  if CLI_AUDIT_UPDATE_LOCAL=1 CLI_AUDIT_MERGE=1 python3 "$audit_script" "$tool_name" >/dev/null 2>&1; then
+    echo "# ✓ Snapshot updated for $tool_name" >&2
+    return 0
+  fi
+
+  # Fallback to legacy mode
   CLI_AUDIT_COLLECT=1 CLI_AUDIT_MERGE=1 python3 "$audit_script" "$tool_name" >/dev/null 2>&1 || {
     echo "# Warning: Failed to refresh snapshot for $tool_name" >&2
     return 1

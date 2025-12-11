@@ -31,6 +31,17 @@ from cli_audit.render import render_table, print_summary, status_icon  # noqa: E
 from cli_audit.collectors import get_github_rate_limit  # noqa: E402
 from cli_audit import collectors  # noqa: E402
 from cli_audit.logging_config import setup_logging  # noqa: E402
+# Split file support (Phase 2.1)
+from cli_audit.upstream_cache import (  # noqa: E402
+    UpstreamVersion, UpstreamCache,
+    load_upstream_cache, write_upstream_cache, get_upstream_cache_path,
+    update_cached_upstream,
+)
+from cli_audit.local_state import (  # noqa: E402
+    LocalInstallation, LocalState,
+    load_local_state, write_local_state, get_local_state_path,
+    update_local_installation, merge_for_display, build_legacy_snapshot,
+)
 
 # Configuration from environment
 OFFLINE_MODE = os.environ.get("CLI_AUDIT_OFFLINE", "0") == "1"
@@ -40,6 +51,10 @@ COLLECT_MODE = os.environ.get("CLI_AUDIT_COLLECT", "0") == "1"
 RENDER_MODE = os.environ.get("CLI_AUDIT_RENDER", "0") == "1"
 JSON_MODE = os.environ.get("CLI_AUDIT_JSON", "0") == "1"
 FILTER_STATUS = os.environ.get("CLI_AUDIT_FILTER_STATUS", "")  # e.g., "NOT INSTALLED,OUTDATED"
+# Split file modes (Phase 2.1)
+UPDATE_LOCAL_ONLY = os.environ.get("CLI_AUDIT_UPDATE_LOCAL", "0") == "1"
+UPDATE_BASELINE_ONLY = os.environ.get("CLI_AUDIT_UPDATE_BASELINE", "0") == "1"
+USE_SPLIT_FILES = os.environ.get("CLI_AUDIT_SPLIT_FILES", "0") == "1"
 
 
 def normalize_version(version: str) -> str:
@@ -479,6 +494,170 @@ def cmd_update(args: argparse.Namespace) -> int:
         return 1
 
 
+def cmd_update_local(args: argparse.Namespace) -> int:
+    """Update only local installation state (fast, no network)."""
+    print("=" * 80, file=sys.stderr)
+    print("Update Local State", file=sys.stderr)
+    print("=" * 80, file=sys.stderr)
+
+    # Get tools to audit
+    tools_list = filter_tools(args.tools) if args.tools else all_tools()
+    total = len(tools_list)
+
+    print(f"# Detecting local installations for {total} tools...", file=sys.stderr)
+
+    # Load existing upstream cache for status determination
+    upstream_cache = load_upstream_cache()
+
+    # Collect local state only (no network calls)
+    local_state = LocalState()
+    completed = 0
+
+    with ThreadPoolExecutor(max_workers=min(MAX_WORKERS, total)) as executor:
+        future_to_tool = {}
+        for tool in tools_list:
+            # Submit only local detection (no upstream collection)
+            future = executor.submit(_detect_local_only, tool)
+            future_to_tool[future] = tool
+
+        for future in as_completed(future_to_tool):
+            tool = future_to_tool[future]
+            try:
+                installation = future.result()
+                # Determine status using cached upstream
+                cached = upstream_cache.versions.get(tool.name)
+                if cached and installation.installed_version:
+                    norm_inst = normalize_version(installation.installed_version)
+                    norm_latest = normalize_version(cached.latest_version)
+                    if norm_inst == norm_latest:
+                        installation.status = "UP-TO-DATE"
+                    else:
+                        installation.status = "OUTDATED"
+                elif not installation.installed_version:
+                    installation.status = "NOT INSTALLED"
+                else:
+                    installation.status = "UNKNOWN"
+
+                local_state.tools[tool.name] = installation
+                completed += 1
+                print(f"# [{completed}/{total}] {tool.name}: {installation.installed_version or 'not installed'}", file=sys.stderr)
+            except Exception as e:
+                completed += 1
+                print(f"# [{completed}/{total}] {tool.name}: failed ({e})", file=sys.stderr)
+
+    # Write local state
+    write_local_state(local_state, offline=OFFLINE_MODE)
+    print("", file=sys.stderr)
+    print(f"✓ Local state updated: {get_local_state_path()}", file=sys.stderr)
+    print(f"✓ Detected {len(local_state.tools)} tools", file=sys.stderr)
+
+    # Also update legacy snapshot for backward compatibility
+    legacy_snapshot = build_legacy_snapshot(upstream_cache, local_state)
+    write_snapshot(legacy_snapshot.get("tools", []), offline=OFFLINE_MODE)
+    print(f"✓ Legacy snapshot updated: {get_snapshot_path()}", file=sys.stderr)
+
+    return 0
+
+
+def cmd_update_baseline(args: argparse.Namespace) -> int:
+    """Update only upstream baseline cache (network required)."""
+    print("=" * 80, file=sys.stderr)
+    print("Update Upstream Baseline", file=sys.stderr)
+    print("=" * 80, file=sys.stderr)
+
+    # Get tools to audit
+    tools_list = filter_tools(args.tools) if args.tools else all_tools()
+    total = len(tools_list)
+
+    # Show GitHub rate limit
+    rate_limit = get_github_rate_limit()
+    if rate_limit:
+        remaining = rate_limit.get("remaining", 0)
+        limit = rate_limit.get("limit", 0)
+        print(f"✓ GitHub rate limit: {remaining}/{limit} remaining", file=sys.stderr)
+
+    print(f"# Collecting upstream versions for {total} tools...", file=sys.stderr)
+
+    # Collect upstream versions only
+    upstream_cache = UpstreamCache()
+    completed = 0
+
+    with ThreadPoolExecutor(max_workers=min(MAX_WORKERS, total)) as executor:
+        future_to_tool = {}
+        for tool in tools_list:
+            future = executor.submit(collect_latest_version, tool, None)
+            future_to_tool[future] = tool
+
+        for future in as_completed(future_to_tool):
+            tool = future_to_tool[future]
+            try:
+                latest_tag, latest_num = future.result()
+                version = UpstreamVersion(
+                    latest_tag=latest_tag,
+                    latest_version=latest_num,
+                    latest_url=latest_target_url(tool, latest_tag, latest_num),
+                    tool_url=tool_homepage_url(tool),
+                    upstream_method=tool.source_kind,
+                )
+                upstream_cache.versions[tool.name] = version
+                completed += 1
+
+                display = latest_num or latest_tag or "n/a"
+                print(f"# [{completed}/{total}] {tool.name}: {display}", file=sys.stderr)
+            except Exception as e:
+                completed += 1
+                print(f"# [{completed}/{total}] {tool.name}: failed ({e})", file=sys.stderr)
+
+    # Write upstream cache
+    write_upstream_cache(upstream_cache)
+    print("", file=sys.stderr)
+    print(f"✓ Upstream baseline updated: {get_upstream_cache_path()}", file=sys.stderr)
+    print(f"✓ Collected {len(upstream_cache.versions)} versions", file=sys.stderr)
+
+    # Report rate limit
+    rate_limit = get_github_rate_limit()
+    if rate_limit:
+        remaining = rate_limit.get("remaining", 0)
+        limit = rate_limit.get("limit", 0)
+        print(f"✓ GitHub rate limit: {remaining}/{limit} remaining", file=sys.stderr)
+
+    return 0
+
+
+def _detect_local_only(tool: Tool) -> LocalInstallation:
+    """Detect local installation without collecting upstream version."""
+    from cli_audit.catalog import ToolCatalog
+    catalog = ToolCatalog()
+    version_flag = None
+    version_command = None
+    if catalog.has_tool(tool.name):
+        catalog_data = catalog.get_raw_data(tool.name)
+        version_flag = catalog_data.get("version_flag")
+        version_command = catalog_data.get("version_command")
+
+    deep_scan = tool.name in {"node", "python", "semgrep", "pre-commit", "bandit", "black", "flake8", "isort"}
+    version_num, version_line, path, install_method = audit_tool_installation(
+        tool.name, tool.candidates, deep=deep_scan, version_flag=version_flag, version_command=version_command
+    )
+
+    installed = version_num if version_num else (version_line if version_line != "X" else "")
+
+    if install_method:
+        classification_reason = f"Detected via path analysis: {install_method}"
+    else:
+        classification_reason = "No installation detected"
+
+    return LocalInstallation(
+        installed_version=installed,
+        installed_path=path,
+        installed_method=install_method,
+        status="UNKNOWN",  # Will be determined by caller using cached upstream
+        classification_reason=classification_reason,
+        category=tool.category,
+        hint=tool.hint,
+    )
+
+
 def cmd_install(args: argparse.Namespace) -> int:
     """Install missing tools using bulk installation system."""
     print("=" * 80, file=sys.stderr)
@@ -512,6 +691,16 @@ def main() -> int:
         help="Collect latest versions from upstream (network required)",
     )
     parser.add_argument(
+        "--update-local",
+        action="store_true",
+        help="Update only local state (no network, fast)",
+    )
+    parser.add_argument(
+        "--update-baseline",
+        action="store_true",
+        help="Update only upstream baseline cache (network required)",
+    )
+    parser.add_argument(
         "--install",
         action="store_true",
         help="Install missing tools",
@@ -541,6 +730,12 @@ def main() -> int:
     if args.update:
         # Explicit --update flag: full update of all tools
         return cmd_update(args)
+    elif getattr(args, 'update_local', False) or UPDATE_LOCAL_ONLY:
+        # Update only local state (fast, no network)
+        return cmd_update_local(args)
+    elif getattr(args, 'update_baseline', False) or UPDATE_BASELINE_ONLY:
+        # Update only upstream baseline cache
+        return cmd_update_baseline(args)
     elif args.install:
         return cmd_install(args)
     elif args.upgrade:

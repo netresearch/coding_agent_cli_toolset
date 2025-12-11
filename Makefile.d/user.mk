@@ -63,6 +63,18 @@ update: ## Collect fresh version data with network calls and update snapshot (~1
 	@$(MAKE) check-python-managers 2>/dev/null || true
 	@$(MAKE) check-node-managers 2>/dev/null || true
 
+update-local: ## Update only local installation state (fast, no network)
+	@echo "→ Detecting local tool installations..." >&2
+	@bash -c 'set -o pipefail; $(PYTHON) audit.py --update-local' || true
+
+update-baseline: ## Update upstream version baseline (for commit)
+	@echo "→ Collecting upstream versions for baseline..." >&2
+	@bash -c 'set -o pipefail; $(PYTHON) audit.py --update-baseline' || true
+	@echo "" >&2
+	@echo "To commit the baseline:" >&2
+	@echo "  git add upstream_versions.json" >&2
+	@echo "  git commit -m 'chore: update upstream version baseline'" >&2
+
 update-debug: ## Collect with verbose debug output (shows network calls)
 	@bash -c 'set -o pipefail; CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 CLI_AUDIT_TIMINGS=1 $(PYTHON) audit.py --update --verbose' || true
 

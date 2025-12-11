@@ -11,6 +11,7 @@ MAKEFLAGS += --no-print-directory
 export
 
 .PHONY: user-help help audit audit-offline audit-% audit-offline-% update upgrade guide \
+	update-local update-baseline \
 	test test-unit test-integration test-coverage test-watch test-failed \
 	lint lint-code lint-types lint-security format format-check \
 	install install-dev install-core install-python install-node install-go \
