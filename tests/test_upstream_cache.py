@@ -196,11 +196,13 @@ class TestGetUpstreamCachePath:
         assert path.name == "custom_upstream.json"
         assert path.parent == Path.cwd()
 
-    def test_get_upstream_cache_path_env_absolute(self, monkeypatch):
+    def test_get_upstream_cache_path_env_absolute(self, monkeypatch, tmp_path):
         """Test absolute path from environment variable."""
-        monkeypatch.setenv("CLI_AUDIT_UPSTREAM_FILE", "/tmp/upstream.json")
+        absolute_path = tmp_path / "upstream.json"
+        monkeypatch.setenv("CLI_AUDIT_UPSTREAM_FILE", str(absolute_path))
         path = get_upstream_cache_path()
-        assert path == Path("/tmp/upstream.json")
+        assert path == absolute_path
+        assert path.is_absolute()
 
 
 class TestLoadUpstreamCache:

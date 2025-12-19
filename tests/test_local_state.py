@@ -225,11 +225,13 @@ class TestGetLocalStatePath:
         assert path.name == "custom_local.json"
         assert path.parent == Path.cwd()
 
-    def test_get_local_state_path_env_absolute(self, monkeypatch):
+    def test_get_local_state_path_env_absolute(self, monkeypatch, tmp_path):
         """Test absolute path from environment variable."""
-        monkeypatch.setenv("CLI_AUDIT_LOCAL_FILE", "/tmp/local_state.json")
+        absolute_path = tmp_path / "local_state.json"
+        monkeypatch.setenv("CLI_AUDIT_LOCAL_FILE", str(absolute_path))
         path = get_local_state_path()
-        assert path == Path("/tmp/local_state.json")
+        assert path == absolute_path
+        assert path.is_absolute()
 
 
 class TestLoadLocalState:
