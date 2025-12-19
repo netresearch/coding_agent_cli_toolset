@@ -229,7 +229,7 @@ class TestGetLocalStatePath:
         """Test absolute path from environment variable."""
         monkeypatch.setenv("CLI_AUDIT_LOCAL_FILE", "/tmp/local_state.json")
         path = get_local_state_path()
-        assert str(path) == "/tmp/local_state.json"
+        assert path == Path("/tmp/local_state.json")
 
 
 class TestLoadLocalState:

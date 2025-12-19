@@ -200,7 +200,7 @@ class TestGetUpstreamCachePath:
         """Test absolute path from environment variable."""
         monkeypatch.setenv("CLI_AUDIT_UPSTREAM_FILE", "/tmp/upstream.json")
         path = get_upstream_cache_path()
-        assert str(path) == "/tmp/upstream.json"
+        assert path == Path("/tmp/upstream.json")
 
 
 class TestLoadUpstreamCache:
