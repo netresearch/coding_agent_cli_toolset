@@ -41,6 +41,10 @@ node_modules/
 # AI agent session context (not committed)
 claudedocs/
 .serena/
+.beads/
+
+# Type checking cache
+.mypy_cache/
 
 # Runtime directories
 config/
