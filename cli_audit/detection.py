@@ -189,24 +189,6 @@ def get_version_line(path: str, tool_name: str, version_flag: str | None = None,
         # sponge reads stdin and can block - catalog has version_command to query dpkg
         return "installed"
 
-    if tool_name == "fx":
-        # fx is a Node.js tool with no --version flag
-        # Try to read version from package.json
-        real_path = os.path.realpath(path)
-        if "node_modules/fx" in real_path:
-            pkg_json = real_path.replace("index.js", "package.json")
-            if os.path.isfile(pkg_json):
-                try:
-                    import json
-                    with open(pkg_json) as f:
-                        data = json.load(f)
-                        version = data.get("version", "")
-                        if version:
-                            return f"fx {version}"
-                except Exception:
-                    pass
-        return "installed"
-
     # Generic version flags
     for flags in VERSION_FLAG_SETS:
         line = run_with_timeout([path, *flags])
@@ -226,6 +208,24 @@ def get_version_line(path: str, tool_name: str, version_flag: str | None = None,
         # Return if contains version
         if extract_version_number(line):
             return line
+
+    # Fallback: fx legacy Node.js version (installed via npm)
+    # Only runs if --version didn't work (old Node.js version of fx)
+    if tool_name == "fx":
+        real_path = os.path.realpath(path)
+        if "node_modules/fx" in real_path:
+            pkg_json = real_path.replace("index.js", "package.json")
+            if os.path.isfile(pkg_json):
+                try:
+                    import json
+                    with open(pkg_json) as f:
+                        data = json.load(f)
+                        version = data.get("version", "")
+                        if version:
+                            return f"fx {version}"
+                except Exception:
+                    pass
+        return "installed"
 
     return ""
 

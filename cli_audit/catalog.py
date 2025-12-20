@@ -27,6 +27,7 @@ class ToolCatalogEntry:
     description: str = ""
     homepage: str = ""
     github_repo: str = ""
+    gitlab_project: str = ""  # GitLab project path (e.g., "gitlab-org/cli")
     binary_name: str = ""
     install_method: str = ""
     package_name: str = ""
@@ -46,6 +47,7 @@ class ToolCatalogEntry:
             description=data.get("description", ""),
             homepage=data.get("homepage", ""),
             github_repo=data.get("github_repo", ""),
+            gitlab_project=data.get("gitlab_project", ""),
             binary_name=data.get("binary_name", ""),
             install_method=data.get("install_method", ""),
             package_name=data.get("package_name", ""),
@@ -64,21 +66,31 @@ class ToolCatalogEntry:
         Returns:
             Tuple of (source_kind, source_args)
         """
-        # Priority 0: Skip version checking for pure package_manager tools
-        # These are OS-managed and can't be manually upgraded
-        if self.install_method == "package_manager" and not self.github_repo and not self.package_name:
+        # Priority 0: Explicit skip_upstream flag (package-manager-only tools)
+        if self._raw_data and self._raw_data.get("skip_upstream"):
             return ("skip", ())
 
-        # Priority 1: GitHub repo
+        # Priority 0b: Skip version checking for pure package_manager tools
+        # These are OS-managed and can't be manually upgraded
+        if self.install_method == "package_manager" and not self.github_repo and not self.gitlab_project and not self.package_name:
+            return ("skip", ())
+
+        # Priority 1: Explicit GitLab project
+        if self.gitlab_project:
+            parts = self.gitlab_project.split("/", 1)
+            if len(parts) == 2:
+                return ("gitlab", (parts[0], parts[1]))
+
+        # Priority 2: GitHub repo
         if self.github_repo:
             parts = self.github_repo.split("/", 1)
             if len(parts) == 2:
-                # Check if it's GitLab
+                # Check if it's GitLab (legacy: infer from homepage)
                 if "gitlab" in self.homepage.lower():
                     return ("gitlab", (parts[0], parts[1]))
                 return ("gh", (parts[0], parts[1]))
 
-        # Priority 2: Package name + homepage hints
+        # Priority 3: Package name + homepage hints
         if self.package_name:
             homepage_lower = self.homepage.lower()
             # Check homepage for package source hints
@@ -96,11 +108,11 @@ class ToolCatalogEntry:
             elif "cargo" in self.install_method or "crates" in self.install_method:
                 return ("crates", (self.package_name,))
 
-        # Priority 3: GNU FTP releases (check raw data for ftp_url field)
+        # Priority 4: GNU FTP releases (check raw data for ftp_url field)
         if self._raw_data and self._raw_data.get("ftp_url"):
             return ("gnu", (self.name, self._raw_data["ftp_url"]))
 
-        # Priority 4: Detect GNU tools from homepage
+        # Priority 5: Detect GNU tools from homepage
         if "gnu.org" in self.homepage:
             # Construct default FTP URL
             return ("gnu", (self.name, f"https://ftp.gnu.org/gnu/{self.name}/"))
