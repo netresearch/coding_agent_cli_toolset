@@ -19,6 +19,9 @@ fi
 # Parse catalog
 PACKAGE_NAME="$(jq -r '.package_name' "$CATALOG_FILE")"
 PYTHON_VERSION="$(jq -r '.python_version // empty' "$CATALOG_FILE")"
+BINARY_NAME="$(jq -r '.binary_name // empty' "$CATALOG_FILE")"
+# Use binary_name if specified, otherwise fall back to tool name
+BINARY_NAME="${BINARY_NAME:-$TOOL}"
 
 # Ensure uv is available
 if ! command -v uv >/dev/null 2>&1; then
@@ -26,12 +29,13 @@ if ! command -v uv >/dev/null 2>&1; then
   exit 1
 fi
 
-# Get current version (skip for tools that hang on --version)
-if [ "$TOOL" = "codex" ] || [ "$TOOL" = "gam" ]; then
-  # codex/gam binaries hang on --version - will use uv tool list instead
+# Get current version (skip for tools that hang or don't output proper versions)
+# codex/gam binaries hang on --version
+# git-filter-repo outputs git hash instead of version
+if [ "$TOOL" = "codex" ] || [ "$TOOL" = "gam" ] || [ "$TOOL" = "git-filter-repo" ]; then
   before="<none>"
 else
-  before="$(command -v "$TOOL" >/dev/null 2>&1 && timeout 2 "$TOOL" --version </dev/null 2>/dev/null || true)"
+  before="$(command -v "$BINARY_NAME" >/dev/null 2>&1 && timeout 2 "$BINARY_NAME" --version </dev/null 2>/dev/null || true)"
 fi
 
 # Install or upgrade with optional Python version pinning
@@ -43,13 +47,14 @@ else
 fi
 
 # Report
-if [ "$TOOL" = "codex" ] || [ "$TOOL" = "gam" ]; then
-  # codex/gam binaries hang on --version - use uv tool list instead
-  after="$(uv tool list 2>/dev/null | grep -E "^(codex|gam7) " | head -1 || echo "<failed>")"
+if [ "$TOOL" = "codex" ] || [ "$TOOL" = "gam" ] || [ "$TOOL" = "git-filter-repo" ]; then
+  # These tools hang or don't output proper versions - use uv tool list instead
+  # Use the specific package name for this tool to avoid matching wrong package
+  after="$(uv tool list 2>/dev/null | grep -E "^${PACKAGE_NAME} " | head -1 || echo "<failed>")"
 else
-  after="$(command -v "$TOOL" >/dev/null 2>&1 && timeout 2 "$TOOL" --version 2>/dev/null || true)"
+  after="$(command -v "$BINARY_NAME" >/dev/null 2>&1 && timeout 2 "$BINARY_NAME" --version 2>/dev/null || true)"
 fi
-path="$(command -v "$TOOL" 2>/dev/null || true)"
+path="$(command -v "$BINARY_NAME" 2>/dev/null || true)"
 printf "[%s] before: %s\n" "$TOOL" "${before:-<none>}"
 printf "[%s] after:  %s\n" "$TOOL" "${after:-<none>}"
 if [ -n "$path" ]; then printf "[%s] path:   %s\n" "$TOOL" "$path"; fi

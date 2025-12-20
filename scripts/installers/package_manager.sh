@@ -21,9 +21,11 @@ fi
 
 # Parse catalog
 BINARY_NAME="$(jq -r '.binary_name // .name' "$CATALOG_FILE")"
-PACKAGES="$(jq -r '.packages // {}' "$CATALOG_FILE")"
+# Support both 'packages' and 'package_managers' field names
+PACKAGES="$(jq -r '.packages // .package_managers // {}' "$CATALOG_FILE")"
 NOTES="$(jq -r '.notes // empty' "$CATALOG_FILE")"
 VERSION_CMD="$(jq -r '.version_command // empty' "$CATALOG_FILE")"
+PPA="$(jq -r '.ppa // empty' "$CATALOG_FILE")"
 
 # Get current version
 if [ -n "$VERSION_CMD" ]; then
@@ -65,6 +67,13 @@ fi
 if ! $installed && have apt-get; then
   pkg="$(echo "$PACKAGES" | jq -r '.apt // empty')"
   if [ "$pkg" != "null" ] && [ -n "$pkg" ]; then
+    # Add PPA if specified (for latest versions on Ubuntu/Debian)
+    if [ -n "$PPA" ] && command -v add-apt-repository >/dev/null 2>&1; then
+      if ! grep -q "^deb.*$PPA" /etc/apt/sources.list.d/*.list 2>/dev/null; then
+        echo "[$TOOL] Adding PPA: ppa:$PPA" >&2
+        sudo add-apt-repository -y "ppa:$PPA" || true
+      fi
+    fi
     sudo apt-get update && sudo apt-get install -y "$pkg" || true
     installed=true
   fi

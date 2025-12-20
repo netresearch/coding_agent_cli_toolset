@@ -43,12 +43,52 @@ if ! command -v git >/dev/null 2>&1; then
   exit 1
 fi
 
+# Parse optional version detection settings
+BINARY_NAME="$(jq -r '.binary_name // ""' "$CATALOG_FILE")"
+VERSION_COMMAND="$(jq -r '.version_command // ""' "$CATALOG_FILE")"
+
+# Helper: get version using best available method
+get_version() {
+  local clone_path="$1"
+  local binary_name="$2"
+  local version_cmd="$3"
+
+  # Try binary --version first (if binary exists in PATH or clone_path/bin)
+  if [ -n "$binary_name" ]; then
+    local bin_path=""
+    if command -v "$binary_name" >/dev/null 2>&1; then
+      bin_path="$(command -v "$binary_name")"
+    elif [ -x "$clone_path/bin/$binary_name" ]; then
+      bin_path="$clone_path/bin/$binary_name"
+    fi
+    if [ -n "$bin_path" ]; then
+      local ver="$("$bin_path" --version 2>/dev/null | head -1 | grep -oE '[0-9]+(\.[0-9]+)*' | head -1 || true)"
+      if [ -n "$ver" ]; then
+        echo "$ver"
+        return
+      fi
+    fi
+  fi
+
+  # Try version_command from catalog
+  if [ -n "$version_cmd" ]; then
+    local ver="$(eval "$version_cmd" 2>/dev/null || true)"
+    if [ -n "$ver" ]; then
+      echo "$ver"
+      return
+    fi
+  fi
+
+  # Fall back to git short hash
+  if [ -d "$clone_path/.git" ]; then
+    (cd "$clone_path" && git rev-parse --short HEAD 2>/dev/null || echo "<unknown>")
+  fi
+}
+
 # Get current version/commit if already cloned
 before=""
 if [ -d "$CLONE_PATH/.git" ]; then
-  cd "$CLONE_PATH"
-  before="$(git rev-parse --short HEAD 2>/dev/null || echo "<unknown>")"
-  cd - >/dev/null
+  before="$(get_version "$CLONE_PATH" "$BINARY_NAME" "$VERSION_COMMAND")"
 fi
 
 # Clone or update
@@ -76,9 +116,7 @@ fi
 # Get new version/commit
 after=""
 if [ -d "$CLONE_PATH/.git" ]; then
-  cd "$CLONE_PATH"
-  after="$(git rev-parse --short HEAD 2>/dev/null || echo "<unknown>")"
-  cd - >/dev/null
+  after="$(get_version "$CLONE_PATH" "$BINARY_NAME" "$VERSION_COMMAND")"
 fi
 
 # Report

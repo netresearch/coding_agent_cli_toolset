@@ -28,12 +28,17 @@ fi
 PACKAGE_NAME="$(jq -r '.package_name // .name' "$CATALOG_FILE")"
 
 # Detect available package manager (pnpm > npm > yarn)
+# Only use pnpm if it's properly configured with a global bin directory
 PKG_MANAGER=""
 if command -v pnpm >/dev/null 2>&1; then
-  PKG_MANAGER="pnpm"
-elif command -v npm >/dev/null 2>&1; then
+  # Check if pnpm has a global-bin-dir configured
+  if pnpm config get global-bin-dir 2>/dev/null | grep -qv "undefined"; then
+    PKG_MANAGER="pnpm"
+  fi
+fi
+if [ -z "$PKG_MANAGER" ] && command -v npm >/dev/null 2>&1; then
   PKG_MANAGER="npm"
-elif command -v yarn >/dev/null 2>&1; then
+elif [ -z "$PKG_MANAGER" ] && command -v yarn >/dev/null 2>&1; then
   PKG_MANAGER="yarn"
 fi
 
