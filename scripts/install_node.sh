@@ -3,6 +3,7 @@ set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$DIR/lib/common.sh"
+. "$DIR/lib/install_strategy.sh"
 
 ACTION="${1:-install}"
 # Channel: 'node' (current latest) or 'lts'. Default to 'node' to match audit latest
@@ -78,6 +79,8 @@ reconcile_node() {
   printf "[%s] before: %s\n" "node" "${before:-<none>}"
   printf "[%s] after:  %s\n"  "node" "${after:-<none>}"
   if [ -n "$path" ]; then printf "[%s] path:   %s\n" "node" "$path"; fi
+
+  refresh_snapshot "node"
 }
 
 case "$ACTION" in

@@ -47,7 +47,19 @@ install_ruby() {
   fi
 
   echo "Installing Ruby $RUBY_VERSION via rbenv..."
-  rbenv install --skip-existing "$RUBY_VERSION" || true
+  if ! rbenv install --skip-existing "$RUBY_VERSION"; then
+    echo "[ruby] Error: Failed to install Ruby $RUBY_VERSION" >&2
+    echo "[ruby] You may need to install build dependencies:" >&2
+    echo "[ruby]   sudo apt install build-essential libssl-dev libreadline-dev zlib1g-dev libyaml-dev libffi-dev" >&2
+    return 1
+  fi
+
+  # Verify the version is actually installed before continuing
+  if ! rbenv versions --bare | grep -q "^${RUBY_VERSION}$"; then
+    echo "[ruby] Error: Ruby $RUBY_VERSION not found after install" >&2
+    return 1
+  fi
+
   rbenv global "$RUBY_VERSION" || true
   rbenv rehash || true
 

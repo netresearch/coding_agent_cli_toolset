@@ -3,6 +3,7 @@ set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$DIR/lib/common.sh"
+. "$DIR/lib/install_strategy.sh"
 
 ACTION="${1:-install}"
 
@@ -12,34 +13,45 @@ ensure_python_distro() {
   if ! have python3 && have apt-get; then sudo apt-get update && sudo apt-get install -y python3 python3-pip; fi
 }
 
+# Get current Python version managed by uv
+get_uv_python_version() {
+  if command -v uv >/dev/null 2>&1; then
+    # Get the highest installed Python version
+    uv python list --only-installed 2>/dev/null | grep -E "^cpython-[0-9]" | head -1 | sed 's/cpython-\([0-9.]*\).*/\1/' || true
+  fi
+}
+
+# Install or upgrade Python via uv
+uv_install_python() {
+  local PY_SPEC="${UV_PYTHON_SPEC:-3}"
+
+  echo "[python] Installing Python $PY_SPEC via uv..." >&2
+
+  # Install the requested Python version
+  if ! uv python install "$PY_SPEC" 2>&1; then
+    # If exact version fails, try without patch version
+    local ALT_SPEC="${PY_SPEC%.*}"
+    if [ "$ALT_SPEC" != "$PY_SPEC" ]; then
+      echo "[python] Trying $ALT_SPEC..." >&2
+      uv python install "$ALT_SPEC" 2>&1 || true
+    fi
+  fi
+}
+
 # Create/update a default dev venv using uv if available
 uv_setup_default_venv() {
   if command -v uv >/dev/null 2>&1; then
-    # Select Python spec: default to latest 3.x; allow override via UV_PYTHON_SPEC (e.g., 3.13)
-    local PY_SPEC
-    PY_SPEC="${UV_PYTHON_SPEC:-3}"
-    # If a fully pinned X.Y.Z isn't available, fall back to X.Y
-    local ALT_SPEC
-    ALT_SPEC="$PY_SPEC"
+    local PY_SPEC="${UV_PYTHON_SPEC:-3}"
+    local ALT_SPEC="$PY_SPEC"
     case "$PY_SPEC" in
       *.*.*) ALT_SPEC="${PY_SPEC%.*}" ;;
-      *) ALT_SPEC="$PY_SPEC" ;;
     esac
-    # Resolve the exact interpreter path, allowing pre-releases when stable is not yet available
+
+    # Find the interpreter
     local PY_PATH
-    PY_PATH="$(uv python find "$PY_SPEC" 2>/dev/null || true)"
-    if [ -z "$PY_PATH" ]; then
-      PY_PATH="$(uv python find "$ALT_SPEC" 2>/dev/null || true)"
-    fi
-    if [ -z "$PY_PATH" ]; then
-      uv python install "$PY_SPEC" >/dev/null 2>&1 || uv python install "$ALT_SPEC" >/dev/null 2>&1 || true
-      PY_PATH="$(uv python find "$PY_SPEC" 2>/dev/null || true)"
-      if [ -z "$PY_PATH" ]; then
-        PY_PATH="$(uv python find "$ALT_SPEC" 2>/dev/null || true)"
-      fi
-    fi
+    PY_PATH="$(uv python find "$PY_SPEC" 2>/dev/null || uv python find "$ALT_SPEC" 2>/dev/null || true)"
+
     mkdir -p "$HOME/.venvs" || true
-    # Recreate the default venv to ensure it uses the requested interpreter
     if [ -n "$PY_PATH" ] && [ -x "$PY_PATH" ]; then
       uv venv --python "$PY_PATH" --clear "$HOME/.venvs/dev" >/dev/null 2>&1 || true
     else
@@ -82,15 +94,39 @@ install_or_update_py_cli() {
 }
 
 install_py_stack() {
+  local before after path
+  before="$(get_uv_python_version)"
+
   ensure_uv || true
+  uv_install_python || true
   uv_setup_default_venv || true
   install_or_update_py_cli install
+
+  after="$(get_uv_python_version)"
+  path="$(command -v python3 2>/dev/null || true)"
+  printf "[%s] before: %s\n" "python" "${before:-<none>}"
+  printf "[%s] after:  %s\n" "python" "${after:-<none>}"
+  if [ -n "$path" ]; then printf "[%s] path:   %s\n" "python" "$path"; fi
+
+  refresh_snapshot "python"
 }
 
 update_py_stack() {
+  local before after path
+  before="$(get_uv_python_version)"
+
   ensure_uv || true
+  uv_install_python || true
   uv_setup_default_venv || true
   install_or_update_py_cli upgrade
+
+  after="$(get_uv_python_version)"
+  path="$(command -v python3 2>/dev/null || true)"
+  printf "[%s] before: %s\n" "python" "${before:-<none>}"
+  printf "[%s] after:  %s\n" "python" "${after:-<none>}"
+  if [ -n "$path" ]; then printf "[%s] path:   %s\n" "python" "$path"; fi
+
+  refresh_snapshot "python"
 }
 
 uninstall_py_tools() {
@@ -111,7 +147,5 @@ case "$ACTION" in
   reconcile) reconcile_py_tools ;;
   *) echo "Usage: $0 {install|update|uninstall|reconcile}" ; exit 2 ;;
 esac
-
-echo "python: $ACTION complete (or attempted)."
 
 
