@@ -48,6 +48,14 @@ remove_installation() {
         cargo uninstall "$tool" 2>/dev/null || true
       fi
       ;;
+    go)
+      # Go binaries are in $GOPATH/bin or $HOME/go/bin
+      local go_bin="${GOPATH:-$HOME/go}/bin/$binary"
+      if [ -f "$go_bin" ]; then
+        echo "[$tool] Removing go binary: $go_bin" >&2
+        rm -f "$go_bin" || true
+      fi
+      ;;
     npm)
       if command -v npm >/dev/null 2>&1; then
         echo "[$tool] Uninstalling npm global package: $tool" >&2
@@ -186,6 +194,19 @@ install_via_method() {
       echo "[$tool] Installing brew formula: $formula" >&2
       brew install "$formula" || return 1
       ;;
+    go)
+      local package
+      if command -v jq >/dev/null 2>&1; then
+        package="$(echo "$config" | jq -r '.package // ""')"
+      fi
+      if [ -z "$package" ]; then
+        echo "[$tool] Error: go method requires 'package' in config" >&2
+        return 1
+      fi
+
+      echo "[$tool] Installing via go install: $package@latest" >&2
+      go install "${package}@latest" || return 1
+      ;;
     github_release_binary)
       # Use existing github_release_binary.sh installer
       local installer="$RECONCILE_LIB_DIR/../installers/github_release_binary.sh"
@@ -242,9 +263,9 @@ reconcile_tool() {
 
   # Resolve best method via policy
   local best_method
-  best_method="$(resolve_best_method "$catalog_file" 2>&1)"
-  if [ $? -ne 0 ]; then
-    echo "[$tool] Error resolving best method: $best_method" >&2
+  best_method="$(resolve_best_method "$catalog_file")"
+  if [ $? -ne 0 ] || [ -z "$best_method" ]; then
+    echo "[$tool] Error: No suitable installation method found" >&2
     return 1
   fi
 

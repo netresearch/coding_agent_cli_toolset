@@ -30,6 +30,10 @@ detect_install_method() {
       echo "cargo"
       return 0
       ;;
+    "$HOME/go/bin/"*|"${GOPATH:-$HOME/go}/bin/"*)
+      echo "go"
+      return 0
+      ;;
     "$HOME/.local/bin/"*)
       # Could be github_release_binary or pipx
       # Check if pipx knows about it
@@ -142,12 +146,16 @@ is_method_available() {
       fi
       return 1
       ;;
+    go)
+      command -v go >/dev/null 2>&1
+      return $?
+      ;;
     dedicated_script)
       # Dedicated scripts are always "available" as they handle their own logic
       return 0
       ;;
     *)
-      echo "Unknown method: $method" >&2
+      # Unknown methods are treated as unavailable (not an error)
       return 1
       ;;
   esac
@@ -228,7 +236,7 @@ get_current_method_details() {
 
 # List all available installation methods on this system
 list_available_methods() {
-  local methods=("apt" "cargo" "npm" "gem" "pip" "pipx" "brew" "github_release_binary")
+  local methods=("apt" "cargo" "go" "npm" "gem" "pip" "pipx" "brew" "github_release_binary")
   local available=()
 
   for method in "${methods[@]}"; do
