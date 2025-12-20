@@ -496,21 +496,31 @@ def cmd_update(args: argparse.Namespace) -> int:
 
 def cmd_update_local(args: argparse.Namespace) -> int:
     """Update only local installation state (fast, no network)."""
-    print("=" * 80, file=sys.stderr)
-    print("Update Local State", file=sys.stderr)
-    print("=" * 80, file=sys.stderr)
+    # Check if we're in merge mode (updating specific tools only)
+    merge_mode = os.environ.get("CLI_AUDIT_MERGE", "0") == "1"
+    specific_tools = bool(args.tools)
+
+    # Only show header if not in quiet merge mode
+    if not (merge_mode and specific_tools):
+        print("=" * 80, file=sys.stderr)
+        print("Update Local State", file=sys.stderr)
+        print("=" * 80, file=sys.stderr)
 
     # Get tools to audit
     tools_list = filter_tools(args.tools) if args.tools else all_tools()
     total = len(tools_list)
 
-    print(f"# Detecting local installations for {total} tools...", file=sys.stderr)
+    if not (merge_mode and specific_tools):
+        print(f"# Detecting local installations for {total} tools...", file=sys.stderr)
 
     # Load existing upstream cache for status determination
     upstream_cache = load_upstream_cache()
 
-    # Collect local state only (no network calls)
-    local_state = LocalState()
+    # In merge mode with specific tools, load existing local state first
+    if merge_mode and specific_tools:
+        local_state = load_local_state()
+    else:
+        local_state = LocalState()
     completed = 0
 
     with ThreadPoolExecutor(max_workers=min(MAX_WORKERS, total)) as executor:
@@ -547,14 +557,40 @@ def cmd_update_local(args: argparse.Namespace) -> int:
 
     # Write local state
     write_local_state(local_state, offline=OFFLINE_MODE)
-    print("", file=sys.stderr)
-    print(f"✓ Local state updated: {get_local_state_path()}", file=sys.stderr)
-    print(f"✓ Detected {len(local_state.tools)} tools", file=sys.stderr)
 
-    # Also update legacy snapshot for backward compatibility
-    legacy_snapshot = build_legacy_snapshot(upstream_cache, local_state)
-    write_snapshot(legacy_snapshot.get("tools", []), offline=OFFLINE_MODE)
-    print(f"✓ Legacy snapshot updated: {get_snapshot_path()}", file=sys.stderr)
+    if not (merge_mode and specific_tools):
+        print("", file=sys.stderr)
+        print(f"✓ Local state updated: {get_local_state_path()}", file=sys.stderr)
+        print(f"✓ Detected {len(local_state.tools)} tools", file=sys.stderr)
+
+    # Update legacy snapshot for backward compatibility
+    if merge_mode and specific_tools:
+        # In merge mode, load existing snapshot and merge in updated tools
+        existing_snapshot = load_snapshot()
+        existing_tools = existing_snapshot.get("tools", [])
+
+        # Build dict of existing tools keyed by name
+        tools_by_name = {t.get("tool"): t for t in existing_tools}
+
+        # Get updated tool data for the specific tools we just detected
+        updated_tools = build_legacy_snapshot(upstream_cache, local_state).get("tools", [])
+        tools_to_update = {tool.name for tool in tools_list}
+        updated_tool_names = {t.get("tool") for t in updated_tools if t.get("tool") in tools_to_update}
+
+        # Merge: update only the tools we re-detected
+        for updated_tool in updated_tools:
+            tool_name = updated_tool.get("tool")
+            if tool_name in updated_tool_names:
+                tools_by_name[tool_name] = updated_tool
+
+        # Write merged snapshot
+        merged_tools = list(tools_by_name.values())
+        write_snapshot(merged_tools, offline=OFFLINE_MODE)
+    else:
+        # Full update: replace entire snapshot
+        legacy_snapshot = build_legacy_snapshot(upstream_cache, local_state)
+        write_snapshot(legacy_snapshot.get("tools", []), offline=OFFLINE_MODE)
+        print(f"✓ Legacy snapshot updated: {get_snapshot_path()}", file=sys.stderr)
 
     return 0
 
