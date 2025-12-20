@@ -247,6 +247,14 @@ while read -r line; do
       continue
     fi
 
+    # Skip installed tools with upstream_method="skip" (package-manager-only tools)
+    # These can't be tracked for upgrades, but we still show them if not installed
+    upstream_method="$(json_field "$tool_name" upstream_method)"
+    installed="$(json_field "$tool_name" installed)"
+    if [ "$upstream_method" = "skip" ] && [ -n "$installed" ]; then
+      continue
+    fi
+
     TOOLS_TO_PROCESS+=("$tool_name")
   fi
 done <<< "$AUDIT_OUTPUT"
