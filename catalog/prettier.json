@@ -1,5 +1,6 @@
 {
   "name": "prettier",
+  "category": "node",
   "install_method": "npm_global",
   "description": "Opinionated code formatter",
   "homepage": "https://prettier.io",

@@ -1,5 +1,6 @@
 {
   "name": "entr",
+  "category": "general",
   "install_method": "package_manager",
   "description": "Run arbitrary commands when files change",
   "homepage": "http://eradman.com/entrproject/",

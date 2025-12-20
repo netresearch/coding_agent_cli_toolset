@@ -1,5 +1,6 @@
 {
   "name": "xsv",
+  "category": "general",
   "install_method": "github_release_binary",
   "description": "A fast CSV command line toolkit written in Rust",
   "homepage": "https://github.com/BurntSushi/xsv",

@@ -1,5 +1,6 @@
 {
   "name": "sd",
+  "category": "general",
   "install_method": "github_release_binary",
   "description": "Intuitive find & replace CLI (sed alternative)",
   "homepage": "https://github.com/chmln/sd",

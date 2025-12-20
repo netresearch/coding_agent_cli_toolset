@@ -1,5 +1,6 @@
 {
   "name": "ninja",
+  "category": "devops",
   "install_method": "github_release_binary",
   "description": "Small build system with a focus on speed",
   "homepage": "https://github.com/ninja-build/ninja",

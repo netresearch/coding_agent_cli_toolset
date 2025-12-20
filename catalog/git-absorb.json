@@ -1,5 +1,6 @@
 {
   "name": "git-absorb",
+  "category": "git",
   "install_method": "github_release_binary",
   "description": "git commit --fixup, but automatic",
   "homepage": "https://github.com/tummychow/git-absorb",

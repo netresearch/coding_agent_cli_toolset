@@ -1,5 +1,6 @@
 {
   "name": "bat",
+  "category": "general",
   "install_method": "auto",
   "description": "A cat clone with syntax highlighting and Git integration",
   "homepage": "https://github.com/sharkdp/bat",
@@ -36,5 +37,7 @@
     }
   ],
   "requires": [],
-  "tags": ["core"]
+  "tags": [
+    "core"
+  ]
 }

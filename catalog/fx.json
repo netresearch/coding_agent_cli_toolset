@@ -1,5 +1,6 @@
 {
   "name": "fx",
+  "category": "general",
   "install_method": "github_release_binary",
   "description": "Terminal JSON viewer and processor",
   "homepage": "https://github.com/antonmedv/fx",

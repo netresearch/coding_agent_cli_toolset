@@ -1,5 +1,6 @@
 {
   "name": "isort",
+  "category": "python",
   "install_method": "uv_tool",
   "description": "A Python utility to sort imports alphabetically and automatically separate them into sections",
   "homepage": "https://github.com/PyCQA/isort",

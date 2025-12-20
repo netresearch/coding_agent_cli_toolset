@@ -1,5 +1,6 @@
 {
   "name": "tfsec",
+  "category": "devops",
   "install_method": "github_release_binary",
   "description": "Security scanner for your Terraform code",
   "homepage": "https://github.com/aquasecurity/tfsec",

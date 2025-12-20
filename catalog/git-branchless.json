@@ -1,5 +1,6 @@
 {
   "name": "git-branchless",
+  "category": "git",
   "install_method": "github_release_binary",
   "description": "High-velocity, monorepo-scale workflow for Git",
   "homepage": "https://github.com/arxanas/git-branchless",

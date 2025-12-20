@@ -1,5 +1,6 @@
 {
   "name": "node",
+  "category": "node",
   "install_method": "dedicated_script",
   "description": "Node.js JavaScript runtime",
   "homepage": "https://nodejs.org",

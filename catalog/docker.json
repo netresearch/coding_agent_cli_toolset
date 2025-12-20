@@ -1,5 +1,6 @@
 {
   "name": "docker",
+  "category": "devops",
   "install_method": "dedicated_script",
   "description": "Container platform for building and running applications",
   "homepage": "https://www.docker.com",

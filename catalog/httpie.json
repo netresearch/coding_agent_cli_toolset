@@ -1,5 +1,6 @@
 {
   "name": "httpie",
+  "category": "general",
   "install_method": "uv_tool",
   "description": "A user-friendly command-line HTTP client with intuitive syntax and colorized output",
   "homepage": "https://github.com/httpie/cli",

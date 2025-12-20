@@ -1,5 +1,6 @@
 {
   "name": "rust",
+  "category": "rust",
   "install_method": "dedicated_script",
   "description": "Rust programming language and toolchain",
   "homepage": "https://www.rust-lang.org",

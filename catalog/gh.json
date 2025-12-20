@@ -1,5 +1,6 @@
 {
   "name": "gh",
+  "category": "platform",
   "install_method": "github_release_binary",
   "description": "GitHub's official command line tool",
   "homepage": "https://github.com/cli/cli",

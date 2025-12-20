@@ -1,5 +1,6 @@
 {
   "name": "npm",
+  "category": "node",
   "install_method": "npm_self_update",
   "description": "Node.js package manager",
   "homepage": "https://www.npmjs.com/",

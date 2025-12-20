@@ -1,5 +1,6 @@
 {
   "name": "dasel",
+  "category": "general",
   "install_method": "github_release_binary",
   "description": "Query and update data structures from the command line",
   "homepage": "https://github.com/TomWright/dasel",

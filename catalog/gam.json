@@ -1,5 +1,6 @@
 {
   "name": "gam",
+  "category": "platform",
   "install_method": "uv_tool",
   "description": "Google Workspace admin management tool",
   "homepage": "https://github.com/GAM-team/GAM",

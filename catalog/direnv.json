@@ -1,5 +1,6 @@
 {
   "name": "direnv",
+  "category": "general",
   "install_method": "github_release_binary",
   "description": "Unclutter your .profile with environment switcher",
   "homepage": "https://github.com/direnv/direnv",

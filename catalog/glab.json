@@ -1,5 +1,6 @@
 {
   "name": "glab",
+  "category": "platform",
   "install_method": "github_release_binary",
   "description": "GitLab CLI tool bringing GitLab to your command line",
   "homepage": "https://gitlab.com/gitlab-org/cli",

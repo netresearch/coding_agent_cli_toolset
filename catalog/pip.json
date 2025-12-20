@@ -1,5 +1,6 @@
 {
   "name": "pip",
+  "category": "python",
   "install_method": "package_manager",
   "description": "Python package installer",
   "homepage": "https://pip.pypa.io/",

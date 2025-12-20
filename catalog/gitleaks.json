@@ -1,5 +1,6 @@
 {
   "name": "gitleaks",
+  "category": "git",
   "install_method": "github_release_binary",
   "description": "A SAST tool for detecting and preventing hardcoded secrets like passwords, api keys, and tokens in git repos",
   "homepage": "https://github.com/gitleaks/gitleaks",

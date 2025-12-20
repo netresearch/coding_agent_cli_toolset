@@ -1,5 +1,6 @@
 {
   "name": "parallel",
+  "category": "general",
   "install_method": "dedicated_script",
   "description": "GNU Parallel - shell tool for executing jobs in parallel",
   "homepage": "https://www.gnu.org/software/parallel/",

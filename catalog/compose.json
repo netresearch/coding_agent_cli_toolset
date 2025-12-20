@@ -1,5 +1,6 @@
 {
   "name": "compose",
+  "category": "devops",
   "install_method": "docker_plugin",
   "description": "Docker Compose - tool for defining multi-container applications",
   "homepage": "https://docs.docker.com/compose/",

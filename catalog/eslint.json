@@ -1,5 +1,6 @@
 {
   "name": "eslint",
+  "category": "node",
   "install_method": "npm_global",
   "description": "JavaScript and TypeScript linter",
   "homepage": "https://eslint.org",

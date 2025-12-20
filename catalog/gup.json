@@ -1,5 +1,6 @@
 {
   "name": "gup",
+  "category": "go",
   "install_method": "auto",
   "description": "Update Go binaries installed via 'go install' to their latest versions",
   "homepage": "https://github.com/nao1215/gup",
@@ -37,6 +38,12 @@
       }
     }
   ],
-  "requires": ["go"],
-  "tags": ["go", "package-manager", "updater"]
+  "requires": [
+    "go"
+  ],
+  "tags": [
+    "go",
+    "package-manager",
+    "updater"
+  ]
 }

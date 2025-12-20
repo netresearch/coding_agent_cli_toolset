@@ -1,5 +1,6 @@
 {
   "name": "ansible-core",
+  "category": "devops",
   "install_method": "uv_tool",
   "description": "Ansible core automation engine",
   "homepage": "https://ansible.com",

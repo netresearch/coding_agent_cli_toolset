@@ -1,5 +1,6 @@
 {
   "name": "sponge",
+  "category": "general",
   "install_method": "package_manager",
   "description": "Soak up standard input and write to a file - part of moreutils",
   "homepage": "https://joeyh.name/code/moreutils/",

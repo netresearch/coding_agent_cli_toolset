@@ -1,5 +1,6 @@
 {
   "name": "ast-grep",
+  "category": "general",
   "install_method": "github_release_binary",
   "description": "A CLI tool for code structural search, lint and rewriting",
   "homepage": "https://github.com/ast-grep/ast-grep",

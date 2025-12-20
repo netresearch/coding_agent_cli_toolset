@@ -8,6 +8,18 @@ VERBOSE="${VERBOSE:-0}"
 OFFLINE="${OFFLINE:-0}"
 CLI="${PYTHON:-python3}"
 
+# Category filter: CATEGORY=python,go or --category=python
+CATEGORY_FILTER="${CATEGORY:-}"
+for arg in "$@"; do
+  case "$arg" in
+    --category=*) CATEGORY_FILTER="${arg#--category=}" ;;
+    --categories)
+      echo "Available categories: python, node, go, rust, ruby, php, shell, git, devops, platform, ai, general"
+      exit 0
+      ;;
+  esac
+done
+
 # Load catalog query functions
 . "$DIR/lib/catalog.sh"
 
@@ -39,6 +51,30 @@ check_cache_age || true
 echo "Gathering current tool status from snapshot..."
 AUDIT_OUTPUT="$(cd "$ROOT" && CLI_AUDIT_RENDER=1 CLI_AUDIT_LINKS=0 CLI_AUDIT_EMOJI=0 "$CLI" audit.py || true)"
 AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" audit.py || true)"
+
+# Category definitions: order, icon, description
+declare -A CATEGORY_ORDER=(
+  [python]=1 [node]=2 [go]=3 [rust]=4 [ruby]=5 [php]=6 [shell]=7
+  [git]=10 [devops]=11 [platform]=12 [ai]=13 [general]=20
+)
+declare -A CATEGORY_ICON=(
+  [python]="🐍" [node]="📦" [go]="🔵" [rust]="🦀" [ruby]="💎" [php]="🐘" [shell]="🐚"
+  [git]="📝" [devops]="🔧" [platform]="☁️" [ai]="🤖" [general]="🔨"
+)
+declare -A CATEGORY_DESC=(
+  [python]="Python Development"
+  [node]="Node.js Development"
+  [go]="Go Development"
+  [rust]="Rust Development"
+  [ruby]="Ruby Development"
+  [php]="PHP Development"
+  [shell]="Shell Scripting"
+  [git]="Git & Version Control"
+  [devops]="DevOps & Infrastructure"
+  [platform]="Platform CLIs"
+  [ai]="AI & LLM Tools"
+  [general]="General CLI Utilities"
+)
 
 if [ "$VERBOSE" = "1" ]; then
   printf "%s\n" "$AUDIT_OUTPUT" | "$CLI" smart_column.py -s '|' -t --right 3,5 --header || printf "%s\n" "$AUDIT_OUTPUT"
@@ -225,8 +261,8 @@ prompt_pin_version() {
   fi
 }
 
-# Build tool list from audit output with catalog entries
-TOOLS_TO_PROCESS=()
+# Build tool list from audit output, grouped by category
+declare -A CATEGORY_TOOLS
 while read -r line; do
   [[ "$line" =~ ^state ]] && continue
   tool_name="$(echo "$line" | awk -F'|' '{gsub(/^ +| +$/,"",$2); print $2}')"
@@ -255,20 +291,75 @@ while read -r line; do
       continue
     fi
 
-    TOOLS_TO_PROCESS+=("$tool_name")
+    # Get category from catalog
+    category="$(catalog_get_property "$tool_name" category)"
+    category="${category:-general}"
+
+    # Add to category group
+    CATEGORY_TOOLS[$category]="${CATEGORY_TOOLS[$category]:-} $tool_name"
   fi
 done <<< "$AUDIT_OUTPUT"
 
-# Sort tools by processing order from catalog
-declare -A TOOL_LIST
-for tool in "${TOOLS_TO_PROCESS[@]}"; do
-  order="$(catalog_get_guide_property "$tool" order "1000")"
-  TOOL_LIST[$order]="${TOOL_LIST[$order]:-} $tool"
-done
+# Helper: check if category matches filter
+category_matches_filter() {
+  local cat="$1"
+  [ -z "$CATEGORY_FILTER" ] && return 0  # No filter = match all
+  echo ",$CATEGORY_FILTER," | grep -q ",$cat," && return 0
+  return 1
+}
 
-# Process tools in order
-for order in $(printf '%s\n' "${!TOOL_LIST[@]}" | sort -n); do
-  for tool in ${TOOL_LIST[$order]}; do
+# Process tools grouped by category (in category order)
+for category in $(printf '%s\n' "${!CATEGORY_TOOLS[@]}" | while read c; do echo "${CATEGORY_ORDER[$c]:-99} $c"; done | sort -n | awk '{print $2}'); do
+  tools="${CATEGORY_TOOLS[$category]}"
+  [ -z "$tools" ] && continue
+
+  # Skip if category doesn't match filter
+  if ! category_matches_filter "$category"; then
+    continue
+  fi
+
+  # Count tools in category
+  tool_count=$(echo $tools | wc -w)
+
+  # Print category header
+  icon="${CATEGORY_ICON[$category]:-📦}"
+  desc="${CATEGORY_DESC[$category]:-$category}"
+
+  printf "\n"
+  printf "================================================================================\n"
+  printf "%s %s (%d tool%s)\n" "$icon" "$desc" "$tool_count" "$([ $tool_count -eq 1 ] && echo '' || echo 's')"
+  printf "================================================================================\n"
+
+  # Category-level prompt (skip if auto-yes mode)
+  if [ "${AUTO_YES_ALL:-}" != "1" ]; then
+    printf "  Tools: %s\n" "$(echo $tools | tr ' ' ', ' | sed 's/^, //')"
+    printf "  Process this category? [Y/n/a=all/s=skip-all] "
+
+    cat_ans=""
+    if [ -t 0 ]; then
+      read -r cat_ans || true
+    elif [ -r /dev/tty ]; then
+      read -r cat_ans </dev/tty || true
+    fi
+
+    case "$cat_ans" in
+      [Nn])
+        printf "  Skipping %s category\n" "$desc"
+        continue
+        ;;
+      [Aa]|all)
+        printf "  Processing all remaining categories\n"
+        AUTO_YES_ALL=1
+        ;;
+      [Ss]|skip-all)
+        printf "  Skipping all remaining categories\n"
+        break
+        ;;
+    esac
+  fi
+
+  # Process each tool in category
+  for tool in $tools; do
     process_tool "$tool"
   done
 done

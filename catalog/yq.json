@@ -1,5 +1,6 @@
 {
   "name": "yq",
+  "category": "general",
   "install_method": "github_release_binary",
   "description": "A lightweight and portable command-line YAML, JSON and XML processor",
   "homepage": "https://github.com/mikefarah/yq",
@@ -10,6 +11,8 @@
     "x86_64": "amd64",
     "aarch64": "arm64",
     "armv7l": "arm"
-  }
-  ,"tags": ["core"]
+  },
+  "tags": [
+    "core"
+  ]
 }

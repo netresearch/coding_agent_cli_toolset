@@ -1,5 +1,6 @@
 {
   "name": "composer",
+  "category": "php",
   "install_method": "dedicated_script",
   "description": "PHP dependency manager",
   "homepage": "https://getcomposer.org/",

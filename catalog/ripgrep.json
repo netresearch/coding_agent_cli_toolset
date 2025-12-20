@@ -1,5 +1,6 @@
 {
   "name": "ripgrep",
+  "category": "general",
   "install_method": "auto",
   "description": "A line-oriented search tool that recursively searches directories for a regex pattern",
   "homepage": "https://github.com/BurntSushi/ripgrep",
@@ -36,5 +37,7 @@
     }
   ],
   "requires": [],
-  "tags": ["core"]
+  "tags": [
+    "core"
+  ]
 }

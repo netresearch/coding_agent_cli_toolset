@@ -1,5 +1,6 @@
 {
   "name": "black",
+  "category": "python",
   "install_method": "uv_tool",
   "description": "The uncompromising Python code formatter",
   "homepage": "https://github.com/psf/black",

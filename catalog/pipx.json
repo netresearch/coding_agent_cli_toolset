@@ -1,5 +1,6 @@
 {
   "name": "pipx",
+  "category": "python",
   "install_method": "package_manager",
   "description": "Install and run Python applications in isolated environments",
   "homepage": "https://pipx.pypa.io/",

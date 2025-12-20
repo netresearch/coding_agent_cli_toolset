@@ -1,5 +1,6 @@
 {
   "name": "python",
+  "category": "python",
   "install_method": "dedicated_script",
   "description": "Python programming language",
   "homepage": "https://www.python.org",

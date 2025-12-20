@@ -1,5 +1,6 @@
 {
   "name": "rga",
+  "category": "general",
   "install_method": "github_release_binary",
   "description": "ripgrep, but also search in PDFs, E-Books, Office documents, zip, tar.gz, etc.",
   "homepage": "https://github.com/phiresky/ripgrep-all",

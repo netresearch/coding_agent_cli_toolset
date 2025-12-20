@@ -1,5 +1,6 @@
 {
   "name": "git",
+  "category": "git",
   "install_method": "package_manager",
   "description": "Distributed version control system",
   "homepage": "https://git-scm.com",

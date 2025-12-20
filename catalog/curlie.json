@@ -1,5 +1,6 @@
 {
   "name": "curlie",
+  "category": "general",
   "install_method": "github_release_binary",
   "description": "The power of curl, the ease of use of httpie",
   "homepage": "https://github.com/rs/curlie",

@@ -1,5 +1,6 @@
 {
   "name": "git-lfs",
+  "category": "git",
   "install_method": "github_release_binary",
   "description": "Git extension for versioning large files",
   "homepage": "https://github.com/git-lfs/git-lfs",

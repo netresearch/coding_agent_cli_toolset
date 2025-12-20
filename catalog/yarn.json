@@ -1,5 +1,6 @@
 {
   "name": "yarn",
+  "category": "node",
   "install_method": "dedicated_script",
   "description": "Alternative Node.js package manager with offline mode and deterministic installs",
   "homepage": "https://yarnpkg.com/",

@@ -1,5 +1,6 @@
 {
   "name": "jq",
+  "category": "general",
   "install_method": "github_release_binary",
   "description": "Command-line JSON processor",
   "homepage": "https://jqlang.github.io/jq/",
@@ -11,5 +12,9 @@
     "aarch64": "arm64",
     "armv7l": "armv7"
   },
-  "tags": ["core", "json", "text-utils"]
+  "tags": [
+    "core",
+    "json",
+    "text-utils"
+  ]
 }

@@ -1,5 +1,6 @@
 {
   "name": "golangci-lint",
+  "category": "go",
   "install_method": "github_release_binary",
   "description": "Fast linters runner for Go",
   "homepage": "https://github.com/golangci/golangci-lint",

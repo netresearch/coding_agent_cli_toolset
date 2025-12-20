@@ -1,5 +1,6 @@
 {
   "name": "claude",
+  "category": "ai",
   "install_method": "npm_global",
   "description": "Anthropic's Claude Code CLI - AI-powered development assistant",
   "homepage": "https://claude.com/claude-code",

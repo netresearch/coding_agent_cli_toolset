@@ -1,5 +1,6 @@
 {
   "name": "just",
+  "category": "general",
   "install_method": "github_release_binary",
   "description": "A handy way to save and run project-specific commands",
   "homepage": "https://github.com/casey/just",
@@ -10,6 +11,8 @@
     "x86_64": "x86_64",
     "aarch64": "aarch64",
     "armv7l": "armv7"
-  }
-  ,"tags": ["core"]
+  },
+  "tags": [
+    "core"
+  ]
 }

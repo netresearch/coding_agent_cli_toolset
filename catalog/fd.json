@@ -1,5 +1,6 @@
 {
   "name": "fd",
+  "category": "general",
   "install_method": "auto",
   "description": "A simple, fast and user-friendly alternative to find",
   "homepage": "https://github.com/sharkdp/fd",
@@ -36,5 +37,9 @@
     }
   ],
   "requires": [],
-  "tags": ["core", "search", "file-utils"]
+  "tags": [
+    "core",
+    "search",
+    "file-utils"
+  ]
 }

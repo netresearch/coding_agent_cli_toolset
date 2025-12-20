@@ -1,5 +1,6 @@
 {
   "name": "delta",
+  "category": "git",
   "install_method": "github_release_binary",
   "description": "A syntax-highlighting pager for git, diff, and grep output",
   "homepage": "https://github.com/dandavison/delta",
@@ -10,6 +11,8 @@
     "x86_64": "x86_64",
     "aarch64": "aarch64",
     "armv7l": "armv7"
-  }
-  ,"tags": ["core"]
+  },
+  "tags": [
+    "core"
+  ]
 }

@@ -1,5 +1,6 @@
 {
   "name": "trivy",
+  "category": "devops",
   "install_method": "github_release_binary",
   "description": "A comprehensive security scanner for vulnerabilities in container images, file systems, and Git repositories",
   "homepage": "https://github.com/aquasecurity/trivy",

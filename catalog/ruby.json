@@ -1,5 +1,6 @@
 {
   "name": "ruby",
+  "category": "ruby",
   "install_method": "dedicated_script",
   "description": "Ruby programming language",
   "homepage": "https://www.ruby-lang.org/",

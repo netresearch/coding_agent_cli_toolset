@@ -88,8 +88,35 @@ def osc8(url: str, text: str) -> str:
     return f"\033]8;;{url}\033\\{text}\033]8;;\033\\"
 
 
+GROUP_BY_CATEGORY = os.environ.get("CLI_AUDIT_GROUP", "1") == "1"
+
+# Category display info
+CATEGORY_ORDER = {
+    "python": 1, "node": 2, "go": 3, "rust": 4, "ruby": 5, "php": 6, "shell": 7,
+    "git": 10, "devops": 11, "platform": 12, "ai": 13, "general": 20,
+}
+CATEGORY_ICON = {
+    "python": "🐍", "node": "📦", "go": "🔵", "rust": "🦀", "ruby": "💎", "php": "🐘", "shell": "🐚",
+    "git": "📝", "devops": "🔧", "platform": "☁️", "ai": "🤖", "general": "🔨",
+}
+CATEGORY_DESC = {
+    "python": "Python Development",
+    "node": "Node.js Development",
+    "go": "Go Development",
+    "rust": "Rust Development",
+    "ruby": "Ruby Development",
+    "php": "PHP Development",
+    "shell": "Shell Scripting",
+    "git": "Git & Version Control",
+    "devops": "DevOps & Infrastructure",
+    "platform": "Platform CLIs",
+    "ai": "AI & LLM Tools",
+    "general": "General CLI Utilities",
+}
+
+
 def render_table(tools: list[dict[str, Any]], show_hints: bool = False) -> None:
-    """Render tools as pipe-delimited table.
+    """Render tools as pipe-delimited table, optionally grouped by category.
 
     Args:
         tools: List of tool dictionaries
@@ -98,70 +125,94 @@ def render_table(tools: list[dict[str, Any]], show_hints: bool = False) -> None:
     from .catalog import ToolCatalog
 
     # Header
-    headers = (" ", "tool", "installed", "latest_upstream")
+    headers = ("state", "tool", "installed", "latest_upstream")
     print("|".join(headers))
 
     # Load catalog for pinned versions
     catalog = ToolCatalog()
 
-    # Rows
-    for tool in tools:
-        name = tool.get("tool", "")
-        installed = tool.get("installed", "")
-        latest = tool.get("latest_upstream", "")
-        status = tool.get("status", "UNKNOWN")
-        tool_url = tool.get("tool_url", "")
-        latest_url = tool.get("latest_url", "")
+    # Group tools by category if enabled
+    if GROUP_BY_CATEGORY:
+        categorized: dict[str, list[dict[str, Any]]] = {}
+        for tool in tools:
+            cat = tool.get("category", "general")
+            if cat not in categorized:
+                categorized[cat] = []
+            categorized[cat].append(tool)
 
-        # Icon
-        icon = status_icon(status, installed)
+        # Sort categories by order
+        sorted_cats = sorted(categorized.keys(), key=lambda c: CATEGORY_ORDER.get(c, 99))
 
-        # Determine colors based on status
-        if status == "UP-TO-DATE":
-            inst_color = GREEN
-            latest_color = GREEN
-        elif status == "OUTDATED":
-            inst_color = YELLOW
-            latest_color = BOLD_GREEN  # Latest is newer, make it bold green
-        elif status == "CONFLICT":
-            inst_color = YELLOW
-            latest_color = BOLD_GREEN
-        else:  # NOT INSTALLED, UNKNOWN
-            inst_color = BLUE
-            latest_color = BLUE
+        for cat in sorted_cats:
+            cat_tools = categorized[cat]
+            icon = CATEGORY_ICON.get(cat, "📦")
+            desc = CATEGORY_DESC.get(cat, cat)
+            print(f"# {icon} {desc} ({len(cat_tools)} tools)", file=sys.stderr)
+            for tool in cat_tools:
+                _render_tool_row(tool, catalog, show_hints)
+    else:
+        for tool in tools:
+            _render_tool_row(tool, catalog, show_hints)
 
-        # Hyperlinks
-        name_display = osc8(tool_url, name) if tool_url else name
 
-        # Apply colors to installed and latest (before adding markers/hints)
-        installed_display = colorize(installed, inst_color)
-        latest_display = colorize(latest, latest_color)
+def _render_tool_row(tool: dict[str, Any], catalog: Any, show_hints: bool) -> None:
+    """Render a single tool row."""
+    name = tool.get("tool", "")
+    installed = tool.get("installed", "")
+    latest = tool.get("latest_upstream", "")
+    status = tool.get("status", "UNKNOWN")
+    tool_url = tool.get("tool_url", "")
+    latest_url = tool.get("latest_url", "")
 
-        # Apply hyperlinks (after colorization, hyperlinks wrap the colored text)
-        if latest_url:
-            latest_display = osc8(latest_url, latest_display)
+    # Icon
+    icon = status_icon(status, installed)
 
-        # Add pinned/skip markers
-        markers = []
-        if catalog.is_pinned(name):
-            markers.append("PINNED")
-        if catalog.should_skip(name, latest):
-            markers.append("SKIP")
+    # Determine colors based on status
+    if status == "UP-TO-DATE":
+        inst_color = GREEN
+        latest_color = GREEN
+    elif status == "OUTDATED":
+        inst_color = YELLOW
+        latest_color = BOLD_GREEN  # Latest is newer, make it bold green
+    elif status == "CONFLICT":
+        inst_color = YELLOW
+        latest_color = BOLD_GREEN
+    else:  # NOT INSTALLED, UNKNOWN
+        inst_color = BLUE
+        latest_color = BLUE
 
-        if markers:
-            latest_display = f"{latest_display}  [{' '.join(markers)}]"
+    # Hyperlinks
+    name_display = osc8(tool_url, name) if tool_url else name
 
-        # Hint
-        if show_hints and status in ("NOT INSTALLED", "OUTDATED", "CONFLICT"):
-            hint = tool.get("hint", "")
-            if hint:
-                latest_display = f"{latest_display}  [{hint}]"
+    # Apply colors to installed and latest (before adding markers/hints)
+    installed_display = colorize(installed, inst_color)
+    latest_display = colorize(latest, latest_color)
 
-        # Add CONFLICT message to installed display
-        if status == "CONFLICT" and installed_display.startswith("CONFLICT:"):
-            installed_display = installed_display.replace("CONFLICT: ", "")  # Show clean message
+    # Apply hyperlinks (after colorization, hyperlinks wrap the colored text)
+    if latest_url:
+        latest_display = osc8(latest_url, latest_display)
 
-        print("|".join((icon, name_display, installed_display, latest_display)))
+    # Add pinned/skip markers
+    markers = []
+    if catalog.is_pinned(name):
+        markers.append("PINNED")
+    if catalog.should_skip(name, latest):
+        markers.append("SKIP")
+
+    if markers:
+        latest_display = f"{latest_display}  [{' '.join(markers)}]"
+
+    # Hint
+    if show_hints and status in ("NOT INSTALLED", "OUTDATED", "CONFLICT"):
+        hint = tool.get("hint", "")
+        if hint:
+            latest_display = f"{latest_display}  [{hint}]"
+
+    # Add CONFLICT message to installed display
+    if status == "CONFLICT" and installed_display.startswith("CONFLICT:"):
+        installed_display = installed_display.replace("CONFLICT: ", "")  # Show clean message
+
+    print("|".join((icon, name_display, installed_display, latest_display)))
 
 
 def print_summary(snapshot: dict[str, Any], tools: list[dict[str, Any]]) -> None:

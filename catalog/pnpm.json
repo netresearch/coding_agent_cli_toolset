@@ -1,5 +1,6 @@
 {
   "name": "pnpm",
+  "category": "node",
   "install_method": "auto",
   "description": "Fast, disk space efficient Node.js package manager",
   "homepage": "https://pnpm.io/",
