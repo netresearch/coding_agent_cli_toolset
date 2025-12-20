@@ -11,6 +11,5 @@
     "dnf": "python3-pip",
     "pacman": "python-pip"
   },
-  "notes": "pip typically comes with Python 3. Use python3 -m pip if pip command is not available.",
-  "pinned_version": "never"
+  "notes": "pip typically comes with Python 3. Use python3 -m pip if pip command is not available."
 }

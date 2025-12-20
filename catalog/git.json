@@ -5,11 +5,12 @@
   "homepage": "https://git-scm.com",
   "github_repo": "git/git",
   "binary_name": "git",
+  "ppa": "git-core/ppa",
   "packages": {
     "apt": "git",
     "brew": "git",
     "dnf": "git",
     "pacman": "git"
   },
-  "notes": "For latest version on Ubuntu, use PPA: add-apt-repository ppa:git-core/ppa"
+  "notes": "Uses git-core PPA for latest version on Ubuntu/Debian"
 }

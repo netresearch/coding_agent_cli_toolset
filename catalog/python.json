@@ -5,8 +5,9 @@
   "homepage": "https://www.python.org",
   "github_repo": "python/cpython",
   "binary_name": "python3",
-  "script": "install_python.sh"
-  ,"guide": {
+  "script": "install_python.sh",
+  "version_command": "uv python list --only-installed 2>/dev/null | grep -E '^cpython-[0-9]' | head -1 | sed 's/cpython-\\([0-9.]*\\).*/\\1/'",
+  "guide": {
     "display_name": "Python stack",
     "install_action": "update",
     "order": 30

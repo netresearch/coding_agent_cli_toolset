@@ -11,6 +11,5 @@
     "display_name": "Yarn",
     "install_action": "update",
     "order": 151
-  },
-  "pinned_version": "never"
+  }
 }

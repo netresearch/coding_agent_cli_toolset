@@ -10,6 +10,5 @@
     "display_name": "Docker CLI",
     "install_action": "install",
     "order": 200
-  },
-  "pinned_version": "29.0.0"
+  }
 }

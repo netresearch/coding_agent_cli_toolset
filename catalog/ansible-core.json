@@ -1,6 +1,6 @@
 {
   "name": "ansible-core",
-  "install_method": "pipx",
+  "install_method": "uv_tool",
   "description": "Ansible core automation engine",
   "homepage": "https://ansible.com",
   "github_repo": "ansible/ansible",

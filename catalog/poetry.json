@@ -11,6 +11,5 @@
     "dnf": "poetry",
     "pacman": "python-poetry"
   },
-  "notes": "Some distributions may require installing via pipx or the official installer: curl -sSL https://install.python-poetry.org | python3 -",
-  "pinned_version": "never"
+  "notes": "Some distributions may require installing via pipx or the official installer: curl -sSL https://install.python-poetry.org | python3 -"
 }

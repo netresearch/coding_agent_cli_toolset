@@ -10,6 +10,5 @@
     "brew": "pipx",
     "dnf": "pipx",
     "pacman": "python-pipx"
-  },
-  "pinned_version": "never"
+  }
 }

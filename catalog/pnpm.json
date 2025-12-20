@@ -5,11 +5,28 @@
   "homepage": "https://pnpm.io/",
   "package_name": "pnpm",
   "binary_name": "pnpm",
-  "packages": {
-    "apt": "pnpm",
-    "brew": "pnpm",
-    "dnf": "pnpm",
-    "pacman": "pnpm"
-  },
+  "available_methods": [
+    {
+      "method": "npm",
+      "priority": 1,
+      "config": {
+        "package": "pnpm"
+      }
+    },
+    {
+      "method": "apt",
+      "priority": 2,
+      "config": {
+        "package": "pnpm"
+      }
+    },
+    {
+      "method": "brew",
+      "priority": 3,
+      "config": {
+        "formula": "pnpm"
+      }
+    }
+  ],
   "notes": "Can be installed via npm (npm install -g pnpm), apt, or brew"
 }
