@@ -143,13 +143,6 @@ python3 cli_audit.py
 CLI_AUDIT_HOST_CAP_GITHUB_API=2 python3 cli_audit.py
 ```
 
-**Use Hints Cache:**
-```bash
-# Hints automatically prioritize successful methods
-# No action needed - just run again
-python3 cli_audit.py
-```
-
 **Use Offline Mode:**
 ```bash
 # When rate limited, fall back to manual cache
@@ -219,18 +212,6 @@ def get_version_line(path: str, tool_name: str) -> str:
             return output
 
     return ""
-```
-
-**Add Hint for Version Flag:**
-
-Edit `upstream_versions.json`:
-
-```json
-{
-  "__hints__": {
-    "local_flag:your-tool": "version"
-  }
-}
 ```
 
 **Fix PATH Issues:**
@@ -452,10 +433,8 @@ rm -f .tmp_*.json
 jq '.' upstream_versions.json > upstream_versions.json.tmp
 mv upstream_versions.json.tmp upstream_versions.json
 
-# Rebuild hints
-jq 'del(.__hints__)' upstream_versions.json > upstream_versions.json.tmp
-mv upstream_versions.json.tmp upstream_versions.json
-make update  # Rebuilds hints
+# Refresh from upstream
+python audit.py --update-baseline
 ```
 
 ### 7. Version Parsing Edge Cases
@@ -755,8 +734,7 @@ python3 cli_audit.py --only ripgrep 2>&1 | grep -E "(http_|retry)"
 CLI_AUDIT_OFFLINE=1 python3 cli_audit.py --only ripgrep
 
 # 4. Check cache state
-jq '.ripgrep' upstream_versions.json
-jq '.__hints__["gh:BurntSushi/ripgrep"]' upstream_versions.json
+jq '.versions.ripgrep' upstream_versions.json
 ```
 
 ### Workflow 3: Diagnose Performance
@@ -786,16 +764,15 @@ make update
 ```bash
 # 1. Validate JSON
 jq '.' upstream_versions.json
-jq '.' tools_snapshot.json
+jq '.' local_state.json
 
 # 2. Check metadata
-jq '.__meta__' tools_snapshot.json
-jq '.__hints__ | length' upstream_versions.json
+jq '.__meta__' upstream_versions.json
+jq '.versions | length' upstream_versions.json
 
 # 3. Rebuild cache
-rm -f upstream_versions.json tools_snapshot.json
 git checkout upstream_versions.json
-make update
+python audit.py --update-baseline
 
 # 4. Verify consistency
 CLI_AUDIT_OFFLINE=1 make audit
@@ -942,9 +919,8 @@ CLI_AUDIT_DEBUG=1 CLI_AUDIT_TRACE=1 python3 cli_audit.py --only tool 2>&1 | tee 
 
 4. **Cache State:**
 ```bash
-jq '.__meta__' tools_snapshot.json
-jq '.tool' upstream_versions.json
-jq '.__hints__' upstream_versions.json
+jq '.__meta__' upstream_versions.json
+jq '.versions | keys' upstream_versions.json
 ```
 
 5. **Expected vs Actual Behavior:**

@@ -246,20 +246,7 @@ def risky_operation():
 
 ### Threading Safety
 
-When updating caches, always use locks:
-
-```python
-# ALWAYS acquire MANUAL_LOCK before HINTS_LOCK
-with MANUAL_LOCK:
-    # Update upstream_versions.json
-    set_manual_latest(tool_name, version)
-
-    with HINTS_LOCK:
-        # Update __hints__ section
-        set_hint(f"gh:{owner}/{repo}", method)
-```
-
-**Lock Ordering Rule:** MANUAL_LOCK → HINTS_LOCK (never reversed)
+File writes use atomic operations (write to temp, then rename) to prevent corruption.
 
 ## Testing Strategies
 
@@ -417,14 +404,11 @@ CLI_AUDIT_DEBUG=1 python3 cli_audit.py --only problematic-tool 2>&1 | tee debug.
 ### Check Cache State
 
 ```bash
-# View manual cache
+# View upstream versions
 jq '.' upstream_versions.json
 
-# View hints
-jq '.__hints__' upstream_versions.json
-
-# View snapshot metadata
-jq '.__meta__' tools_snapshot.json
+# View local state
+jq '.' local_state.json
 ```
 
 ## Git Workflow Best Practices
@@ -493,22 +477,6 @@ CLI_AUDIT_FAST=1 python3 cli_audit.py
 ```
 
 ## Common Pitfalls
-
-### ❌ Wrong Lock Ordering
-
-```python
-# WRONG - Can deadlock
-with HINTS_LOCK:
-    with MANUAL_LOCK:  # Bad order
-        ...
-```
-
-```python
-# CORRECT
-with MANUAL_LOCK:
-    with HINTS_LOCK:  # Good order
-        ...
-```
 
 ### ❌ Unhandled Exceptions in Workers
 

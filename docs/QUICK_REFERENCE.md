@@ -282,43 +282,43 @@ make lint                      # Run pyflakes
 make scripts-perms             # Fix script permissions
 ```
 
-## Cache File Schemas
+## Data File Schemas
 
-### upstream_versions.json
-
-```json
-{
-  "__hints__": {
-    "gh:owner/repo": "latest_redirect",
-    "local_flag:tool": "--version"
-  },
-  "__methods__": {
-    "tool": "pypi"
-  },
-  "ripgrep": "14.1.1",
-  "python": "3.14.0"
-}
-```
-
-### tools_snapshot.json
+### upstream_versions.json (committed)
 
 ```json
 {
   "__meta__": {
-    "schema_version": 1,
-    "created_at": "2025-10-09T12:34:56Z",
-    "count": 50
+    "schema_version": 2,
+    "baseline_updated_at": "2025-12-21T12:00:00Z",
+    "source": "github/pypi/npm/crates API"
   },
-  "tools": [
-    {
-      "tool": "ripgrep",
-      "installed": "14.1.1 (150ms)",
-      "installed_method": "rustup/cargo",
-      "latest_upstream": "14.1.1 (220ms)",
-      "upstream_method": "github",
-      "status": "UP-TO-DATE"
+  "versions": {
+    "ripgrep": {
+      "latest_version": "14.1.1",
+      "latest_url": "https://github.com/BurntSushi/ripgrep/releases/tag/14.1.1",
+      "upstream_method": "gh"
     }
-  ]
+  }
+}
+```
+
+### local_state.json (gitignored)
+
+```json
+{
+  "__meta__": {
+    "schema_version": 2,
+    "collected_at": "2025-12-21T12:00:00Z",
+    "hostname": "myhost"
+  },
+  "tools": {
+    "ripgrep": {
+      "installed_version": "14.1.1",
+      "installed_method": "cargo",
+      "installed_path": "/home/user/.cargo/bin/rg"
+    }
+  }
 }
 ```
 

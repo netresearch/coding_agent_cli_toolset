@@ -11,7 +11,7 @@ Quick lookup reference for functions in `cli_audit.py`, organized by category.
 | **Classification** | `detect_install_method`, `_classify_install_method` | Installation method detection |
 | **Upstream APIs** | `latest_github`, `latest_pypi`, `latest_crates`, `latest_npm`, `latest_gnu` | Fetch upstream versions |
 | **HTTP** | `http_fetch`, `http_get` | Network layer with retries |
-| **Cache** | `load_manual_versions`, `get_manual_latest`, `set_manual_latest`, `load_hints`, `get_hint`, `set_hint` | Multi-tier cache management |
+| **Cache** | `load_manual_versions`, `get_manual_latest`, `set_manual_latest` | Cache management |
 | **Core** | `audit_tool`, `get_latest`, `main` | Main audit logic |
 
 ---
@@ -134,7 +134,6 @@ Extract version string from executable.
 - Most tools: `<path> --version`
 - `go`, `curlie`, `isort`: Custom version flags
 - `entr`, `sponge`: No version flag (returns empty)
-- Uses hints cache to remember working flags
 
 **Usage:**
 ```python
@@ -335,8 +334,6 @@ Fetch latest GitHub release.
 **Strategies:**
 1. Try `/repos/{owner}/{repo}/releases/latest` with redirect following
 2. On failure, try Atom feed at `/releases.atom`
-3. Use hints cache to skip failed methods
-4. Store successful method as hint for next run
 
 **Usage:**
 ```python
@@ -345,9 +342,6 @@ tag, method = latest_github("sharkdp", "fd")
 
 tag, method = latest_github("BurntSushi", "ripgrep")
 # ("14.1.1", "latest_redirect")
-
-# Hint is stored automatically for next run
-hint = get_hint("gh:sharkdp/fd")
 # "latest_redirect"
 ```
 
@@ -603,76 +597,6 @@ set_manual_latest("ripgrep", "14.1.1")
 
 ---
 
-### `load_hints() -> None`
-
-Load API method hints from `__hints__` in `upstream_versions.json`.
-
-**Side Effects:** Populates global `HINTS` dict
-
-**Usage:**
-```python
-load_hints()
-method = HINTS.get("gh:owner/repo", "")
-```
-
-**See:** [API_REFERENCE.md#load_hints](API_REFERENCE.md#load_hints)
-
----
-
-### `get_hint(key) -> str`
-
-Get cached API method for a source.
-
-**Parameters:**
-- `key` (`str`) - Hint key formats:
-  - `"gh:owner/repo"` - GitHub API method
-  - `"local_flag:tool"` - Version flag that worked
-
-**Returns:**
-- `str` - Method string (e.g., `"latest_redirect"`, `"--version"`) or empty
-
-**Usage:**
-```python
-# Get GitHub API method
-method = get_hint("gh:sharkdp/fd")
-if method == "latest_redirect":
-    # Try latest redirect first
-
-# Get version flag
-flag = get_hint("local_flag:ripgrep")
-if flag == "-V":
-    # Use -V instead of --version
-```
-
-**See:** [API_REFERENCE.md#get_hint](API_REFERENCE.md#get_hint)
-
----
-
-### `set_hint(key, value) -> None`
-
-Store API method hint for future runs.
-
-**Parameters:**
-- `key` (`str`) - Hint key
-- `value` (`str`) - Method that worked
-
-**Side Effects:** Writes to `__hints__` in `upstream_versions.json`
-
-**Lock Ordering:** Requires `MANUAL_LOCK` → `HINTS_LOCK`
-
-**Usage:**
-```python
-# Store successful GitHub method
-set_hint("gh:owner/repo", "latest_redirect")
-
-# Store working version flag
-set_hint("local_flag:ripgrep", "-V")
-```
-
-**See:** [API_REFERENCE.md#set_hint](API_REFERENCE.md#set_hint)
-
----
-
 ## Core Audit Functions
 
 Main audit logic coordinating all subsystems.
@@ -732,12 +656,10 @@ Get latest upstream version for a tool.
 - `tuple[str, str]` - `(version, method)` - version string and source method
 
 **Cache Strategy:**
-1. If `MANUAL_FIRST=1`, check manual cache first
-2. Check hints cache for fastest method
-3. Try upstream API (with retries)
-4. On success, update hints and manual caches
-5. On failure, fall back to manual cache
-6. Final fallback: return `("", "")`
+1. Try upstream API (with retries)
+2. On success, update cache
+3. On failure, fall back to cached upstream
+4. Final fallback: return `("", "")`
 
 **Usage:**
 ```python

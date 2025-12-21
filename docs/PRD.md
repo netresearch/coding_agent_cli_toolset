@@ -75,13 +75,11 @@ AI CLI Preparation is a specialized environment audit and installation managemen
 
 **Threading Model:**
 - ThreadPoolExecutor with configurable workers (default: 16)
-- Lock ordering enforcement (MANUAL_LOCK → HINTS_LOCK for safety)
 - Independent tool audits (failures isolated)
 
-**Cache Hierarchy:**
-- **Hints**: Optimization hints for faster lookups (__hints__ in upstream_versions.json)
-- **Manual**: User-committed versions (upstream_versions.json)
-- **Upstream**: Live API queries (fallback)
+**Data Model:**
+- **upstream_versions.json**: Cached upstream versions (committed)
+- **local_state.json**: Machine-specific state (gitignored)
 
 **Resilience Patterns:**
 - Network failures → fallback to cache

@@ -171,7 +171,6 @@ def _classify_install_method(path: str, tool_name: str) -> tuple[str, str]:
 1. **GitHub:**
    - Try `/repos/{owner}/{repo}/releases/latest` with redirect following
    - Fallback to Atom feed parsing if API fails
-   - Store successful method in hints for speed
 
 2. **PyPI:**
    - Query `https://pypi.org/pypi/{package}/json`
@@ -202,55 +201,31 @@ sleep_time = base * (2 ** attempt) + random.uniform(0, jitter)
 # Example: attempt 1 → 200ms + 0-100ms = 200-300ms
 ```
 
-### 6. Cache Layer (Multi-Tier)
+### 6. Data Files
 
-**Cache Hierarchy (fastest → slowest):**
+**Two-file model:**
 
-1. **Hints Cache** (`__hints__` in `upstream_versions.json`)
-   - Stores which API method worked last per tool
-   - Example: `"gh:BurntSushi/ripgrep": "latest_redirect"`
-   - Purpose: Skip failed methods, try successful ones first
-   - Lock: `HINTS_LOCK` (acquired after `MANUAL_LOCK`)
-
-2. **Manual Cache** (`upstream_versions.json`)
-   - Committed to repository
+1. **Upstream Cache** (`upstream_versions.json`) - Committed
+   - Latest available versions from upstream sources
    - Used in offline mode (`CLI_AUDIT_OFFLINE=1`)
-   - Updated on successful upstream fetches (unless `CLI_AUDIT_WRITE_MANUAL=0`)
-   - Lock: `MANUAL_LOCK` (acquired first)
+   - Updated via `--update-baseline`
 
-3. **Snapshot** (`tools_snapshot.json`)
-   - Complete audit results with metadata
-   - Schema version 1 with `__meta__` object
-   - Used for render-only mode
-   - Written atomically after collection
-
-**Lock Ordering Rule:**
-```python
-with MANUAL_LOCK:
-    # Update upstream_versions.json
-    with HINTS_LOCK:
-        # Update __hints__ section
-```
-**Critical:** MANUAL_LOCK must be acquired before HINTS_LOCK to prevent deadlock.
+2. **Local State** (`local_state.json`) - Gitignored
+   - Machine-specific installed tool versions
+   - Updated via `--update-local`
 
 ### 7. Threading Model & Synchronization
 
 **Concurrency Strategy:**
 
 ```python
-# Global locks for cache writes
-MANUAL_LOCK = threading.Lock()  # For upstream_versions.json
-HINTS_LOCK = threading.Lock()   # For __hints__ in upstream_versions.json (nested)
-
 # ThreadPoolExecutor for parallel tool audits
 with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
     # Each worker calls audit_tool(tool)
-    # Workers may update caches (with locks)
 ```
 
 **Thread Safety:**
-- Tool audits run in parallel (no shared state except caches)
-- Cache updates are serialized via locks
+- Tool audits run in parallel (no shared state)
 - Atomic file writes prevent corruption (write to temp, then rename)
 
 **Performance Considerations:**
@@ -367,9 +342,7 @@ for attempt in range(retries + 1):
 ```
 Attempt 1: Try upstream API (with retries)
   ↓ (on failure)
-Attempt 2: Check hints cache for alternative method
-  ↓ (on failure)
-Attempt 3: Use manual cache (upstream_versions.json)
+Attempt 2: Use cached upstream (upstream_versions.json)
   ↓ (on failure)
 Result: Mark as UNKNOWN, continue audit
 ```

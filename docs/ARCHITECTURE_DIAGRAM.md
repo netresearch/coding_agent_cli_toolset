@@ -473,19 +473,13 @@ NOT ProcessPoolExecutor (GIL not a bottleneck)
 
 get_available_version(tool, pm, cache_ttl)
     │
-    ├─→ Check in-memory cache (TTL: 1 hour)
-    │   └─→ HIT → return cached version
-    │
-    ├─→ MISS → Query upstream API
+    ├─→ Query upstream API
     │   │
-    │   ├─→ Check hints cache (last working method)
-    │   │        └─→ Try: github/pypi/crates/npm
+    │   ├─→ Try: github/pypi/crates/npm
     │   │
     │   ├─→ Retry with exponential backoff (2x)
     │   │
     │   ├─→ SUCCESS:
-    │   │   ├─→ Update in-memory cache
-    │   │   ├─→ Update hints cache
     │   │   └─→ Write to upstream_versions.json
     │   │
     │   └─→ FAILURE:
@@ -494,26 +488,9 @@ get_available_version(tool, pm, cache_ttl)
     │
     └─→ Returns: version string
 
-Multi-Tier Cache Hierarchy:
-1. In-memory (fastest)
-2. Hints (method preference)
-3. Manual cache (upstream_versions.json)
-4. Snapshot (tools_snapshot.json)
-```
-
-### Lock Hierarchy
-
-```
-MANUAL_LOCK (file-level cache updates)
-    └─→ HINTS_LOCK (hints section updates)
-
-Rule: Always acquire MANUAL_LOCK before HINTS_LOCK
-Prevents: Deadlocks
-
-with MANUAL_LOCK:
-    # Update upstream_versions.json
-    with HINTS_LOCK:
-        # Update __hints__ section
+Data Files:
+1. upstream_versions.json (committed) - latest available versions
+2. local_state.json (gitignored) - machine-specific state
 ```
 
 ---

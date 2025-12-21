@@ -548,28 +548,13 @@ CLI_AUDIT_OFFLINE=1 python3 cli_audit.py --only python
 
 ### Offline Cache Management
 
-**Cache File:** `upstream_versions.json` (override with `CLI_AUDIT_MANUAL_FILE`)
+**Data Files:**
+- `upstream_versions.json` - Latest available versions (committed)
+- `local_state.json` - Machine-specific state (gitignored)
 
-**Structure:**
-```json
-{
-  "__hints__": {
-    "gh:BurntSushi/ripgrep": "latest_redirect",
-    "gh:sharkdp/fd": "latest_redirect"
-  },
-  "__methods__": {
-    "pip": "pypi",
-    "pipx": "pypi"
-  },
-  "ripgrep": "14.1.1",
-  "fd": "10.3.0",
-  "python": "3.14.0"
-}
-```
-
-**Update Behavior:**
-- Online lookups automatically update cache (default)
-- Disable auto-update: `CLI_AUDIT_WRITE_MANUAL=0`
+**Update Commands:**
+- `python audit.py --update-baseline` - Refresh upstream versions
+- `python audit.py --update-local` - Refresh local state
 
 ## Environment Variable Configuration
 
