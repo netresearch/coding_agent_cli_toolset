@@ -58,7 +58,7 @@ AI CLI Preparation is a specialized environment audit and installation managemen
 - Multi-source API support (GitHub, PyPI, crates.io, npm, GNU FTP)
 - HTTP layer with retries, exponential backoff, rate limiting
 - Per-origin request caps (GitHub: 5/min, PyPI: 10/min, crates.io: 5/min)
-- Offline-first design with committed cache (latest_versions.json)
+- Offline-first design with committed cache (upstream_versions.json)
 
 **Output Formats:**
 - Table view with status icons (✓ UP-TO-DATE, ↑ OUTDATED, ✗ NOT INSTALLED, ? UNKNOWN)
@@ -79,8 +79,8 @@ AI CLI Preparation is a specialized environment audit and installation managemen
 - Independent tool audits (failures isolated)
 
 **Cache Hierarchy:**
-- **Hints**: Optimization hints for faster lookups (__hints__ in latest_versions.json)
-- **Manual**: User-committed versions (latest_versions.json)
+- **Hints**: Optimization hints for faster lookups (__hints__ in upstream_versions.json)
+- **Manual**: User-committed versions (upstream_versions.json)
 - **Upstream**: Live API queries (fallback)
 
 **Resilience Patterns:**

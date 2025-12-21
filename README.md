@@ -730,24 +730,17 @@ make audit
 - Some package managers (like Go) don't have built-in bulk update mechanisms - manual updates are required
 - The script gracefully handles missing package managers (skips them)
 
-## Caching
+## Data Files
 
-- Manual baseline (committed): `latest_versions.json` in this repo (override with `CLI_AUDIT_MANUAL_FILE`). Used as the primary source in offline mode; also used as a fallback when online lookups fail. Example content:
+The audit system uses two JSON files:
 
-```json
-{
-  "rust": "1.89.0",
-  "jq": "jq-1.8.1",
-  "parallel": "20240322"
-}
-```
+| File | Purpose | Git Tracked |
+|------|---------|-------------|
+| `upstream_versions.json` | Latest available versions from upstream sources | Yes (committed) |
+| `local_state.json` | Machine-specific installed tool versions | No (gitignored) |
 
-- Auto-updates: when an online lookup succeeds, the tool writes the discovered latest value back into `latest_versions.json` (toggle with `CLI_AUDIT_WRITE_MANUAL=0`).
-- Offline behavior: set `CLI_AUDIT_OFFLINE=1` to use `latest_versions.json` exclusively.
-
-### Lookup hints
-
-To speed up future runs, the audit records which upstream retrieval method worked last per tool. These hints are stored inside `latest_versions.json` under the special key `"__hints__"`. They help prioritize the fastest working method on subsequent runs and are safe to edit or remove; they will be rebuilt.
+- **Offline mode**: Set `CLI_AUDIT_OFFLINE=1` to use cached `upstream_versions.json` without network calls
+- **Baseline refresh**: Run `python audit.py --update-baseline` to update upstream versions
 
 ## License
 MIT

@@ -54,7 +54,7 @@ make update && make audit
 ### 5. Commit and Push
 
 ```bash
-git add cli_audit.py latest_versions.json
+git add cli_audit.py upstream_versions.json
 git commit -m "feat(tools): add support for new-tool"
 git push -u origin feature/add-new-tool
 ```
@@ -143,7 +143,7 @@ CLI_AUDIT_JSON=1 python3 cli_audit.py --only your-tool | jq '.'
 
 ### Step 6: Update Manual Cache
 
-Add initial version to `latest_versions.json`:
+Add initial version to `upstream_versions.json`:
 
 ```json
 {
@@ -185,7 +185,7 @@ python3 cli_audit.py --only deno | python3 smart_column.py -s "|" -t
 
 **4. Commit:**
 ```bash
-git add cli_audit.py latest_versions.json
+git add cli_audit.py upstream_versions.json
 git commit -m "feat(tools): add Deno runtime support"
 ```
 
@@ -251,7 +251,7 @@ When updating caches, always use locks:
 ```python
 # ALWAYS acquire MANUAL_LOCK before HINTS_LOCK
 with MANUAL_LOCK:
-    # Update latest_versions.json
+    # Update upstream_versions.json
     set_manual_latest(tool_name, version)
 
     with HINTS_LOCK:
@@ -313,7 +313,7 @@ CLI_AUDIT_DEBUG=1 CLI_AUDIT_TRACE=1 python3 cli_audit.py 2>&1 | grep "slow"
 
 ```bash
 # Ensure manual cache is valid JSON
-jq '.' latest_versions.json > /dev/null
+jq '.' upstream_versions.json > /dev/null
 
 # Ensure snapshot is valid
 jq '.__meta__.schema_version' tools_snapshot.json
@@ -418,10 +418,10 @@ CLI_AUDIT_DEBUG=1 python3 cli_audit.py --only problematic-tool 2>&1 | tee debug.
 
 ```bash
 # View manual cache
-jq '.' latest_versions.json
+jq '.' upstream_versions.json
 
 # View hints
-jq '.__hints__' latest_versions.json
+jq '.__hints__' upstream_versions.json
 
 # View snapshot metadata
 jq '.__meta__' tools_snapshot.json
@@ -457,7 +457,7 @@ test(smoke): verify JSON output schema
 - [ ] Code passes `pyflakes` lint
 - [ ] Manual test passed for affected tools
 - [ ] Smoke test passed (`bash scripts/test_smoke.sh`)
-- [ ] Updated `latest_versions.json` if adding tools
+- [ ] Updated `upstream_versions.json` if adding tools
 - [ ] Updated documentation if changing behavior
 - [ ] Commit message follows conventions
 

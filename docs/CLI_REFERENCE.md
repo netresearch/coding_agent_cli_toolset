@@ -142,7 +142,7 @@ make audit   # Render only
 ### Offline Mode
 
 ```bash
-# Use only manual cache (latest_versions.json)
+# Use only manual cache (upstream_versions.json)
 CLI_AUDIT_OFFLINE=1 python3 cli_audit.py
 
 # Offline + render from snapshot
@@ -190,7 +190,7 @@ CLI_AUDIT_OFFLINE=1 CLI_AUDIT_RENDER=1 python3 cli_audit.py
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
 | `CLI_AUDIT_SNAPSHOT_FILE` | path | `tools_snapshot.json` | Snapshot file path |
-| `CLI_AUDIT_MANUAL_FILE` | path | `latest_versions.json` | Manual cache path |
+| `CLI_AUDIT_MANUAL_FILE` | path | `upstream_versions.json` | Manual cache path |
 | `CLI_AUDIT_WRITE_MANUAL` | bool | `1` | Auto-update manual cache |
 | `CLI_AUDIT_MANUAL_FIRST` | bool | `0` | Try manual cache before network |
 
@@ -708,7 +708,7 @@ CLI_AUDIT_COLLECT=1 python3 cli_audit.py
 jq '.' tools_snapshot.json
 
 # Rebuild from scratch
-rm tools_snapshot.json latest_versions.json
+rm tools_snapshot.json upstream_versions.json
 make update
 ```
 

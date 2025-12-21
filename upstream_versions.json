@@ -1,15 +1,141 @@
 {
   "__meta__": {
-    "baseline_updated_at": "2025-12-11T12:59:11Z",
+    "baseline_updated_at": "2025-12-21T12:41:48Z",
     "schema_version": 2,
     "source": "github/pypi/npm/crates API"
   },
   "versions": {
+    "ansible-core": {
+      "latest_tag": "2.20.1",
+      "latest_url": "https://github.com/ansible/ansible/releases/tag/2.20.1",
+      "latest_version": "2.20.1",
+      "tool_url": "https://github.com/ansible/ansible",
+      "upstream_method": "gh"
+    },
+    "ast-grep": {
+      "latest_tag": "0.40.3",
+      "latest_url": "https://github.com/ast-grep/ast-grep/releases/tag/0.40.3",
+      "latest_version": "0.40.3",
+      "tool_url": "https://github.com/ast-grep/ast-grep",
+      "upstream_method": "gh"
+    },
+    "aws": {
+      "latest_tag": "2.32.21",
+      "latest_url": "https://github.com/aws/aws-cli/releases/tag/2.32.21",
+      "latest_version": "2.32.21",
+      "tool_url": "https://github.com/aws/aws-cli",
+      "upstream_method": "gh"
+    },
+    "bandit": {
+      "latest_tag": "1.9.2",
+      "latest_url": "https://pypi.org/project/bandit/",
+      "latest_version": "1.9.2",
+      "tool_url": "https://pypi.org/project/bandit/",
+      "upstream_method": "pypi"
+    },
     "bat": {
       "latest_tag": "0.26.1",
       "latest_url": "https://github.com/sharkdp/bat/releases/tag/0.26.1",
       "latest_version": "0.26.1",
       "tool_url": "https://github.com/sharkdp/bat",
+      "upstream_method": "gh"
+    },
+    "black": {
+      "latest_tag": "25.12.0",
+      "latest_url": "https://pypi.org/project/black/",
+      "latest_version": "25.12.0",
+      "tool_url": "https://pypi.org/project/black/",
+      "upstream_method": "pypi"
+    },
+    "claude": {
+      "latest_tag": "2.0.74",
+      "latest_url": "https://github.com/anthropics/claude-code/releases/tag/2.0.74",
+      "latest_version": "2.0.74",
+      "tool_url": "https://github.com/anthropics/claude-code",
+      "upstream_method": "gh"
+    },
+    "codex": {
+      "latest_tag": "1.8.22",
+      "latest_url": "https://pypi.org/project/codex/",
+      "latest_version": "1.8.22",
+      "tool_url": "https://pypi.org/project/codex/",
+      "upstream_method": "pypi"
+    },
+    "compose": {
+      "latest_tag": "5.0.1",
+      "latest_url": "https://github.com/docker/compose/releases/tag/5.0.1",
+      "latest_version": "5.0.1",
+      "tool_url": "https://github.com/docker/compose",
+      "upstream_method": "gh"
+    },
+    "composer": {
+      "latest_tag": "2.9.2",
+      "latest_url": "https://github.com/composer/composer/releases/tag/2.9.2",
+      "latest_version": "2.9.2",
+      "tool_url": "https://github.com/composer/composer",
+      "upstream_method": "gh"
+    },
+    "ctags": {
+      "latest_tag": "",
+      "latest_url": "",
+      "latest_version": "",
+      "tool_url": "",
+      "upstream_method": "skip"
+    },
+    "curlie": {
+      "latest_tag": "1.8.2",
+      "latest_url": "https://github.com/rs/curlie/releases/tag/1.8.2",
+      "latest_version": "1.8.2",
+      "tool_url": "https://github.com/rs/curlie",
+      "upstream_method": "gh"
+    },
+    "dasel": {
+      "latest_tag": "3.1.4",
+      "latest_url": "https://github.com/TomWright/dasel/releases/tag/3.1.4",
+      "latest_version": "3.1.4",
+      "tool_url": "https://github.com/TomWright/dasel",
+      "upstream_method": "gh"
+    },
+    "delta": {
+      "latest_tag": "0.18.2",
+      "latest_url": "https://github.com/dandavison/delta/releases/tag/0.18.2",
+      "latest_version": "0.18.2",
+      "tool_url": "https://github.com/dandavison/delta",
+      "upstream_method": "gh"
+    },
+    "direnv": {
+      "latest_tag": "2.37.1",
+      "latest_url": "https://github.com/direnv/direnv/releases/tag/2.37.1",
+      "latest_version": "2.37.1",
+      "tool_url": "https://github.com/direnv/direnv",
+      "upstream_method": "gh"
+    },
+    "dive": {
+      "latest_tag": "0.13.1",
+      "latest_url": "https://github.com/wagoodman/dive/releases/tag/0.13.1",
+      "latest_version": "0.13.1",
+      "tool_url": "https://github.com/wagoodman/dive",
+      "upstream_method": "gh"
+    },
+    "docker": {
+      "latest_tag": "29.1.3",
+      "latest_url": "https://github.com/docker/cli/releases/tag/29.1.3",
+      "latest_version": "29.1.3",
+      "tool_url": "https://github.com/docker/cli",
+      "upstream_method": "gh"
+    },
+    "entr": {
+      "latest_tag": "",
+      "latest_url": "",
+      "latest_version": "",
+      "tool_url": "",
+      "upstream_method": "skip"
+    },
+    "eslint": {
+      "latest_tag": "9.39.2",
+      "latest_url": "https://github.com/eslint/eslint/releases/tag/9.39.2",
+      "latest_version": "9.39.2",
+      "tool_url": "https://github.com/eslint/eslint",
       "upstream_method": "gh"
     },
     "fd": {
@@ -19,11 +145,389 @@
       "tool_url": "https://github.com/sharkdp/fd",
       "upstream_method": "gh"
     },
+    "flake8": {
+      "latest_tag": "7.3.0",
+      "latest_url": "https://pypi.org/project/flake8/",
+      "latest_version": "7.3.0",
+      "tool_url": "https://pypi.org/project/flake8/",
+      "upstream_method": "pypi"
+    },
+    "fx": {
+      "latest_tag": "39.2.0",
+      "latest_url": "https://github.com/antonmedv/fx/releases/tag/39.2.0",
+      "latest_version": "39.2.0",
+      "tool_url": "https://github.com/antonmedv/fx",
+      "upstream_method": "gh"
+    },
+    "fzf": {
+      "latest_tag": "0.67.0",
+      "latest_url": "https://github.com/junegunn/fzf/releases/tag/0.67.0",
+      "latest_version": "0.67.0",
+      "tool_url": "https://github.com/junegunn/fzf",
+      "upstream_method": "gh"
+    },
+    "gam": {
+      "latest_tag": "7.30.03",
+      "latest_url": "https://github.com/GAM-team/GAM/releases/tag/7.30.03",
+      "latest_version": "7.30.03",
+      "tool_url": "https://github.com/GAM-team/GAM",
+      "upstream_method": "gh"
+    },
+    "gem": {
+      "latest_tag": "bundler-v4.0.2",
+      "latest_url": "https://github.com/rubygems/rubygems/releases/tag/bundler-v4.0.2",
+      "latest_version": "4.0.2",
+      "tool_url": "https://github.com/rubygems/rubygems",
+      "upstream_method": "gh"
+    },
+    "gh": {
+      "latest_tag": "2.83.2",
+      "latest_url": "https://github.com/cli/cli/releases/tag/2.83.2",
+      "latest_version": "2.83.2",
+      "tool_url": "https://github.com/cli/cli",
+      "upstream_method": "gh"
+    },
+    "git": {
+      "latest_tag": "2.52.0",
+      "latest_url": "https://github.com/git/git/releases/tag/2.52.0",
+      "latest_version": "2.52.0",
+      "tool_url": "https://github.com/git/git",
+      "upstream_method": "gh"
+    },
+    "git-absorb": {
+      "latest_tag": "0.8.0",
+      "latest_url": "https://github.com/tummychow/git-absorb/releases/tag/0.8.0",
+      "latest_version": "0.8.0",
+      "tool_url": "https://github.com/tummychow/git-absorb",
+      "upstream_method": "gh"
+    },
+    "git-branchless": {
+      "latest_tag": "0.10.0",
+      "latest_url": "https://github.com/arxanas/git-branchless/releases/tag/0.10.0",
+      "latest_version": "0.10.0",
+      "tool_url": "https://github.com/arxanas/git-branchless",
+      "upstream_method": "gh"
+    },
+    "git-filter-repo": {
+      "latest_tag": "2.47.0",
+      "latest_url": "https://pypi.org/project/git-filter-repo/",
+      "latest_version": "2.47.0",
+      "tool_url": "https://pypi.org/project/git-filter-repo/",
+      "upstream_method": "pypi"
+    },
+    "git-lfs": {
+      "latest_tag": "3.7.1",
+      "latest_url": "https://github.com/git-lfs/git-lfs/releases/tag/3.7.1",
+      "latest_version": "3.7.1",
+      "tool_url": "https://github.com/git-lfs/git-lfs",
+      "upstream_method": "gh"
+    },
+    "gitleaks": {
+      "latest_tag": "8.30.0",
+      "latest_url": "https://github.com/gitleaks/gitleaks/releases/tag/8.30.0",
+      "latest_version": "8.30.0",
+      "tool_url": "https://github.com/gitleaks/gitleaks",
+      "upstream_method": "gh"
+    },
+    "glab": {
+      "latest_tag": "1.80.4",
+      "latest_url": "https://gitlab.com/gitlab-org/cli/-/releases/1.80.4",
+      "latest_version": "1.80.4",
+      "tool_url": "https://gitlab.com/gitlab-org/cli",
+      "upstream_method": "gitlab"
+    },
+    "go": {
+      "latest_tag": "1.25.5",
+      "latest_url": "https://github.com/golang/go/releases/tag/1.25.5",
+      "latest_version": "1.25.5",
+      "tool_url": "https://github.com/golang/go",
+      "upstream_method": "gh"
+    },
+    "golangci-lint": {
+      "latest_tag": "2.7.2",
+      "latest_url": "https://github.com/golangci/golangci-lint/releases/tag/2.7.2",
+      "latest_version": "2.7.2",
+      "tool_url": "https://github.com/golangci/golangci-lint",
+      "upstream_method": "gh"
+    },
+    "gosec": {
+      "latest_tag": "2.22.11",
+      "latest_url": "https://github.com/securego/gosec/releases/tag/2.22.11",
+      "latest_version": "2.22.11",
+      "tool_url": "https://github.com/securego/gosec",
+      "upstream_method": "gh"
+    },
+    "gup": {
+      "latest_tag": "0.28.1",
+      "latest_url": "https://github.com/nao1215/gup/releases/tag/0.28.1",
+      "latest_version": "0.28.1",
+      "tool_url": "https://github.com/nao1215/gup",
+      "upstream_method": "gh"
+    },
+    "httpie": {
+      "latest_tag": "3.2.4",
+      "latest_url": "https://pypi.org/project/httpie/",
+      "latest_version": "3.2.4",
+      "tool_url": "https://pypi.org/project/httpie/",
+      "upstream_method": "pypi"
+    },
+    "isort": {
+      "latest_tag": "7.0.0",
+      "latest_url": "https://pypi.org/project/isort/",
+      "latest_version": "7.0.0",
+      "tool_url": "https://pypi.org/project/isort/",
+      "upstream_method": "pypi"
+    },
+    "jq": {
+      "latest_tag": "jq-1.8.1",
+      "latest_url": "https://github.com/jqlang/jq/releases/tag/jq-1.8.1",
+      "latest_version": "1.8.1",
+      "tool_url": "https://github.com/jqlang/jq",
+      "upstream_method": "gh"
+    },
+    "just": {
+      "latest_tag": "1.45.0",
+      "latest_url": "https://github.com/casey/just/releases/tag/1.45.0",
+      "latest_version": "1.45.0",
+      "tool_url": "https://github.com/casey/just",
+      "upstream_method": "gh"
+    },
+    "kubectl": {
+      "latest_tag": "1.35.0",
+      "latest_url": "https://github.com/kubernetes/kubernetes/releases/tag/1.35.0",
+      "latest_version": "1.35.0",
+      "tool_url": "https://github.com/kubernetes/kubernetes",
+      "upstream_method": "gh"
+    },
+    "ninja": {
+      "latest_tag": "1.13.2",
+      "latest_url": "https://github.com/ninja-build/ninja/releases/tag/1.13.2",
+      "latest_version": "1.13.2",
+      "tool_url": "https://github.com/ninja-build/ninja",
+      "upstream_method": "gh"
+    },
+    "node": {
+      "latest_tag": "25.2.1",
+      "latest_url": "https://github.com/nodejs/node/releases/tag/25.2.1",
+      "latest_version": "25.2.1",
+      "tool_url": "https://github.com/nodejs/node",
+      "upstream_method": "gh"
+    },
+    "npm": {
+      "latest_tag": "11.7.0",
+      "latest_url": "https://www.npmjs.com/package/npm",
+      "latest_version": "11.7.0",
+      "tool_url": "https://www.npmjs.com/package/npm",
+      "upstream_method": "npm"
+    },
+    "parallel": {
+      "latest_tag": "20251122",
+      "latest_url": "",
+      "latest_version": "20251122",
+      "tool_url": "",
+      "upstream_method": "gnu"
+    },
+    "pip": {
+      "latest_tag": "25.3",
+      "latest_url": "https://pypi.org/project/pip/",
+      "latest_version": "25.3",
+      "tool_url": "https://pypi.org/project/pip/",
+      "upstream_method": "pypi"
+    },
+    "pipx": {
+      "latest_tag": "1.8.0",
+      "latest_url": "https://pypi.org/project/pipx/",
+      "latest_version": "1.8.0",
+      "tool_url": "https://pypi.org/project/pipx/",
+      "upstream_method": "pypi"
+    },
+    "pnpm": {
+      "latest_tag": "10.26.1",
+      "latest_url": "https://www.npmjs.com/package/pnpm",
+      "latest_version": "10.26.1",
+      "tool_url": "https://www.npmjs.com/package/pnpm",
+      "upstream_method": "npm"
+    },
+    "poetry": {
+      "latest_tag": "",
+      "latest_url": "",
+      "latest_version": "",
+      "tool_url": "",
+      "upstream_method": "skip"
+    },
+    "pre-commit": {
+      "latest_tag": "4.5.1",
+      "latest_url": "https://pypi.org/project/pre-commit/",
+      "latest_version": "4.5.1",
+      "tool_url": "https://pypi.org/project/pre-commit/",
+      "upstream_method": "pypi"
+    },
+    "prename": {
+      "latest_tag": "",
+      "latest_url": "",
+      "latest_version": "",
+      "tool_url": "",
+      "upstream_method": "skip"
+    },
+    "prettier": {
+      "latest_tag": "3.7.4",
+      "latest_url": "https://www.npmjs.com/package/prettier",
+      "latest_version": "3.7.4",
+      "tool_url": "https://www.npmjs.com/package/prettier",
+      "upstream_method": "npm"
+    },
+    "python": {
+      "latest_tag": "3.14.2",
+      "latest_url": "https://github.com/python/cpython/releases/tag/3.14.2",
+      "latest_version": "3.14.2",
+      "tool_url": "https://github.com/python/cpython",
+      "upstream_method": "gh"
+    },
+    "rbenv": {
+      "latest_tag": "1.3.2",
+      "latest_url": "https://github.com/rbenv/rbenv/releases/tag/1.3.2",
+      "latest_version": "1.3.2",
+      "tool_url": "https://github.com/rbenv/rbenv",
+      "upstream_method": "gh"
+    },
+    "rename.ul": {
+      "latest_tag": "",
+      "latest_url": "",
+      "latest_version": "",
+      "tool_url": "",
+      "upstream_method": "skip"
+    },
+    "rga": {
+      "latest_tag": "0.10.10",
+      "latest_url": "https://github.com/phiresky/ripgrep-all/releases/tag/0.10.10",
+      "latest_version": "0.10.10",
+      "tool_url": "https://github.com/phiresky/ripgrep-all",
+      "upstream_method": "gh"
+    },
     "ripgrep": {
       "latest_tag": "15.1.0",
       "latest_url": "https://github.com/BurntSushi/ripgrep/releases/tag/15.1.0",
       "latest_version": "15.1.0",
       "tool_url": "https://github.com/BurntSushi/ripgrep",
+      "upstream_method": "gh"
+    },
+    "ruby": {
+      "latest_tag": "3.4.8",
+      "latest_url": "https://github.com/ruby/ruby/releases/tag/3.4.8",
+      "latest_version": "3.4.8",
+      "tool_url": "https://github.com/ruby/ruby",
+      "upstream_method": "gh"
+    },
+    "ruby-build": {
+      "latest_tag": "20251218",
+      "latest_url": "https://github.com/rbenv/ruby-build/releases/tag/20251218",
+      "latest_version": "20251218",
+      "tool_url": "https://github.com/rbenv/ruby-build",
+      "upstream_method": "gh"
+    },
+    "ruff": {
+      "latest_tag": "0.14.10",
+      "latest_url": "https://pypi.org/project/ruff/",
+      "latest_version": "0.14.10",
+      "tool_url": "https://pypi.org/project/ruff/",
+      "upstream_method": "pypi"
+    },
+    "rust": {
+      "latest_tag": "1.92.0",
+      "latest_url": "https://github.com/rust-lang/rust/releases/tag/1.92.0",
+      "latest_version": "1.92.0",
+      "tool_url": "https://github.com/rust-lang/rust",
+      "upstream_method": "gh"
+    },
+    "sd": {
+      "latest_tag": "1.0.0",
+      "latest_url": "https://github.com/chmln/sd/releases/tag/1.0.0",
+      "latest_version": "1.0.0",
+      "tool_url": "https://github.com/chmln/sd",
+      "upstream_method": "gh"
+    },
+    "semgrep": {
+      "latest_tag": "1.146.0",
+      "latest_url": "https://pypi.org/project/semgrep/",
+      "latest_version": "1.146.0",
+      "tool_url": "https://pypi.org/project/semgrep/",
+      "upstream_method": "pypi"
+    },
+    "shellcheck": {
+      "latest_tag": "0.11.0",
+      "latest_url": "https://github.com/koalaman/shellcheck/releases/tag/0.11.0",
+      "latest_version": "0.11.0",
+      "tool_url": "https://github.com/koalaman/shellcheck",
+      "upstream_method": "gh"
+    },
+    "shfmt": {
+      "latest_tag": "3.12.0",
+      "latest_url": "https://github.com/mvdan/sh/releases/tag/3.12.0",
+      "latest_version": "3.12.0",
+      "tool_url": "https://github.com/mvdan/sh",
+      "upstream_method": "gh"
+    },
+    "sponge": {
+      "latest_tag": "",
+      "latest_url": "",
+      "latest_version": "",
+      "tool_url": "",
+      "upstream_method": "skip"
+    },
+    "terraform": {
+      "latest_tag": "1.14.3",
+      "latest_url": "https://github.com/hashicorp/terraform/releases/tag/1.14.3",
+      "latest_version": "1.14.3",
+      "tool_url": "https://github.com/hashicorp/terraform",
+      "upstream_method": "gh"
+    },
+    "tfsec": {
+      "latest_tag": "1.28.14",
+      "latest_url": "https://github.com/aquasecurity/tfsec/releases/tag/1.28.14",
+      "latest_version": "1.28.14",
+      "tool_url": "https://github.com/aquasecurity/tfsec",
+      "upstream_method": "gh"
+    },
+    "trivy": {
+      "latest_tag": "0.68.2",
+      "latest_url": "https://github.com/aquasecurity/trivy/releases/tag/0.68.2",
+      "latest_version": "0.68.2",
+      "tool_url": "https://github.com/aquasecurity/trivy",
+      "upstream_method": "gh"
+    },
+    "uv": {
+      "latest_tag": "0.9.18",
+      "latest_url": "https://github.com/astral-sh/uv/releases/tag/0.9.18",
+      "latest_version": "0.9.18",
+      "tool_url": "https://github.com/astral-sh/uv",
+      "upstream_method": "gh"
+    },
+    "watchexec": {
+      "latest_tag": "2.3.2",
+      "latest_url": "https://github.com/watchexec/watchexec/releases/tag/2.3.2",
+      "latest_version": "2.3.2",
+      "tool_url": "https://github.com/watchexec/watchexec",
+      "upstream_method": "gh"
+    },
+    "xsv": {
+      "latest_tag": "0.13.0",
+      "latest_url": "https://github.com/BurntSushi/xsv/releases/tag/0.13.0",
+      "latest_version": "0.13.0",
+      "tool_url": "https://github.com/BurntSushi/xsv",
+      "upstream_method": "gh"
+    },
+    "yarn": {
+      "latest_tag": "1.22.22",
+      "latest_url": "https://www.npmjs.com/package/yarn",
+      "latest_version": "1.22.22",
+      "tool_url": "https://www.npmjs.com/package/yarn",
+      "upstream_method": "npm"
+    },
+    "yq": {
+      "latest_tag": "4.50.1",
+      "latest_url": "https://github.com/mikefarah/yq/releases/tag/4.50.1",
+      "latest_version": "4.50.1",
+      "tool_url": "https://github.com/mikefarah/yq",
       "upstream_method": "gh"
     }
   }

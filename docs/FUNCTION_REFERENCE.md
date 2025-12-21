@@ -25,7 +25,7 @@ Functions for reading/writing snapshot files that decouple data collection from 
 Load snapshot from file.
 
 **Parameters:**
-- `paths` (`Sequence[str] | None`) - Custom paths to try (default: `[SNAPSHOT_FILE, "latest_versions.json"]`)
+- `paths` (`Sequence[str] | None`) - Custom paths to try (default: `[SNAPSHOT_FILE, "upstream_versions.json"]`)
 
 **Returns:**
 - `dict[str, Any]` - Document with `__meta__` and `tools` keys
@@ -543,7 +543,7 @@ Multi-tier caching system for offline operation and performance.
 
 ### `load_manual_versions() -> None`
 
-Load manual cache from `latest_versions.json`.
+Load manual cache from `upstream_versions.json`.
 
 **Side Effects:** Populates global `MANUAL_VERSIONS` dict
 
@@ -591,12 +591,12 @@ Update manual cache with new version.
 - `tool_name` (`str`) - Tool name
 - `tag_or_version` (`str`) - Version string or tag
 
-**Side Effects:** Writes to `latest_versions.json` (requires `MANUAL_LOCK`)
+**Side Effects:** Writes to `upstream_versions.json` (requires `MANUAL_LOCK`)
 
 **Usage:**
 ```python
 set_manual_latest("ripgrep", "14.1.1")
-# Updates latest_versions.json atomically
+# Updates upstream_versions.json atomically
 ```
 
 **See:** [API_REFERENCE.md#set_manual_latest](API_REFERENCE.md#set_manual_latest)
@@ -605,7 +605,7 @@ set_manual_latest("ripgrep", "14.1.1")
 
 ### `load_hints() -> None`
 
-Load API method hints from `__hints__` in `latest_versions.json`.
+Load API method hints from `__hints__` in `upstream_versions.json`.
 
 **Side Effects:** Populates global `HINTS` dict
 
@@ -656,7 +656,7 @@ Store API method hint for future runs.
 - `key` (`str`) - Hint key
 - `value` (`str`) - Method that worked
 
-**Side Effects:** Writes to `__hints__` in `latest_versions.json`
+**Side Effects:** Writes to `__hints__` in `upstream_versions.json`
 
 **Lock Ordering:** Requires `MANUAL_LOCK` → `HINTS_LOCK`
 
@@ -1152,7 +1152,7 @@ See [API_REFERENCE.md#environment-variables](API_REFERENCE.md#environment-variab
 
 - **[API_REFERENCE.md](API_REFERENCE.md)** - Complete function signatures
 - **Data Structures** - Tool dataclass, TOOLS registry
-- **File Schemas** - tools_snapshot.json, latest_versions.json
+- **File Schemas** - tools_snapshot.json, upstream_versions.json
 
 ### Developer Guide
 

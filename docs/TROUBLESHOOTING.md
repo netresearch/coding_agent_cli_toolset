@@ -223,7 +223,7 @@ def get_version_line(path: str, tool_name: str) -> str:
 
 **Add Hint for Version Flag:**
 
-Edit `latest_versions.json`:
+Edit `upstream_versions.json`:
 
 ```json
 {
@@ -306,7 +306,7 @@ def _classify_install_method(path: str, tool_name: str) -> tuple[str, str]:
 
 **Set Classification Hints:**
 
-Edit `latest_versions.json`:
+Edit `upstream_versions.json`:
 
 ```json
 {
@@ -404,11 +404,11 @@ def latest_github(owner: str, repo: str) -> tuple[str, str]:
 **Diagnosis:**
 ```bash
 # Validate JSON files
-jq '.' latest_versions.json
+jq '.' upstream_versions.json
 jq '.' tools_snapshot.json
 
 # Check file permissions
-ls -l latest_versions.json tools_snapshot.json
+ls -l upstream_versions.json tools_snapshot.json
 
 # Check disk space
 df -h .
@@ -422,7 +422,7 @@ ls -la .tmp_*
 **Recover from Backup:**
 ```bash
 # Restore from git
-git checkout latest_versions.json tools_snapshot.json
+git checkout upstream_versions.json tools_snapshot.json
 
 # Rebuild snapshot
 make update
@@ -430,7 +430,7 @@ make update
 
 **Fix Permissions:**
 ```bash
-chmod 644 latest_versions.json tools_snapshot.json
+chmod 644 upstream_versions.json tools_snapshot.json
 ```
 
 **Clean Temp Files:**
@@ -449,12 +449,12 @@ rm -f .tmp_*.json
 **Manual Cache Repair:**
 ```bash
 # Validate and pretty-print
-jq '.' latest_versions.json > latest_versions.json.tmp
-mv latest_versions.json.tmp latest_versions.json
+jq '.' upstream_versions.json > upstream_versions.json.tmp
+mv upstream_versions.json.tmp upstream_versions.json
 
 # Rebuild hints
-jq 'del(.__hints__)' latest_versions.json > latest_versions.json.tmp
-mv latest_versions.json.tmp latest_versions.json
+jq 'del(.__hints__)' upstream_versions.json > upstream_versions.json.tmp
+mv upstream_versions.json.tmp upstream_versions.json
 make update  # Rebuilds hints
 ```
 
@@ -511,7 +511,7 @@ def extract_version_number(s: str) -> str:
 
 **Manual Version Normalization:**
 
-Edit `latest_versions.json`:
+Edit `upstream_versions.json`:
 
 ```json
 {
@@ -755,8 +755,8 @@ python3 cli_audit.py --only ripgrep 2>&1 | grep -E "(http_|retry)"
 CLI_AUDIT_OFFLINE=1 python3 cli_audit.py --only ripgrep
 
 # 4. Check cache state
-jq '.ripgrep' latest_versions.json
-jq '.__hints__["gh:BurntSushi/ripgrep"]' latest_versions.json
+jq '.ripgrep' upstream_versions.json
+jq '.__hints__["gh:BurntSushi/ripgrep"]' upstream_versions.json
 ```
 
 ### Workflow 3: Diagnose Performance
@@ -785,16 +785,16 @@ make update
 
 ```bash
 # 1. Validate JSON
-jq '.' latest_versions.json
+jq '.' upstream_versions.json
 jq '.' tools_snapshot.json
 
 # 2. Check metadata
 jq '.__meta__' tools_snapshot.json
-jq '.__hints__ | length' latest_versions.json
+jq '.__hints__ | length' upstream_versions.json
 
 # 3. Rebuild cache
-rm -f latest_versions.json tools_snapshot.json
-git checkout latest_versions.json
+rm -f upstream_versions.json tools_snapshot.json
+git checkout upstream_versions.json
 make update
 
 # 4. Verify consistency
@@ -943,8 +943,8 @@ CLI_AUDIT_DEBUG=1 CLI_AUDIT_TRACE=1 python3 cli_audit.py --only tool 2>&1 | tee 
 4. **Cache State:**
 ```bash
 jq '.__meta__' tools_snapshot.json
-jq '.tool' latest_versions.json
-jq '.__hints__' latest_versions.json
+jq '.tool' upstream_versions.json
+jq '.__hints__' upstream_versions.json
 ```
 
 5. **Expected vs Actual Behavior:**

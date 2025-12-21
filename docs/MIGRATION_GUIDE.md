@@ -80,7 +80,7 @@ cli_audit/
 ### File Locations
 
 **Unchanged:**
-- `latest_versions.json` (cache)
+- `upstream_versions.json` (cache)
 - `tools_snapshot.json` (snapshot)
 - `smart_column.py` (formatting)
 - `Makefile` and `Makefile.d/`

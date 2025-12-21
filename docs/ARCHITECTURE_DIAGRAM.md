@@ -486,10 +486,10 @@ get_available_version(tool, pm, cache_ttl)
     │   ├─→ SUCCESS:
     │   │   ├─→ Update in-memory cache
     │   │   ├─→ Update hints cache
-    │   │   └─→ Write to latest_versions.json
+    │   │   └─→ Write to upstream_versions.json
     │   │
     │   └─→ FAILURE:
-    │       └─→ Fallback to latest_versions.json
+    │       └─→ Fallback to upstream_versions.json
     │           └─→ Return cached or "UNKNOWN"
     │
     └─→ Returns: version string
@@ -497,7 +497,7 @@ get_available_version(tool, pm, cache_ttl)
 Multi-Tier Cache Hierarchy:
 1. In-memory (fastest)
 2. Hints (method preference)
-3. Manual cache (latest_versions.json)
+3. Manual cache (upstream_versions.json)
 4. Snapshot (tools_snapshot.json)
 ```
 
@@ -511,7 +511,7 @@ Rule: Always acquire MANUAL_LOCK before HINTS_LOCK
 Prevents: Deadlocks
 
 with MANUAL_LOCK:
-    # Update latest_versions.json
+    # Update upstream_versions.json
     with HINTS_LOCK:
         # Update __hints__ section
 ```
@@ -606,7 +606,7 @@ Example: Version lookup failure
 └──────────────────────────────────────┘
     │
     ├─→ No network requests
-    ├─→ Use committed cache (latest_versions.json)
+    ├─→ Use committed cache (upstream_versions.json)
     ├─→ Use snapshot (tools_snapshot.json)
     └─→ Baseline version checking only
 ```

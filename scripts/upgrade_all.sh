@@ -113,7 +113,7 @@ stage_1_refresh() {
 	cd "$PROJECT_ROOT"
 
 	# Check if version data is fresh (updated within last hour)
-	local versions_file="$PROJECT_ROOT/latest_versions.json"
+	local versions_file="$PROJECT_ROOT/upstream_versions.json"
 	local cache_ttl=3600  # 1 hour in seconds
 
 	if [ -f "$versions_file" ]; then

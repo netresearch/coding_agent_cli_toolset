@@ -206,13 +206,13 @@ sleep_time = base * (2 ** attempt) + random.uniform(0, jitter)
 
 **Cache Hierarchy (fastest → slowest):**
 
-1. **Hints Cache** (`__hints__` in `latest_versions.json`)
+1. **Hints Cache** (`__hints__` in `upstream_versions.json`)
    - Stores which API method worked last per tool
    - Example: `"gh:BurntSushi/ripgrep": "latest_redirect"`
    - Purpose: Skip failed methods, try successful ones first
    - Lock: `HINTS_LOCK` (acquired after `MANUAL_LOCK`)
 
-2. **Manual Cache** (`latest_versions.json`)
+2. **Manual Cache** (`upstream_versions.json`)
    - Committed to repository
    - Used in offline mode (`CLI_AUDIT_OFFLINE=1`)
    - Updated on successful upstream fetches (unless `CLI_AUDIT_WRITE_MANUAL=0`)
@@ -227,7 +227,7 @@ sleep_time = base * (2 ** attempt) + random.uniform(0, jitter)
 **Lock Ordering Rule:**
 ```python
 with MANUAL_LOCK:
-    # Update latest_versions.json
+    # Update upstream_versions.json
     with HINTS_LOCK:
         # Update __hints__ section
 ```
@@ -239,8 +239,8 @@ with MANUAL_LOCK:
 
 ```python
 # Global locks for cache writes
-MANUAL_LOCK = threading.Lock()  # For latest_versions.json
-HINTS_LOCK = threading.Lock()   # For __hints__ in latest_versions.json (nested)
+MANUAL_LOCK = threading.Lock()  # For upstream_versions.json
+HINTS_LOCK = threading.Lock()   # For __hints__ in upstream_versions.json (nested)
 
 # ThreadPoolExecutor for parallel tool audits
 with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
@@ -369,7 +369,7 @@ Attempt 1: Try upstream API (with retries)
   ↓ (on failure)
 Attempt 2: Check hints cache for alternative method
   ↓ (on failure)
-Attempt 3: Use manual cache (latest_versions.json)
+Attempt 3: Use manual cache (upstream_versions.json)
   ↓ (on failure)
 Result: Mark as UNKNOWN, continue audit
 ```

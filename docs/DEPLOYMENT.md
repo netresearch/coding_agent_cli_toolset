@@ -517,7 +517,7 @@ make audit-offline
 
 **What Changes:**
 - No upstream API calls (GitHub, PyPI, crates.io, npm)
-- Uses `latest_versions.json` exclusively for version data
+- Uses `upstream_versions.json` exclusively for version data
 - Marks upstream method as `manual`
 - Displays `(offline)` in readiness summary
 
@@ -532,12 +532,12 @@ make audit-offline
 1. **Update manual cache online:**
 ```bash
 make update
-# Populates latest_versions.json with current data
+# Populates upstream_versions.json with current data
 ```
 
 2. **Commit manual cache:**
 ```bash
-git add latest_versions.json
+git add upstream_versions.json
 git commit -m "chore: update manual version cache"
 ```
 
@@ -548,7 +548,7 @@ CLI_AUDIT_OFFLINE=1 python3 cli_audit.py --only python
 
 ### Offline Cache Management
 
-**Cache File:** `latest_versions.json` (override with `CLI_AUDIT_MANUAL_FILE`)
+**Cache File:** `upstream_versions.json` (override with `CLI_AUDIT_MANUAL_FILE`)
 
 **Structure:**
 ```json
@@ -610,7 +610,7 @@ CLI_AUDIT_PROGRESS=0
 
 # Paths
 CLI_AUDIT_SNAPSHOT_FILE=tools_snapshot.json
-CLI_AUDIT_MANUAL_FILE=latest_versions.json
+CLI_AUDIT_MANUAL_FILE=upstream_versions.json
 
 # Cache
 CLI_AUDIT_WRITE_MANUAL=1
@@ -728,7 +728,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: tools_snapshot.json
-          key: tools-snapshot-${{ runner.os }}-${{ hashFiles('latest_versions.json') }}
+          key: tools-snapshot-${{ runner.os }}-${{ hashFiles('upstream_versions.json') }}
           restore-keys: |
             tools-snapshot-${{ runner.os }}-
 
@@ -746,7 +746,7 @@ jobs:
         if: always()
         with:
           path: tools_snapshot.json
-          key: tools-snapshot-${{ runner.os }}-${{ hashFiles('latest_versions.json') }}
+          key: tools-snapshot-${{ runner.os }}-${{ hashFiles('upstream_versions.json') }}
 ```
 
 #### PR Comment Workflow

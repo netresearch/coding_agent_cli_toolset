@@ -190,7 +190,7 @@ CLI_AUDIT_RENDER=1 python3 cli_audit.py
 ```bash
 # 1. Online machine: Update cache
 make update
-git add latest_versions.json tools_snapshot.json
+git add upstream_versions.json tools_snapshot.json
 git commit -m "chore: update tool version cache"
 
 # 2. Transfer repository to offline machine
@@ -223,7 +223,7 @@ smart_column.py                 # Column formatting with emoji support
 scripts/install_*.sh           # Installation scripts (13 files)
 
 # Cache files
-latest_versions.json           # Manual cache + hints
+upstream_versions.json           # Manual cache + hints
 tools_snapshot.json            # Audit results snapshot
 
 # Build system
@@ -284,7 +284,7 @@ make scripts-perms             # Fix script permissions
 
 ## Cache File Schemas
 
-### latest_versions.json
+### upstream_versions.json
 
 ```json
 {
@@ -363,7 +363,7 @@ python3 --version
 ls -lh tools_snapshot.json
 
 # Validate JSON files
-jq '.' latest_versions.json
+jq '.' upstream_versions.json
 jq '.__meta__' tools_snapshot.json
 
 # Check git status
@@ -428,7 +428,7 @@ which tool-name
 
 ```bash
 # Remove corrupted caches
-rm latest_versions.json tools_snapshot.json
+rm upstream_versions.json tools_snapshot.json
 
 # Regenerate
 make update
