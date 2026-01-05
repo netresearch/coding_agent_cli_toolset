@@ -35,19 +35,19 @@ tests/
 
 **Requirements:**
 ```bash
-# Python 3.10+ with pytest
-python3 --version  # 3.10, 3.11, 3.12, 3.14 tested
+# Python 3.14+ with uv package manager
+python3 --version  # 3.14 required
+uv --version       # uv required
 
-# Install test dependencies
-pip install -e ".[dev]"
-# OR
-uv pip install -e ".[dev]"
+# Sync all dependencies (including dev)
+uv sync --extra dev
 ```
 
 **Test dependencies (from pyproject.toml):**
 - pytest — Test framework
 - pytest-cov — Coverage reporting
-- pytest-mock — Mocking utilities (if used)
+- pytest-mock — Mocking utilities
+- pytest-xdist — Parallel test execution
 
 **Test environment variables:**
 ```bash
@@ -58,33 +58,36 @@ CLI_AUDIT_TIMEOUT_SECONDS=1 # Fast timeout for tests
 
 ## Build & tests
 
-**Run all tests:**
+**Run all tests (use uv run):**
 ```bash
-# From project root
-python3 -m pytest tests/ -v
+# From project root - ALWAYS use uv run
+uv run python -m pytest
+
+# Verbose output
+uv run python -m pytest -v
 
 # With coverage
-python3 -m pytest tests/ -v --cov=cli_audit --cov-report=html
+uv run python -m pytest --cov=cli_audit --cov-report=html
 
-# Parallel execution
-python3 -m pytest tests/ -v -n auto
+# Parallel execution (fast)
+uv run python -m pytest -n auto
 ```
 
 **Run specific test files:**
 ```bash
 # Single test file
-python3 -m pytest tests/test_config.py -v
+uv run python -m pytest tests/test_config.py -v
 
 # Single test class
-python3 -m pytest tests/test_config.py::TestToolConfig -v
+uv run python -m pytest tests/test_config.py::TestToolConfig -v
 
 # Single test function
-python3 -m pytest tests/test_config.py::TestToolConfig::test_tool_config_defaults -v
+uv run python -m pytest tests/test_config.py::TestToolConfig::test_tool_config_defaults -v
 ```
 
 **Run integration tests:**
 ```bash
-python3 -m pytest tests/integration/ -v
+uv run python -m pytest tests/integration/ -v
 ```
 
 **Smoke test (quick validation):**
@@ -95,13 +98,13 @@ python3 -m pytest tests/integration/ -v
 **Filter tests by marker:**
 ```bash
 # Run only slow tests
-python3 -m pytest -m slow
+uv run python -m pytest -m slow
 
 # Skip slow tests
-python3 -m pytest -m "not slow"
+uv run python -m pytest -m "not slow"
 
 # Run only unit tests
-python3 -m pytest -m unit
+uv run python -m pytest -m unit
 ```
 
 ## Code style & conventions
@@ -206,7 +209,7 @@ def test_tool_execution(mock_run):
 
 Before committing test changes:
 
-- [ ] **All tests pass:** `pytest tests/ -v` succeeds
+- [ ] **All tests pass:** `uv run python -m pytest` succeeds
 - [ ] **No skipped tests:** Fix or document skipped tests
 - [ ] **Coverage maintained:** New code has corresponding tests
 - [ ] **Isolation:** Tests don't depend on execution order
@@ -217,7 +220,7 @@ Before committing test changes:
 - [ ] **Documentation:** Complex test logic has comments
 
 **Integration test checklist:**
-- [ ] E2E tests pass: `pytest tests/integration/ -v`
+- [ ] E2E tests pass: `uv run python -m pytest tests/integration/ -v`
 - [ ] Real environment tested: Not just mocks
 - [ ] Idempotent: Can run multiple times safely
 - [ ] Reasonable timeout: Integration tests <30s each
@@ -330,38 +333,39 @@ def test_snapshot_write(tmp_path):
 **Debugging failing tests:**
 ```bash
 # Run with verbose output
-python3 -m pytest tests/test_config.py -vv
+uv run python -m pytest tests/test_config.py -vv
 
 # Show print statements
-python3 -m pytest tests/test_config.py -s
+uv run python -m pytest tests/test_config.py -s
 
 # Stop on first failure
-python3 -m pytest tests/ -x
+uv run python -m pytest -x
 
 # Enter debugger on failure
-python3 -m pytest tests/ --pdb
+uv run python -m pytest --pdb
 
 # Show last failed tests
-python3 -m pytest --lf
+uv run python -m pytest --lf
 ```
 
 **Common issues:**
-- **Import errors:** Run from project root, check PYTHONPATH
+- **Import errors:** Run `uv sync --extra dev` first, ensure uv run is used
 - **Fixture not found:** Check fixture scope and location
 - **Test order dependency:** Tests should be independent, fix test isolation
 - **Slow tests:** Mock external calls, use tmp_path, check for real network/subprocess
 - **Flaky tests:** Usually timing issues, mock time-dependent operations
+- **VIRTUAL_ENV warning:** Run `deactivate` first if another venv is active
 
 **Test coverage:**
 ```bash
 # Generate coverage report
-python3 -m pytest tests/ --cov=cli_audit --cov-report=html
+uv run python -m pytest --cov=cli_audit --cov-report=html
 
 # View report
 open htmlcov/index.html
 
 # Show missing lines
-python3 -m pytest tests/ --cov=cli_audit --cov-report=term-missing
+uv run python -m pytest --cov=cli_audit --cov-report=term-missing
 ```
 
 ## House rules

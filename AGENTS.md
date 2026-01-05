@@ -13,13 +13,30 @@
 - Ask before: heavy deps, full rewrites, breaking changes
 - Never commit secrets, PII, or credentials
 
+## Package management (uv)
+
+**This project uses [uv](https://docs.astral.sh/uv/) for package management.** Always use `uv run` to execute Python commands.
+
+```bash
+# Sync dependencies (run after clone or when pyproject.toml changes)
+uv sync --extra dev
+
+# Run any Python command
+uv run python -m pytest          # Run tests
+uv run python audit.py ripgrep   # Run audit script
+uv run python -m flake8          # Run linter
+```
+
+**Why uv?** Fast dependency resolution, proper lockfile support, and isolated environments without manual venv activation.
+
 ## Minimal pre-commit checks
 
 ```bash
-make lint                    # flake8 (required)
-make lint-types              # mypy (optional)
-./scripts/test_smoke.sh      # Smoke tests (required)
-make audit                   # Verify core workflows
+uv run python -m pytest          # All tests (required)
+uv run python -m flake8 cli_audit tests  # flake8 (required)
+uv run python -m mypy cli_audit  # mypy (optional)
+./scripts/test_smoke.sh          # Smoke tests (required)
+uv run python audit.py --help    # Verify CLI works
 ```
 
 ## Index of scoped AGENTS.md
@@ -32,11 +49,13 @@ make audit                   # Verify core workflows
 
 | Command | Purpose |
 |---------|---------|
+| `uv run python -m pytest` | Run all tests |
+| `uv run python -m pytest -x` | Run tests, stop on first failure |
+| `uv run python audit.py ripgrep` | Single tool audit |
+| `uv run python audit.py --help` | Show CLI options |
 | `make audit` | Render from snapshot (<100ms) |
 | `make update` | Collect fresh versions (~7s) |
 | `make upgrade` | Interactive upgrade guide |
-| `make upgrade-all` | Complete 5-stage system upgrade |
-| `python3 audit.py ripgrep` | Single tool audit |
 
 ## Project overview
 
