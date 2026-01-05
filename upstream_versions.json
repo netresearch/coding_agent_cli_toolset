@@ -48,11 +48,12 @@
       "upstream_method": "pypi"
     },
     "claude": {
-      "latest_tag": "2.0.74",
-      "latest_url": "https://github.com/anthropics/claude-code/releases/tag/2.0.74",
-      "latest_version": "2.0.74",
-      "tool_url": "https://github.com/anthropics/claude-code",
-      "upstream_method": "gh"
+      "latest_tag": "2.0.76",
+      "latest_url": "https://www.npmjs.com/package/@anthropic-ai/claude-code",
+      "latest_version": "2.0.76",
+      "tool_url": "https://www.npmjs.com/package/@anthropic-ai/claude-code",
+      "upstream_method": "npm",
+      "npm_package": "@anthropic-ai/claude-code"
     },
     "codex": {
       "latest_tag": "1.8.22",
