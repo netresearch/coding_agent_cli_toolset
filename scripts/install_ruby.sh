@@ -34,8 +34,8 @@ ensure_rbenv_loaded() {
 
 get_latest_ruby_version() {
   ensure_rbenv
-  # Get latest stable Ruby version from rbenv
-  rbenv install --list 2>/dev/null | grep -E '^\s*[0-9]+\.[0-9]+\.[0-9]+$' | tail -1 | tr -d ' ' || echo "3.3.6"
+  # Get latest stable Ruby version from rbenv (MRI Ruby only, excludes jruby/mruby/truffleruby)
+  rbenv install --list 2>/dev/null | grep -E '^\s*[0-9]+\.[0-9]+\.[0-9]+$' | tail -1 | tr -d ' ' || echo "4.0.0"
 }
 
 install_ruby() {

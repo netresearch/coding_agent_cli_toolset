@@ -134,6 +134,7 @@ process_tool() {
   local install_action="$(catalog_get_guide_property "$tool" install_action "")"
   local description="$(catalog_get_property "$tool" description)"
   local homepage="$(catalog_get_property "$tool" homepage)"
+  local auto_update="$(catalog_get_property "$tool" auto_update)"
 
   # Check if up-to-date
   if [ -n "$is_up_to_date" ] && [ -n "$installed" ]; then
@@ -141,6 +142,36 @@ process_tool() {
     printf "    installed: %s via %s\n" "$installed" "$method"
     printf "    target:    %s (same)\n" "$(osc8 "$url" "$latest")"
     printf "    up-to-date; skipping.\n"
+    return 0
+  fi
+
+  # Check if auto_update is enabled - install without prompting
+  if [ "$auto_update" = "true" ]; then
+    printf "\n==> %s %s [auto-update]\n" "$icon" "$display"
+    printf "    installed: %s via %s\n" "${installed:-<none>}" "${method:-unknown}"
+    printf "    target:    %s\n" "$(osc8 "$url" "${latest:-<unknown>}")"
+    printf "    auto-updating...\n"
+
+    # Build install command from catalog metadata
+    local install_cmd="install_tool.sh $tool"
+    if [ -n "$install_action" ]; then
+      install_cmd="install_tool.sh $tool $install_action"
+    elif [ -n "$installed" ]; then
+      install_cmd="install_tool.sh $tool update"
+    fi
+
+    # Execute the install
+    if [ "$tool" = "python" ]; then
+      UV_PYTHON_SPEC="$latest" "$ROOT"/scripts/$install_cmd || true
+    elif [ "$tool" = "ruby" ]; then
+      RUBY_VERSION="$latest" "$ROOT"/scripts/$install_cmd || true
+    else
+      "$ROOT"/scripts/$install_cmd || true
+    fi
+
+    # Re-audit with fresh collection for this specific tool
+    CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_MERGE=1 "$CLI" audit.py "$tool" >/dev/null 2>&1 || true
+    AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" audit.py || true)"
     return 0
   fi
 
@@ -164,6 +195,7 @@ process_tool() {
   # Prompt with options explained
   printf "    Options:\n"
   printf "      y = Install/upgrade now\n"
+  printf "      a = Always update (install now + auto-update in future)\n"
   printf "      N = Skip (ask again next time)\n"
   if [ -n "$installed" ]; then
     printf "      s = Skip version %s (ask again if newer available)\n" "$latest"
@@ -173,7 +205,7 @@ process_tool() {
     printf "      p = Never install (permanently skip this tool)\n"
   fi
 
-  local prompt_text="Install/update? [y/N/s/p] "
+  local prompt_text="Install/update? [y/a/N/s/p] "
 
   local ans=""
   if [ -t 0 ]; then
@@ -213,6 +245,41 @@ process_tool() {
         if catalog_has_tool "$tool"; then
           local existing_pin="$(catalog_get_property "$tool" pinned_version)"
           if [ -n "$existing_pin" ] && [ "$existing_pin" != "never" ]; then
+            "$ROOT"/scripts/unpin_version.sh "$tool" || true
+          fi
+        fi
+      fi
+      ;;
+    [Aa])
+      # Install/upgrade AND enable auto-update for future
+      printf "    Enabling auto-update for future upgrades...\n"
+      "$ROOT"/scripts/set_auto_update.sh "$tool" true >/dev/null 2>&1 || true
+
+      # Handle tool-specific version environment variables
+      local upgrade_success_a=0
+      if [ "$tool" = "python" ]; then
+        UV_PYTHON_SPEC="$latest" "$ROOT"/scripts/$install_cmd && upgrade_success_a=1 || true
+      elif [ "$tool" = "ruby" ]; then
+        RUBY_VERSION="$latest" "$ROOT"/scripts/$install_cmd && upgrade_success_a=1 || true
+      else
+        "$ROOT"/scripts/$install_cmd && upgrade_success_a=1 || true
+      fi
+
+      # Re-audit with fresh collection for this specific tool
+      CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_MERGE=1 "$CLI" audit.py "$tool" >/dev/null 2>&1 || true
+      AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" audit.py || true)"
+
+      # Check if upgrade succeeded
+      local new_installed_a="$(json_field "$tool" installed)"
+      if [ "$upgrade_success_a" = "0" ] || [ "$new_installed_a" = "$installed" ]; then
+        printf "\n    ⚠️  Upgrade did not succeed (version unchanged)\n"
+        printf "    Auto-update is still enabled - will try again next time.\n"
+      else
+        printf "    ✓ Auto-update enabled. This tool will update automatically in future.\n"
+        # Remove any existing pin
+        if catalog_has_tool "$tool"; then
+          local existing_pin_a="$(catalog_get_property "$tool" pinned_version)"
+          if [ -n "$existing_pin_a" ]; then
             "$ROOT"/scripts/unpin_version.sh "$tool" || true
           fi
         fi

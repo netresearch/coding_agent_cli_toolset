@@ -57,19 +57,22 @@ fi
 echo "[$TOOL] Installing package globally via $PKG_MANAGER: $PACKAGE_NAME" >&2
 case "$PKG_MANAGER" in
   pnpm)
-    pnpm add -g "$PACKAGE_NAME" || {
+    # Use @latest to ensure we get the newest version
+    pnpm add -g "${PACKAGE_NAME}@latest" || {
       echo "[$TOOL] Error: pnpm install failed" >&2
       exit 1
     }
     ;;
   npm)
-    npm install -g "$PACKAGE_NAME" || {
+    # Use @latest to ensure we get the newest version (bypasses npm cache issues)
+    npm install -g "${PACKAGE_NAME}@latest" || {
       echo "[$TOOL] Error: npm install failed" >&2
       exit 1
     }
     ;;
   yarn)
-    yarn global add "$PACKAGE_NAME" || {
+    # Use @latest to ensure we get the newest version
+    yarn global add "${PACKAGE_NAME}@latest" || {
       echo "[$TOOL] Error: yarn install failed" >&2
       exit 1
     }
