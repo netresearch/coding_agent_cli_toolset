@@ -26,13 +26,24 @@ DOWNLOAD_URL_TEMPLATE="$(jq -r '.download_url_template' "$CATALOG_FILE")"
 FALLBACK_URL_TEMPLATE="$(jq -r '.fallback_url_template // empty' "$CATALOG_FILE")"
 GITHUB_REPO="$(jq -r '.github_repo // empty' "$CATALOG_FILE")"
 PRESERVE_DIR="$(jq -r '.preserve_directory // empty' "$CATALOG_FILE")"
+VERSION_COMMAND="$(jq -r '.version_command // empty' "$CATALOG_FILE")"
+VERSION_FLAG="$(jq -r '.version_flag // empty' "$CATALOG_FILE")"
 
-# Get current version (try multiple version command formats)
+# Get current version
 before=""
 if command -v "$BINARY_NAME" >/dev/null 2>&1; then
-  before="$(timeout 2 "$BINARY_NAME" --version </dev/null 2>/dev/null || \
-           timeout 2 "$BINARY_NAME" version --client </dev/null 2>/dev/null | head -1 || \
-           timeout 2 "$BINARY_NAME" version </dev/null 2>/dev/null | head -1 || true)"
+  if [ -n "$VERSION_COMMAND" ]; then
+    # Use catalog-specified shell command
+    before="$(timeout 2 bash -c "$VERSION_COMMAND" 2>/dev/null || true)"
+  elif [ -n "$VERSION_FLAG" ]; then
+    # Use catalog-specified version flag/subcommand
+    before="$(timeout 2 "$BINARY_NAME" $VERSION_FLAG </dev/null 2>/dev/null | head -1 || true)"
+  else
+    # Fallback: try multiple version command formats
+    before="$(timeout 2 "$BINARY_NAME" --version </dev/null 2>/dev/null || \
+             timeout 2 "$BINARY_NAME" version --client </dev/null 2>/dev/null | head -1 || \
+             timeout 2 "$BINARY_NAME" version </dev/null 2>/dev/null | head -1 || true)"
+  fi
 fi
 
 # Detect OS and architecture
@@ -241,10 +252,18 @@ if [ -n "$EXTRACT_DIR" ] && [ -d "$EXTRACT_DIR" ]; then
 fi
 
 # Report
-after="$(command -v "$BINARY_NAME" >/dev/null 2>&1 && \
-  (timeout 2 "$BINARY_NAME" --version </dev/null 2>/dev/null || \
-   timeout 2 "$BINARY_NAME" version --client </dev/null 2>/dev/null | head -1 || \
-   timeout 2 "$BINARY_NAME" version </dev/null 2>/dev/null | head -1 || true))"
+after=""
+if command -v "$BINARY_NAME" >/dev/null 2>&1; then
+  if [ -n "$VERSION_COMMAND" ]; then
+    after="$(timeout 2 bash -c "$VERSION_COMMAND" 2>/dev/null || true)"
+  elif [ -n "$VERSION_FLAG" ]; then
+    after="$(timeout 2 "$BINARY_NAME" $VERSION_FLAG </dev/null 2>/dev/null | head -1 || true)"
+  else
+    after="$(timeout 2 "$BINARY_NAME" --version </dev/null 2>/dev/null || \
+             timeout 2 "$BINARY_NAME" version --client </dev/null 2>/dev/null | head -1 || \
+             timeout 2 "$BINARY_NAME" version </dev/null 2>/dev/null | head -1 || true)"
+  fi
+fi
 path="$(command -v "$BINARY_NAME" 2>/dev/null || true)"
 printf "[%s] before: %s\n" "$TOOL" "${before:-<none>}"
 printf "[%s] after:  %s\n" "$TOOL" "${after:-<none>}"
