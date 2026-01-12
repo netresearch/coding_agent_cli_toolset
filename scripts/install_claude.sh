@@ -80,6 +80,27 @@ install_npm() {
   return 1
 }
 
+# Get latest version from GitHub
+get_latest_version() {
+  curl -fsSIL -H "User-Agent: cli-audit" -o /dev/null -w '%{url_effective}' \
+    "https://github.com/anthropics/claude-code/releases/latest" 2>/dev/null | awk -F'/' '{print $NF}' | sed 's/^v//'
+}
+
+# Compare versions (returns 0 if v1 < v2)
+version_lt() {
+  [ "$(printf '%s\n%s' "$1" "$2" | sort -V | head -1)" = "$1" ] && [ "$1" != "$2" ]
+}
+
+# Migrate from npm to native installer
+migrate_npm_to_native() {
+  echo "[claude] Migrating from npm to native installer..." >&2
+  echo "[claude] Removing npm package..." >&2
+  npm uninstall -g @anthropic-ai/claude-code 2>/dev/null || true
+  hash -r 2>/dev/null || true
+  echo "[claude] Installing native version..." >&2
+  install_native
+}
+
 # Upgrade existing installation
 upgrade_claude() {
   local claude_bin
@@ -96,8 +117,28 @@ upgrade_claude() {
 
   # Detect installation method and upgrade accordingly
   if echo "$real_path" | grep -q 'node_modules'; then
-    echo "[claude] Detected npm installation, upgrading via npm..." >&2
-    npm update -g @anthropic-ai/claude-code || install_native
+    local current_ver latest_ver
+    current_ver=$(get_current_version)
+    latest_ver=$(get_latest_version)
+
+    echo "[claude] Detected npm installation (v${current_ver:-unknown})" >&2
+
+    # Check if npm version is significantly outdated
+    # The npm package is deprecated - native installer is now recommended
+    if [ -n "$latest_ver" ] && [ -n "$current_ver" ] && version_lt "$current_ver" "$latest_ver"; then
+      echo "[claude] npm package is outdated (latest: $latest_ver)" >&2
+      echo "[claude] The npm package is deprecated. Native installer recommended." >&2
+      echo "" >&2
+      echo "[claude] To migrate manually:" >&2
+      echo "  npm uninstall -g @anthropic-ai/claude-code" >&2
+      echo "  curl -fsSL https://claude.ai/install.sh | bash" >&2
+      echo "" >&2
+      echo "[claude] Attempting automatic migration..." >&2
+      migrate_npm_to_native
+    else
+      echo "[claude] Upgrading via npm..." >&2
+      npm update -g @anthropic-ai/claude-code || install_native
+    fi
   elif echo "$real_path" | grep -q 'Cellar\|homebrew'; then
     echo "[claude] Detected Homebrew installation, upgrading via brew..." >&2
     brew upgrade --cask claude-code || brew reinstall --cask claude-code
