@@ -374,6 +374,44 @@ def collect_gnu(tool_name: str, ftp_url: str, offline_cache: dict[str, tuple[str
     return "", ""
 
 
+def get_gh_cli_token() -> str | None:
+    """Try to get GitHub token from gh CLI if authenticated.
+
+    Returns:
+        Token string or None if gh CLI is not available/authenticated
+    """
+    import shutil
+    import subprocess
+
+    if not shutil.which("gh"):
+        return None
+
+    try:
+        # Check if gh is authenticated
+        result = subprocess.run(
+            ["gh", "auth", "status"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode != 0:
+            return None
+
+        # Get the token
+        result = subprocess.run(
+            ["gh", "auth", "token"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+    except Exception:
+        pass
+
+    return None
+
+
 def get_github_rate_limit() -> dict[str, Any]:
     """Get GitHub API rate limit status.
 
@@ -384,7 +422,17 @@ def get_github_rate_limit() -> dict[str, Any]:
 
     try:
         headers = {"User-Agent": "ai-cli-preparation/2.0"}
+
+        # Try to get token from multiple sources
         token = os.environ.get("GITHUB_TOKEN")
+        token_source = "GITHUB_TOKEN" if token else None
+
+        # Try gh CLI if no token in environment
+        if not token:
+            token = get_gh_cli_token()
+            if token:
+                token_source = "gh_cli"
+
         if token:
             headers["Authorization"] = f"token {token}"
 
@@ -396,7 +444,48 @@ def get_github_rate_limit() -> dict[str, Any]:
             "remaining": core.get("remaining", 0),
             "used": core.get("used", 0),
             "reset": core.get("reset", 0),
+            "authenticated": token is not None,
+            "token_source": token_source,
         }
     except Exception as e:
         logger.debug(f"Failed to get GitHub rate limit: {e}")
         return {}
+
+
+def get_github_rate_limit_help() -> str:
+    """Get helpful instructions for setting up GitHub authentication.
+
+    Returns:
+        Multiline string with instructions
+    """
+    import shutil
+
+    lines = []
+
+    # Check if gh CLI is available
+    has_gh = shutil.which("gh") is not None
+
+    lines.append("")
+    lines.append("To increase GitHub API rate limit from 60 to 5,000 requests/hour:")
+    lines.append("")
+
+    if has_gh:
+        lines.append("Option 1 (Recommended): Use GitHub CLI (already installed)")
+        lines.append("  gh auth login")
+        lines.append("")
+        lines.append("Option 2: Set GITHUB_TOKEN environment variable")
+    else:
+        lines.append("Option 1 (Recommended): Install and authenticate GitHub CLI")
+        lines.append("  # Install: https://cli.github.com/")
+        lines.append("  gh auth login")
+        lines.append("")
+        lines.append("Option 2: Set GITHUB_TOKEN environment variable")
+
+    # Deep link to create PAT with minimal required scopes
+    # The 'public_repo' scope is needed for accessing public repository data
+    pat_url = "https://github.com/settings/tokens/new?description=CLI%20Toolset&scopes=public_repo"
+    lines.append(f"  1. Create a PAT: {pat_url}")
+    lines.append("  2. Add to your shell profile:")
+    lines.append("     export GITHUB_TOKEN='ghp_your_token_here'")
+
+    return "\n".join(lines)

@@ -28,7 +28,7 @@ from cli_audit.tools import Tool, all_tools, filter_tools, tool_homepage_url, la
 from cli_audit.detection import audit_tool_installation  # noqa: E402
 from cli_audit.snapshot import load_snapshot, write_snapshot, render_from_snapshot, get_snapshot_path  # noqa: E402
 from cli_audit.render import render_table, print_summary, status_icon  # noqa: E402
-from cli_audit.collectors import get_github_rate_limit  # noqa: E402
+from cli_audit.collectors import get_github_rate_limit, get_github_rate_limit_help  # noqa: E402
 from cli_audit import collectors  # noqa: E402
 from cli_audit.logging_config import setup_logging  # noqa: E402
 # Split file support (Phase 2.1)
@@ -353,10 +353,27 @@ def cmd_update(args: argparse.Namespace) -> int:
     if rate_limit:
         remaining = rate_limit.get("remaining", 0)
         limit = rate_limit.get("limit", 0)
+        authenticated = rate_limit.get("authenticated", False)
+        token_source = rate_limit.get("token_source", "")
+
+        # Build status message
+        auth_info = ""
+        if authenticated:
+            if token_source == "gh_cli":
+                auth_info = " (via gh CLI)"
+            elif token_source == "GITHUB_TOKEN":
+                auth_info = " (via GITHUB_TOKEN)"
+
         if remaining < limit * 0.2:  # Warn if less than 20% remaining
-            print(f"⚠️  GitHub rate limit: {remaining}/{limit} remaining", file=sys.stderr)
+            print(f"⚠️  GitHub rate limit: {remaining}/{limit} remaining{auth_info}", file=sys.stderr)
+            if not authenticated:
+                print(get_github_rate_limit_help(), file=sys.stderr)
+        elif not authenticated and limit == 60:
+            # Unauthenticated with default limit - suggest authentication
+            print(f"ℹ️  GitHub rate limit: {remaining}/{limit} remaining (unauthenticated)", file=sys.stderr)
+            print(get_github_rate_limit_help(), file=sys.stderr)
         else:
-            print(f"✓ GitHub rate limit: {remaining}/{limit} remaining", file=sys.stderr)
+            print(f"✓ GitHub rate limit: {remaining}/{limit} remaining{auth_info}", file=sys.stderr)
 
     print(f"# Collecting fresh data for {total} tools...", file=sys.stderr)
     est_time = int((total / MAX_WORKERS) * 3 * 1.5)
@@ -487,10 +504,20 @@ def cmd_update(args: argparse.Namespace) -> int:
         if rate_limit:
             remaining = rate_limit.get("remaining", 0)
             limit = rate_limit.get("limit", 0)
-            if remaining < limit * 0.2:  # Warn if less than 20% remaining
-                print(f"⚠️  GitHub rate limit: {remaining}/{limit} remaining", file=sys.stderr)
+            authenticated = rate_limit.get("authenticated", False)
+            token_source = rate_limit.get("token_source", "")
+
+            auth_info = ""
+            if authenticated:
+                if token_source == "gh_cli":
+                    auth_info = " (via gh CLI)"
+                elif token_source == "GITHUB_TOKEN":
+                    auth_info = " (via GITHUB_TOKEN)"
+
+            if remaining < limit * 0.2:
+                print(f"⚠️  GitHub rate limit: {remaining}/{limit} remaining{auth_info}", file=sys.stderr)
             else:
-                print(f"✓ GitHub rate limit: {remaining}/{limit} remaining", file=sys.stderr)
+                print(f"✓ GitHub rate limit: {remaining}/{limit} remaining{auth_info}", file=sys.stderr)
 
         # Suggest package manager upgrades
         from cli_audit.catalog import suggest_package_manager_upgrades
@@ -626,7 +653,21 @@ def cmd_update_baseline(args: argparse.Namespace) -> int:
     if rate_limit:
         remaining = rate_limit.get("remaining", 0)
         limit = rate_limit.get("limit", 0)
-        print(f"✓ GitHub rate limit: {remaining}/{limit} remaining", file=sys.stderr)
+        authenticated = rate_limit.get("authenticated", False)
+        token_source = rate_limit.get("token_source", "")
+
+        auth_info = ""
+        if authenticated:
+            if token_source == "gh_cli":
+                auth_info = " (via gh CLI)"
+            elif token_source == "GITHUB_TOKEN":
+                auth_info = " (via GITHUB_TOKEN)"
+
+        if not authenticated and limit == 60:
+            print(f"ℹ️  GitHub rate limit: {remaining}/{limit} remaining (unauthenticated)", file=sys.stderr)
+            print(get_github_rate_limit_help(), file=sys.stderr)
+        else:
+            print(f"✓ GitHub rate limit: {remaining}/{limit} remaining{auth_info}", file=sys.stderr)
 
     print(f"# Collecting upstream versions for {total} tools...", file=sys.stderr)
 
@@ -671,7 +712,17 @@ def cmd_update_baseline(args: argparse.Namespace) -> int:
     if rate_limit:
         remaining = rate_limit.get("remaining", 0)
         limit = rate_limit.get("limit", 0)
-        print(f"✓ GitHub rate limit: {remaining}/{limit} remaining", file=sys.stderr)
+        authenticated = rate_limit.get("authenticated", False)
+        token_source = rate_limit.get("token_source", "")
+
+        auth_info = ""
+        if authenticated:
+            if token_source == "gh_cli":
+                auth_info = " (via gh CLI)"
+            elif token_source == "GITHUB_TOKEN":
+                auth_info = " (via GITHUB_TOKEN)"
+
+        print(f"✓ GitHub rate limit: {remaining}/{limit} remaining{auth_info}", file=sys.stderr)
 
     return 0
 
