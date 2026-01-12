@@ -3,8 +3,32 @@
 # Downloads latest stable composer.phar and installs to /usr/local/bin
 set -euo pipefail
 
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 INSTALL_DIR="${COMPOSER_INSTALL_DIR:-/usr/local/bin}"
 COMPOSER_URL="https://getcomposer.org/download/latest-stable/composer.phar"
+
+# Check for PHP dependency
+if ! command -v php >/dev/null 2>&1; then
+  echo "[composer] Error: PHP is required but not installed." >&2
+  echo "[composer] Install PHP first using one of:" >&2
+  echo "           - sudo apt-get install php php-cli  (Debian/Ubuntu)" >&2
+  echo "           - brew install php                   (macOS)" >&2
+  echo "           - ./install_tool.sh php              (via this toolset)" >&2
+
+  # Try to install PHP automatically if we can
+  if [ -f "$DIR/installers/package_manager.sh" ]; then
+    echo "[composer] Attempting to install PHP automatically..." >&2
+    if "$DIR/installers/package_manager.sh" php; then
+      echo "[composer] PHP installed successfully, continuing with Composer..." >&2
+    else
+      echo "[composer] Failed to install PHP automatically. Please install manually." >&2
+      exit 1
+    fi
+  else
+    exit 1
+  fi
+fi
 
 echo "[composer] Downloading latest stable composer.phar..."
 

@@ -1,0 +1,23 @@
+{
+  "name": "php",
+  "category": "php",
+  "install_method": "package_manager",
+  "description": "PHP programming language",
+  "homepage": "https://www.php.net",
+  "github_repo": "php/php-src",
+  "binary_name": "php",
+  "ppa": "ondrej/php",
+  "packages": {
+    "apt": "php php-cli php-mbstring php-xml php-curl php-zip",
+    "brew": "php",
+    "dnf": "php php-cli php-mbstring php-xml",
+    "pacman": "php"
+  },
+  "version_flag": "--version",
+  "guide": {
+    "display_name": "PHP",
+    "install_action": "install",
+    "order": 250
+  },
+  "notes": "Uses ondrej/php PPA for latest PHP version on Ubuntu/Debian. Required for Composer."
+}
