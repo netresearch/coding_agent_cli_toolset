@@ -1,15 +1,18 @@
 {
   "name": "claude",
   "category": "ai",
-  "install_method": "npm_global",
+  "install_method": "dedicated_script",
   "description": "Anthropic's Claude Code CLI - AI-powered development assistant",
-  "homepage": "https://www.npmjs.com/package/@anthropic-ai/claude-code",
+  "homepage": "https://claude.ai/download",
+  "github_repo": "anthropics/claude-code",
   "binary_name": "claude",
-  "package_name": "@anthropic-ai/claude-code",
+  "script": "install_claude.sh",
+  "version_command": "claude_bin=$(command -v claude 2>/dev/null); if [ -n \"$claude_bin\" ]; then real_path=$(readlink -f \"$claude_bin\" 2>/dev/null || echo \"$claude_bin\"); if echo \"$real_path\" | grep -q 'node_modules'; then pkg_dir=$(dirname \"$real_path\"); [ -f \"$pkg_dir/package.json\" ] && grep '\"version\"' \"$pkg_dir/package.json\" | head -1 | sed 's/.*\"version\": *\"\\([0-9][0-9.]*\\)\".*/\\1/' && exit 0; fi; timeout 2 \"$claude_bin\" --version 2>/dev/null | grep -oE '[0-9]+\\.[0-9]+\\.[0-9]+' | head -1; fi",
   "guide": {
     "display_name": "Claude Code",
     "install_action": "upgrade",
     "order": 400
   },
-  "auto_update": true
+  "auto_update": true,
+  "notes": "Native install recommended: curl -fsSL https://claude.ai/install.sh | bash. Also available via: brew install --cask claude-code (macOS). Legacy npm install requires Node.js 18-24 (v25+ incompatible)."
 }
