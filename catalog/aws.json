@@ -11,5 +11,6 @@
     "display_name": "AWS CLI",
     "install_action": "install",
     "order": 202
-  }
+  },
+  "auto_update": true
 }

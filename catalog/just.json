@@ -14,5 +14,6 @@
   },
   "tags": [
     "core"
-  ]
+  ],
+  "auto_update": true
 }

@@ -11,5 +11,6 @@
     "display_name": "uv",
     "install_action": "reconcile",
     "order": 20
-  }
+  },
+  "auto_update": true
 }

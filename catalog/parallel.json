@@ -7,5 +7,6 @@
   "binary_name": "parallel",
   "script": "install_parallel.sh",
   "ftp_url": "https://ftp.gnu.org/gnu/parallel/",
-  "notes": "Installed from GNU FTP releases. Installs to ~/.local/bin/parallel."
+  "notes": "Installed from GNU FTP releases. Installs to ~/.local/bin/parallel.",
+  "auto_update": true
 }

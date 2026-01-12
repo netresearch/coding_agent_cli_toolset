@@ -7,5 +7,6 @@
   "github_repo": "GAM-team/GAM",
   "binary_name": "gam",
   "version_flag": "version",
-  "package_name": "gam7"
+  "package_name": "gam7",
+  "auto_update": true
 }

@@ -45,5 +45,6 @@
     "go",
     "package-manager",
     "updater"
-  ]
+  ],
+  "auto_update": true
 }
