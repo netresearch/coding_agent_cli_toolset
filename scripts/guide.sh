@@ -237,11 +237,13 @@ process_tool() {
 
       # Check if upgrade succeeded by comparing versions
       local new_installed="$(json_field "$tool" installed)"
-      if [ "$upgrade_success" = "0" ] || [ "$new_installed" = "$installed" ]; then
-        # Upgrade failed or version didn't change
-        printf "
-    ⚠️  Upgrade did not succeed (version unchanged)
-"
+      if [ "$upgrade_success" = "0" ]; then
+        # Install script failed
+        printf "\n    ⚠️  Upgrade failed (install script error)\n"
+        prompt_pin_version "$tool" "$installed"
+      elif [ "$new_installed" = "$installed" ] && [ "$new_installed" != "$latest" ]; then
+        # Version didn't change and not at target
+        printf "\n    ⚠️  Upgrade did not succeed (version unchanged)\n"
         prompt_pin_version "$tool" "$installed"
       else
         # Upgrade succeeded - remove any existing pin to avoid stale pins
@@ -274,7 +276,10 @@ process_tool() {
 
       # Check if upgrade succeeded
       local new_installed_a="$(json_field "$tool" installed)"
-      if [ "$upgrade_success_a" = "0" ] || [ "$new_installed_a" = "$installed" ]; then
+      if [ "$upgrade_success_a" = "0" ]; then
+        printf "\n    ⚠️  Upgrade failed (install script error)\n"
+        printf "    Auto-update is still enabled - will try again next time.\n"
+      elif [ "$new_installed_a" = "$installed" ] && [ "$new_installed_a" != "$latest" ]; then
         printf "\n    ⚠️  Upgrade did not succeed (version unchanged)\n"
         printf "    Auto-update is still enabled - will try again next time.\n"
       else

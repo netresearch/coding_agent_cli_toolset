@@ -82,4 +82,9 @@ prefers_rbenv_ruby() {
   is_path_under "$p" "$HOME/.rbenv" || return 1
 }
 
+# WSL detection
+is_wsl() {
+  grep -qi microsoft /proc/version 2>/dev/null
+}
+
 

@@ -8,6 +8,14 @@ ACTION="${1:-reconcile}"
 # Target Ruby version (default: latest stable)
 RUBY_VERSION="${RUBY_VERSION:-3.3.6}"
 
+update_ruby_build() {
+  local ruby_build_dir="$HOME/.rbenv/plugins/ruby-build"
+  if [ -d "$ruby_build_dir/.git" ]; then
+    echo "[ruby] Updating ruby-build definitions..."
+    git -C "$ruby_build_dir" pull --quiet || true
+  fi
+}
+
 ensure_rbenv() {
   if [ ! -d "$HOME/.rbenv" ]; then
     echo "Installing rbenv..."
@@ -19,6 +27,9 @@ ensure_rbenv() {
   if [ ! -d "$HOME/.rbenv/plugins/ruby-build" ]; then
     echo "Installing ruby-build plugin..."
     git clone https://github.com/rbenv/ruby-build.git "$HOME/.rbenv/plugins/ruby-build"
+  else
+    # Update ruby-build to get latest version definitions
+    update_ruby_build
   fi
 
   ensure_rbenv_loaded
@@ -35,7 +46,14 @@ ensure_rbenv_loaded() {
 get_latest_ruby_version() {
   ensure_rbenv
   # Get latest stable Ruby version from rbenv (MRI Ruby only, excludes jruby/mruby/truffleruby)
-  rbenv install --list 2>/dev/null | grep -E '^\s*[0-9]+\.[0-9]+\.[0-9]+$' | tail -1 | tr -d ' ' || echo "4.0.0"
+  local latest
+  latest=$(rbenv install --list 2>/dev/null | grep -E '^\s*[0-9]+\.[0-9]+\.[0-9]+$' | tail -1 | tr -d ' ')
+  if [ -z "$latest" ]; then
+    # Fallback to known stable version if list fails
+    echo "${RUBY_VERSION:-3.3.6}"
+  else
+    echo "$latest"
+  fi
 }
 
 install_ruby() {
