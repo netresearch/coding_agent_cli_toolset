@@ -5,6 +5,5 @@
   "description": "Opinionated code formatter",
   "homepage": "https://prettier.io",
   "package_name": "prettier",
-  "notes": "Prettier is a JavaScript/Node.js tool installed via npm",
-  "auto_update": true
+  "notes": "Prettier is a JavaScript/Node.js tool installed via npm"
 }

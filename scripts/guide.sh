@@ -23,6 +23,9 @@ done
 # Load catalog query functions
 . "$DIR/lib/catalog.sh"
 
+# Load config query functions (for user preferences like auto_update)
+. "$DIR/lib/config.sh"
+
 ensure_perms() {
   chmod +x "$ROOT"/scripts/*.sh 2>/dev/null || true
   chmod +x "$ROOT"/scripts/lib/*.sh 2>/dev/null || true
@@ -134,7 +137,7 @@ process_tool() {
   local install_action="$(catalog_get_guide_property "$tool" install_action "")"
   local description="$(catalog_get_property "$tool" description)"
   local homepage="$(catalog_get_property "$tool" homepage)"
-  local auto_update="$(catalog_get_property "$tool" auto_update)"
+  local auto_update="$(config_get_auto_update "$tool")"
 
   # Check if up-to-date
   if [ -n "$is_up_to_date" ] && [ -n "$installed" ]; then

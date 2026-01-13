@@ -35,10 +35,12 @@ class ToolConfig:
         version: Target version (e.g., "latest", "3.12.*", "1.2.3")
         method: Preferred installation method (e.g., "uv", "cargo", "npm")
         fallback: Fallback installation method if primary fails
+        auto_update: Whether to auto-update this tool (None = use global preference)
     """
     version: str = "latest"
     method: str | None = None
     fallback: str | None = None
+    auto_update: bool | None = None
 
     @staticmethod
     def from_dict(data: dict[str, Any]) -> ToolConfig:
@@ -47,6 +49,7 @@ class ToolConfig:
             version=data.get("version", "latest"),
             method=data.get("method"),
             fallback=data.get("fallback"),
+            auto_update=data.get("auto_update"),
         )
 
 
@@ -233,6 +236,23 @@ class Config:
             ToolConfig for the tool, or default ToolConfig if not configured
         """
         return self.tools.get(tool_name, ToolConfig())
+
+    def is_auto_update_enabled(self, tool_name: str) -> bool:
+        """
+        Check if auto_update is enabled for a specific tool.
+
+        Checks per-tool configuration first, falls back to global preference.
+
+        Args:
+            tool_name: Name of the tool
+
+        Returns:
+            True if auto_update is enabled for this tool
+        """
+        tool_config = self.get_tool_config(tool_name)
+        if tool_config.auto_update is not None:
+            return tool_config.auto_update
+        return self.preferences.auto_upgrade
 
     def merge_with(self, other: Config) -> Config:
         """
