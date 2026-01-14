@@ -1,8 +1,8 @@
-<!-- Managed by agent: keep sections & order; edit content, not structure. Last updated: 2025-11-29 -->
+<!-- Managed by agent: keep sections & order; edit content, not structure. Last updated: 2026-01-14 -->
 
 # cli_audit/ — Python Package
 
-**Modular architecture** with 18 specialized modules for tool detection, auditing, installation, and upgrade management.
+**Modular architecture** with 20 specialized modules for tool detection, auditing, installation, and upgrade management.
 
 ## Overview
 
@@ -10,7 +10,7 @@ The `cli_audit` package provides the core functionality for AI CLI Preparation:
 
 **Phase 1: Detection & Auditing (6 modules)**
 - `tools.py` — Tool definitions and metadata
-- `catalog.py` — JSON catalog management (74 entries)
+- `catalog.py` — JSON catalog management (76 entries)
 - `detection.py` — Installation detection, version extraction
 - `collectors.py` — Upstream version collection (GitHub, PyPI, npm, crates)
 - `snapshot.py` — Snapshot-based caching
@@ -19,7 +19,7 @@ The `cli_audit` package provides the core functionality for AI CLI Preparation:
 **Phase 2: Foundation (5 modules)**
 - `common.py` — Shared types (InstallResult, AuditResult, etc.)
 - `environment.py` — OS/arch detection, package manager detection
-- `config.py` — Configuration management (YAML support)
+- `config.py` — Configuration management (YAML, user prefs, auto_update)
 - `package_managers.py` — Package manager abstractions
 - `logging_config.py` — Logging configuration
 
@@ -29,10 +29,32 @@ The `cli_audit` package provides the core functionality for AI CLI Preparation:
 - `bulk.py` — Parallel bulk operations
 - `upgrade.py` — Upgrade workflows
 
+**Phase 2: State Management (2 modules)**
+- `local_state.py` — Machine-specific installation state (gitignored)
+- `upstream_cache.py` — Upstream version cache (committed baseline)
+
 **Phase 2: Advanced Features (3 modules)**
 - `breaking_changes.py` — Semver analysis for breaking changes
 - `reconcile.py` — Duplicate installation cleanup
 - `__init__.py` — Public API exports (backward compatibility)
+
+## Data model
+
+**2-file data model** (Phase 2.1 consolidation):
+```
+upstream_versions.json  # Committed - latest available versions (shared baseline)
+local_state.json        # Gitignored - machine-specific installation state
+```
+
+**User configuration:**
+```
+~/.config/cli-audit/config.yml  # User preferences (auto_update, tool overrides)
+```
+
+**Catalog entries** (76 JSON files in `catalog/`):
+- Each tool has `name`, `candidates`, `source_kind`, `source_args`, `category`
+- Categories: python, node, go, rust, ruby, php, shell, git, devops, platform, ai, general
+- User preferences (auto_update) stored in user config, not catalog
 
 ## Setup & environment
 

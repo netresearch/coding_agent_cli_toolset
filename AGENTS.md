@@ -1,4 +1,4 @@
-<!-- Managed by agent: keep sections and order; edit content, not structure. Last updated: 2025-11-29 -->
+<!-- Managed by agent: keep sections and order; edit content, not structure. Last updated: 2026-01-14 -->
 
 # AGENTS.md (root)
 
@@ -41,7 +41,7 @@ uv run python audit.py --help    # Verify CLI works
 
 ## Index of scoped AGENTS.md
 
-- [cli_audit/AGENTS.md](./cli_audit/AGENTS.md) — Python package (18 modules)
+- [cli_audit/AGENTS.md](./cli_audit/AGENTS.md) — Python package (20 modules)
 - [scripts/AGENTS.md](./scripts/AGENTS.md) — Installation scripts (Bash)
 - [tests/AGENTS.md](./tests/AGENTS.md) — Test suite (pytest)
 
@@ -53,15 +53,31 @@ uv run python audit.py --help    # Verify CLI works
 | `uv run python -m pytest -x` | Run tests, stop on first failure |
 | `uv run python audit.py ripgrep` | Single tool audit |
 | `uv run python audit.py --help` | Show CLI options |
-| `make audit` | Render from snapshot (<100ms) |
-| `make update` | Collect fresh versions (~7s) |
+| `make audit` | Render from snapshot (fast, no network) |
+| `make audit-offline` | Offline audit with hints |
+| `make outdated` | Show only missing/outdated tools |
+| `make update` | Collect fresh versions (~10s) |
+| `make update-local` | Update only local state (no network) |
+| `make update-baseline` | Update upstream baseline for commit |
 | `make upgrade` | Interactive upgrade guide |
+| `make upgrade-managed` | Upgrade all package managers |
+| `make upgrade-dry-run` | Preview upgrades without changes |
+| `./scripts/set_auto_update.sh <tool>` | Enable auto-update for a tool |
+
+## Data files
+
+**2-file data model** (Phase 2.1):
+- `upstream_versions.json` — Latest upstream versions (committed, shared baseline)
+- `local_state.json` — Machine-specific installation state (gitignored)
+
+**User configuration:**
+- `~/.config/cli-audit/config.yml` — User preferences (auto_update, tool overrides)
 
 ## Project overview
 
 **AI CLI Preparation v2.0** — Tool version auditing and installation management for AI coding agents.
 
-- **Architecture:** 18 Python modules, 74 JSON tool catalogs
+- **Architecture:** 20 Python modules, 76 JSON tool catalogs
 - **Phase 1:** Detection & auditing (complete)
 - **Phase 2:** Installation & upgrade management (complete)
 - **Entry point:** `audit.py` → `cli_audit` package

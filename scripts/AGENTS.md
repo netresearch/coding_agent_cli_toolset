@@ -1,4 +1,4 @@
-<!-- Managed by agent: keep sections & order; edit content, not structure. Last updated: 2025-11-29 -->
+<!-- Managed by agent: keep sections & order; edit content, not structure. Last updated: 2026-01-14 -->
 
 # Installation Scripts - Agent Guide
 
@@ -6,22 +6,51 @@
 
 ## Overview
 
-25+ Bash scripts for installing developer tools with multiple actions:
+28 Bash scripts for installing developer tools with multiple actions:
 - **install**: Fresh installation (default action)
 - **update**: Upgrade to latest version
 - **uninstall**: Remove installation
 - **reconcile**: Switch to preferred installation method (e.g., system → user)
 
-**Key scripts:**
-- `install_core.sh`: Core tools (fd, fzf, ripgrep, jq, yq, bat, delta, just)
+**Installation scripts** (language toolchains):
 - `install_python.sh`: Python toolchain via uv
 - `install_node.sh`: Node.js via nvm
 - `install_rust.sh`: Rust via rustup
-- `install_go.sh`, `install_aws.sh`, `install_kubectl.sh`, etc.
-- `guide.sh`: Interactive upgrade guide
-- `test_smoke.sh`: Smoke test for audit output
+- `install_go.sh`: Go via official installer
+- `install_ruby.sh`: Ruby via rbenv/ruby-build
+- `install_uv.sh`: uv package manager
 
-**Shared utilities:** `lib/` directory (colors, logging, common functions)
+**Installation scripts** (tools & services):
+- `install_tool.sh`: Main orchestrator - reads catalog, delegates to installers
+- `install_group.sh`: Install tool groups
+- `install_claude.sh`: Claude Code CLI (native installer)
+- `install_ansible.sh`, `install_brew.sh`, `install_composer.sh`
+- `install_docker.sh`, `install_gem.sh`, `install_parallel.sh`, `install_yarn.sh`
+
+**Upgrade & management:**
+- `guide.sh`: Interactive upgrade guide (supports 'a' for auto-update)
+- `upgrade_all.sh`: Batch upgrade all tools
+- `auto_update.sh`: Automatic update runner
+- `set_auto_update.sh`: Enable/disable auto-update per tool
+- `pin_version.sh`, `unpin_version.sh`: Version pinning
+
+**Reconciliation:**
+- `reconcile_pip_to_uv.sh`: Migrate pip packages to uv
+- `reconcile_pipx_to_uv.sh`: Migrate pipx packages to uv
+
+**Utilities:**
+- `check_python_package_managers.sh`: Detect multiple Python package managers
+- `check_node_package_managers.sh`: Detect multiple Node.js package managers
+- `test_smoke.sh`: Smoke test for audit output
+- `auto_update_scope_prototype.sh`: Prototype for scope detection
+
+**Shared utilities:** `scripts/lib/` directory (10 modules):
+- `lib/common.sh` — Logging and output formatting
+- `lib/config.sh` — Read user config from `~/.config/cli-audit/config.yml`
+- `lib/catalog.sh` — Catalog access utilities
+- `lib/capability.sh`, `lib/dependency.sh` — Capability and dependency checks
+- `lib/install_strategy.sh`, `lib/reconcile.sh` — Installation strategies
+- `lib/path_check.sh`, `lib/policy.sh`, `lib/scope_detection.sh` — Path and policy utilities
 
 ## Setup & environment
 
@@ -73,6 +102,15 @@ make reconcile-node              # Switch Node.js to nvm-managed
 ./scripts/test_smoke.sh          # Verify audit output format
 ```
 
+**Auto-update management:**
+```bash
+# Enable auto-update for a tool (stores in ~/.config/cli-audit/config.yml)
+./scripts/set_auto_update.sh prettier        # Enable
+./scripts/set_auto_update.sh prettier false  # Disable
+
+# In guide.sh, press 'a' to install AND enable auto-update
+```
+
 **Debug mode:**
 ```bash
 DEBUG=1 ./scripts/install_python.sh
@@ -102,7 +140,7 @@ set -euo pipefail
 
 # Source shared utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/lib/colors.sh" || true
+source "${SCRIPT_DIR}/lib/common.sh" || true
 source "${SCRIPT_DIR}/lib/common.sh" || true
 
 # Main function per action
@@ -226,7 +264,7 @@ fi
 **Script checklist:**
 - [ ] Shebang: `#!/usr/bin/env bash`
 - [ ] Strict mode: `set -euo pipefail`
-- [ ] Source shared lib: `source "${SCRIPT_DIR}/lib/colors.sh"`
+- [ ] Source shared lib: `source "${SCRIPT_DIR}/lib/common.sh"`
 - [ ] Action dispatcher (install/update/uninstall/reconcile)
 - [ ] Error handling (check return codes, trap on exit)
 - [ ] Confirmation prompts (respect FORCE_INSTALL)

@@ -1,4 +1,4 @@
-<!-- Managed by agent: keep sections & order; edit content, not structure. Last updated: 2025-11-29 -->
+<!-- Managed by agent: keep sections & order; edit content, not structure. Last updated: 2026-01-14 -->
 
 # tests/ — Test Suite
 
@@ -6,29 +6,30 @@
 
 ## Overview
 
-The test suite validates all 18 modules across Phase 1 (Detection & Auditing) and Phase 2 (Installation & Upgrade Management).
+The test suite validates all 20 modules across Phase 1 (Detection & Auditing) and Phase 2 (Installation & Upgrade Management).
 
 **Test organization:**
 ```
 tests/
-├── test_config.py          # Configuration management (48+ tests) ✅
-├── test_environment.py     # Environment detection (10KB)
-├── test_package_managers.py # Package manager abstractions (13KB)
-├── test_installer.py       # Installation logic (22KB)
-├── test_install_plan.py    # Planning & dependencies (15KB)
-├── test_bulk.py            # Bulk operations (28KB)
-├── test_reconcile.py       # Duplicate cleanup (26KB)
-├── test_upgrade.py         # Upgrade workflows
-├── test_logging.py         # Logging configuration (7KB)
-├── integration/
-│   └── test_e2e_install.py # End-to-end installation tests
-└── fixtures/               # Test data and mocks
+├── test_bulk.py                  # Bulk operations
+├── test_catalog_and_collectors.py # Catalog and version collectors
+├── test_config.py                # Configuration management
+├── test_environment.py           # Environment detection
+├── test_install_plan.py          # Planning & dependencies
+├── test_installer.py             # Installation logic
+├── test_local_state.py           # Local state management
+├── test_logging.py               # Logging configuration
+├── test_package_managers.py      # Package manager abstractions
+├── test_reconcile.py             # Duplicate cleanup
+├── test_upgrade.py               # Upgrade workflows
+├── test_upstream_cache.py        # Upstream cache management
+└── integration/
+    └── test_e2e_install.py       # End-to-end installation tests
 ```
 
 **Test coverage:**
-- 8 unit test files
+- 12 unit test files covering all 20 modules
 - 1 integration test directory
-- 48+ test cases in test_config.py alone
 - Fixtures for mocking external services
 
 ## Setup & environment
