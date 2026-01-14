@@ -1,0 +1,11 @@
+{
+  "name": "templ",
+  "category": "go",
+  "install_method": "go_install",
+  "description": "HTML templating language for Go with great developer tooling",
+  "homepage": "https://templ.guide",
+  "github_repo": "a-h/templ",
+  "go_package": "github.com/a-h/templ/cmd/templ",
+  "version_command": "templ version",
+  "version_regex": "v?([0-9]+\\.[0-9]+\\.[0-9]+)"
+}
