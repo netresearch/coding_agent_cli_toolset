@@ -172,8 +172,27 @@ version_lt() {
 # Migrate from npm to native installer
 migrate_npm_to_native() {
   echo "[claude] Migrating from npm to native installer..." >&2
-  echo "[claude] Removing npm package..." >&2
+  echo "[claude] Removing npm packages..." >&2
+
+  # Remove from current npm
   npm uninstall -g @anthropic-ai/claude-code 2>/dev/null || true
+
+  # Remove from ALL nvm Node versions (they accumulate)
+  if [ -d "$HOME/.nvm/versions/node" ]; then
+    for node_dir in "$HOME/.nvm/versions/node"/*/; do
+      if [ -d "$node_dir/lib/node_modules/@anthropic-ai" ]; then
+        echo "[claude] Removing from ${node_dir}..." >&2
+        rm -rf "$node_dir/lib/node_modules/@anthropic-ai"
+        rm -f "$node_dir/bin/claude"
+      fi
+    done
+  fi
+
+  # Remove pnpm version if present
+  if command -v pnpm >/dev/null 2>&1; then
+    pnpm uninstall -g @anthropic-ai/claude-code 2>/dev/null || true
+  fi
+
   hash -r 2>/dev/null || true
   echo "[claude] Installing native version..." >&2
   install_native
