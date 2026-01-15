@@ -369,21 +369,21 @@ def cmd_update(args: argparse.Namespace) -> int:
                 auth_info = " (via GITHUB_TOKEN)"
 
         if remaining < limit * 0.2:  # Warn if less than 20% remaining
-            print(f"⚠️  GitHub rate limit: {remaining}/{limit} remaining{auth_info}", file=sys.stderr)
+            print(f"⚠️  GitHub rate limit: {remaining}/{limit} remaining{auth_info}", file=sys.stderr, flush=True)
             if not authenticated:
-                print(get_github_rate_limit_help(), file=sys.stderr)
+                print(get_github_rate_limit_help(), file=sys.stderr, flush=True)
         elif not authenticated and limit == 60:
             # Unauthenticated with default limit - suggest authentication
-            print(f"ℹ️  GitHub rate limit: {remaining}/{limit} remaining (unauthenticated)", file=sys.stderr)
-            print(get_github_rate_limit_help(), file=sys.stderr)
+            print(f"ℹ️  GitHub rate limit: {remaining}/{limit} remaining (unauthenticated)", file=sys.stderr, flush=True)
+            print(get_github_rate_limit_help(), file=sys.stderr, flush=True)
         else:
-            print(f"✓ GitHub rate limit: {remaining}/{limit} remaining{auth_info}", file=sys.stderr)
+            print(f"✓ GitHub rate limit: {remaining}/{limit} remaining{auth_info}", file=sys.stderr, flush=True)
 
     # Show GitLab rate limit if we have GitLab tools
     gitlab_rate = get_gitlab_rate_limit()
-    if gitlab_rate:
-        gl_remaining = gitlab_rate.get("remaining", 0)
-        gl_limit = gitlab_rate.get("limit", 0)
+    if gitlab_rate and "remaining" in gitlab_rate and "limit" in gitlab_rate:
+        gl_remaining = gitlab_rate["remaining"]
+        gl_limit = gitlab_rate["limit"]
         gl_authenticated = gitlab_rate.get("authenticated", False)
         gl_token_source = gitlab_rate.get("token_source", "")
         gl_host = gitlab_rate.get("host", "gitlab.com")
@@ -396,9 +396,9 @@ def cmd_update(args: argparse.Namespace) -> int:
                 gl_auth_info = " (via GITLAB_TOKEN)"
 
         if gl_remaining < gl_limit * 0.2:
-            print(f"⚠️  GitLab rate limit ({gl_host}): {gl_remaining}/{gl_limit} remaining{gl_auth_info}", file=sys.stderr)
+            print(f"⚠️  GitLab rate limit ({gl_host}): {gl_remaining}/{gl_limit} remaining{gl_auth_info}", file=sys.stderr, flush=True)
         else:
-            print(f"✓ GitLab rate limit ({gl_host}): {gl_remaining}/{gl_limit} remaining{gl_auth_info}", file=sys.stderr)
+            print(f"✓ GitLab rate limit ({gl_host}): {gl_remaining}/{gl_limit} remaining{gl_auth_info}", file=sys.stderr, flush=True)
 
     print(f"# Collecting fresh data for {total} tools...", file=sys.stderr)
     est_time = int((total / MAX_WORKERS) * 3 * 1.5)
@@ -540,9 +540,9 @@ def cmd_update(args: argparse.Namespace) -> int:
                     auth_info = " (via GITHUB_TOKEN)"
 
             if remaining < limit * 0.2:
-                print(f"⚠️  GitHub rate limit: {remaining}/{limit} remaining{auth_info}", file=sys.stderr)
+                print(f"⚠️  GitHub rate limit: {remaining}/{limit} remaining{auth_info}", file=sys.stderr, flush=True)
             else:
-                print(f"✓ GitHub rate limit: {remaining}/{limit} remaining{auth_info}", file=sys.stderr)
+                print(f"✓ GitHub rate limit: {remaining}/{limit} remaining{auth_info}", file=sys.stderr, flush=True)
 
         # Suggest package manager upgrades
         from cli_audit.catalog import suggest_package_manager_upgrades
@@ -689,10 +689,10 @@ def cmd_update_baseline(args: argparse.Namespace) -> int:
                 auth_info = " (via GITHUB_TOKEN)"
 
         if not authenticated and limit == 60:
-            print(f"ℹ️  GitHub rate limit: {remaining}/{limit} remaining (unauthenticated)", file=sys.stderr)
-            print(get_github_rate_limit_help(), file=sys.stderr)
+            print(f"ℹ️  GitHub rate limit: {remaining}/{limit} remaining (unauthenticated)", file=sys.stderr, flush=True)
+            print(get_github_rate_limit_help(), file=sys.stderr, flush=True)
         else:
-            print(f"✓ GitHub rate limit: {remaining}/{limit} remaining{auth_info}", file=sys.stderr)
+            print(f"✓ GitHub rate limit: {remaining}/{limit} remaining{auth_info}", file=sys.stderr, flush=True)
 
     print(f"# Collecting upstream versions for {total} tools...", file=sys.stderr)
 
@@ -747,7 +747,7 @@ def cmd_update_baseline(args: argparse.Namespace) -> int:
             elif token_source == "GITHUB_TOKEN":
                 auth_info = " (via GITHUB_TOKEN)"
 
-        print(f"✓ GitHub rate limit: {remaining}/{limit} remaining{auth_info}", file=sys.stderr)
+        print(f"✓ GitHub rate limit: {remaining}/{limit} remaining{auth_info}", file=sys.stderr, flush=True)
 
     return 0
 
