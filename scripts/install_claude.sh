@@ -8,28 +8,8 @@ ACTION="${1:-install}"
 
 # Get current version
 get_current_version() {
-  local claude_bin
-  claude_bin=$(command -v claude 2>/dev/null || true)
-
-  if [ -z "$claude_bin" ]; then
-    echo ""
-    return
-  fi
-
-  local real_path
-  real_path=$(readlink -f "$claude_bin" 2>/dev/null || echo "$claude_bin")
-
-  # If npm install, get version from package.json (avoids Node.js version issues)
-  if echo "$real_path" | grep -q 'node_modules'; then
-    local pkg_dir
-    pkg_dir=$(dirname "$real_path")
-    if [ -f "$pkg_dir/package.json" ]; then
-      grep '"version"' "$pkg_dir/package.json" | head -1 | sed 's/.*"version": *"\([0-9][0-9.]*\)".*/\1/' && return
-    fi
-  fi
-
-  # For native installs, try --version
-  timeout 2 "$claude_bin" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true
+  # Always use --version for accurate version detection
+  timeout 2 claude --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true
 }
 
 # Install via native installer (recommended)
@@ -116,7 +96,8 @@ upgrade_claude() {
   real_path=$(readlink -f "$claude_bin" 2>/dev/null || echo "$claude_bin")
 
   # Detect installation method and upgrade accordingly
-  if echo "$real_path" | grep -q 'node_modules'; then
+  # Check for npm install: node_modules in resolved path OR .nvm path (nvm-managed npm)
+  if echo "$real_path" | grep -qE 'node_modules|\.nvm/'; then
     local current_ver
     current_ver=$(get_current_version)
 

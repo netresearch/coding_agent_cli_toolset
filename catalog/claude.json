@@ -7,7 +7,7 @@
   "github_repo": "anthropics/claude-code",
   "binary_name": "claude",
   "script": "install_claude.sh",
-  "version_command": "claude_bin=$(command -v claude 2>/dev/null); if [ -n \"$claude_bin\" ]; then real_path=$(readlink -f \"$claude_bin\" 2>/dev/null || echo \"$claude_bin\"); if echo \"$real_path\" | grep -q 'node_modules'; then pkg_dir=$(dirname \"$real_path\"); [ -f \"$pkg_dir/package.json\" ] && grep '\"version\"' \"$pkg_dir/package.json\" | head -1 | sed 's/.*\"version\": *\"\\([0-9][0-9.]*\\)\".*/\\1/' && exit 0; fi; timeout 2 \"$claude_bin\" --version 2>/dev/null | grep -oE '[0-9]+\\.[0-9]+\\.[0-9]+' | head -1; fi",
+  "version_command": "timeout 2 claude --version 2>/dev/null | grep -oE '[0-9]+\\.[0-9]+\\.[0-9]+' | head -1",
   "guide": {
     "display_name": "Claude Code",
     "install_action": "upgrade",
