@@ -139,12 +139,33 @@ process_tool() {
   local homepage="$(catalog_get_property "$tool" homepage)"
   local auto_update="$(config_get_auto_update "$tool")"
 
-  # Check if up-to-date
-  if [ -n "$is_up_to_date" ] && [ -n "$installed" ]; then
+  # Check if migration needed (deprecated install method)
+  local needs_migration=""
+  if [ "$tool" = "claude" ] && { [ "$method" = "nvm" ] || [ "$method" = "npm" ]; }; then
+    needs_migration="true"
+  fi
+
+  # Check if up-to-date (but still migrate if needed)
+  if [ -n "$is_up_to_date" ] && [ -n "$installed" ] && [ -z "$needs_migration" ]; then
     printf "\n==> %s %s\n" "$icon" "$display"
     printf "    installed: %s via %s\n" "$installed" "$method"
     printf "    target:    %s (same)\n" "$(osc8 "$url" "$latest")"
     printf "    up-to-date; skipping.\n"
+    return 0
+  fi
+
+  # Handle migration case (version matches but install method deprecated)
+  if [ -n "$needs_migration" ] && [ -n "$is_up_to_date" ]; then
+    printf "\n==> ⚠️  %s [migration needed]\n" "$display"
+    printf "    installed: %s via %s (deprecated)\n" "$installed" "$method"
+    printf "    target:    %s (native installer)\n" "$(osc8 "$url" "$latest")"
+    printf "    migrating to native installer...\n"
+
+    "$ROOT"/scripts/install_tool.sh "$tool" upgrade || true
+
+    # Re-audit
+    CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_MERGE=1 "$CLI" audit.py "$tool" >/dev/null 2>&1 || true
+    AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" audit.py || true)"
     return 0
   fi
 
