@@ -34,16 +34,17 @@ class TestClaudeVersionDetection:
         assert data["version_command"], "version_command should not be empty"
 
     def test_claude_catalog_version_command_format(self):
-        """Test that claude.json version_command checks package.json."""
+        """Test that claude.json version_command runs claude --version."""
         catalog_path = PROJECT_ROOT / "catalog" / "claude.json"
 
         with open(catalog_path) as f:
             data = json.load(f)
 
         version_cmd = data.get("version_command", "")
-        # Should reference package.json to get version, not run claude binary
-        assert "package.json" in version_cmd, "version_command should check package.json"
-        assert "version" in version_cmd.lower(), "version_command should extract version"
+        # Should run claude --version directly for accurate detection
+        # (package.json was unreliable - returned stale/incorrect versions)
+        assert "claude" in version_cmd, "version_command should run claude binary"
+        assert "--version" in version_cmd, "version_command should use --version flag"
 
     def test_claude_catalog_structure(self):
         """Test that claude.json has valid catalog structure."""
