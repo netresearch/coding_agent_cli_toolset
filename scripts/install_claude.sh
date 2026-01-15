@@ -13,17 +13,50 @@ get_current_version() {
 }
 
 # Install via native installer (recommended)
+# Accepts optional version argument to skip CDN version fetch
 install_native() {
+  local target_version="${1:-}"
   echo "[claude] Installing via native installer (recommended)..." >&2
 
   if [ "$(uname)" = "Darwin" ] || [ "$(uname)" = "Linux" ]; then
     # macOS / Linux / WSL
+    local installer_args=""
+    if [ -n "$target_version" ]; then
+      installer_args="$target_version"
+      echo "[claude] Using version: $target_version" >&2
+    fi
+
     if command -v curl >/dev/null 2>&1; then
-      curl -fsSL https://claude.ai/install.sh | bash
-      return $?
+      if curl -fsSL https://claude.ai/install.sh | bash -s -- $installer_args; then
+        return 0
+      fi
+      # If failed and we didn't specify version, retry with known version from GitHub
+      if [ -z "$target_version" ]; then
+        echo "[claude] Installer failed, retrying with explicit version..." >&2
+        local github_version
+        github_version=$(get_latest_version)
+        if [ -n "$github_version" ]; then
+          echo "[claude] Using version from GitHub: $github_version" >&2
+          curl -fsSL https://claude.ai/install.sh | bash -s -- "$github_version"
+          return $?
+        fi
+      fi
+      return 1
     elif command -v wget >/dev/null 2>&1; then
-      wget -qO- https://claude.ai/install.sh | bash
-      return $?
+      if wget -qO- https://claude.ai/install.sh | bash -s -- $installer_args; then
+        return 0
+      fi
+      if [ -z "$target_version" ]; then
+        echo "[claude] Installer failed, retrying with explicit version..." >&2
+        local github_version
+        github_version=$(get_latest_version)
+        if [ -n "$github_version" ]; then
+          echo "[claude] Using version from GitHub: $github_version" >&2
+          wget -qO- https://claude.ai/install.sh | bash -s -- "$github_version"
+          return $?
+        fi
+      fi
+      return 1
     fi
   fi
 
