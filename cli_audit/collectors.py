@@ -489,3 +489,76 @@ def get_github_rate_limit_help() -> str:
     lines.append("     export GITHUB_TOKEN='ghp_your_token_here'")
 
     return "\n".join(lines)
+
+
+def get_gitlab_rate_limit(host: str = "gitlab.com") -> dict[str, Any]:
+    """Get GitLab API rate limit status.
+
+    Args:
+        host: GitLab host (default: gitlab.com)
+
+    Returns:
+        Dictionary with rate limit info or empty dict on failure
+    """
+    import os
+
+    try:
+        headers = {"User-Agent": "ai-cli-preparation/2.0"}
+
+        # Try to get token from environment
+        token = os.environ.get("GITLAB_TOKEN") or os.environ.get("GITLAB_PRIVATE_TOKEN")
+        token_source = "GITLAB_TOKEN" if token else None
+
+        # Try glab CLI if no token in environment
+        if not token:
+            import subprocess
+            try:
+                result = subprocess.run(
+                    ["glab", "auth", "token", "--hostname", host],
+                    capture_output=True, text=True, timeout=5
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    token = result.stdout.strip()
+                    token_source = "glab_cli"
+            except Exception:
+                pass
+
+        if token:
+            headers["PRIVATE-TOKEN"] = token
+
+        # GitLab returns rate limit info in response headers
+        # We make a simple API call and check the headers
+        import urllib.request
+        url = f"https://{host}/api/v4/user"
+        req = urllib.request.Request(url, headers=headers)
+
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            # GitLab rate limit headers
+            limit = int(resp.headers.get("RateLimit-Limit", 0))
+            remaining = int(resp.headers.get("RateLimit-Remaining", 0))
+            reset = int(resp.headers.get("RateLimit-Reset", 0))
+
+            return {
+                "limit": limit,
+                "remaining": remaining,
+                "reset": reset,
+                "authenticated": token is not None,
+                "token_source": token_source,
+                "host": host,
+            }
+    except Exception as e:
+        logger.debug(f"Failed to get GitLab rate limit: {e}")
+        return {}
+
+
+def is_wsl() -> bool:
+    """Detect if running in Windows Subsystem for Linux.
+
+    Returns:
+        True if running in WSL, False otherwise
+    """
+    try:
+        with open("/proc/version", "r") as f:
+            return "microsoft" in f.read().lower()
+    except Exception:
+        return False

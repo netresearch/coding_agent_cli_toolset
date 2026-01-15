@@ -25,6 +25,8 @@ from .collectors import (  # noqa: E402
     collect_crates,
     normalize_version_tag,
     get_github_rate_limit,
+    get_gitlab_rate_limit,
+    is_wsl,
 )
 from .tools import Tool, all_tools, filter_tools, get_tool, tool_homepage_url, latest_target_url  # noqa: E402
 from .detection import (  # noqa: E402
@@ -139,6 +141,8 @@ __all__ = [
     "normalize_version_tag",
     "extract_version_number",
     "get_github_rate_limit",
+    "get_gitlab_rate_limit",
+    "is_wsl",
     # Breaking changes
     "is_major_upgrade",
     "check_breaking_change_policy",

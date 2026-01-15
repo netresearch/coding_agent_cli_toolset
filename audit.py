@@ -28,7 +28,7 @@ from cli_audit.tools import Tool, all_tools, filter_tools, tool_homepage_url, la
 from cli_audit.detection import audit_tool_installation  # noqa: E402
 from cli_audit.snapshot import load_snapshot, write_snapshot, render_from_snapshot, get_snapshot_path  # noqa: E402
 from cli_audit.render import render_table, print_summary, status_icon  # noqa: E402
-from cli_audit.collectors import get_github_rate_limit, get_github_rate_limit_help  # noqa: E402
+from cli_audit.collectors import get_github_rate_limit, get_github_rate_limit_help, get_gitlab_rate_limit, is_wsl  # noqa: E402
 from cli_audit import collectors  # noqa: E402
 from cli_audit.logging_config import setup_logging  # noqa: E402
 # Split file support (Phase 2.1)
@@ -344,6 +344,10 @@ def cmd_update(args: argparse.Namespace) -> int:
     print("Update Mode", file=sys.stderr)
     print("=" * 80, file=sys.stderr)
 
+    # Show platform info
+    if is_wsl():
+        print("ℹ️  Platform: WSL (Windows Subsystem for Linux)", file=sys.stderr)
+
     # Get tools to audit
     tools_list = filter_tools(args.tools) if args.tools else all_tools()
     total = len(tools_list)
@@ -374,6 +378,27 @@ def cmd_update(args: argparse.Namespace) -> int:
             print(get_github_rate_limit_help(), file=sys.stderr)
         else:
             print(f"✓ GitHub rate limit: {remaining}/{limit} remaining{auth_info}", file=sys.stderr)
+
+    # Show GitLab rate limit if we have GitLab tools
+    gitlab_rate = get_gitlab_rate_limit()
+    if gitlab_rate:
+        gl_remaining = gitlab_rate.get("remaining", 0)
+        gl_limit = gitlab_rate.get("limit", 0)
+        gl_authenticated = gitlab_rate.get("authenticated", False)
+        gl_token_source = gitlab_rate.get("token_source", "")
+        gl_host = gitlab_rate.get("host", "gitlab.com")
+
+        gl_auth_info = ""
+        if gl_authenticated:
+            if gl_token_source == "glab_cli":
+                gl_auth_info = " (via glab CLI)"
+            else:
+                gl_auth_info = " (via GITLAB_TOKEN)"
+
+        if gl_remaining < gl_limit * 0.2:
+            print(f"⚠️  GitLab rate limit ({gl_host}): {gl_remaining}/{gl_limit} remaining{gl_auth_info}", file=sys.stderr)
+        else:
+            print(f"✓ GitLab rate limit ({gl_host}): {gl_remaining}/{gl_limit} remaining{gl_auth_info}", file=sys.stderr)
 
     print(f"# Collecting fresh data for {total} tools...", file=sys.stderr)
     est_time = int((total / MAX_WORKERS) * 3 * 1.5)
