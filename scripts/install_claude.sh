@@ -35,7 +35,7 @@ install_native() {
     # Patch installer to add --force flag if needed (handles network timeouts)
     if [ "$use_force" = "force" ]; then
       echo "[claude] Using --force to bypass network checks..." >&2
-      sed -i 's/\$binary_path" install/\$binary_path" install --force/' "$installer_script"
+      sed -i 's/"\$binary_path" install/"\$binary_path" install --force/' "$installer_script"
     fi
 
     # Run installer with optional version
@@ -50,23 +50,14 @@ install_native() {
       return 0
     fi
 
-    # If failed without force, retry with force and explicit version
-    if [ "$use_force" != "force" ]; then
-      echo "[claude] Installer failed, retrying with --force..." >&2
-      local github_version
-      github_version=$(get_latest_version)
-      if [ -n "$github_version" ]; then
-        echo "[claude] Using version from GitHub: $github_version" >&2
-        # Patch to add --force
-        sed -i 's/\$binary_path" install/\$binary_path" install --force/' "$installer_script"
-        if bash "$installer_script" "$github_version"; then
-          rm -f "$installer_script"
-          return 0
-        fi
-      fi
+    # If failed, try direct binary download as final fallback
+    echo "[claude] Native installer failed, trying direct download..." >&2
+    rm -f "$installer_script"
+
+    if install_direct; then
+      return 0
     fi
 
-    rm -f "$installer_script"
     return 1
   fi
 
@@ -107,6 +98,70 @@ install_npm() {
 get_latest_version() {
   curl -fsSIL -H "User-Agent: cli-audit" -o /dev/null -w '%{url_effective}' \
     "https://github.com/anthropics/claude-code/releases/latest" 2>/dev/null | awk -F'/' '{print $NF}' | sed 's/^v//'
+}
+
+# Direct binary download (fallback when installer has network issues)
+install_direct() {
+  local version="${1:-}"
+  if [ -z "$version" ]; then
+    version=$(get_latest_version)
+  fi
+
+  if [ -z "$version" ]; then
+    echo "[claude] Could not determine version" >&2
+    return 1
+  fi
+
+  echo "[claude] Direct binary download (bypassing installer)..." >&2
+
+  local GCS_BUCKET="https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases"
+
+  # Detect platform
+  local os arch platform
+  case "$(uname -s)" in
+    Darwin) os="darwin" ;;
+    Linux) os="linux" ;;
+    *) echo "[claude] Unsupported OS" >&2; return 1 ;;
+  esac
+
+  case "$(uname -m)" in
+    x86_64|amd64) arch="x64" ;;
+    arm64|aarch64) arch="arm64" ;;
+    *) echo "[claude] Unsupported architecture: $(uname -m)" >&2; return 1 ;;
+  esac
+
+  # Check for musl on Linux
+  if [ "$os" = "linux" ]; then
+    if [ -f /lib/libc.musl-x86_64.so.1 ] || [ -f /lib/libc.musl-aarch64.so.1 ] || ldd /bin/ls 2>&1 | grep -q musl; then
+      platform="linux-${arch}-musl"
+    else
+      platform="linux-${arch}"
+    fi
+  else
+    platform="${os}-${arch}"
+  fi
+
+  echo "[claude] Downloading v${version} for ${platform}..." >&2
+
+  # Download to ~/.local/bin
+  mkdir -p ~/.local/bin
+  if ! curl -fsSL "$GCS_BUCKET/$version/$platform/claude" -o ~/.local/bin/claude; then
+    echo "[claude] Download failed" >&2
+    return 1
+  fi
+
+  chmod +x ~/.local/bin/claude
+
+  # Verify it works
+  if ~/.local/bin/claude --version >/dev/null 2>&1; then
+    echo "[claude] Installed to ~/.local/bin/claude" >&2
+    echo "[claude] Make sure ~/.local/bin is in your PATH" >&2
+    return 0
+  else
+    echo "[claude] Binary verification failed" >&2
+    rm -f ~/.local/bin/claude
+    return 1
+  fi
 }
 
 # Compare versions (returns 0 if v1 < v2)
