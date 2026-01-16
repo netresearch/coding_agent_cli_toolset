@@ -344,3 +344,85 @@ def audit_tool_installation(
         install_method = detect_install_method(path, tool_name)
 
     return (version_num, version_line, path, install_method)
+
+
+def detect_multi_versions(
+    tool_name: str,
+    multi_version_config: dict,
+    supported_versions: list[dict],
+) -> list[dict]:
+    """Detect multiple installed versions of a runtime.
+
+    This function checks for version-specific binaries (e.g., php8.4, php8.3)
+    based on the supported versions from endoflife.date.
+
+    Args:
+        tool_name: Base tool name (e.g., "php", "python", "go")
+        multi_version_config: Multi-version configuration from catalog, containing:
+            - binary_pattern: Pattern like "php{cycle}" or "python{cycle}"
+            - candidates: List of patterns to try
+        supported_versions: List of supported versions from endoflife.date, each with:
+            - cycle: Version cycle (e.g., "8.4", "3.12")
+            - latest: Latest patch version
+            - status: "active" or "security"
+
+    Returns:
+        List of detected version info dicts, each containing:
+        - cycle: Version cycle (e.g., "8.4")
+        - latest_upstream: Latest upstream version (e.g., "8.4.17")
+        - installed: Installed version or None
+        - path: Path to binary or None
+        - install_method: How it was installed
+        - status: "active" or "security" (from endoflife.date)
+
+    Example:
+        >>> detect_multi_versions("php", {"binary_pattern": "php{cycle}"},
+        ...     [{"cycle": "8.4", "latest": "8.4.17", "status": "active"}])
+        [{"cycle": "8.4", "installed": "8.4.16", "path": "/usr/bin/php8.4", ...}]
+    """
+    results = []
+    binary_pattern = multi_version_config.get("binary_pattern", f"{tool_name}{{cycle}}")
+    candidate_patterns = multi_version_config.get("candidates", [binary_pattern])
+
+    for version_info in supported_versions:
+        cycle = version_info.get("cycle", "")
+        if not cycle:
+            continue
+
+        # Try each candidate pattern
+        found_path = None
+        installed_version = None
+
+        for pattern in candidate_patterns:
+            # Replace {cycle} with actual version cycle
+            binary_name = pattern.replace("{cycle}", cycle)
+
+            # Check if absolute path
+            if binary_name.startswith("/"):
+                if os.path.isfile(binary_name) and os.access(binary_name, os.X_OK):
+                    found_path = binary_name
+            else:
+                # Search in PATH
+                path = shutil.which(binary_name)
+                if path:
+                    found_path = path
+
+            if found_path:
+                # Get version info
+                version_line = get_version_line(found_path, tool_name)
+                installed_version = extract_version_number(version_line)
+                break
+
+        result = {
+            "cycle": cycle,
+            "latest_upstream": version_info.get("latest", ""),
+            "installed": installed_version,
+            "path": found_path,
+            "install_method": detect_install_method(found_path, tool_name) if found_path else None,
+            "status": version_info.get("status", "unknown"),
+            "eol": version_info.get("eol"),
+            "lts": version_info.get("lts", False),
+        }
+        results.append(result)
+
+    return results
