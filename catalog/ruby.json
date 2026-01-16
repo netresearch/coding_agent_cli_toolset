@@ -7,10 +7,21 @@
   "github_repo": "ruby/ruby",
   "binary_name": "ruby",
   "script": "install_ruby.sh",
-  "notes": "Installed via rbenv for version management. Removes apt-managed Ruby in favor of rbenv.",
   "guide": {
     "display_name": "Ruby (rbenv)",
     "install_action": "reconcile",
     "order": 32
-  }
+  },
+  "multi_version": {
+    "enabled": true,
+    "source": "endoflife",
+    "product": "ruby",
+    "max_versions": 3,
+    "version_manager_dir": "~/.rbenv/versions",
+    "version_prefix": "",
+    "binary_subpath": "bin",
+    "binary_name": "ruby",
+    "version_files": [".ruby-version", "Gemfile"]
+  },
+  "notes": "Managed via rbenv for version management. Supports multiple concurrent versions."
 }
