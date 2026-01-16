@@ -346,6 +346,47 @@ def audit_tool_installation(
     return (version_num, version_line, path, install_method)
 
 
+def scan_version_manager_dir(
+    base_dir: str,
+    version_prefix: str = "",
+    binary_subpath: str = "bin",
+    binary_name: str = "",
+) -> list[tuple[str, str]]:
+    """Scan a version manager directory for installed versions.
+
+    Args:
+        base_dir: Base directory (e.g., "~/.nvm/versions/node")
+        version_prefix: Prefix to strip (e.g., "v" for node versions like "v22.0.0")
+        binary_subpath: Subdirectory containing the binary (e.g., "bin")
+        binary_name: Name of the binary to look for (e.g., "node", "ruby")
+
+    Returns:
+        List of (version, binary_path) tuples for installed versions
+    """
+    base_dir = os.path.expanduser(base_dir)
+    if not os.path.isdir(base_dir):
+        return []
+
+    results = []
+    for version_dir in sorted(os.listdir(base_dir), reverse=True):
+        version_path = os.path.join(base_dir, version_dir)
+        if not os.path.isdir(version_path):
+            continue
+
+        # Get version string (strip prefix if present)
+        version = version_dir
+        if version_prefix and version.startswith(version_prefix):
+            version = version[len(version_prefix):]
+
+        # Find the binary
+        if binary_name:
+            binary_path = os.path.join(version_path, binary_subpath, binary_name)
+            if os.path.isfile(binary_path) and os.access(binary_path, os.X_OK):
+                results.append((version, binary_path))
+
+    return results
+
+
 def detect_multi_versions(
     tool_name: str,
     multi_version_config: dict,
@@ -354,15 +395,18 @@ def detect_multi_versions(
     """Detect multiple installed versions of a runtime.
 
     This function checks for version-specific binaries (e.g., php8.4, php8.3)
-    based on the supported versions from endoflife.date.
+    or scans version manager directories (e.g., ~/.nvm/versions/node/).
 
     Args:
-        tool_name: Base tool name (e.g., "php", "python", "go")
+        tool_name: Base tool name (e.g., "php", "python", "go", "node")
         multi_version_config: Multi-version configuration from catalog, containing:
             - binary_pattern: Pattern like "php{cycle}" or "python{cycle}"
             - candidates: List of patterns to try
+            - version_manager_dir: Directory to scan (e.g., "~/.nvm/versions/node")
+            - version_prefix: Prefix to strip from directory names (e.g., "v")
+            - binary_subpath: Subdirectory containing binary (default: "bin")
         supported_versions: List of supported versions from endoflife.date, each with:
-            - cycle: Version cycle (e.g., "8.4", "3.12")
+            - cycle: Version cycle (e.g., "8.4", "3.12", "22")
             - latest: Latest patch version
             - status: "active" or "security"
 
@@ -381,48 +425,135 @@ def detect_multi_versions(
         [{"cycle": "8.4", "installed": "8.4.16", "path": "/usr/bin/php8.4", ...}]
     """
     results = []
-    binary_pattern = multi_version_config.get("binary_pattern", f"{tool_name}{{cycle}}")
-    candidate_patterns = multi_version_config.get("candidates", [binary_pattern])
 
-    for version_info in supported_versions:
-        cycle = version_info.get("cycle", "")
-        if not cycle:
-            continue
+    # Check if using version manager directory scanning
+    version_manager_dir = multi_version_config.get("version_manager_dir")
 
-        # Try each candidate pattern
-        found_path = None
-        installed_version = None
+    if version_manager_dir:
+        # Scan version manager directory for installed versions
+        version_prefix = multi_version_config.get("version_prefix", "")
+        binary_subpath = multi_version_config.get("binary_subpath", "bin")
+        binary_name = multi_version_config.get("binary_name", tool_name)
 
-        for pattern in candidate_patterns:
-            # Replace {cycle} with actual version cycle
-            binary_name = pattern.replace("{cycle}", cycle)
+        installed_versions = scan_version_manager_dir(
+            version_manager_dir, version_prefix, binary_subpath, binary_name
+        )
 
-            # Check if absolute path
-            if binary_name.startswith("/"):
-                if os.path.isfile(binary_name) and os.access(binary_name, os.X_OK):
-                    found_path = binary_name
-            else:
-                # Search in PATH
-                path = shutil.which(binary_name)
-                if path:
-                    found_path = path
+        # Create a lookup map: major.minor -> (full_version, path)
+        installed_map: dict[str, tuple[str, str]] = {}
+        for version, path in installed_versions:
+            # Extract major.minor from full version (e.g., "22.12.0" -> "22")
+            parts = version.split(".")
+            if parts:
+                major = parts[0]
+                # For some runtimes, use major.minor (e.g., Python 3.12)
+                if len(parts) > 1 and tool_name in ("python", "ruby"):
+                    key = f"{parts[0]}.{parts[1]}"
+                else:
+                    key = major
+                # Keep the highest patch version for each major/minor
+                if key not in installed_map or version > installed_map[key][0]:
+                    installed_map[key] = (version, path)
 
-            if found_path:
-                # Get version info
-                version_line = get_version_line(found_path, tool_name)
-                installed_version = extract_version_number(version_line)
-                break
+        for version_info in supported_versions:
+            cycle = str(version_info.get("cycle", ""))
+            if not cycle:
+                continue
 
-        result = {
-            "cycle": cycle,
-            "latest_upstream": version_info.get("latest", ""),
-            "installed": installed_version,
-            "path": found_path,
-            "install_method": detect_install_method(found_path, tool_name) if found_path else None,
-            "status": version_info.get("status", "unknown"),
-            "eol": version_info.get("eol"),
-            "lts": version_info.get("lts", False),
-        }
-        results.append(result)
+            installed_version = None
+            found_path = None
+
+            if cycle in installed_map:
+                installed_version, found_path = installed_map[cycle]
+
+            result = {
+                "cycle": cycle,
+                "latest_upstream": version_info.get("latest", ""),
+                "installed": installed_version,
+                "path": found_path,
+                "install_method": detect_install_method(found_path, tool_name) if found_path else None,
+                "status": version_info.get("status", "unknown"),
+                "eol": version_info.get("eol"),
+                "lts": version_info.get("lts", False),
+            }
+            results.append(result)
+
+    else:
+        # Use binary pattern matching (original behavior)
+        binary_pattern = multi_version_config.get("binary_pattern", f"{tool_name}{{cycle}}")
+        candidate_patterns = multi_version_config.get("candidates", [binary_pattern])
+
+        # For Go: also check the default 'go' binary and map to cycle
+        if tool_name == "go":
+            default_go = shutil.which("go")
+            if default_go:
+                version_line = get_version_line(default_go, "go", version_flag="version")
+                default_version = extract_version_number(version_line)
+                if default_version:
+                    # Extract major.minor from version (e.g., "1.25.6" -> "1.25")
+                    parts = default_version.split(".")
+                    if len(parts) >= 2:
+                        default_cycle = f"{parts[0]}.{parts[1]}"
+                        # Pre-populate with the default go binary
+                        for version_info in supported_versions:
+                            if str(version_info.get("cycle", "")) == default_cycle:
+                                # Found matching cycle, add early result
+                                results.append({
+                                    "cycle": default_cycle,
+                                    "latest_upstream": version_info.get("latest", ""),
+                                    "installed": default_version,
+                                    "path": default_go,
+                                    "install_method": detect_install_method(default_go, tool_name),
+                                    "status": version_info.get("status", "unknown"),
+                                    "eol": version_info.get("eol"),
+                                    "lts": version_info.get("lts", False),
+                                })
+                                # Remove this cycle from further processing
+                                supported_versions = [
+                                    v for v in supported_versions
+                                    if str(v.get("cycle", "")) != default_cycle
+                                ]
+                                break
+
+        for version_info in supported_versions:
+            cycle = version_info.get("cycle", "")
+            if not cycle:
+                continue
+
+            # Try each candidate pattern
+            found_path = None
+            installed_version = None
+
+            for pattern in candidate_patterns:
+                # Replace {cycle} with actual version cycle
+                binary_name = pattern.replace("{cycle}", str(cycle))
+
+                # Check if absolute path
+                if binary_name.startswith("/"):
+                    if os.path.isfile(binary_name) and os.access(binary_name, os.X_OK):
+                        found_path = binary_name
+                else:
+                    # Search in PATH
+                    path = shutil.which(binary_name)
+                    if path:
+                        found_path = path
+
+                if found_path:
+                    # Get version info
+                    version_line = get_version_line(found_path, tool_name)
+                    installed_version = extract_version_number(version_line)
+                    break
+
+            result = {
+                "cycle": cycle,
+                "latest_upstream": version_info.get("latest", ""),
+                "installed": installed_version,
+                "path": found_path,
+                "install_method": detect_install_method(found_path, tool_name) if found_path else None,
+                "status": version_info.get("status", "unknown"),
+                "eol": version_info.get("eol"),
+                "lts": version_info.get("lts", False),
+            }
+            results.append(result)
 
     return results
