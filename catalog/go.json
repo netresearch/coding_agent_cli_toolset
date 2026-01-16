@@ -12,5 +12,15 @@
     "display_name": "Go toolchain",
     "install_action": "install",
     "order": 50
-  }
+  },
+  "multi_version": {
+    "enabled": true,
+    "source": "endoflife",
+    "product": "go",
+    "max_versions": 2,
+    "binary_pattern": "go{cycle}",
+    "candidates": ["go{cycle}", "/usr/local/go{cycle}/bin/go"],
+    "version_files": ["go.mod"]
+  },
+  "notes": "Go supports 2 versions (current + previous). Uses goenv if available, otherwise single system install."
 }
