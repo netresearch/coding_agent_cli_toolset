@@ -23,6 +23,8 @@ from .collectors import (  # noqa: E402
     collect_pypi,
     collect_npm,
     collect_crates,
+    collect_endoflife,
+    get_endoflife_products,
     normalize_version_tag,
     get_github_rate_limit,
     get_gitlab_rate_limit,
@@ -35,6 +37,7 @@ from .detection import (  # noqa: E402
     extract_version_number,
     detect_install_method,
     audit_tool_installation,
+    detect_multi_versions,
 )
 from .snapshot import load_snapshot, write_snapshot, render_from_snapshot, get_snapshot_path  # noqa: E402
 from .render import status_icon, osc8, render_table, print_summary  # noqa: E402
@@ -138,6 +141,9 @@ __all__ = [
     "collect_pypi",
     "collect_npm",
     "collect_crates",
+    "collect_endoflife",
+    "get_endoflife_products",
+    "detect_multi_versions",
     "normalize_version_tag",
     "extract_version_number",
     "get_github_rate_limit",
