@@ -811,21 +811,10 @@ def cmd_versions(args: argparse.Namespace) -> int:
 
     Displays all runtimes that support multiple concurrent versions (PHP, Python,
     Node.js, Ruby, Go) and shows which versions are installed vs available.
+
+    Supports JSON output via CLI_AUDIT_JSON=1 environment variable.
     """
     from cli_audit.catalog import ToolCatalog
-
-    # ANSI colors
-    GREEN = "\033[32m"
-    YELLOW = "\033[33m"
-    RED = "\033[31m"
-    BLUE = "\033[34m"
-    BOLD = "\033[1m"
-    RESET = "\033[0m"
-
-    print("=" * 80, file=sys.stderr)
-    print("Runtime Versions", file=sys.stderr)
-    print("=" * 80, file=sys.stderr)
-    print("", file=sys.stderr)
 
     catalog = ToolCatalog()
 
@@ -838,7 +827,10 @@ def cmd_versions(args: argparse.Namespace) -> int:
             multi_version_tools.append((tool_name, data, mv_config))
 
     if not multi_version_tools:
-        print("No multi-version runtimes configured.", file=sys.stderr)
+        if JSON_MODE:
+            print(json.dumps({"runtimes": [], "total": 0}))
+        else:
+            print("No multi-version runtimes configured.", file=sys.stderr)
         return 0
 
     # Filter to specific tools if requested
@@ -849,39 +841,91 @@ def cmd_versions(args: argparse.Namespace) -> int:
             if name in requested
         ]
 
-    # Process each runtime
+    # Collect all runtime data
+    runtimes_data = []
     for tool_name, data, mv_config in multi_version_tools:
         product = mv_config.get("product", tool_name)
         max_versions = mv_config.get("max_versions", 4)
         display_name = data.get("description", tool_name.upper())
 
-        print(f"{BOLD}🔧 {display_name}{RESET}", file=sys.stderr)
-        print("-" * 40, file=sys.stderr)
+        runtime_info = {
+            "name": tool_name,
+            "display_name": display_name,
+            "product": product,
+            "versions": [],
+            "error": None,
+        }
 
         # Fetch supported versions from endoflife.date
         try:
             supported = collect_endoflife(product, max_versions=max_versions)
         except Exception as e:
-            print(f"  {RED}✗ Failed to fetch version info: {e}{RESET}", file=sys.stderr)
-            print("", file=sys.stderr)
+            runtime_info["error"] = str(e)
+            runtimes_data.append(runtime_info)
             continue
 
         if not supported:
-            print(f"  {YELLOW}⚠ No supported versions found{RESET}", file=sys.stderr)
-            print("", file=sys.stderr)
+            runtime_info["error"] = "No supported versions found"
+            runtimes_data.append(runtime_info)
             continue
 
         # Detect installed versions
         detected = detect_multi_versions(tool_name, mv_config, supported)
 
-        # Display results
         for version_info in detected:
-            cycle = version_info.get("cycle", "?")
-            latest = version_info.get("latest_upstream", "")
             installed = version_info.get("installed")
-            status = version_info.get("status", "unknown")
-            path = version_info.get("path", "")
-            method = version_info.get("install_method", "")
+            latest = version_info.get("latest_upstream", "")
+            runtime_info["versions"].append({
+                "cycle": version_info.get("cycle", ""),
+                "latest_upstream": latest,
+                "installed": installed,
+                "is_installed": bool(installed),
+                "is_up_to_date": installed == latest if installed else False,
+                "needs_upgrade": bool(installed and installed != latest),
+                "path": version_info.get("path", ""),
+                "install_method": version_info.get("install_method", ""),
+                "status": version_info.get("status", "unknown"),
+            })
+
+        runtimes_data.append(runtime_info)
+
+    # JSON output mode
+    if JSON_MODE:
+        output = {
+            "runtimes": runtimes_data,
+            "total": len(runtimes_data),
+        }
+        print(json.dumps(output, indent=2, ensure_ascii=False))
+        return 0
+
+    # Table output mode
+    GREEN = "\033[32m"
+    YELLOW = "\033[33m"
+    RED = "\033[31m"
+    BLUE = "\033[34m"
+    BOLD = "\033[1m"
+    RESET = "\033[0m"
+
+    print("=" * 80, file=sys.stderr)
+    print("Runtime Versions", file=sys.stderr)
+    print("=" * 80, file=sys.stderr)
+    print("", file=sys.stderr)
+
+    for runtime in runtimes_data:
+        print(f"{BOLD}🔧 {runtime['display_name']}{RESET}", file=sys.stderr)
+        print("-" * 40, file=sys.stderr)
+
+        if runtime["error"]:
+            print(f"  {RED}✗ {runtime['error']}{RESET}", file=sys.stderr)
+            print("", file=sys.stderr)
+            continue
+
+        for v in runtime["versions"]:
+            cycle = v["cycle"]
+            latest = v["latest_upstream"]
+            installed = v["installed"]
+            status = v["status"]
+            method = v["install_method"]
 
             # Status indicator
             if status == "active":
@@ -908,7 +952,7 @@ def cmd_versions(args: argparse.Namespace) -> int:
 
     # Summary
     print("=" * 80, file=sys.stderr)
-    print(f"Total: {len(multi_version_tools)} runtimes configured", file=sys.stderr)
+    print(f"Total: {len(runtimes_data)} runtimes configured", file=sys.stderr)
 
     return 0
 
