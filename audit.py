@@ -129,6 +129,99 @@ def collect_latest_version(tool: Tool, offline_cache: dict[str, tuple[str, str]]
         return ("", "")
 
 
+def audit_multi_version_tool(
+    tool_name: str,
+    catalog_data: dict,
+    mv_config: dict,
+) -> list[dict[str, str]]:
+    """Audit a multi-version runtime tool.
+
+    For tools like PHP, Python, Node.js that support multiple concurrent versions,
+    this generates separate audit entries for each supported version cycle.
+
+    Args:
+        tool_name: Base tool name (e.g., "php", "python")
+        catalog_data: Full catalog entry data
+        mv_config: Multi-version configuration from catalog
+
+    Returns:
+        List of audit result dictionaries, one per version cycle
+    """
+    product = mv_config.get("product", tool_name)
+    max_versions = mv_config.get("max_versions", 4)
+
+    # Fetch supported versions from endoflife.date
+    try:
+        supported = collect_endoflife(product, max_versions=max_versions)
+    except Exception:
+        return []
+
+    if not supported:
+        return []
+
+    # Detect installed versions
+    detected = detect_multi_versions(tool_name, mv_config, supported)
+
+    results = []
+    for version_info in detected:
+        cycle = version_info.get("cycle", "")
+        latest = version_info.get("latest_upstream", "")
+        installed = version_info.get("installed")
+        path = version_info.get("path", "")
+        method = version_info.get("install_method", "")
+        status_lifecycle = version_info.get("status", "unknown")
+
+        # Determine audit status
+        if installed:
+            if installed == latest:
+                status = "UP-TO-DATE"
+            else:
+                status = "OUTDATED"
+        else:
+            status = "NOT INSTALLED"
+
+        # Build versioned tool name
+        versioned_name = f"{tool_name}@{cycle}"
+
+        # Classification reason
+        if method:
+            classification_reason = f"Detected via path analysis: {method}"
+        else:
+            classification_reason = "No installation detected"
+
+        # Hint for not installed or outdated
+        if status == "NOT INSTALLED":
+            hint = f"Install {tool_name} {cycle}: check your package manager or version manager"
+        elif status == "OUTDATED":
+            hint = f"Upgrade {tool_name} {cycle}: {installed} → {latest}"
+        else:
+            hint = ""
+
+        results.append({
+            "tool": versioned_name,
+            "category": catalog_data.get("category", tool_name),
+            "installed": installed or "",
+            "installed_method": method,
+            "installed_version": installed or "",
+            "installed_path_selected": path,
+            "classification_reason_selected": classification_reason,
+            "latest_upstream": latest,
+            "latest_version": latest,
+            "upstream_method": "endoflife",
+            "status": status,
+            "tool_url": catalog_data.get("homepage", ""),
+            "latest_url": f"https://endoflife.date/{product}",
+            "hint": hint,
+            # Extra fields for multi-version
+            "is_multi_version": True,
+            "base_tool": tool_name,
+            "version_cycle": cycle,
+            "lifecycle_status": status_lifecycle,  # active, security, eol
+        })
+
+    return results
+
+
 def audit_tool(tool: Tool, offline_cache: dict[str, tuple[str, str]] | None = None) -> dict[str, str]:
     """Audit a single tool.
 
@@ -405,15 +498,33 @@ def cmd_update(args: argparse.Namespace) -> int:
     print(f"# Estimated time: ~{est_time}s (timeout=3s per tool, {MAX_WORKERS} workers)", file=sys.stderr)
     print("", file=sys.stderr)
 
-    # Group tools by category for organized output
+    # Identify multi-version tools
+    from cli_audit.catalog import ToolCatalog
+    catalog = ToolCatalog()
+    multi_version_tools = {}  # tool_name -> (catalog_data, mv_config)
+    regular_tools = []
+
+    for tool in tools_list:
+        if catalog.has_tool(tool.name):
+            catalog_data = catalog.get_raw_data(tool.name)
+            mv_config = catalog_data.get("multi_version", {})
+            if mv_config.get("enabled"):
+                multi_version_tools[tool.name] = (catalog_data, mv_config)
+                continue
+        regular_tools.append(tool)
+
+    # Group regular tools by category for organized output
     from cli_audit.render import CATEGORY_ORDER, CATEGORY_ICON, CATEGORY_DESC
     categorized: dict[str, list] = {}
-    for tool in tools_list:
+    for tool in regular_tools:
         cat = tool.category or "general"
         if cat not in categorized:
             categorized[cat] = []
         categorized[cat].append(tool)
     sorted_cats = sorted(categorized.keys(), key=lambda c: CATEGORY_ORDER.get(c, 99))
+
+    # Total includes both regular tools and multi-version entries
+    total = len(regular_tools) + len(multi_version_tools)
 
     # Parallel audit with progress tracking, grouped by category
     results = []
@@ -506,6 +617,49 @@ def cmd_update(args: argparse.Namespace) -> int:
                             "latest_url": "",
                             "hint": "",
                         })
+
+        # Audit multi-version runtimes
+        if multi_version_tools:
+            # ANSI colors
+            GREEN = "\033[32m"
+            BOLD_GREEN = "\033[1;32m"
+            YELLOW = "\033[33m"
+            BLUE = "\033[34m"
+            RESET = "\033[0m"
+
+            print(f"\n# 🔄 Multi-version runtimes ({len(multi_version_tools)} runtimes)", file=sys.stderr)
+
+            for tool_name, (catalog_data, mv_config) in multi_version_tools.items():
+                completed += 1
+                print(f"# [{completed}/{total}] {tool_name} (multi-version)...", file=sys.stderr, flush=True)
+
+                mv_results = audit_multi_version_tool(tool_name, catalog_data, mv_config)
+
+                for mv_result in mv_results:
+                    results.append(mv_result)
+
+                    # Progress output for each version
+                    versioned_name = mv_result.get("tool", "")
+                    inst = mv_result.get("installed", "")
+                    latest = mv_result.get("latest_upstream", "")
+                    status = mv_result.get("status", "")
+
+                    if status == "UP-TO-DATE":
+                        inst_color = GREEN
+                        op = "==="
+                    elif status == "OUTDATED":
+                        inst_color = YELLOW
+                        op = "!=="
+                    else:
+                        inst_color = BLUE
+                        op = "?"
+
+                    inst_display = inst if inst else "n/a"
+                    latest_display = latest if latest else "n/a"
+                    inst_fmt = f"{inst_color}{inst_display}{RESET}"
+                    latest_fmt = f"{BOLD_GREEN}{latest_display}{RESET}"
+                    print(f"#     → {versioned_name}: {inst_fmt} {op} {latest_fmt}", file=sys.stderr, flush=True)
+
     except KeyboardInterrupt:
         # Shutdown executor immediately without waiting for threads
         executor.shutdown(wait=False, cancel_futures=True)
