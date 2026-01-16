@@ -51,7 +51,7 @@ local_state.json        # Gitignored - machine-specific installation state
 ~/.config/cli-audit/config.yml  # User preferences (auto_update, tool overrides)
 ```
 
-**Catalog entries** (77 JSON files in `catalog/`):
+**Catalog entries** (78 JSON files in `catalog/`):
 - Each tool has `name`, `candidates`, `source_kind`, `source_args`, `category`
 - Categories: python, node, go, rust, ruby, php, shell, git, devops, platform, ai, general
 - User preferences (auto_update) stored in user config, not catalog

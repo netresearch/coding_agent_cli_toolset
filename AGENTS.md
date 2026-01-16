@@ -77,7 +77,7 @@ uv run python audit.py --help    # Verify CLI works
 
 **AI CLI Preparation v2.0** — Tool version auditing and installation management for AI coding agents.
 
-- **Architecture:** 20 Python modules, 77 JSON tool catalogs
+- **Architecture:** 20 Python modules, 78 JSON tool catalogs
 - **Phase 1:** Detection & auditing (complete)
 - **Phase 2:** Installation & upgrade management (complete)
 - **Entry point:** `audit.py` → `cli_audit` package
