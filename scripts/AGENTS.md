@@ -1,4 +1,4 @@
-<!-- Managed by agent: keep sections & order; edit content, not structure. Last updated: 2026-01-14 -->
+<!-- Managed by agent: keep sections & order; edit content, not structure. Last updated: 2026-01-16 -->
 
 # Installation Scripts - Agent Guide
 
