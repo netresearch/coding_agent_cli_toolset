@@ -19,5 +19,14 @@
     "install_action": "install",
     "order": 250
   },
-  "notes": "Uses ondrej/php PPA for latest PHP version on Ubuntu/Debian. Required for Composer."
+  "multi_version": {
+    "enabled": true,
+    "source": "endoflife",
+    "product": "php",
+    "max_versions": 4,
+    "binary_pattern": "php{cycle}",
+    "candidates": ["php{cycle}", "/usr/bin/php{cycle}"],
+    "version_files": [".php-version", "composer.json"]
+  },
+  "notes": "Uses ondrej/php PPA for latest PHP version on Ubuntu/Debian. Required for Composer. Supports multiple concurrent versions (8.5, 8.4, 8.3, 8.2)."
 }
