@@ -1,0 +1,22 @@
+{
+  "name": "symfony",
+  "category": "php",
+  "install_method": "github_release_binary",
+  "description": "Symfony CLI for local development, cloud deployment, and project scaffolding",
+  "homepage": "https://symfony.com/download",
+  "github_repo": "symfony-cli/symfony-cli",
+  "binary_name": "symfony",
+  "download_url_template": "https://github.com/symfony-cli/symfony-cli/releases/download/{version}/symfony-cli_linux_{arch}.tar.gz",
+  "arch_map": {
+    "x86_64": "amd64",
+    "aarch64": "arm64",
+    "armv7l": "armv6",
+    "i686": "386"
+  },
+  "guide": {
+    "display_name": "Symfony CLI",
+    "install_action": "install",
+    "order": 265
+  },
+  "notes": "Standalone CLI for Symfony development. Includes local web server, security checker, and cloud deployment."
+}
