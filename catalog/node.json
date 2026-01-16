@@ -12,5 +12,17 @@
     "display_name": "Node.js stack",
     "install_action": "reconcile",
     "order": 40
-  }
+  },
+  "multi_version": {
+    "enabled": true,
+    "source": "endoflife",
+    "product": "nodejs",
+    "max_versions": 3,
+    "version_manager_dir": "~/.nvm/versions/node",
+    "version_prefix": "v",
+    "binary_subpath": "bin",
+    "binary_name": "node",
+    "version_files": [".nvmrc", ".node-version", "package.json"]
+  },
+  "notes": "Managed via nvm (Node Version Manager). Supports multiple concurrent LTS versions."
 }
