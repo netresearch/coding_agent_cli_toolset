@@ -25,10 +25,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Import modules
 from cli_audit.tools import Tool, all_tools, filter_tools, tool_homepage_url, latest_target_url  # noqa: E402
-from cli_audit.detection import audit_tool_installation  # noqa: E402
+from cli_audit.detection import audit_tool_installation, detect_multi_versions  # noqa: E402
 from cli_audit.snapshot import load_snapshot, write_snapshot, render_from_snapshot, get_snapshot_path  # noqa: E402
 from cli_audit.render import render_table, print_summary, status_icon  # noqa: E402
-from cli_audit.collectors import get_github_rate_limit, get_github_rate_limit_help, get_gitlab_rate_limit, is_wsl  # noqa: E402
+from cli_audit.collectors import get_github_rate_limit, get_github_rate_limit_help, get_gitlab_rate_limit, is_wsl, collect_endoflife  # noqa: E402
 from cli_audit import collectors  # noqa: E402
 from cli_audit.logging_config import setup_logging  # noqa: E402
 # Split file support (Phase 2.1)
@@ -806,6 +806,113 @@ def cmd_upgrade(args: argparse.Namespace) -> int:
     return 1
 
 
+def cmd_versions(args: argparse.Namespace) -> int:
+    """Show multi-version runtime status.
+
+    Displays all runtimes that support multiple concurrent versions (PHP, Python,
+    Node.js, Ruby, Go) and shows which versions are installed vs available.
+    """
+    from cli_audit.catalog import ToolCatalog
+
+    # ANSI colors
+    GREEN = "\033[32m"
+    YELLOW = "\033[33m"
+    RED = "\033[31m"
+    BLUE = "\033[34m"
+    BOLD = "\033[1m"
+    RESET = "\033[0m"
+
+    print("=" * 80, file=sys.stderr)
+    print("Runtime Versions", file=sys.stderr)
+    print("=" * 80, file=sys.stderr)
+    print("", file=sys.stderr)
+
+    catalog = ToolCatalog()
+
+    # Find all tools with multi_version enabled
+    multi_version_tools = []
+    for tool_name in catalog.all_tools():
+        data = catalog.get_raw_data(tool_name)
+        mv_config = data.get("multi_version", {})
+        if mv_config.get("enabled"):
+            multi_version_tools.append((tool_name, data, mv_config))
+
+    if not multi_version_tools:
+        print("No multi-version runtimes configured.", file=sys.stderr)
+        return 0
+
+    # Filter to specific tools if requested
+    if args.tools:
+        requested = set(args.tools)
+        multi_version_tools = [
+            (name, data, config) for name, data, config in multi_version_tools
+            if name in requested
+        ]
+
+    # Process each runtime
+    for tool_name, data, mv_config in multi_version_tools:
+        product = mv_config.get("product", tool_name)
+        max_versions = mv_config.get("max_versions", 4)
+        display_name = data.get("description", tool_name.upper())
+
+        print(f"{BOLD}🔧 {display_name}{RESET}", file=sys.stderr)
+        print("-" * 40, file=sys.stderr)
+
+        # Fetch supported versions from endoflife.date
+        try:
+            supported = collect_endoflife(product, max_versions=max_versions)
+        except Exception as e:
+            print(f"  {RED}✗ Failed to fetch version info: {e}{RESET}", file=sys.stderr)
+            print("", file=sys.stderr)
+            continue
+
+        if not supported:
+            print(f"  {YELLOW}⚠ No supported versions found{RESET}", file=sys.stderr)
+            print("", file=sys.stderr)
+            continue
+
+        # Detect installed versions
+        detected = detect_multi_versions(tool_name, mv_config, supported)
+
+        # Display results
+        for version_info in detected:
+            cycle = version_info.get("cycle", "?")
+            latest = version_info.get("latest_upstream", "")
+            installed = version_info.get("installed")
+            status = version_info.get("status", "unknown")
+            path = version_info.get("path", "")
+            method = version_info.get("install_method", "")
+
+            # Status indicator
+            if status == "active":
+                status_str = f"{GREEN}active{RESET}"
+            elif status == "security":
+                status_str = f"{YELLOW}security{RESET}"
+            else:
+                status_str = f"{RED}eol{RESET}"
+
+            # Installed indicator
+            if installed:
+                if installed == latest:
+                    inst_str = f"{GREEN}✓ {installed}{RESET}"
+                else:
+                    inst_str = f"{YELLOW}⚠ {installed}{RESET} → {GREEN}{latest}{RESET}"
+                method_str = f" ({method})" if method else ""
+            else:
+                inst_str = f"{BLUE}○ not installed{RESET}"
+                method_str = ""
+
+            print(f"  {cycle:6} [{status_str:16}] {inst_str}{method_str}", file=sys.stderr)
+
+        print("", file=sys.stderr)
+
+    # Summary
+    print("=" * 80, file=sys.stderr)
+    print(f"Total: {len(multi_version_tools)} runtimes configured", file=sys.stderr)
+
+    return 0
+
+
 def main() -> int:
     """Main entry point for audit system."""
     parser = argparse.ArgumentParser(
@@ -839,6 +946,11 @@ def main() -> int:
         help="Upgrade outdated tools",
     )
     parser.add_argument(
+        "--versions",
+        action="store_true",
+        help="Show multi-version runtime status (PHP, Python, Node.js, Ruby, Go)",
+    )
+    parser.add_argument(
         "--verbose", "-v",
         action="store_true",
         help="Verbose output",
@@ -855,7 +967,9 @@ def main() -> int:
     setup_logging(verbose=args.verbose)
 
     # Route to appropriate command
-    if args.update:
+    if args.versions:
+        return cmd_versions(args)
+    elif args.update:
         # Explicit --update flag: full update of all tools
         return cmd_update(args)
     elif getattr(args, 'update_local', False) or UPDATE_LOCAL_ONLY:
