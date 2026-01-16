@@ -562,3 +562,118 @@ def is_wsl() -> bool:
             return "microsoft" in f.read().lower()
     except Exception:
         return False
+
+
+def collect_endoflife(
+    product: str,
+    max_versions: int = 4,
+    offline_cache: dict[str, list[dict[str, Any]]] | None = None,
+) -> list[dict[str, Any]]:
+    """Collect supported versions from endoflife.date API.
+
+    This function fetches version lifecycle information for runtimes that support
+    multiple concurrent versions (PHP, Python, Go, Node.js, Ruby, etc.).
+
+    Args:
+        product: Product name as used by endoflife.date (e.g., "php", "python", "go", "nodejs")
+        max_versions: Maximum number of supported versions to return (default: 4)
+        offline_cache: Optional offline cache for fallback
+
+    Returns:
+        List of version info dicts, each containing:
+        - cycle: Version cycle (e.g., "8.4", "3.12", "1.23")
+        - latest: Latest patch version (e.g., "8.4.17", "3.12.8")
+        - status: "active" (full support), "security" (security fixes only), or "eol"
+        - eol: End of life date string or False if still supported
+        - support: End of active support date (after this, security only)
+
+    Example:
+        >>> collect_endoflife("php", max_versions=3)
+        [
+            {"cycle": "8.4", "latest": "8.4.17", "status": "active", ...},
+            {"cycle": "8.3", "latest": "8.3.30", "status": "security", ...},
+            {"cycle": "8.2", "latest": "8.2.30", "status": "security", ...},
+        ]
+    """
+    from datetime import datetime
+
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    try:
+        url = f"https://endoflife.date/api/{product}.json"
+        data = json.loads(http_get(url, timeout=5))
+
+        if not isinstance(data, list):
+            logger.warning(f"endoflife.date {product}: Unexpected response format")
+            return []
+
+        supported_versions = []
+
+        for entry in data:
+            cycle = entry.get("cycle", "")
+            eol = entry.get("eol")
+            support = entry.get("support")
+            latest = entry.get("latest", "")
+
+            # Determine if version is still supported
+            # eol can be False (still supported) or a date string
+            if eol is False:
+                is_supported = True
+            elif isinstance(eol, str):
+                is_supported = eol > today
+            else:
+                is_supported = False
+
+            if not is_supported:
+                continue
+
+            # Determine status: active (full support) vs security (security fixes only)
+            if support is None or support is False:
+                status = "active"
+            elif isinstance(support, str) and support > today:
+                status = "active"
+            else:
+                status = "security"
+
+            supported_versions.append({
+                "cycle": str(cycle),
+                "latest": latest,
+                "status": status,
+                "eol": eol,
+                "support": support,
+                "release_date": entry.get("releaseDate"),
+                "lts": entry.get("lts", False),
+            })
+
+            if len(supported_versions) >= max_versions:
+                break
+
+        logger.debug(f"endoflife.date {product}: Found {len(supported_versions)} supported versions")
+        return supported_versions
+
+    except Exception as e:
+        logger.debug(f"endoflife.date failed for {product}: {e}")
+
+    # Use offline cache if available
+    if offline_cache and product in offline_cache:
+        logger.debug(f"endoflife.date {product}: Using offline cache")
+        return offline_cache[product]
+
+    logger.warning(f"endoflife.date {product}: No versions found")
+    return []
+
+
+def get_endoflife_products() -> dict[str, str]:
+    """Return mapping of tool names to endoflife.date product names.
+
+    Returns:
+        Dict mapping internal tool names to endoflife.date product identifiers
+    """
+    return {
+        "php": "php",
+        "python": "python",
+        "go": "go",
+        "node": "nodejs",
+        "ruby": "ruby",
+        "rust": "rust",
+    }
