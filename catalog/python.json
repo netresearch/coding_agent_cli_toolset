@@ -12,5 +12,14 @@
     "display_name": "Python stack",
     "install_action": "update",
     "order": 30
+  },
+  "multi_version": {
+    "enabled": true,
+    "source": "endoflife",
+    "product": "python",
+    "max_versions": 5,
+    "binary_pattern": "python{cycle}",
+    "candidates": ["python{cycle}", "/usr/bin/python{cycle}"],
+    "version_files": [".python-version", "pyproject.toml", ".tool-versions"]
   }
 }
