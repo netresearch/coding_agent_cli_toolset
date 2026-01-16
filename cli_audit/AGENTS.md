@@ -10,9 +10,9 @@ The `cli_audit` package provides the core functionality for AI CLI Preparation:
 
 **Phase 1: Detection & Auditing (6 modules)**
 - `tools.py` — Tool definitions and metadata
-- `catalog.py` — JSON catalog management (76 entries)
-- `detection.py` — Installation detection, version extraction
-- `collectors.py` — Upstream version collection (GitHub, PyPI, npm, crates)
+- `catalog.py` — JSON catalog management (78 entries)
+- `detection.py` — Installation detection, version extraction, multi-version detection
+- `collectors.py` — Upstream version collection (GitHub, PyPI, npm, crates, endoflife.date)
 - `snapshot.py` — Snapshot-based caching
 - `render.py` — Output formatting and table rendering
 
@@ -55,6 +55,12 @@ local_state.json        # Gitignored - machine-specific installation state
 - Each tool has `name`, `candidates`, `source_kind`, `source_args`, `category`
 - Categories: python, node, go, rust, ruby, php, shell, git, devops, platform, ai, general
 - User preferences (auto_update) stored in user config, not catalog
+
+**Multi-version runtimes** (PHP, Python, Node.js, Ruby, Go):
+- Catalog entries with `multi_version.enabled: true` support concurrent versions
+- Version lifecycle data from [endoflife.date](https://endoflife.date/) API
+- Detection via binary patterns (`php8.4`) or version manager dirs (`~/.nvm/versions/node/`)
+- See: `collect_endoflife()`, `detect_multi_versions()`
 
 ## Setup & environment
 

@@ -63,6 +63,8 @@ uv run python audit.py --help    # Verify CLI works
 | `make upgrade-managed` | Upgrade all package managers |
 | `make upgrade-dry-run` | Preview upgrades without changes |
 | `./scripts/set_auto_update.sh <tool>` | Enable auto-update for a tool |
+| `uv run python audit.py --versions` | Show multi-version runtime status |
+| `uv run python audit.py --versions php` | Show specific runtime versions |
 
 ## Data files
 
@@ -81,6 +83,20 @@ uv run python audit.py --help    # Verify CLI works
 - **Phase 1:** Detection & auditing (complete)
 - **Phase 2:** Installation & upgrade management (complete)
 - **Entry point:** `audit.py` → `cli_audit` package
+
+## Multi-version runtimes
+
+Runtimes supporting multiple concurrent versions (PHP, Python, Node.js, Ruby, Go) use dynamic detection from [endoflife.date](https://endoflife.date/) API.
+
+```bash
+# Show all runtime versions
+uv run python audit.py --versions
+
+# JSON output for scripting
+CLI_AUDIT_JSON=1 uv run python audit.py --versions
+```
+
+**Catalog config:** Tools with `multi_version.enabled: true` in their JSON catalog define detection strategies (binary patterns or version manager directories).
 
 ## When instructions conflict
 
