@@ -8,6 +8,20 @@ ACTION="${1:-reconcile}"
 # Target Ruby version (default: latest stable)
 RUBY_VERSION="${RUBY_VERSION:-3.3.6}"
 
+# Get version of a specific Ruby installation
+get_specific_ruby_version() {
+  local version="$1"
+  local ruby_bin="$HOME/.rbenv/versions/$version/bin/ruby"
+  if [ -x "$ruby_bin" ]; then
+    "$ruby_bin" --version 2>/dev/null || true
+  fi
+}
+
+# Extract major.minor from full version (3.4.8 -> 3.4)
+get_version_cycle() {
+  echo "$1" | sed 's/^\([0-9]*\.[0-9]*\).*/\1/'
+}
+
 update_ruby_build() {
   local ruby_build_dir="$HOME/.rbenv/plugins/ruby-build"
   if [ -d "$ruby_build_dir/.git" ]; then
@@ -64,6 +78,12 @@ install_ruby() {
     RUBY_VERSION=$(get_latest_ruby_version)
   fi
 
+  # Check version before install
+  local before="$(get_specific_ruby_version "$RUBY_VERSION")"
+  local version_cycle="$(get_version_cycle "$RUBY_VERSION")"
+  local display_name="ruby"
+  [ -n "$version_cycle" ] && display_name="ruby@${version_cycle}"
+
   echo "Installing Ruby $RUBY_VERSION via rbenv..."
   if ! rbenv install --skip-existing "$RUBY_VERSION"; then
     echo "[ruby] Error: Failed to install Ruby $RUBY_VERSION" >&2
@@ -78,44 +98,38 @@ install_ruby() {
     return 1
   fi
 
-  rbenv global "$RUBY_VERSION" || true
+  # Only set global if no global version is set yet
+  local current_global="$(rbenv global 2>/dev/null || true)"
+  if [ -z "$current_global" ] || [ "$current_global" = "system" ]; then
+    rbenv global "$RUBY_VERSION" || true
+  fi
   rbenv rehash || true
 
-  # Update gem itself
-  gem update --system || true
+  # Update gem in this specific version
+  RBENV_VERSION="$RUBY_VERSION" gem update --system || true
 
-  # Install common gems
-  gem install bundler rake || true
+  # Install common gems in this specific version
+  RBENV_VERSION="$RUBY_VERSION" gem install bundler rake || true
   rbenv rehash || true
+
+  # Report version for this specific install
+  local after="$(get_specific_ruby_version "$RUBY_VERSION")"
+  local path="$HOME/.rbenv/versions/$RUBY_VERSION/bin/ruby"
+  printf "[%s] before: %s\n" "$display_name" "${before:-<none>}"
+  printf "[%s] after:  %s\n" "$display_name" "${after:-<none>}"
+  if [ -x "$path" ]; then printf "[%s] path:   %s\n" "$display_name" "$path"; fi
 }
 
 update_ruby() {
   ensure_rbenv
 
-  # Get current version
-  local current_version target_version
-  current_version=$(rbenv global 2>/dev/null || echo "")
-
   # Use RUBY_VERSION if set, otherwise get latest from rbenv
-  if [ -n "${RUBY_VERSION:-}" ] && [ "$RUBY_VERSION" != "latest" ]; then
-    target_version="$RUBY_VERSION"
-  else
-    target_version=$(get_latest_ruby_version)
-    RUBY_VERSION="$target_version"
+  if [ -z "${RUBY_VERSION:-}" ] || [ "$RUBY_VERSION" = "latest" ]; then
+    RUBY_VERSION=$(get_latest_ruby_version)
   fi
 
-  echo "Current Ruby: $current_version"
-  echo "Target Ruby: $target_version"
-
-  # Install target if different
-  if [ "$current_version" != "$target_version" ]; then
-    install_ruby
-  else
-    # Just update gems
-    gem update --system || true
-    gem update bundler rake || true
-    rbenv rehash || true
-  fi
+  # install_ruby handles its own before/after reporting
+  install_ruby
 }
 
 uninstall_ruby() {
@@ -140,23 +154,12 @@ prefers_rbenv_ruby() {
 }
 
 reconcile_ruby() {
-  local before after path
-  before="$(command -v ruby >/dev/null 2>&1 && ruby --version || true)"
-
   if ! prefers_rbenv_ruby; then
     echo "Removing apt-managed Ruby in favor of rbenv..."
     apt_remove_if_present ruby ruby-dev ruby-rubygems || true
-    install_ruby
-  else
-    update_ruby
   fi
-
-  after="$(command -v ruby >/dev/null 2>&1 && ruby --version || true)"
-  path="$(command -v ruby 2>/dev/null || true)"
-
-  printf "[%s] before: %s\n" "ruby" "${before:-<none>}"
-  printf "[%s] after:  %s\n" "ruby" "${after:-<none>}"
-  if [ -n "$path" ]; then printf "[%s] path:   %s\n" "ruby" "$path"; fi
+  # install_ruby handles its own before/after reporting
+  install_ruby
 }
 
 case "$ACTION" in
