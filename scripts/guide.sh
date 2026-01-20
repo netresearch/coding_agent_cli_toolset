@@ -124,7 +124,24 @@ osc8() {
 process_tool() {
   local tool="$1"
 
-  # Get tool data from audit JSON
+  # Determine catalog tool name (handle multi-version tools like php@8.3)
+  local catalog_tool="$tool"
+  local is_multi_version=""
+  local version_cycle=""
+  if [[ "$tool" == *"@"* ]]; then
+    local base_tool="$(json_field "$tool" base_tool)"
+    version_cycle="$(json_field "$tool" version_cycle)"
+    if [ -n "$base_tool" ]; then
+      catalog_tool="$base_tool"
+      is_multi_version="true"
+    else
+      catalog_tool="${tool%%@*}"
+      version_cycle="${tool##*@}"
+      is_multi_version="true"
+    fi
+  fi
+
+  # Get tool data from audit JSON (use full tool name for JSON queries)
   local icon="$(json_field "$tool" state_icon)"
   local installed="$(json_field "$tool" installed)"
   local latest="$(json_field "$tool" latest_upstream)"
@@ -132,12 +149,16 @@ process_tool() {
   local method="$(json_field "$tool" installed_method)"
   local is_up_to_date="$(json_bool "$tool" is_up_to_date)"
 
-  # Get metadata from catalog (with defaults)
-  local display="$(catalog_get_guide_property "$tool" display_name "$tool")"
-  local install_action="$(catalog_get_guide_property "$tool" install_action "")"
-  local description="$(catalog_get_property "$tool" description)"
-  local homepage="$(catalog_get_property "$tool" homepage)"
-  local auto_update="$(config_get_auto_update "$tool")"
+  # Get metadata from catalog (use base tool name for catalog queries)
+  local display="$(catalog_get_guide_property "$catalog_tool" display_name "$catalog_tool")"
+  # For multi-version tools, append version cycle to display name
+  if [ -n "$is_multi_version" ] && [ -n "$version_cycle" ]; then
+    display="$display $version_cycle"
+  fi
+  local install_action="$(catalog_get_guide_property "$catalog_tool" install_action "")"
+  local description="$(catalog_get_property "$catalog_tool" description)"
+  local homepage="$(catalog_get_property "$catalog_tool" homepage)"
+  local auto_update="$(config_get_auto_update "$catalog_tool")"
 
   # Check if migration needed (deprecated install method)
   local needs_migration=""
@@ -176,19 +197,25 @@ process_tool() {
     printf "    target:    %s\n" "$(osc8 "$url" "${latest:-<unknown>}")"
     printf "    auto-updating...\n"
 
-    # Build install command from catalog metadata
-    local install_cmd="install_tool.sh $tool"
+    # Build install command from catalog metadata (use catalog_tool for script name)
+    local install_cmd="install_tool.sh $catalog_tool"
     if [ -n "$install_action" ]; then
-      install_cmd="install_tool.sh $tool $install_action"
+      install_cmd="install_tool.sh $catalog_tool $install_action"
     elif [ -n "$installed" ]; then
-      install_cmd="install_tool.sh $tool update"
+      install_cmd="install_tool.sh $catalog_tool update"
     fi
 
-    # Execute the install
-    if [ "$tool" = "python" ]; then
+    # Execute the install with version-specific environment variables
+    if [ "$catalog_tool" = "python" ] || [ -n "$is_multi_version" ] && [ "$catalog_tool" = "python" ]; then
       UV_PYTHON_SPEC="$latest" "$ROOT"/scripts/$install_cmd || true
-    elif [ "$tool" = "ruby" ]; then
+    elif [ "$catalog_tool" = "ruby" ]; then
       RUBY_VERSION="$latest" "$ROOT"/scripts/$install_cmd || true
+    elif [ "$catalog_tool" = "php" ] && [ -n "$version_cycle" ]; then
+      PHP_VERSION="$version_cycle" "$ROOT"/scripts/$install_cmd || true
+    elif [ "$catalog_tool" = "node" ] && [ -n "$version_cycle" ]; then
+      NODE_VERSION="$version_cycle" "$ROOT"/scripts/$install_cmd || true
+    elif [ "$catalog_tool" = "go" ] && [ -n "$version_cycle" ]; then
+      GO_VERSION="$version_cycle" "$ROOT"/scripts/$install_cmd || true
     else
       "$ROOT"/scripts/$install_cmd || true
     fi
@@ -206,13 +233,13 @@ process_tool() {
   printf "    installed: %s via %s\n" "${installed:-<none>}" "${method:-unknown}"
   printf "    target:    %s\n" "$(osc8 "$url" "${latest:-<unknown>}")"
 
-  # Build install command from catalog metadata
-  local install_cmd="install_tool.sh $tool"
+  # Build install command from catalog metadata (use catalog_tool for script name)
+  local install_cmd="install_tool.sh $catalog_tool"
   if [ -n "$install_action" ]; then
-    install_cmd="install_tool.sh $tool $install_action"
+    install_cmd="install_tool.sh $catalog_tool $install_action"
   elif [ -n "$installed" ]; then
     # Tool is already installed, use "update" action
-    install_cmd="install_tool.sh $tool update"
+    install_cmd="install_tool.sh $catalog_tool update"
   fi
   printf "    will run: scripts/%s\n" "$install_cmd"
 
@@ -242,10 +269,16 @@ process_tool() {
     [Yy])
       # Handle tool-specific version environment variables
       local upgrade_success=0
-      if [ "$tool" = "python" ]; then
+      if [ "$catalog_tool" = "python" ]; then
         UV_PYTHON_SPEC="$latest" "$ROOT"/scripts/$install_cmd && upgrade_success=1 || true
-      elif [ "$tool" = "ruby" ]; then
+      elif [ "$catalog_tool" = "ruby" ]; then
         RUBY_VERSION="$latest" "$ROOT"/scripts/$install_cmd && upgrade_success=1 || true
+      elif [ "$catalog_tool" = "php" ] && [ -n "$version_cycle" ]; then
+        PHP_VERSION="$version_cycle" "$ROOT"/scripts/$install_cmd && upgrade_success=1 || true
+      elif [ "$catalog_tool" = "node" ] && [ -n "$version_cycle" ]; then
+        NODE_VERSION="$version_cycle" "$ROOT"/scripts/$install_cmd && upgrade_success=1 || true
+      elif [ "$catalog_tool" = "go" ] && [ -n "$version_cycle" ]; then
+        GO_VERSION="$version_cycle" "$ROOT"/scripts/$install_cmd && upgrade_success=1 || true
       else
         "$ROOT"/scripts/$install_cmd && upgrade_success=1 || true
       fi
@@ -277,16 +310,22 @@ process_tool() {
       fi
       ;;
     [Aa])
-      # Install/upgrade AND enable auto-update for future
+      # Install/upgrade AND enable auto-update for future (use catalog_tool for settings)
       printf "    Enabling auto-update for future upgrades...\n"
-      "$ROOT"/scripts/set_auto_update.sh "$tool" true >/dev/null 2>&1 || true
+      "$ROOT"/scripts/set_auto_update.sh "$catalog_tool" true >/dev/null 2>&1 || true
 
       # Handle tool-specific version environment variables
       local upgrade_success_a=0
-      if [ "$tool" = "python" ]; then
+      if [ "$catalog_tool" = "python" ]; then
         UV_PYTHON_SPEC="$latest" "$ROOT"/scripts/$install_cmd && upgrade_success_a=1 || true
-      elif [ "$tool" = "ruby" ]; then
+      elif [ "$catalog_tool" = "ruby" ]; then
         RUBY_VERSION="$latest" "$ROOT"/scripts/$install_cmd && upgrade_success_a=1 || true
+      elif [ "$catalog_tool" = "php" ] && [ -n "$version_cycle" ]; then
+        PHP_VERSION="$version_cycle" "$ROOT"/scripts/$install_cmd && upgrade_success_a=1 || true
+      elif [ "$catalog_tool" = "node" ] && [ -n "$version_cycle" ]; then
+        NODE_VERSION="$version_cycle" "$ROOT"/scripts/$install_cmd && upgrade_success_a=1 || true
+      elif [ "$catalog_tool" = "go" ] && [ -n "$version_cycle" ]; then
+        GO_VERSION="$version_cycle" "$ROOT"/scripts/$install_cmd && upgrade_success_a=1 || true
       else
         "$ROOT"/scripts/$install_cmd && upgrade_success_a=1 || true
       fi
@@ -364,10 +403,26 @@ while read -r line; do
   tool_name="$(echo "$line" | awk -F'|' '{gsub(/^ +| +$/,"",$2); print $2}')"
   [ -z "$tool_name" ] && continue
 
-  # Only process tools with catalog entries
-  if catalog_has_tool "$tool_name"; then
-    # Check if tool is pinned
-    pinned_version="$(catalog_get_property "$tool_name" pinned_version)"
+  # Determine catalog tool name (handle multi-version tools like php@8.3)
+  catalog_name="$tool_name"
+  is_multi_version=""
+  if [[ "$tool_name" == *"@"* ]]; then
+    # Multi-version tool: get base_tool from JSON, or extract from name
+    base_tool="$(json_field "$tool_name" base_tool)"
+    if [ -n "$base_tool" ]; then
+      catalog_name="$base_tool"
+      is_multi_version="true"
+    else
+      # Fallback: extract base name before @
+      catalog_name="${tool_name%%@*}"
+      is_multi_version="true"
+    fi
+  fi
+
+  # Only process tools with catalog entries (check base tool for multi-version)
+  if catalog_has_tool "$catalog_name"; then
+    # Check if tool is pinned (use catalog name for pin check)
+    pinned_version="$(catalog_get_property "$catalog_name" pinned_version)"
 
     # Skip if pinned to "never" (permanently skip installation)
     if [ "$pinned_version" = "never" ]; then
@@ -375,7 +430,8 @@ while read -r line; do
     fi
 
     # Skip if pinned to any specific version (don't prompt for upgrades)
-    if [ -n "$pinned_version" ]; then
+    # But allow multi-version tools to be processed individually
+    if [ -n "$pinned_version" ] && [ -z "$is_multi_version" ]; then
       continue
     fi
 
@@ -387,8 +443,8 @@ while read -r line; do
       continue
     fi
 
-    # Get category from catalog
-    category="$(catalog_get_property "$tool_name" category)"
+    # Get category from catalog (use catalog name)
+    category="$(catalog_get_property "$catalog_name" category)"
     category="${category:-general}"
 
     # Add to category group
