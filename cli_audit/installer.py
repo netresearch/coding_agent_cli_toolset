@@ -19,6 +19,7 @@ from .config import Config
 from .environment import Environment
 from .install_plan import InstallStep, generate_install_plan
 from .package_managers import select_package_manager
+from .prerequisites import ensure_prerequisites, format_prerequisite_error
 
 
 @dataclass(frozen=True)
@@ -423,6 +424,8 @@ def install_tool(
     language: str | None = None,
     dry_run: bool = False,
     verbose: bool = False,
+    check_prerequisites: bool = True,
+    interactive: bool = True,
 ) -> InstallResult:
     """
     Install a single tool.
@@ -436,6 +439,8 @@ def install_tool(
         language: Tool language/ecosystem (e.g., "python", "rust")
         dry_run: If True, only generate plan without executing
         verbose: Enable verbose logging
+        check_prerequisites: If True, check and install prerequisites first
+        interactive: If True, prompt user for missing prerequisites
 
     Returns:
         InstallResult with installation outcome
@@ -443,6 +448,7 @@ def install_tool(
     Raises:
         InstallError: If installation fails critically
     """
+    from .catalog import ToolCatalog
     from .config import load_config
     from .environment import detect_environment
 
@@ -453,6 +459,45 @@ def install_tool(
         env = detect_environment(verbose=verbose)
 
     start_time = time.time()
+
+    # Check and install prerequisites if requested
+    if check_prerequisites and not dry_run:
+        catalog = ToolCatalog()
+
+        def prereq_installer(prereq_name: str) -> bool:
+            """Install a prerequisite tool (without recursive prereq check)."""
+            result = install_tool(
+                tool_name=prereq_name,
+                package_name=prereq_name,
+                target_version="latest",
+                config=config,
+                env=env,
+                dry_run=False,
+                verbose=verbose,
+                check_prerequisites=False,  # Prerequisites already resolved
+                interactive=False,
+            )
+            return result.success
+
+        prereq_result = ensure_prerequisites(
+            tool_name=tool_name,
+            catalog=catalog,
+            install_func=prereq_installer if interactive else None,
+            interactive=interactive,
+            verbose=verbose,
+        )
+
+        if not prereq_result.user_approved or prereq_result.missing:
+            error_msg = format_prerequisite_error(prereq_result)
+            return InstallResult(
+                tool_name=tool_name,
+                success=False,
+                installed_version=None,
+                package_manager_used="unknown",
+                steps_completed=(),
+                duration_seconds=time.time() - start_time,
+                error_message=error_msg,
+            )
 
     try:
         # Select package manager

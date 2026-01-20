@@ -2,6 +2,15 @@
 
 A minimal utility to verify that tools used by AI coding agents are installed and up to date on your system. It audits versions of common agent toolchain CLIs against the latest upstream releases and prints a pipe-delimited report suitable for quick human scan or downstream tooling.
 
+## Quick Start
+
+```bash
+make update    # Scan all tools, fetch latest versions, save snapshot
+make upgrade   # Interactive remediation for outdated/missing tools
+```
+
+That's it. Run these periodically to keep your AI coding agent toolchain current.
+
 ## Scope: agent toolchain
 - This audit targets CLIs that coding agents commonly utilize themselves if present on the machine. It is agent-focused; tools may be reported as NOT INSTALLED on your host if you don't use them.
 - Upstream versions are resolved from GitHub releases, PyPI, crates.io, or the npm registry for Node CLIs.

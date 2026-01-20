@@ -581,6 +581,7 @@ def upgrade_tool(
     skip_backup: bool = False,
     dry_run: bool = False,
     verbose: bool = False,
+    interactive: bool = True,
 ) -> UpgradeResult:
     """
     Upgrade a single tool to a newer version.
@@ -594,6 +595,7 @@ def upgrade_tool(
         skip_backup: Don't create backup (faster but no rollback)
         dry_run: Show what would be upgraded without executing
         verbose: Enable verbose logging
+        interactive: If True, prompt user for missing prerequisites
 
     Returns:
         UpgradeResult with upgrade outcome
@@ -741,6 +743,8 @@ def upgrade_tool(
             env=env,
             dry_run=False,
             verbose=verbose,
+            check_prerequisites=True,
+            interactive=interactive,
         )
 
         if install_result.success:
@@ -859,6 +863,7 @@ def bulk_upgrade(
     skip_backup: bool = False,
     dry_run: bool = False,
     verbose: bool = False,
+    interactive: bool = True,
 ) -> BulkUpgradeResult:
     """
     Upgrade multiple tools in parallel.
@@ -873,6 +878,7 @@ def bulk_upgrade(
         skip_backup: Don't create backups (faster but no rollback)
         dry_run: Show what would be upgraded without executing
         verbose: Enable verbose logging
+        interactive: If True, prompt user for missing prerequisites
 
     Returns:
         BulkUpgradeResult with upgrade outcomes
@@ -931,7 +937,71 @@ def bulk_upgrade(
             rollbacks_executed=0,
         )
 
-    # 4. Execute upgrades in parallel
+    # 4. Pre-flight prerequisite check (before parallel execution)
+    if interactive and not dry_run:
+        from .catalog import ToolCatalog
+        from .prerequisites import (
+            resolve_prerequisites,
+            check_prerequisites,
+            prompt_install_all_prerequisites,
+        )
+
+        catalog = ToolCatalog()
+
+        # Collect all prerequisites for all tools
+        all_prereqs: list[str] = []
+        for candidate in allowed:
+            prereqs = resolve_prerequisites(candidate.tool_name, catalog, verbose)
+            for p in prereqs:
+                if p not in all_prereqs:
+                    all_prereqs.append(p)
+
+        if all_prereqs:
+            installed, missing = check_prerequisites(all_prereqs, verbose)
+
+            if missing:
+                vlog(f"Missing prerequisites for bulk upgrade: {missing}", verbose)
+
+                if not prompt_install_all_prerequisites(missing, "selected tools"):
+                    # User declined - can't proceed
+                    return BulkUpgradeResult(
+                        tools_attempted=tuple(c.tool_name for c in allowed),
+                        upgrades=(),
+                        skipped=tuple(c.tool_name for c in allowed),
+                        failures=(),
+                        duration_seconds=time.time() - start_time,
+                        breaking_changes_count=len([c for c in candidates if c.breaking_change]),
+                        rollbacks_executed=0,
+                    )
+
+                # Install missing prerequisites sequentially
+                for prereq in missing:
+                    vlog(f"Installing prerequisite: {prereq}", verbose)
+                    prereq_result = install_tool(
+                        tool_name=prereq,
+                        package_name=prereq,
+                        target_version="latest",
+                        config=config,
+                        env=env,
+                        dry_run=False,
+                        verbose=verbose,
+                        check_prerequisites=False,  # Already resolved
+                        interactive=False,
+                    )
+                    if not prereq_result.success:
+                        vlog(f"Failed to install prerequisite {prereq}: {prereq_result.error_message}", verbose)
+                        return BulkUpgradeResult(
+                            tools_attempted=tuple(c.tool_name for c in allowed),
+                            upgrades=(),
+                            skipped=tuple(c.tool_name for c in allowed),
+                            failures=(),
+                            duration_seconds=time.time() - start_time,
+                            breaking_changes_count=len([c for c in candidates if c.breaking_change]),
+                            rollbacks_executed=0,
+                        )
+                    vlog(f"Prerequisite {prereq} installed successfully", verbose)
+
+    # 5. Execute upgrades in parallel
     upgrades: list[UpgradeResult] = []
     failures: list[UpgradeResult] = []
 
@@ -947,14 +1017,15 @@ def bulk_upgrade(
         future_to_candidate = {
             executor.submit(
                 upgrade_tool,
-                candidate.tool_name,
-                candidate.available_version,
-                config,
-                env,
-                force,
-                skip_backup,
-                False,  # not dry_run
-                verbose,
+                tool_name=candidate.tool_name,
+                target_version=candidate.available_version,
+                config=config,
+                env=env,
+                force=force,
+                skip_backup=skip_backup,
+                dry_run=False,
+                verbose=verbose,
+                interactive=False,  # Prerequisites already handled
             ): candidate
             for candidate in allowed
         }
