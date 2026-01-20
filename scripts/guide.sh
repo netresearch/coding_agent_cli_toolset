@@ -191,7 +191,8 @@ process_tool() {
   fi
 
   # Check if auto_update is enabled - install without prompting
-  if [ "$auto_update" = "true" ]; then
+  # BUT: multi-version tools always prompt (more significant operation)
+  if [ "$auto_update" = "true" ] && [ -z "$is_multi_version" ]; then
     printf "\n==> %s %s [auto-update]\n" "$icon" "$display"
     printf "    installed: %s via %s\n" "${installed:-<none>}" "${method:-unknown}"
     printf "    target:    %s\n" "$(osc8 "$url" "${latest:-<unknown>}")"
