@@ -6,6 +6,7 @@
   "homepage": "https://symfony.com/download",
   "github_repo": "symfony-cli/symfony-cli",
   "binary_name": "symfony",
+  "version_command": "symfony -V 2>/dev/null | head -1",
   "download_url_template": "https://github.com/symfony-cli/symfony-cli/releases/download/{version}/symfony-cli_linux_{arch}.tar.gz",
   "arch_map": {
     "x86_64": "amd64",
