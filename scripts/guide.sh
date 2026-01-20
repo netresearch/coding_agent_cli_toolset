@@ -460,10 +460,58 @@ category_matches_filter() {
   return 1
 }
 
+# Helper: sort tools with runtime first, then multi-version, then others
+# Priority: base runtime (0) < multi-version (1-99 by version desc) < other tools (100)
+sort_tools_runtime_first() {
+  local tools="$1"
+  local category="$2"
+
+  # Runtimes that should appear first in their category
+  local runtimes="python node php go ruby rust"
+
+  for tool in $tools; do
+    local priority=100
+    local sort_key=""
+
+    # Check if tool is a base runtime
+    for rt in $runtimes; do
+      if [ "$tool" = "$rt" ]; then
+        priority=0
+        sort_key="000"
+        break
+      fi
+    done
+
+    # Check if tool is a multi-version runtime (e.g., python@3.14)
+    if [ "$priority" = "100" ] && [[ "$tool" == *"@"* ]]; then
+      local base="${tool%%@*}"
+      local version="${tool##*@}"
+      for rt in $runtimes; do
+        if [ "$base" = "$rt" ]; then
+          # Sort by version descending (higher versions first)
+          # Convert version to sortable number (3.14 -> 986, 3.13 -> 987)
+          local major="${version%%.*}"
+          local minor="${version#*.}"
+          minor="${minor%%.*}"
+          # Invert so higher versions sort first
+          priority=1
+          sort_key=$(printf "%03d" $((999 - major * 10 - minor)))
+          break
+        fi
+      done
+    fi
+
+    echo "$sort_key $tool"
+  done | sort | awk '{print $2}'
+}
+
 # Process tools grouped by category (in category order)
 for category in $(printf '%s\n' "${!CATEGORY_TOOLS[@]}" | while read c; do echo "${CATEGORY_ORDER[$c]:-99} $c"; done | sort -n | awk '{print $2}'); do
   tools="${CATEGORY_TOOLS[$category]}"
   [ -z "$tools" ] && continue
+
+  # Sort tools: runtime first, then multi-version (desc), then others
+  tools="$(sort_tools_runtime_first "$tools" "$category")"
 
   # Skip if category doesn't match filter
   if ! category_matches_filter "$category"; then

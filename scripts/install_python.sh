@@ -21,6 +21,45 @@ get_uv_python_version() {
   fi
 }
 
+# Get version of a specific Python (e.g., python3.13)
+get_specific_python_version() {
+  local major_minor="$1"  # e.g., "3.13" or "3.13.11"
+  local short_ver="${major_minor%.*}"  # e.g., "3.13" from "3.13.11"
+
+  # If it's a full version like "3.13.11", extract major.minor
+  if [[ "$short_ver" == *.* ]]; then
+    : # Already major.minor
+  else
+    short_ver="$major_minor"
+  fi
+
+  local binary="python${short_ver}"
+
+  # Try to find and run the specific binary
+  if command -v "$binary" >/dev/null 2>&1; then
+    "$binary" --version 2>&1 | sed 's/Python //' || true
+  else
+    # Try via uv python list
+    if command -v uv >/dev/null 2>&1; then
+      uv python list --only-installed 2>/dev/null | grep -E "^cpython-${short_ver}" | head -1 | sed 's/cpython-\([0-9.]*\).*/\1/' || true
+    fi
+  fi
+}
+
+# Get the binary path for a specific Python version
+get_specific_python_path() {
+  local major_minor="$1"
+  local short_ver="${major_minor%.*}"
+  if [[ "$short_ver" == *.* ]]; then
+    : # Already major.minor
+  else
+    short_ver="$major_minor"
+  fi
+
+  local binary="python${short_ver}"
+  command -v "$binary" 2>/dev/null || true
+}
+
 # Install or upgrade Python via uv
 uv_install_python() {
   local PY_SPEC="${UV_PYTHON_SPEC:-3}"
@@ -95,15 +134,29 @@ install_or_update_py_cli() {
 
 install_py_stack() {
   local before after path
-  before="$(get_uv_python_version)"
+  local PY_SPEC="${UV_PYTHON_SPEC:-}"
+
+  # Use specific version detection if a version is specified
+  if [ -n "$PY_SPEC" ] && [[ "$PY_SPEC" == *.* ]]; then
+    before="$(get_specific_python_version "$PY_SPEC")"
+  else
+    before="$(get_uv_python_version)"
+  fi
 
   ensure_uv || true
   uv_install_python || true
   uv_setup_default_venv || true
   install_or_update_py_cli install
 
-  after="$(get_uv_python_version)"
-  path="$(command -v python3 2>/dev/null || true)"
+  # Use specific version detection for after check
+  if [ -n "$PY_SPEC" ] && [[ "$PY_SPEC" == *.* ]]; then
+    after="$(get_specific_python_version "$PY_SPEC")"
+    path="$(get_specific_python_path "$PY_SPEC")"
+  else
+    after="$(get_uv_python_version)"
+    path="$(command -v python3 2>/dev/null || true)"
+  fi
+
   printf "[%s] before: %s\n" "python" "${before:-<none>}"
   printf "[%s] after:  %s\n" "python" "${after:-<none>}"
   if [ -n "$path" ]; then printf "[%s] path:   %s\n" "python" "$path"; fi
@@ -113,15 +166,29 @@ install_py_stack() {
 
 update_py_stack() {
   local before after path
-  before="$(get_uv_python_version)"
+  local PY_SPEC="${UV_PYTHON_SPEC:-}"
+
+  # Use specific version detection if a version is specified
+  if [ -n "$PY_SPEC" ] && [[ "$PY_SPEC" == *.* ]]; then
+    before="$(get_specific_python_version "$PY_SPEC")"
+  else
+    before="$(get_uv_python_version)"
+  fi
 
   ensure_uv || true
   uv_install_python || true
   uv_setup_default_venv || true
   install_or_update_py_cli upgrade
 
-  after="$(get_uv_python_version)"
-  path="$(command -v python3 2>/dev/null || true)"
+  # Use specific version detection for after check
+  if [ -n "$PY_SPEC" ] && [[ "$PY_SPEC" == *.* ]]; then
+    after="$(get_specific_python_version "$PY_SPEC")"
+    path="$(get_specific_python_path "$PY_SPEC")"
+  else
+    after="$(get_uv_python_version)"
+    path="$(command -v python3 2>/dev/null || true)"
+  fi
+
   printf "[%s] before: %s\n" "python" "${before:-<none>}"
   printf "[%s] after:  %s\n" "python" "${after:-<none>}"
   if [ -n "$path" ]; then printf "[%s] path:   %s\n" "python" "$path"; fi
