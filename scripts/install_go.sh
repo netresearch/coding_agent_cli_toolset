@@ -4,9 +4,49 @@ set -euo pipefail
 have() { command -v "$1" >/dev/null 2>&1; }
 
 TOOL="go"
-before="$(have go && go version || true)"
 
-if have brew; then
+# Support version-specific installation via GO_VERSION env var
+# e.g., GO_VERSION=1.24 installs go1.24 alongside existing go
+TARGET_CYCLE="${GO_VERSION:-}"
+
+# Determine binary name and version check
+if [ -n "$TARGET_CYCLE" ]; then
+  BINARY="go${TARGET_CYCLE}"
+  DISPLAY_NAME="go@${TARGET_CYCLE}"
+else
+  BINARY="go"
+  DISPLAY_NAME="go"
+fi
+
+# Get current version of the specific binary
+get_go_version() {
+  local bin="$1"
+  if have "$bin"; then
+    "$bin" version 2>/dev/null | head -1 || true
+  fi
+}
+
+before="$(get_go_version "$BINARY")"
+
+# Version-specific Go installation (e.g., go1.24 alongside go1.25)
+if [ -n "$TARGET_CYCLE" ]; then
+  if ! have go; then
+    echo "Error: Base Go installation required for multi-version support" >&2
+    echo "Install base Go first, then specific versions" >&2
+    exit 1
+  fi
+
+  echo "Installing go${TARGET_CYCLE} via go install golang.org/dl/go${TARGET_CYCLE}@latest..."
+  go install "golang.org/dl/go${TARGET_CYCLE}@latest" || true
+
+  # The go1.XX command needs to download its SDK on first run
+  if have "go${TARGET_CYCLE}"; then
+    echo "Downloading Go ${TARGET_CYCLE} SDK..."
+    "go${TARGET_CYCLE}" download || true
+  fi
+
+# Standard single-version Go installation
+elif have brew; then
   # Use homebrew for installation/upgrade
   if have go; then brew upgrade go || brew install go || true; else brew install go || true; fi
 else
@@ -64,10 +104,10 @@ else
   rm -rf "$TMP" 2>/dev/null || true
 fi
 
-after="$(have go && go version || true)"
-path="$(command -v go 2>/dev/null || true)"
-printf "[%s] before: %s\n" "$TOOL" "${before:-<none>}"
-printf "[%s] after:  %s\n"  "$TOOL" "${after:-<none>}"
-if [ -n "$path" ]; then printf "[%s] path:   %s\n" "$TOOL" "$path"; fi
+after="$(get_go_version "$BINARY")"
+path="$(command -v "$BINARY" 2>/dev/null || true)"
+printf "[%s] before: %s\n" "$DISPLAY_NAME" "${before:-<none>}"
+printf "[%s] after:  %s\n"  "$DISPLAY_NAME" "${after:-<none>}"
+if [ -n "$path" ]; then printf "[%s] path:   %s\n" "$DISPLAY_NAME" "$path"; fi
 
 

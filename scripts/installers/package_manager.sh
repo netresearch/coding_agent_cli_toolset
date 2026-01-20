@@ -27,14 +27,26 @@ NOTES="$(jq -r '.notes // empty' "$CATALOG_FILE")"
 VERSION_CMD="$(jq -r '.version_command // empty' "$CATALOG_FILE")"
 PPA="$(jq -r '.ppa // empty' "$CATALOG_FILE")"
 
-# Get current version
-if [ -n "$VERSION_CMD" ]; then
-  # Use custom version command if specified
-  before="$(eval "$VERSION_CMD" 2>/dev/null || true)"
-else
-  # Default version detection
-  before="$(command -v "$BINARY_NAME" >/dev/null 2>&1 && timeout 2 "$BINARY_NAME" --version </dev/null 2>/dev/null | head -1 || true)"
+# Handle version-specific binary names (e.g., php8.3, go1.24)
+VERSIONED_BINARY="$BINARY_NAME"
+if [ -n "${PHP_VERSION:-}" ] && [ "$TOOL" = "php" ]; then
+  VERSIONED_BINARY="php${PHP_VERSION}"
 fi
+if [ -n "${GO_VERSION:-}" ] && [ "$TOOL" = "go" ]; then
+  VERSIONED_BINARY="go${GO_VERSION}"
+fi
+
+# Get current version (use versioned binary if specified)
+get_version() {
+  local bin="$1"
+  if [ -n "$VERSION_CMD" ]; then
+    eval "$VERSION_CMD" 2>/dev/null || true
+  elif command -v "$bin" >/dev/null 2>&1; then
+    timeout 2 "$bin" --version </dev/null 2>&1 | head -1 || true
+  fi
+}
+
+before="$(get_version "$VERSIONED_BINARY")"
 
 # Check if tool is already available (e.g., comes with runtime)
 if command -v "$BINARY_NAME" >/dev/null 2>&1; then
@@ -74,7 +86,16 @@ if ! $installed && have apt-get; then
         sudo add-apt-repository -y "ppa:$PPA" || true
       fi
     fi
-    sudo apt-get update && sudo apt-get install -y "$pkg" || true
+
+    # Handle version-specific packages (e.g., PHP_VERSION=8.3 -> php8.3-cli)
+    if [ -n "${PHP_VERSION:-}" ] && [ "$TOOL" = "php" ]; then
+      # Replace generic php packages with version-specific ones
+      # e.g., "php php-cli php-mbstring" -> "php8.3 php8.3-cli php8.3-mbstring"
+      pkg="$(echo "$pkg" | sed "s/php-/php${PHP_VERSION}-/g; s/^php /php${PHP_VERSION} /; s/ php / php${PHP_VERSION} /g")"
+      echo "[$TOOL] Installing PHP ${PHP_VERSION}: $pkg" >&2
+    fi
+
+    sudo apt-get update && sudo apt-get install -y $pkg || true
     installed=true
   fi
 fi
@@ -100,18 +121,22 @@ if ! $installed; then
   exit 1
 fi
 
-# Report
-if [ -n "$VERSION_CMD" ]; then
-  # Use custom version command if specified
-  after="$(eval "$VERSION_CMD" 2>/dev/null || true)"
-else
-  # Default version detection
-  after="$(command -v "$BINARY_NAME" >/dev/null 2>&1 && timeout 2 "$BINARY_NAME" --version </dev/null 2>/dev/null | head -1 || true)"
+# Report (use versioned binary for version-specific installs)
+after="$(get_version "$VERSIONED_BINARY")"
+path="$(command -v "$VERSIONED_BINARY" 2>/dev/null || true)"
+
+# Display with version suffix if applicable
+DISPLAY_NAME="$TOOL"
+if [ -n "${PHP_VERSION:-}" ] && [ "$TOOL" = "php" ]; then
+  DISPLAY_NAME="php@${PHP_VERSION}"
 fi
-path="$(command -v "$BINARY_NAME" 2>/dev/null || true)"
-printf "[%s] before: %s\n" "$TOOL" "${before:-<none>}"
-printf "[%s] after:  %s\n" "$TOOL" "${after:-<none>}"
-if [ -n "$path" ]; then printf "[%s] path:   %s\n" "$TOOL" "$path"; fi
+if [ -n "${GO_VERSION:-}" ] && [ "$TOOL" = "go" ]; then
+  DISPLAY_NAME="go@${GO_VERSION}"
+fi
+
+printf "[%s] before: %s\n" "$DISPLAY_NAME" "${before:-<none>}"
+printf "[%s] after:  %s\n" "$DISPLAY_NAME" "${after:-<none>}"
+if [ -n "$path" ]; then printf "[%s] path:   %s\n" "$DISPLAY_NAME" "$path"; fi
 
 # Refresh snapshot after successful installation
 # Need to source install_strategy.sh for refresh_snapshot function
