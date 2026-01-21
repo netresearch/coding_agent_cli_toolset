@@ -544,20 +544,18 @@ sort_tools_runtime_first() {
   local runtimes="python node php go ruby rust"
 
   for tool in $tools; do
-    local priority=100
-    local sort_key=""
+    local sort_key="999"  # Default: other tools sort last
 
     # Check if tool is a base runtime
     for rt in $runtimes; do
       if [ "$tool" = "$rt" ]; then
-        priority=0
         sort_key="000"
         break
       fi
     done
 
     # Check if tool is a multi-version runtime (e.g., python@3.14)
-    if [ "$priority" = "100" ] && [[ "$tool" == *"@"* ]]; then
+    if [ "$sort_key" = "999" ] && [[ "$tool" == *"@"* ]]; then
       local base="${tool%%@*}"
       local version="${tool##*@}"
       for rt in $runtimes; do
@@ -568,7 +566,6 @@ sort_tools_runtime_first() {
           local minor="${version#*.}"
           minor="${minor%%.*}"
           # Invert so higher versions sort first
-          priority=1
           sort_key=$(printf "%03d" $((999 - major * 10 - minor)))
           break
         fi
