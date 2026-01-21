@@ -153,15 +153,36 @@ install_direct() {
   chmod +x ~/.local/bin/claude
 
   # Verify it works
-  if ~/.local/bin/claude --version >/dev/null 2>&1; then
-    echo "[claude] Installed to ~/.local/bin/claude" >&2
-    echo "[claude] Make sure ~/.local/bin is in your PATH" >&2
-    return 0
-  else
+  if ! ~/.local/bin/claude --version >/dev/null 2>&1; then
     echo "[claude] Binary verification failed" >&2
     rm -f ~/.local/bin/claude
     return 1
   fi
+
+  echo "[claude] Installed to ~/.local/bin/claude" >&2
+
+  # Check if PATH has ~/.local/bin
+  case ":$PATH:" in
+    *":$HOME/.local/bin:"*) ;;
+    *)
+      echo "[claude] Warning: ~/.local/bin is not in your PATH" >&2
+      echo "[claude] Add to your shell config: export PATH=\"\$HOME/.local/bin:\$PATH\"" >&2
+      ;;
+  esac
+
+  # Clean up any stale nvm versions that might shadow this installation
+  cleanup_npm_versions 2>/dev/null || true
+
+  # Verify we're now finding the native version
+  hash -r 2>/dev/null || true
+  local found_path
+  found_path=$(command -v claude 2>/dev/null || true)
+  if [ "$found_path" != "$HOME/.local/bin/claude" ]; then
+    echo "[claude] Warning: Another claude installation at $found_path may shadow this one" >&2
+    echo "[claude] Ensure ~/.local/bin comes first in PATH" >&2
+  fi
+
+  return 0
 }
 
 # Compare versions (returns 0 if v1 < v2)
@@ -169,29 +190,39 @@ version_lt() {
   [ "$(printf '%s\n%s' "$1" "$2" | sort -V | head -1)" = "$1" ] && [ "$1" != "$2" ]
 }
 
+# Clean up npm/nvm versions without reinstalling
+# Used when native binary exists but stale npm versions remain
+cleanup_npm_versions() {
+  # Remove from current npm (silent)
+  npm uninstall -g @anthropic-ai/claude-code >/dev/null 2>&1 || true
+
+  # Remove from ALL nvm Node versions
+  if [ -d "$HOME/.nvm/versions/node" ]; then
+    for node_dir in "$HOME/.nvm/versions/node"/*/; do
+      [ -d "$node_dir" ] || continue
+      # Always remove bin symlink if it exists (don't check node_modules)
+      if [ -L "$node_dir/bin/claude" ] || [ -f "$node_dir/bin/claude" ]; then
+        rm -f "$node_dir/bin/claude" 2>/dev/null || true
+      fi
+      # Remove node_modules if present
+      if [ -d "$node_dir/lib/node_modules/@anthropic-ai" ]; then
+        rm -rf "$node_dir/lib/node_modules/@anthropic-ai" 2>/dev/null || true
+      fi
+    done
+  fi
+
+  # Remove pnpm version if present (fully silent)
+  if command -v pnpm >/dev/null 2>&1; then
+    pnpm uninstall -g @anthropic-ai/claude-code >/dev/null 2>&1 || true
+  fi
+}
+
 # Migrate from npm to native installer
 migrate_npm_to_native() {
   echo "[claude] Migrating from npm to native installer..." >&2
   echo "[claude] Removing npm packages..." >&2
 
-  # Remove from current npm
-  npm uninstall -g @anthropic-ai/claude-code 2>/dev/null || true
-
-  # Remove from ALL nvm Node versions (they accumulate)
-  if [ -d "$HOME/.nvm/versions/node" ]; then
-    for node_dir in "$HOME/.nvm/versions/node"/*/; do
-      if [ -d "$node_dir/lib/node_modules/@anthropic-ai" ]; then
-        echo "[claude] Removing from ${node_dir}..." >&2
-        rm -rf "$node_dir/lib/node_modules/@anthropic-ai"
-        rm -f "$node_dir/bin/claude"
-      fi
-    done
-  fi
-
-  # Remove pnpm version if present
-  if command -v pnpm >/dev/null 2>&1; then
-    pnpm uninstall -g @anthropic-ai/claude-code 2>/dev/null || true
-  fi
+  cleanup_npm_versions
 
   hash -r 2>/dev/null || true
   echo "[claude] Installing native version..." >&2
@@ -211,6 +242,25 @@ upgrade_claude() {
 
   local real_path
   real_path=$(readlink -f "$claude_bin" 2>/dev/null || echo "$claude_bin")
+
+  # Check if native binary already exists (even if not first in PATH)
+  # This prevents unnecessary migration if native install succeeded previously
+  if [ -x "$HOME/.local/bin/claude" ]; then
+    local native_ver
+    native_ver=$("$HOME/.local/bin/claude" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
+    if [ -n "$native_ver" ]; then
+      echo "[claude] Native installation exists at ~/.local/bin/claude (v${native_ver})" >&2
+      # Only clean up stale nvm versions, don't reinstall
+      if echo "$real_path" | grep -qE 'node_modules|\.nvm/'; then
+        echo "[claude] Cleaning up stale npm installation..." >&2
+        cleanup_npm_versions
+        hash -r 2>/dev/null || true
+      fi
+      echo "[claude] Upgrading native installation..." >&2
+      install_native
+      return $?
+    fi
+  fi
 
   # Detect installation method and upgrade accordingly
   # Check for npm install: node_modules in resolved path OR .nvm path (nvm-managed npm)
