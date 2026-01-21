@@ -8,6 +8,9 @@ VERBOSE="${VERBOSE:-0}"
 OFFLINE="${OFFLINE:-0}"
 CLI="${PYTHON:-python3}"
 
+# Ignore pins: IGNORE_PINS=1 to show all tools regardless of pin status
+IGNORE_PINS="${IGNORE_PINS:-0}"
+
 # Category filter: CATEGORY=python,go or --category=python
 CATEGORY_FILTER="${CATEGORY:-}"
 for arg in "$@"; do
@@ -253,6 +256,7 @@ process_tool() {
     printf "      n = Skip (ask again next time)\n"
     printf "      s = Skip version %s (ask again if newer available)\n" "$latest"
     printf "      p = Pin to %s (don't ask for upgrades)\n" "$installed"
+    printf "      r = Remove/uninstall this tool\n"
     if [ -n "$is_multi_version" ]; then
       printf "      P = Skip all %s versions (never install any)\n" "$catalog_tool"
     fi
@@ -271,9 +275,9 @@ process_tool() {
   local prompt_text
   if [ -n "$installed" ]; then
     if [ -n "$is_multi_version" ]; then
-      prompt_text="Upgrade? [Y/a/n/s/p/P] "
+      prompt_text="Upgrade? [Y/a/n/s/p/r/P] "
     else
-      prompt_text="Upgrade? [Y/a/n/s/p] "
+      prompt_text="Upgrade? [Y/a/n/s/p/r] "
     fi
   else
     if [ -n "$is_multi_version" ]; then
@@ -415,6 +419,27 @@ process_tool() {
         "$ROOT"/scripts/pin_version.sh "$tool" "never" || true
       fi
       ;;
+    [r])
+      # Remove/uninstall this tool (only for installed tools)
+      if [ -n "$installed" ]; then
+        printf "    Removing %s...\n" "$tool"
+        "$ROOT"/scripts/install_tool.sh "$catalog_tool" uninstall || true
+
+        # Re-audit to update snapshot
+        CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_MERGE=1 "$CLI" audit.py "$tool" >/dev/null 2>&1 || true
+        AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" audit.py || true)"
+
+        # Check if removal succeeded
+        local still_installed="$(json_field "$tool" installed)"
+        if [ -z "$still_installed" ]; then
+          printf "    ✓ %s has been removed\n" "$tool"
+        else
+          printf "    ⚠️  %s may not have been fully removed (still detected: %s)\n" "$tool" "$still_installed"
+        fi
+      else
+        printf "    Tool is not installed, nothing to remove\n"
+      fi
+      ;;
     [P])
       # Skip ALL versions of this runtime (only for multi-version tools)
       if [ -n "$is_multi_version" ]; then
@@ -479,35 +504,38 @@ while read -r line; do
   # Only process tools with catalog entries (check base tool for multi-version)
   if catalog_has_tool "$catalog_name"; then
     # Check if tool is pinned (use catalog name for pin check)
-    pinned_version="$(catalog_get_property "$catalog_name" pinned_version)"
+    # Skip pin checks if IGNORE_PINS=1
+    if [ "$IGNORE_PINS" != "1" ]; then
+      pinned_version="$(catalog_get_property "$catalog_name" pinned_version)"
 
-    # For multi-version tools, check pinned_versions object AND base tool pin
-    if [ -n "$is_multi_version" ]; then
-      # First check if the BASE tool (e.g., php) is pinned to "never" - skip ALL versions
-      if [ "$pinned_version" = "never" ]; then
-        continue
-      fi
-      # Then check version-specific pin
-      version_cycle="${tool_name##*@}"
-      multi_pin="$(catalog_get_pinned_version "$catalog_name" "$version_cycle")"
-      if [ "$multi_pin" = "never" ]; then
-        continue
-      fi
-      # Skip if this specific version cycle is pinned to a version
-      if [ -n "$multi_pin" ]; then
-        continue
-      fi
-    else
-      # Skip if pinned to "never" (permanently skip installation)
-      if [ "$pinned_version" = "never" ]; then
-        continue
-      fi
+      # For multi-version tools, check pinned_versions object AND base tool pin
+      if [ -n "$is_multi_version" ]; then
+        # First check if the BASE tool (e.g., php) is pinned to "never" - skip ALL versions
+        if [ "$pinned_version" = "never" ]; then
+          continue
+        fi
+        # Then check version-specific pin
+        version_cycle="${tool_name##*@}"
+        multi_pin="$(catalog_get_pinned_version "$catalog_name" "$version_cycle")"
+        if [ "$multi_pin" = "never" ]; then
+          continue
+        fi
+        # Skip if this specific version cycle is pinned to a version
+        if [ -n "$multi_pin" ]; then
+          continue
+        fi
+      else
+        # Skip if pinned to "never" (permanently skip installation)
+        if [ "$pinned_version" = "never" ]; then
+          continue
+        fi
 
-      # Skip if pinned to any specific version (don't prompt for upgrades)
-      if [ -n "$pinned_version" ]; then
-        continue
+        # Skip if pinned to any specific version (don't prompt for upgrades)
+        if [ -n "$pinned_version" ]; then
+          continue
+        fi
       fi
-    fi
+    fi  # end IGNORE_PINS check
 
     # Skip installed tools with upstream_method="skip" (package-manager-only tools)
     # These can't be tracked for upgrades, but we still show them if not installed

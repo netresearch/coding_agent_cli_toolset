@@ -3,6 +3,33 @@
 # ============================================================================
 ## USER
 
+# ----------------------------------------------------------------------------
+# MOST COMMONLY USED (keep at top for help output)
+# ----------------------------------------------------------------------------
+
+update: ## Collect fresh version data with network calls and update snapshot (~10s)
+	@echo "→ Collecting fresh version data from upstream sources..." >&2
+	@bash -c 'set -o pipefail; CLI_AUDIT_COLLECT=1 CLI_AUDIT_TIMINGS=1 $(PYTHON) audit.py --update' || true
+	@echo "✓ Snapshot updated. Next steps:" >&2
+	@echo "  • make audit              - View tool status" >&2
+	@echo "  • make upgrade            - Interactive upgrade guide" >&2
+	@echo "  • make cleanup            - Remove unwanted tools" >&2
+	@echo "" >&2
+	@echo "→ Running system health checks..." >&2
+	@$(MAKE) check-path 2>/dev/null || true
+	@$(MAKE) check-python-managers 2>/dev/null || true
+	@$(MAKE) check-node-managers 2>/dev/null || true
+
+upgrade: scripts-perms ## Run interactive upgrade guide (uses snapshot, no network calls)
+	@bash scripts/guide.sh
+
+cleanup: scripts-perms ## Interactive removal of installed tools
+	@bash scripts/cleanup.sh
+
+# ----------------------------------------------------------------------------
+# AUDIT COMMANDS
+# ----------------------------------------------------------------------------
+
 audit: ## Render audit from snapshot (no network, <100ms)
 	@bash -c ' \
 		SNAP_FILE=$${CLI_AUDIT_SNAPSHOT_FILE:-tools_snapshot.json}; \
@@ -49,19 +76,54 @@ audit-auto: ## Update snapshot if missing, then render
 	CLI_AUDIT_RENDER=1 CLI_AUDIT_GROUP=0 CLI_AUDIT_HINTS=1 CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 $(PYTHON) audit.py | \
 	$(PYTHON) smart_column.py -s "|" -t --right 3,5 --header || true
 
-update: ## Collect fresh version data with network calls and update snapshot (~10s)
-	@echo "→ Collecting fresh version data from upstream sources..." >&2
-	@bash -c 'set -o pipefail; CLI_AUDIT_COLLECT=1 CLI_AUDIT_TIMINGS=1 $(PYTHON) audit.py --update' || true
-	@echo "✓ Snapshot updated. Next steps:" >&2
-	@echo "  • make audit              - View tool status" >&2
-	@echo "  • make upgrade            - Interactive upgrade guide" >&2
-	@echo "  • make upgrade-dry-run    - Preview package manager upgrades" >&2
-	@echo "  • make upgrade-managed    - Upgrade all package managers" >&2
-	@echo "" >&2
-	@echo "→ Running system health checks..." >&2
-	@$(MAKE) check-path 2>/dev/null || true
-	@$(MAKE) check-python-managers 2>/dev/null || true
-	@$(MAKE) check-node-managers 2>/dev/null || true
+# ----------------------------------------------------------------------------
+# UPGRADE VARIANTS
+# ----------------------------------------------------------------------------
+
+upgrade-ignore-pins: scripts-perms ## Run upgrade guide ignoring all pins (show all tools)
+	@IGNORE_PINS=1 bash scripts/guide.sh
+
+reset-pins: scripts-perms ## Remove all version pins from all tools
+	@bash scripts/reset_pins.sh
+
+guide: upgrade ## Alias for upgrade (deprecated)
+
+upgrade-%: scripts-perms ## Upgrade tool (e.g., make upgrade-python)
+	./scripts/install_$*.sh update
+
+upgrade-managed: scripts-perms ## Upgrade all package managers and their packages
+	SCOPE=all ./scripts/auto_update.sh update
+
+upgrade-dry-run: scripts-perms ## Preview what would be upgraded without making changes
+	SCOPE=all ./scripts/auto_update.sh --dry-run update
+
+upgrade-managed-system-only: scripts-perms ## Upgrade only system package managers (apt, brew, snap, flatpak)
+	@bash -c './scripts/auto_update.sh apt && ./scripts/auto_update.sh brew && ./scripts/auto_update.sh snap && ./scripts/auto_update.sh flatpak' || true
+
+upgrade-managed-skip-system: scripts-perms ## Upgrade all package managers except system ones
+	./scripts/auto_update.sh --skip-system update
+
+upgrade-managed-system: scripts-perms ## Upgrade only system-scoped packages (requires sudo)
+	SCOPE=system ./scripts/auto_update.sh update
+
+upgrade-managed-user: scripts-perms ## Upgrade only user-scoped packages (no sudo)
+	SCOPE=user ./scripts/auto_update.sh update
+
+upgrade-project-deps: scripts-perms ## Upgrade project dependencies (with confirmation)
+	SCOPE=project ./scripts/auto_update.sh update
+
+upgrade-managed-all: scripts-perms ## Upgrade system + user scopes (skip project)
+	SCOPE=all ./scripts/auto_update.sh update
+
+upgrade-all: scripts-perms ## Complete system upgrade: update data → upgrade managers → upgrade tools
+	@bash scripts/upgrade_all.sh
+
+upgrade-all-dry-run: scripts-perms ## Preview complete system upgrade without making changes
+	@DRY_RUN=1 bash scripts/upgrade_all.sh
+
+# ----------------------------------------------------------------------------
+# UPDATE VARIANTS
+# ----------------------------------------------------------------------------
 
 update-local: ## Update only local installation state (fast, no network)
 	@echo "→ Detecting local tool installations..." >&2
@@ -78,10 +140,9 @@ update-baseline: ## Update upstream version baseline (for commit)
 update-debug: ## Collect with verbose debug output (shows network calls)
 	@bash -c 'set -o pipefail; CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 CLI_AUDIT_TIMINGS=1 $(PYTHON) audit.py --update --verbose' || true
 
-upgrade: scripts-perms ## Run interactive upgrade guide (uses snapshot, no network calls)
-	@bash scripts/guide.sh
-
-guide: upgrade ## Alias for upgrade (deprecated)
+# ----------------------------------------------------------------------------
+# INSTALL COMMANDS
+# ----------------------------------------------------------------------------
 
 install-core: scripts-perms ## Install core tools (fd, fzf, ripgrep, jq, yq, bat, delta, just)
 	./scripts/install_core.sh
@@ -116,8 +177,9 @@ install-brew: scripts-perms ## Install Homebrew (macOS/Linux)
 install-rust: scripts-perms ## Install Rust via rustup
 	./scripts/install_rust.sh
 
-upgrade-%: scripts-perms ## Upgrade tool (e.g., make upgrade-python)
-	./scripts/install_$*.sh update
+# ----------------------------------------------------------------------------
+# UNINSTALL / RECONCILE
+# ----------------------------------------------------------------------------
 
 uninstall-%: scripts-perms ## Uninstall tool (e.g., make uninstall-python)
 	./scripts/install_$*.sh uninstall
@@ -131,32 +193,12 @@ reconcile-pipx-to-uv: scripts-perms ## Migrate pipx tools to UV
 reconcile-%: scripts-perms ## Reconcile tool installation (e.g., make reconcile-node)
 	./scripts/install_$*.sh reconcile
 
+# ----------------------------------------------------------------------------
+# SYSTEM MANAGEMENT
+# ----------------------------------------------------------------------------
+
 detect-managers: scripts-perms ## Detect all installed package managers
 	./scripts/auto_update.sh detect
-
-upgrade-managed: scripts-perms ## Upgrade all package managers and their packages
-	SCOPE=all ./scripts/auto_update.sh update
-
-upgrade-dry-run: scripts-perms ## Preview what would be upgraded without making changes
-	SCOPE=all ./scripts/auto_update.sh --dry-run update
-
-upgrade-managed-system-only: scripts-perms ## Upgrade only system package managers (apt, brew, snap, flatpak)
-	@bash -c './scripts/auto_update.sh apt && ./scripts/auto_update.sh brew && ./scripts/auto_update.sh snap && ./scripts/auto_update.sh flatpak' || true
-
-upgrade-managed-skip-system: scripts-perms ## Upgrade all package managers except system ones
-	./scripts/auto_update.sh --skip-system update
-
-upgrade-managed-system: scripts-perms ## Upgrade only system-scoped packages (requires sudo)
-	SCOPE=system ./scripts/auto_update.sh update
-
-upgrade-managed-user: scripts-perms ## Upgrade only user-scoped packages (no sudo)
-	SCOPE=user ./scripts/auto_update.sh update
-
-upgrade-project-deps: scripts-perms ## Upgrade project dependencies (with confirmation)
-	SCOPE=project ./scripts/auto_update.sh update
-
-upgrade-managed-all: scripts-perms ## Upgrade system + user scopes (skip project)
-	SCOPE=all ./scripts/auto_update.sh update
 
 bootstrap: scripts-perms ## Initialize system (install Python if needed, setup environment)
 	@echo "→ Bootstrapping ai_cli_preparation..." >&2
@@ -172,12 +214,6 @@ bootstrap: scripts-perms ## Initialize system (install Python if needed, setup e
 		echo "✓ Bootstrap complete. Run '\''make audit'\'' to see installed tools." >&2'
 
 init: bootstrap ## Alias for bootstrap
-
-upgrade-all: scripts-perms ## Complete system upgrade: update data → upgrade managers → upgrade tools
-	@bash scripts/upgrade_all.sh
-
-upgrade-all-dry-run: scripts-perms ## Preview complete system upgrade without making changes
-	@DRY_RUN=1 bash scripts/upgrade_all.sh
 
 check-path: scripts-perms ## Check PATH configuration for package managers
 	@bash -c "source scripts/lib/path_check.sh && check_all_paths"
