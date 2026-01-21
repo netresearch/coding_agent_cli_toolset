@@ -177,8 +177,28 @@ process_tool() {
   local auto_update="$(config_get_auto_update "$catalog_tool")"
 
   # Check if migration needed (deprecated install method)
+  # But skip migration if native binary already exists and works
   local needs_migration=""
   if [ "$tool" = "claude" ] && { [ "$method" = "nvm" ] || [ "$method" = "npm" ]; }; then
+    # Check if native binary exists and works
+    if [ -x "$HOME/.local/bin/claude" ]; then
+      local native_ver
+      native_ver=$("$HOME/.local/bin/claude" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
+      if [ -n "$native_ver" ]; then
+        # Native exists - just clean up stale nvm, don't trigger full migration
+        printf "\n==> %s %s\n" "✅" "$display"
+        printf "    installed: %s (native at ~/.local/bin/claude)\n" "$native_ver"
+        printf "    Cleaning up stale npm/nvm installation...\n"
+        # Source cleanup function and run it
+        if [ -f "$ROOT/scripts/install_claude.sh" ]; then
+          (
+            source "$ROOT/scripts/install_claude.sh" 2>/dev/null
+            cleanup_npm_versions 2>/dev/null
+          ) || true
+        fi
+        return 0
+      fi
+    fi
     needs_migration="true"
   fi
 

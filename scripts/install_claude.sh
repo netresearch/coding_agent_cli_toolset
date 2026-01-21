@@ -340,10 +340,14 @@ uninstall_claude() {
   fi
 }
 
-case "$ACTION" in
-  install) install_claude ;;
-  update|upgrade) upgrade_claude ;;
-  uninstall) uninstall_claude ;;
-  reconcile) install_claude ;;
-  *) echo "Usage: $0 {install|update|upgrade|uninstall|reconcile}" ; exit 2 ;;
-esac
+# Only run main logic when executed directly, not when sourced
+# This allows other scripts to source this file for cleanup_npm_versions
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  case "$ACTION" in
+    install) install_claude ;;
+    update|upgrade) upgrade_claude ;;
+    uninstall) uninstall_claude ;;
+    reconcile) install_claude ;;
+    *) echo "Usage: $0 {install|update|upgrade|uninstall|reconcile}" ; exit 2 ;;
+  esac
+fi
