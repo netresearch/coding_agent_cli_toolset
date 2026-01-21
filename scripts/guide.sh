@@ -29,6 +29,9 @@ done
 # Load config query functions (for user preferences like auto_update)
 . "$DIR/lib/config.sh"
 
+# Load capability detection (for multi-installation detection)
+. "$DIR/lib/capability.sh"
+
 ensure_perms() {
   chmod +x "$ROOT"/scripts/*.sh 2>/dev/null || true
   chmod +x "$ROOT"/scripts/lib/*.sh 2>/dev/null || true
@@ -245,6 +248,22 @@ process_tool() {
   [ -n "$description" ] && printf "    %s\n" "$description"
   [ -n "$homepage" ] && printf "    Homepage: %s\n" "$(osc8 "$homepage" "$homepage")"
   printf "    installed: %s via %s\n" "${installed:-<none>}" "${method:-unknown}"
+
+  # Check for multiple installations and warn
+  local binary_name
+  binary_name="$(catalog_get_property "$catalog_tool" binary_name)"
+  binary_name="${binary_name:-$catalog_tool}"
+  local all_installs
+  all_installs="$(detect_all_installations "$catalog_tool" "$binary_name" 2>/dev/null || true)"
+  local install_count
+  install_count="$(echo "$all_installs" | grep -c . || echo 0)"
+  if [ "$install_count" -gt 1 ]; then
+    printf "    ⚠️  Multiple installations detected (%d):\n" "$install_count"
+    echo "$all_installs" | while IFS=: read -r inst_method inst_path; do
+      printf "       • %s: %s\n" "$inst_method" "$inst_path"
+    done
+  fi
+
   printf "    target:    %s\n" "$(osc8 "$url" "${latest:-<unknown>}")"
 
   # Build install command from catalog metadata (use catalog_tool for script name)

@@ -40,15 +40,47 @@ if [ -z "$INSTALL_METHOD" ] || [ "$INSTALL_METHOD" = "null" ]; then
   exit 1
 fi
 
-# Handle uninstall universally - detect actual install method, not catalog method
+# Handle uninstall universally - remove ALL installations found
 if [ "$ACTION" = "uninstall" ]; then
   binary_name="$(jq -r '.binary_name // ""' "$CATALOG_FILE" 2>/dev/null || echo "$TOOL")"
-  current_method="$(detect_install_method "$TOOL" "$binary_name")"
-  if [ "$current_method" != "none" ]; then
-    remove_installation "$TOOL" "$current_method" "$binary_name"
-    echo "[$TOOL] Uninstalled (was via $current_method)"
-  else
+  binary_name="${binary_name:-$TOOL}"
+
+  # Detect all installations
+  all_installs="$(detect_all_installations "$TOOL" "$binary_name" 2>/dev/null || true)"
+  install_count="$(echo "$all_installs" | grep -c . || echo 0)"
+
+  if [ "$install_count" -eq 0 ]; then
     echo "[$TOOL] Not installed"
+    exit 0
+  fi
+
+  if [ "$install_count" -gt 1 ]; then
+    echo "[$TOOL] Found $install_count installations:"
+    echo "$all_installs" | while IFS=: read -r method path; do
+      echo "  • $method: $path"
+    done
+    echo "[$TOOL] Removing all installations..."
+  fi
+
+  # Remove each installation
+  removed_count=0
+  echo "$all_installs" | while IFS=: read -r method path; do
+    [ -z "$method" ] && continue
+    # Extract base method (remove version info like "npm(v25.3.0)")
+    base_method="${method%%(*}"
+    remove_installation "$TOOL" "$base_method" "$binary_name"
+  done
+
+  # Verify removal
+  remaining="$(detect_all_installations "$TOOL" "$binary_name" 2>/dev/null || true)"
+  remaining_count="$(echo "$remaining" | grep -c . || echo 0)"
+  if [ "$remaining_count" -eq 0 ]; then
+    echo "[$TOOL] Successfully removed all installations"
+  else
+    echo "[$TOOL] Warning: $remaining_count installation(s) could not be removed:"
+    echo "$remaining" | while IFS=: read -r method path; do
+      echo "  • $method: $path"
+    done
   fi
   exit 0
 fi

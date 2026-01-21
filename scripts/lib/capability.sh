@@ -90,6 +90,116 @@ detect_install_method() {
   esac
 }
 
+# Detect ALL installations of a tool across known locations
+# Args: tool_name, binary_name
+# Returns: newline-separated list of "method:path" pairs
+# Example output:
+#   cargo:/home/user/.cargo/bin/xsv
+#   github_release_binary:/home/user/.local/bin/xsv
+detect_all_installations() {
+  local tool="$1"
+  local binary="${2:-$tool}"
+  local found=()
+
+  # Define all known binary locations to check
+  local locations=(
+    "$HOME/.local/bin/$binary:github_release_binary"
+    "$HOME/.cargo/bin/$binary:cargo"
+    "$HOME/go/bin/$binary:go"
+    "${GOPATH:-$HOME/go}/bin/$binary:go"
+    "$HOME/.rbenv/shims/$binary:gem"
+    "/usr/local/bin/$binary:brew_or_manual"
+    "/usr/bin/$binary:apt_or_system"
+    "/bin/$binary:apt_or_system"
+  )
+
+  # Check nvm locations (multiple node versions)
+  if [ -d "$HOME/.nvm/versions/node" ]; then
+    for node_dir in "$HOME/.nvm/versions/node/"*/bin; do
+      if [ -x "$node_dir/$binary" ]; then
+        local node_version="${node_dir%/bin}"
+        node_version="${node_version##*/}"
+        found+=("npm($node_version):$node_dir/$binary")
+      fi
+    done
+  fi
+
+  # Check pipx locations
+  if [ -d "$HOME/.local/pipx/venvs" ]; then
+    for venv_dir in "$HOME/.local/pipx/venvs/"*/bin; do
+      if [ -x "$venv_dir/$binary" ]; then
+        local pkg_name="${venv_dir%/bin}"
+        pkg_name="${pkg_name##*/}"
+        found+=("pipx($pkg_name):$venv_dir/$binary")
+      fi
+    done
+  fi
+
+  # Check standard locations
+  for loc_spec in "${locations[@]}"; do
+    local path="${loc_spec%%:*}"
+    local method="${loc_spec##*:}"
+
+    if [ -x "$path" ]; then
+      # Refine method detection
+      case "$method" in
+        brew_or_manual)
+          if command -v brew >/dev/null 2>&1 && brew list --formula 2>/dev/null | grep -q "^${tool}\$"; then
+            method="brew"
+          else
+            method="manual"
+          fi
+          ;;
+        apt_or_system)
+          if command -v dpkg >/dev/null 2>&1 && dpkg -S "$path" >/dev/null 2>&1; then
+            method="apt"
+          else
+            method="system"
+          fi
+          ;;
+      esac
+
+      # Avoid duplicates (go can have two paths pointing to same location)
+      local already_found=""
+      for existing in "${found[@]}"; do
+        if [ "${existing##*:}" = "$path" ]; then
+          already_found="true"
+          break
+        fi
+      done
+
+      if [ -z "$already_found" ]; then
+        found+=("$method:$path")
+      fi
+    fi
+  done
+
+  # Output results
+  for item in "${found[@]}"; do
+    echo "$item"
+  done
+}
+
+# Count number of installations for a tool
+# Args: tool_name, binary_name
+# Returns: number of installations found
+count_installations() {
+  local tool="$1"
+  local binary="${2:-$tool}"
+  detect_all_installations "$tool" "$binary" | wc -l
+}
+
+# Check if tool has multiple installations (for warning purposes)
+# Args: tool_name, binary_name
+# Returns: 0 if multiple, 1 if single or none
+has_multiple_installations() {
+  local tool="$1"
+  local binary="${2:-$tool}"
+  local count
+  count="$(count_installations "$tool" "$binary")"
+  [ "$count" -gt 1 ]
+}
+
 # Check if an installation method is available on this system
 # Args: method_name
 # Returns: 0 if available, 1 if not
