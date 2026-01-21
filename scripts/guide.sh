@@ -253,20 +253,34 @@ process_tool() {
     printf "      n = Skip (ask again next time)\n"
     printf "      s = Skip version %s (ask again if newer available)\n" "$latest"
     printf "      p = Pin to %s (don't ask for upgrades)\n" "$installed"
+    if [ -n "$is_multi_version" ]; then
+      printf "      P = Skip all %s versions (never install any)\n" "$catalog_tool"
+    fi
   else
     printf "      y = Install now\n"
     printf "      a = Always update (install now + auto-update in future)\n"
     printf "      N = Skip (default, ask again next time)\n"
     printf "      s = Skip version %s (ask again if newer available)\n" "$latest"
-    printf "      p = Never install (permanently skip this tool)\n"
+    printf "      p = Never install (permanently skip this version)\n"
+    if [ -n "$is_multi_version" ]; then
+      printf "      P = Skip all %s versions (never install any)\n" "$catalog_tool"
+    fi
   fi
 
   # Different defaults: Y for update, N for install
   local prompt_text
   if [ -n "$installed" ]; then
-    prompt_text="Upgrade? [Y/a/n/s/p] "
+    if [ -n "$is_multi_version" ]; then
+      prompt_text="Upgrade? [Y/a/n/s/p/P] "
+    else
+      prompt_text="Upgrade? [Y/a/n/s/p] "
+    fi
   else
-    prompt_text="Install? [y/a/N/s/p] "
+    if [ -n "$is_multi_version" ]; then
+      prompt_text="Install? [y/a/N/s/p/P] "
+    else
+      prompt_text="Install? [y/a/N/s/p] "
+    fi
   fi
 
   local ans=""
@@ -390,13 +404,24 @@ process_tool() {
       printf "    Skipping version %s (will prompt again if newer version available)\n" "$latest"
       "$ROOT"/scripts/pin_version.sh "$tool" "$latest" || true
       ;;
-    [Pp])
+    [p])
       if [ -n "$installed" ]; then
         # Pin to current version
         printf "    Pinning to current version %s\n" "$installed"
         "$ROOT"/scripts/pin_version.sh "$tool" "$installed" || true
       else
-        # Never install - pin to "never"
+        # Never install - pin to "never" for this specific version
+        printf "    Marking as 'never install' (permanently skip this version)\n"
+        "$ROOT"/scripts/pin_version.sh "$tool" "never" || true
+      fi
+      ;;
+    [P])
+      # Skip ALL versions of this runtime (only for multi-version tools)
+      if [ -n "$is_multi_version" ]; then
+        printf "    Marking ALL %s versions as 'never install'\n" "$catalog_tool"
+        "$ROOT"/scripts/pin_version.sh "$catalog_tool" "never" || true
+      else
+        # Fallback to regular pin for non-multi-version tools
         printf "    Marking as 'never install' (permanently skip this tool)\n"
         "$ROOT"/scripts/pin_version.sh "$tool" "never" || true
       fi
@@ -456,14 +481,19 @@ while read -r line; do
     # Check if tool is pinned (use catalog name for pin check)
     pinned_version="$(catalog_get_property "$catalog_name" pinned_version)"
 
-    # For multi-version tools, check pinned_versions object
+    # For multi-version tools, check pinned_versions object AND base tool pin
     if [ -n "$is_multi_version" ]; then
+      # First check if the BASE tool (e.g., php) is pinned to "never" - skip ALL versions
+      if [ "$pinned_version" = "never" ]; then
+        continue
+      fi
+      # Then check version-specific pin
       version_cycle="${tool_name##*@}"
       multi_pin="$(catalog_get_pinned_version "$catalog_name" "$version_cycle")"
       if [ "$multi_pin" = "never" ]; then
         continue
       fi
-      # Skip if this specific version cycle is pinned
+      # Skip if this specific version cycle is pinned to a version
       if [ -n "$multi_pin" ]; then
         continue
       fi
