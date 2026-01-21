@@ -245,25 +245,45 @@ process_tool() {
   printf "    will run: scripts/%s\n" "$install_cmd"
 
   # Prompt with options explained
+  # Default: Y for updates (tool installed), N for installs (new tool)
   printf "    Options:\n"
-  printf "      y = Install/upgrade now\n"
-  printf "      a = Always update (install now + auto-update in future)\n"
-  printf "      N = Skip (ask again next time)\n"
   if [ -n "$installed" ]; then
+    printf "      Y = Upgrade now (default)\n"
+    printf "      a = Always update (upgrade now + auto-update in future)\n"
+    printf "      n = Skip (ask again next time)\n"
     printf "      s = Skip version %s (ask again if newer available)\n" "$latest"
     printf "      p = Pin to %s (don't ask for upgrades)\n" "$installed"
   else
+    printf "      y = Install now\n"
+    printf "      a = Always update (install now + auto-update in future)\n"
+    printf "      N = Skip (default, ask again next time)\n"
     printf "      s = Skip version %s (ask again if newer available)\n" "$latest"
     printf "      p = Never install (permanently skip this tool)\n"
   fi
 
-  local prompt_text="Install/update? [y/a/N/s/p] "
+  # Different defaults: Y for update, N for install
+  local prompt_text
+  if [ -n "$installed" ]; then
+    prompt_text="Upgrade? [Y/a/n/s/p] "
+  else
+    prompt_text="Install? [y/a/N/s/p] "
+  fi
 
   local ans=""
   if [ -t 0 ]; then
     read -r -p "$prompt_text" ans || true
   elif [ -r /dev/tty ]; then
     read -r -p "$prompt_text" ans </dev/tty || true
+  fi
+
+  # Handle default based on install vs update
+  # Empty answer = default (Y for update, N for install)
+  if [ -z "$ans" ]; then
+    if [ -n "$installed" ]; then
+      ans="y"  # Default to yes for updates
+    else
+      ans="n"  # Default to no for installs
+    fi
   fi
 
   case "$ans" in
@@ -425,15 +445,27 @@ while read -r line; do
     # Check if tool is pinned (use catalog name for pin check)
     pinned_version="$(catalog_get_property "$catalog_name" pinned_version)"
 
-    # Skip if pinned to "never" (permanently skip installation)
-    if [ "$pinned_version" = "never" ]; then
-      continue
-    fi
+    # For multi-version tools, check pinned_versions object
+    if [ -n "$is_multi_version" ]; then
+      version_cycle="${tool_name##*@}"
+      multi_pin="$(catalog_get_pinned_version "$catalog_name" "$version_cycle")"
+      if [ "$multi_pin" = "never" ]; then
+        continue
+      fi
+      # Skip if this specific version cycle is pinned
+      if [ -n "$multi_pin" ]; then
+        continue
+      fi
+    else
+      # Skip if pinned to "never" (permanently skip installation)
+      if [ "$pinned_version" = "never" ]; then
+        continue
+      fi
 
-    # Skip if pinned to any specific version (don't prompt for upgrades)
-    # But allow multi-version tools to be processed individually
-    if [ -n "$pinned_version" ] && [ -z "$is_multi_version" ]; then
-      continue
+      # Skip if pinned to any specific version (don't prompt for upgrades)
+      if [ -n "$pinned_version" ]; then
+        continue
+      fi
     fi
 
     # Skip installed tools with upstream_method="skip" (package-manager-only tools)
