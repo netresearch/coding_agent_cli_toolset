@@ -72,6 +72,71 @@ catalog_get_pinned_version() {
   fi
 }
 
+# Check if tool is deprecated
+catalog_is_deprecated() {
+  local tool="$1"
+  local catalog_dir="$ROOT/catalog"
+
+  if ! command -v jq >/dev/null 2>&1; then
+    return 1
+  fi
+
+  local json="$catalog_dir/$tool.json"
+  if [ -f "$json" ]; then
+    local deprecated="$(jq -r '.deprecated // false' "$json")"
+    [ "$deprecated" = "true" ]
+  else
+    return 1
+  fi
+}
+
+# Get the tool that supersedes a deprecated tool
+catalog_get_superseded_by() {
+  local tool="$1"
+  local catalog_dir="$ROOT/catalog"
+
+  if ! command -v jq >/dev/null 2>&1; then
+    return
+  fi
+
+  local json="$catalog_dir/$tool.json"
+  if [ -f "$json" ]; then
+    jq -r '.superseded_by // empty' "$json"
+  fi
+}
+
+# Get deprecation message for a tool
+catalog_get_deprecation_message() {
+  local tool="$1"
+  local catalog_dir="$ROOT/catalog"
+
+  if ! command -v jq >/dev/null 2>&1; then
+    return
+  fi
+
+  local json="$catalog_dir/$tool.json"
+  if [ -f "$json" ]; then
+    jq -r '.deprecation_message // empty' "$json"
+  fi
+}
+
+# Get all deprecated tools
+catalog_get_deprecated_tools() {
+  local catalog_dir="$ROOT/catalog"
+
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "Error: jq required for catalog operations" >&2
+    return 1
+  fi
+
+  for json in "$catalog_dir"/*.json; do
+    [ -f "$json" ] || continue
+    if jq -e '.deprecated == true' "$json" >/dev/null 2>&1; then
+      jq -r '.name' "$json"
+    fi
+  done
+}
+
 # Get guide-specific metadata from catalog
 catalog_get_guide_property() {
   local tool="$1"

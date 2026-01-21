@@ -478,8 +478,137 @@ prompt_pin_version() {
   fi
 }
 
+# Process a deprecated tool with migration options
+process_deprecated_tool() {
+  local tool="$1"
+
+  # Determine catalog tool name
+  local catalog_tool="$tool"
+  if [[ "$tool" == *"@"* ]]; then
+    catalog_tool="${tool%%@*}"
+  fi
+
+  # Get tool data
+  local installed="$(json_field "$tool" installed)"
+  local method="$(json_field "$tool" installed_method)"
+  local description="$(catalog_get_property "$catalog_tool" description)"
+  local superseded_by="$(catalog_get_superseded_by "$catalog_tool")"
+  local deprecation_msg="$(catalog_get_deprecation_message "$catalog_tool")"
+
+  # Get replacement tool info
+  local replacement_desc=""
+  if [ -n "$superseded_by" ] && catalog_has_tool "$superseded_by"; then
+    replacement_desc="$(catalog_get_property "$superseded_by" description)"
+  fi
+
+  printf "\n==> ⚠️  %s %s → DEPRECATED\n" "$tool" "$installed"
+  [ -n "$description" ] && printf "    %s\n" "$description"
+  [ -n "$deprecation_msg" ] && printf "    ⚠️  %s\n" "$deprecation_msg"
+  if [ -n "$superseded_by" ]; then
+    printf "    Superseded by: %s\n" "$superseded_by"
+    [ -n "$replacement_desc" ] && printf "      └─ %s\n" "$replacement_desc"
+  fi
+  printf "    installed: %s via %s\n" "$installed" "${method:-unknown}"
+
+  printf "    Options:\n"
+  if [ -n "$superseded_by" ]; then
+    printf "      M = Migrate to %s (recommended)\n" "$superseded_by"
+  fi
+  printf "      K = Keep %s (no further updates)\n" "$tool"
+  printf "      r = Remove %s\n" "$tool"
+
+  local prompt_text
+  if [ -n "$superseded_by" ]; then
+    prompt_text="Action? [M/K/r] "
+  else
+    prompt_text="Action? [K/r] "
+  fi
+
+  local ans=""
+  if [ -t 0 ]; then
+    read -r -p "$prompt_text" ans || true
+  elif [ -r /dev/tty ]; then
+    read -r -p "$prompt_text" ans </dev/tty || true
+  fi
+
+  # Default to K (keep)
+  [ -z "$ans" ] && ans="K"
+
+  case "$ans" in
+    [Mm])
+      if [ -n "$superseded_by" ]; then
+        printf "    Migrating to %s...\n" "$superseded_by"
+
+        # Install the replacement
+        "$ROOT"/scripts/install_tool.sh "$superseded_by" || true
+
+        # Re-audit for replacement
+        CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_MERGE=1 "$CLI" audit.py "$superseded_by" >/dev/null 2>&1 || true
+
+        # Check if replacement was installed
+        AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" audit.py || true)"
+        local replacement_installed="$(json_field "$superseded_by" installed)"
+
+        if [ -n "$replacement_installed" ]; then
+          printf "    ✓ %s %s installed\n" "$superseded_by" "$replacement_installed"
+
+          # Ask about removing the old tool
+          printf "    Remove deprecated %s? [Y/n] " "$tool"
+          local remove_ans=""
+          if [ -t 0 ]; then
+            read -r remove_ans || true
+          elif [ -r /dev/tty ]; then
+            read -r remove_ans </dev/tty || true
+          fi
+
+          if [ -z "$remove_ans" ] || [[ "$remove_ans" =~ ^[Yy]$ ]]; then
+            printf "    Removing %s...\n" "$tool"
+            "$ROOT"/scripts/install_tool.sh "$catalog_tool" uninstall || true
+            CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_MERGE=1 "$CLI" audit.py "$tool" >/dev/null 2>&1 || true
+            AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" audit.py || true)"
+
+            local still_installed="$(json_field "$tool" installed)"
+            if [ -z "$still_installed" ]; then
+              printf "    ✓ Migration complete: %s → %s\n" "$tool" "$superseded_by"
+            else
+              printf "    ⚠️  %s may not have been fully removed\n" "$tool"
+            fi
+          else
+            printf "    Keeping %s alongside %s\n" "$tool" "$superseded_by"
+          fi
+        else
+          printf "    ⚠️  Failed to install %s\n" "$superseded_by"
+        fi
+      else
+        printf "    No replacement available, keeping %s\n" "$tool"
+      fi
+      ;;
+    [Kk])
+      printf "    Keeping %s (deprecated, no further updates)\n" "$tool"
+      ;;
+    [Rr])
+      printf "    Removing %s...\n" "$tool"
+      "$ROOT"/scripts/install_tool.sh "$catalog_tool" uninstall || true
+      CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_MERGE=1 "$CLI" audit.py "$tool" >/dev/null 2>&1 || true
+      AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" audit.py || true)"
+
+      local still_there="$(json_field "$tool" installed)"
+      if [ -z "$still_there" ]; then
+        printf "    ✓ %s has been removed\n" "$tool"
+      else
+        printf "    ⚠️  %s may not have been fully removed\n" "$tool"
+      fi
+      ;;
+    *)
+      printf "    Keeping %s\n" "$tool"
+      ;;
+  esac
+}
+
 # Build tool list from audit output, grouped by category
 declare -A CATEGORY_TOOLS
+# Track deprecated tools separately (for migration prompts)
+DEPRECATED_TOOLS=""
 while read -r line; do
   [[ "$line" =~ ^state ]] && continue
   tool_name="$(echo "$line" | awk -F'|' '{gsub(/^ +| +$/,"",$2); print $2}')"
@@ -503,6 +632,17 @@ while read -r line; do
 
   # Only process tools with catalog entries (check base tool for multi-version)
   if catalog_has_tool "$catalog_name"; then
+    # Check if tool is deprecated
+    if catalog_is_deprecated "$catalog_name"; then
+      # Deprecated tool: only track if installed (for migration prompt)
+      installed="$(json_field "$tool_name" installed)"
+      if [ -n "$installed" ]; then
+        DEPRECATED_TOOLS="$DEPRECATED_TOOLS $tool_name"
+      fi
+      # Skip deprecated tools in main loop (don't suggest installing them)
+      continue
+    fi
+
     # Check if tool is pinned (use catalog name for pin check)
     # Skip pin checks if IGNORE_PINS=1
     if [ "$IGNORE_PINS" != "1" ]; then
@@ -662,6 +802,47 @@ for category in $(printf '%s\n' "${!CATEGORY_TOOLS[@]}" | while read c; do echo 
     process_tool "$tool"
   done
 done
+
+# Process deprecated tools (if any installed)
+DEPRECATED_TOOLS="$(echo $DEPRECATED_TOOLS | xargs)"  # trim whitespace
+if [ -n "$DEPRECATED_TOOLS" ]; then
+  dep_count=$(echo $DEPRECATED_TOOLS | wc -w)
+
+  printf "\n"
+  printf "================================================================================\n"
+  printf "⚠️  Deprecated Tools (%d installed)\n" "$dep_count"
+  printf "================================================================================\n"
+
+  # Category-level prompt
+  if [ "${AUTO_YES_ALL:-}" != "1" ]; then
+    printf "  Tools: %s\n" "$(echo $DEPRECATED_TOOLS | tr ' ' ',')"
+    printf "  These tools are no longer maintained and have recommended replacements.\n"
+    printf "  Review deprecated tools? [Y/n] "
+
+    dep_ans=""
+    if [ -t 0 ]; then
+      read -r dep_ans || true
+    elif [ -r /dev/tty ]; then
+      read -r dep_ans </dev/tty || true
+    fi
+
+    case "$dep_ans" in
+      [Nn])
+        printf "  Skipping deprecated tools\n"
+        ;;
+      *)
+        for tool in $DEPRECATED_TOOLS; do
+          process_deprecated_tool "$tool"
+        done
+        ;;
+    esac
+  else
+    # AUTO_YES_ALL mode - still process deprecated tools
+    for tool in $DEPRECATED_TOOLS; do
+      process_deprecated_tool "$tool"
+    done
+  fi
+fi
 
 echo
 echo "All done. Re-run: make audit"

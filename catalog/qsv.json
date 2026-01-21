@@ -1,0 +1,15 @@
+{
+  "name": "qsv",
+  "category": "general",
+  "install_method": "github_release_binary",
+  "description": "Ultra-fast CSV data-wrangling toolkit (70+ commands, successor to xsv)",
+  "homepage": "https://github.com/dathere/qsv",
+  "github_repo": "dathere/qsv",
+  "binary_name": "qsv",
+  "download_url_template": "https://github.com/dathere/qsv/releases/download/{version}/qsv-{version}-{arch}-unknown-linux-gnu.zip",
+  "arch_map": {
+    "x86_64": "x86_64",
+    "aarch64": "aarch64"
+  },
+  "archive_format": "zip"
+}
