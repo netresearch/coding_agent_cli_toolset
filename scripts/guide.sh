@@ -54,6 +54,16 @@ check_cache_age() {
 
 check_cache_age || true
 
+# Helper: safely reload AUDIT_JSON, preserving previous value on failure
+reload_audit_json() {
+  local new_json
+  new_json="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" audit.py 2>/dev/null)" || true
+  # Only update if we got valid JSON (non-empty, starts with '[')
+  if [ -n "$new_json" ] && [[ "$new_json" == "["* ]]; then
+    AUDIT_JSON="$new_json"
+  fi
+}
+
 echo "Gathering current tool status from snapshot..."
 AUDIT_OUTPUT="$(cd "$ROOT" && CLI_AUDIT_RENDER=1 CLI_AUDIT_LINKS=0 CLI_AUDIT_EMOJI=0 "$CLI" audit.py || true)"
 AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" audit.py || true)"
@@ -189,7 +199,7 @@ process_tool() {
 
     # Re-audit
     CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_MERGE=1 "$CLI" audit.py "$tool" >/dev/null 2>&1 || true
-    AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" audit.py || true)"
+    reload_audit_json
     return 0
   fi
 
@@ -226,7 +236,7 @@ process_tool() {
 
     # Re-audit with fresh collection for this specific tool
     CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_MERGE=1 "$CLI" audit.py "$tool" >/dev/null 2>&1 || true
-    AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" audit.py || true)"
+    reload_audit_json
     return 0
   fi
 
@@ -326,7 +336,7 @@ process_tool() {
       CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_MERGE=1 "$CLI" audit.py "$tool" >/dev/null 2>&1 || true
 
       # Reload full audit JSON from updated snapshot (needed for subsequent tools)
-      AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" audit.py || true)"
+      reload_audit_json
 
       # Check if upgrade succeeded by comparing versions
       local new_installed="$(json_field "$tool" installed)"
@@ -377,7 +387,7 @@ process_tool() {
 
       # Re-audit with fresh collection for this specific tool
       CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_MERGE=1 "$CLI" audit.py "$tool" >/dev/null 2>&1 || true
-      AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" audit.py || true)"
+      reload_audit_json
 
       # Check if upgrade succeeded
       local new_installed_a="$(json_field "$tool" installed)"
@@ -427,7 +437,7 @@ process_tool() {
 
         # Re-audit to update snapshot
         CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_MERGE=1 "$CLI" audit.py "$tool" >/dev/null 2>&1 || true
-        AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" audit.py || true)"
+        reload_audit_json
 
         # Check if removal succeeded
         local still_installed="$(json_field "$tool" installed)"
@@ -539,18 +549,29 @@ process_deprecated_tool() {
       if [ -n "$superseded_by" ]; then
         printf "    Migrating to %s...\n" "$superseded_by"
 
-        # Install the replacement
-        "$ROOT"/scripts/install_tool.sh "$superseded_by" || true
-
-        # Re-audit for replacement
-        CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_MERGE=1 "$CLI" audit.py "$superseded_by" >/dev/null 2>&1 || true
-
-        # Check if replacement was installed
-        AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" audit.py || true)"
+        # Check if replacement is already installed
         local replacement_installed="$(json_field "$superseded_by" installed)"
 
+        local already_installed=""
         if [ -n "$replacement_installed" ]; then
-          printf "    ✓ %s %s installed\n" "$superseded_by" "$replacement_installed"
+          printf "    ✓ %s %s already installed (skipping install)\n" "$superseded_by" "$replacement_installed"
+          already_installed="true"
+        else
+          # Install the replacement
+          "$ROOT"/scripts/install_tool.sh "$superseded_by" || true
+
+          # Re-audit for replacement
+          CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_MERGE=1 "$CLI" audit.py "$superseded_by" >/dev/null 2>&1 || true
+
+          # Check if replacement was installed
+          reload_audit_json
+          replacement_installed="$(json_field "$superseded_by" installed)"
+          if [ -n "$replacement_installed" ]; then
+            printf "    ✓ %s %s installed\n" "$superseded_by" "$replacement_installed"
+          fi
+        fi
+
+        if [ -n "$replacement_installed" ]; then
 
           # Ask about removing the old tool
           printf "    Remove deprecated %s? [Y/n] " "$tool"
@@ -565,7 +586,7 @@ process_deprecated_tool() {
             printf "    Removing %s...\n" "$tool"
             "$ROOT"/scripts/install_tool.sh "$catalog_tool" uninstall || true
             CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_MERGE=1 "$CLI" audit.py "$tool" >/dev/null 2>&1 || true
-            AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" audit.py || true)"
+            reload_audit_json
 
             local still_installed="$(json_field "$tool" installed)"
             if [ -z "$still_installed" ]; then
@@ -590,7 +611,7 @@ process_deprecated_tool() {
       printf "    Removing %s...\n" "$tool"
       "$ROOT"/scripts/install_tool.sh "$catalog_tool" uninstall || true
       CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_MERGE=1 "$CLI" audit.py "$tool" >/dev/null 2>&1 || true
-      AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" audit.py || true)"
+      reload_audit_json
 
       local still_there="$(json_field "$tool" installed)"
       if [ -z "$still_there" ]; then

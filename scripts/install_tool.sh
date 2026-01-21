@@ -40,6 +40,19 @@ if [ -z "$INSTALL_METHOD" ] || [ "$INSTALL_METHOD" = "null" ]; then
   exit 1
 fi
 
+# Handle uninstall universally - detect actual install method, not catalog method
+if [ "$ACTION" = "uninstall" ]; then
+  binary_name="$(jq -r '.binary_name // ""' "$CATALOG_FILE" 2>/dev/null || echo "$TOOL")"
+  current_method="$(detect_install_method "$TOOL" "$binary_name")"
+  if [ "$current_method" != "none" ]; then
+    remove_installation "$TOOL" "$current_method" "$binary_name"
+    echo "[$TOOL] Uninstalled (was via $current_method)"
+  else
+    echo "[$TOOL] Not installed"
+  fi
+  exit 0
+fi
+
 # Check if tool uses reconciliation system (install_method == "auto")
 if [ "$INSTALL_METHOD" = "auto" ]; then
   # Use reconciliation system
@@ -52,18 +65,6 @@ if [ "$INSTALL_METHOD" = "auto" ]; then
     status)
       reconcile_tool "$CATALOG_FILE" "status"
       exit $?
-      ;;
-    uninstall)
-      # Get current method and remove it
-      binary_name="$(jq -r '.binary_name // ""' "$CATALOG_FILE" 2>/dev/null || echo "$TOOL")"
-      current_method="$(detect_install_method "$TOOL" "$binary_name")"
-      if [ "$current_method" != "none" ]; then
-        remove_installation "$TOOL" "$current_method" "$binary_name"
-        echo "[$TOOL] Uninstalled (was via $current_method)"
-      else
-        echo "[$TOOL] Not installed"
-      fi
-      exit 0
       ;;
     *)
       echo "[$TOOL] Error: Unknown action: $ACTION" >&2
