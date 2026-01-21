@@ -318,8 +318,14 @@ process_tool() {
         prompt_pin_version "$tool" "$installed"
       elif [ "$new_installed" = "$installed" ] && [ "$new_installed" != "$latest" ]; then
         # Version didn't change and not at target
-        printf "\n    ⚠️  Upgrade did not succeed (version unchanged)\n"
-        prompt_pin_version "$tool" "$installed"
+        # BUT: if installed is a prefix of latest (e.g., 3.13 vs 3.13.11), consider it success
+        # This happens when version detection returns short form but upgrade actually worked
+        if [[ "$latest" == "$new_installed"* ]] || [[ "$new_installed" == "$latest"* ]]; then
+          : # Prefix match - upgrade likely succeeded, don't warn
+        else
+          printf "\n    ⚠️  Upgrade did not succeed (version unchanged)\n"
+          prompt_pin_version "$tool" "$installed"
+        fi
       else
         # Upgrade succeeded - remove any existing pin to avoid stale pins
         if catalog_has_tool "$tool"; then
@@ -361,8 +367,13 @@ process_tool() {
         printf "\n    ⚠️  Upgrade failed (install script error)\n"
         printf "    Auto-update is still enabled - will try again next time.\n"
       elif [ "$new_installed_a" = "$installed" ] && [ "$new_installed_a" != "$latest" ]; then
-        printf "\n    ⚠️  Upgrade did not succeed (version unchanged)\n"
-        printf "    Auto-update is still enabled - will try again next time.\n"
+        # Version didn't change - but check for prefix match (e.g., 3.13 vs 3.13.11)
+        if [[ "$latest" == "$new_installed_a"* ]] || [[ "$new_installed_a" == "$latest"* ]]; then
+          printf "    ✓ Auto-update enabled. This tool will update automatically in future.\n"
+        else
+          printf "\n    ⚠️  Upgrade did not succeed (version unchanged)\n"
+          printf "    Auto-update is still enabled - will try again next time.\n"
+        fi
       else
         printf "    ✓ Auto-update enabled. This tool will update automatically in future.\n"
         # Remove any existing pin
