@@ -19,8 +19,16 @@
     "product": "go",
     "max_versions": 2,
     "binary_pattern": "go{cycle}",
-    "candidates": ["go{cycle}", "/usr/local/go{cycle}/bin/go"],
-    "version_files": ["go.mod"]
+    "candidates": [
+      "go{cycle}",
+      "/usr/local/go{cycle}/bin/go"
+    ],
+    "version_files": [
+      "go.mod"
+    ]
   },
-  "notes": "Go supports 2 versions (current + previous). Uses goenv if available, otherwise single system install."
+  "notes": "Go supports 2 versions (current + previous). Uses goenv if available, otherwise single system install.",
+  "pinned_versions": {
+    "1.24": "never"
+  }
 }

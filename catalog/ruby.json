@@ -21,7 +21,14 @@
     "version_prefix": "",
     "binary_subpath": "bin",
     "binary_name": "ruby",
-    "version_files": [".ruby-version", "Gemfile"]
+    "version_files": [
+      ".ruby-version",
+      "Gemfile"
+    ]
   },
-  "notes": "Managed via rbenv for version management. Supports multiple concurrent versions."
+  "notes": "Managed via rbenv for version management. Supports multiple concurrent versions.",
+  "pinned_versions": {
+    "3.4": "never",
+    "3.3": "never"
+  }
 }
