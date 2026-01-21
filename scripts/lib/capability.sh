@@ -90,94 +90,99 @@ detect_install_method() {
   esac
 }
 
-# Detect ALL installations of a tool across known locations
+# Detect ALL installations of a tool using `type -a`
+# This finds all binaries in PATH order, then classifies each by install method
 # Args: tool_name, binary_name
 # Returns: newline-separated list of "method:path" pairs
 # Example output:
 #   cargo:/home/user/.cargo/bin/xsv
-#   github_release_binary:/home/user/.local/bin/xsv
+#   manual:/home/user/.local/bin/xsv
 detect_all_installations() {
   local tool="$1"
   local binary="${2:-$tool}"
-  local found=()
+  local -A seen_paths=()  # associative array to track duplicates
 
-  # Define all known binary locations to check
-  local locations=(
-    "$HOME/.local/bin/$binary:github_release_binary"
-    "$HOME/.cargo/bin/$binary:cargo"
-    "$HOME/go/bin/$binary:go"
-    "${GOPATH:-$HOME/go}/bin/$binary:go"
-    "$HOME/.rbenv/shims/$binary:gem"
-    "/usr/local/bin/$binary:brew_or_manual"
-    "/usr/bin/$binary:apt_or_system"
-    "/bin/$binary:apt_or_system"
-  )
+  # Use type -a to find all binaries in PATH
+  while IFS= read -r line; do
+    # Parse "binary is /path/to/binary" format
+    local path="${line##* is }"
+    [ -z "$path" ] && continue
+    [ ! -x "$path" ] && continue
 
-  # Check nvm locations (multiple node versions)
-  if [ -d "$HOME/.nvm/versions/node" ]; then
-    for node_dir in "$HOME/.nvm/versions/node/"*/bin; do
-      if [ -x "$node_dir/$binary" ]; then
-        local node_version="${node_dir%/bin}"
-        node_version="${node_version##*/}"
-        found+=("npm($node_version):$node_dir/$binary")
+    # Skip duplicates (PATH may have same dir multiple times)
+    [ -n "${seen_paths[$path]:-}" ] && continue
+    seen_paths[$path]=1
+
+    # Classify the installation method based on path
+    local method
+    method="$(classify_install_path "$tool" "$path")"
+
+    echo "$method:$path"
+  done < <(type -a "$binary" 2>/dev/null || true)
+}
+
+# Classify an installation path to determine its install method
+# Args: tool_name, path
+# Returns: method name (cargo, apt, brew, npm, etc.)
+classify_install_path() {
+  local tool="$1"
+  local path="$2"
+
+  case "$path" in
+    "$HOME/.cargo/bin/"*)
+      echo "cargo"
+      ;;
+    "$HOME/go/bin/"*|"${GOPATH:-$HOME/go}/bin/"*)
+      echo "go"
+      ;;
+    "$HOME/.local/bin/"*)
+      # Could be manual, pipx, or uv
+      if command -v pipx >/dev/null 2>&1 && pipx list 2>/dev/null | grep -q "package $tool"; then
+        echo "pipx"
+      elif command -v uv >/dev/null 2>&1 && uv tool list 2>/dev/null | grep -q "^$tool\b"; then
+        echo "uv"
+      else
+        echo "manual"
       fi
-    done
-  fi
-
-  # Check pipx locations
-  if [ -d "$HOME/.local/pipx/venvs" ]; then
-    for venv_dir in "$HOME/.local/pipx/venvs/"*/bin; do
-      if [ -x "$venv_dir/$binary" ]; then
-        local pkg_name="${venv_dir%/bin}"
-        pkg_name="${pkg_name##*/}"
-        found+=("pipx($pkg_name):$venv_dir/$binary")
+      ;;
+    "$HOME/.rbenv/shims/"*)
+      echo "gem"
+      ;;
+    "$HOME/.nvm/"*)
+      # Extract node version for context
+      local node_version="${path#$HOME/.nvm/versions/node/}"
+      node_version="${node_version%%/*}"
+      echo "npm($node_version)"
+      ;;
+    "$HOME/.local/pipx/venvs/"*)
+      local pkg="${path#$HOME/.local/pipx/venvs/}"
+      pkg="${pkg%%/*}"
+      echo "pipx($pkg)"
+      ;;
+    "/home/linuxbrew/.linuxbrew/bin/"*|"/opt/homebrew/bin/"*)
+      echo "brew"
+      ;;
+    "/usr/local/bin/"*)
+      if command -v brew >/dev/null 2>&1 && brew list --formula 2>/dev/null | grep -q "^${tool}\$"; then
+        echo "brew"
+      else
+        echo "manual"
       fi
-    done
-  fi
-
-  # Check standard locations
-  for loc_spec in "${locations[@]}"; do
-    local path="${loc_spec%%:*}"
-    local method="${loc_spec##*:}"
-
-    if [ -x "$path" ]; then
-      # Refine method detection
-      case "$method" in
-        brew_or_manual)
-          if command -v brew >/dev/null 2>&1 && brew list --formula 2>/dev/null | grep -q "^${tool}\$"; then
-            method="brew"
-          else
-            method="manual"
-          fi
-          ;;
-        apt_or_system)
-          if command -v dpkg >/dev/null 2>&1 && dpkg -S "$path" >/dev/null 2>&1; then
-            method="apt"
-          else
-            method="system"
-          fi
-          ;;
-      esac
-
-      # Avoid duplicates (go can have two paths pointing to same location)
-      local already_found=""
-      for existing in "${found[@]}"; do
-        if [ "${existing##*:}" = "$path" ]; then
-          already_found="true"
-          break
-        fi
-      done
-
-      if [ -z "$already_found" ]; then
-        found+=("$method:$path")
+      ;;
+    "/usr/bin/"*|"/bin/"*)
+      if command -v dpkg >/dev/null 2>&1 && dpkg -S "$path" >/dev/null 2>&1; then
+        echo "apt"
+      else
+        echo "system"
       fi
-    fi
-  done
-
-  # Output results
-  for item in "${found[@]}"; do
-    echo "$item"
-  done
+      ;;
+    "/snap/bin/"*)
+      echo "snap"
+      ;;
+    *)
+      echo "unknown"
+      ;;
+  esac
 }
 
 # Count number of installations for a tool
