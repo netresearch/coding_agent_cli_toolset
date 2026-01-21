@@ -36,13 +36,44 @@ if [ -n "$TARGET_CYCLE" ]; then
     exit 1
   fi
 
-  echo "Installing go${TARGET_CYCLE} via go install golang.org/dl/go${TARGET_CYCLE}@latest..."
-  go install "golang.org/dl/go${TARGET_CYCLE}@latest" || true
+  # golang.org/dl uses full version names (go1.24.12, not go1.24)
+  # Look up the latest patch version for this major.minor cycle
+  FULL_VERSION=""
+  if [[ "$TARGET_CYCLE" =~ ^[0-9]+\.[0-9]+$ ]]; then
+    # It's just major.minor, need to find latest patch
+    echo "Looking up latest Go ${TARGET_CYCLE}.x version..."
+    FULL_VERSION=$(curl -s "https://go.dev/dl/?mode=json" 2>/dev/null | \
+      grep -oE "go${TARGET_CYCLE}\.[0-9]+" | head -1 | sed 's/go//' || true)
+  elif [[ "$TARGET_CYCLE" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    # It's already a full version
+    FULL_VERSION="$TARGET_CYCLE"
+  fi
 
-  # The go1.XX command needs to download its SDK on first run
-  if have "go${TARGET_CYCLE}"; then
-    echo "Downloading Go ${TARGET_CYCLE} SDK..."
-    "go${TARGET_CYCLE}" download || true
+  if [ -z "$FULL_VERSION" ]; then
+    echo "Error: Could not determine full version for Go ${TARGET_CYCLE}" >&2
+    echo "Available versions: https://go.dev/dl/" >&2
+    exit 1
+  fi
+
+  # The binary will be named go1.24.12 (full version)
+  FULL_BINARY="go${FULL_VERSION}"
+
+  echo "Installing ${FULL_BINARY} via go install golang.org/dl/${FULL_BINARY}@latest..."
+  if go install "golang.org/dl/${FULL_BINARY}@latest"; then
+    # The go1.XX.YY command needs to download its SDK on first run
+    if have "$FULL_BINARY"; then
+      echo "Downloading Go ${FULL_VERSION} SDK..."
+      "$FULL_BINARY" download || true
+
+      # Create symlink from go1.24 -> go1.24.12 for convenience
+      GOBIN="$(go env GOPATH)/bin"
+      if [ -x "$GOBIN/$FULL_BINARY" ] && [ ! -e "$GOBIN/$BINARY" ]; then
+        ln -sf "$FULL_BINARY" "$GOBIN/$BINARY" 2>/dev/null || true
+        echo "Created symlink: $BINARY -> $FULL_BINARY"
+      fi
+    fi
+  else
+    echo "Failed to install ${FULL_BINARY}" >&2
   fi
 
 # Standard single-version Go installation
