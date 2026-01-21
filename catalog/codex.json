@@ -1,11 +1,17 @@
 {
   "name": "codex",
   "category": "ai",
-  "install_method": "uv_tool",
-  "description": "CLI tool for generating and managing code documentation",
-  "homepage": "https://github.com/codex-cli/codex",
-  "package_name": "codex",
-  "python_version": "3.13",
-  "version_command": "uv tool list | grep '^codex ' | awk '{print $2}'",
-  "notes": "Codex is a web server app - running codex --version starts the full server. Use uv tool list for version detection."
+  "install_method": "npm",
+  "description": "OpenAI Codex CLI - lightweight coding agent that runs in your terminal",
+  "homepage": "https://github.com/openai/codex",
+  "github_repo": "openai/codex",
+  "package_name": "@openai/codex",
+  "binary_name": "codex",
+  "version_command": "codex --version 2>/dev/null | head -1",
+  "guide": {
+    "display_name": "OpenAI Codex CLI",
+    "install_action": "upgrade",
+    "order": 401
+  },
+  "notes": "OpenAI's open-source coding agent. Requires OPENAI_API_KEY. Supports multiple AI providers including third-party models."
 }

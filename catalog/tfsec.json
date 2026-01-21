@@ -11,5 +11,8 @@
     "x86_64": "amd64",
     "aarch64": "arm64",
     "armv7l": "arm"
-  }
+  },
+  "deprecated": true,
+  "superseded_by": "trivy",
+  "deprecation_message": "tfsec has been merged into Trivy. Use 'trivy config' for Terraform scanning. See migration guide: https://github.com/aquasecurity/tfsec/blob/master/tfsec-to-trivy-migration-guide.md"
 }
