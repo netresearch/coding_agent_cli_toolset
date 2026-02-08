@@ -1,8 +1,8 @@
-<!-- Managed by agent: keep sections & order; edit content, not structure. Last updated: 2026-01-16 -->
+<!-- Managed by agent: keep sections & order; edit content, not structure. Last updated: 2026-02-06 -->
 
 # cli_audit/ — Python Package
 
-**Modular architecture** with 20 specialized modules for tool detection, auditing, installation, and upgrade management.
+**Modular architecture** with 21 specialized modules for tool detection, auditing, installation, and upgrade management.
 
 ## Overview
 
@@ -10,7 +10,7 @@ The `cli_audit` package provides the core functionality for AI CLI Preparation:
 
 **Phase 1: Detection & Auditing (6 modules)**
 - `tools.py` — Tool definitions and metadata
-- `catalog.py` — JSON catalog management (78 entries)
+- `catalog.py` — JSON catalog management (79 entries)
 - `detection.py` — Installation detection, version extraction, multi-version detection
 - `collectors.py` — Upstream version collection (GitHub, PyPI, npm, crates, endoflife.date)
 - `snapshot.py` — Snapshot-based caching
@@ -23,9 +23,10 @@ The `cli_audit` package provides the core functionality for AI CLI Preparation:
 - `package_managers.py` — Package manager abstractions
 - `logging_config.py` — Logging configuration
 
-**Phase 2: Installation & Upgrade (4 modules)**
+**Phase 2: Installation & Upgrade (5 modules)**
 - `installer.py` — Tool installation with retry/validation
 - `install_plan.py` — Installation planning, dependency resolution
+- `prerequisites.py` — Prerequisite resolution and dependency chain handling
 - `bulk.py` — Parallel bulk operations
 - `upgrade.py` — Upgrade workflows
 
@@ -51,7 +52,7 @@ local_state.json        # Gitignored - machine-specific installation state
 ~/.config/cli-audit/config.yml  # User preferences (auto_update, tool overrides)
 ```
 
-**Catalog entries** (78 JSON files in `catalog/`):
+**Catalog entries** (79 JSON files in `catalog/`):
 - Each tool has `name`, `candidates`, `source_kind`, `source_args`, `category`
 - Categories: python, node, go, rust, ruby, php, shell, git, devops, platform, ai, general
 - User preferences (auto_update) stored in user config, not catalog

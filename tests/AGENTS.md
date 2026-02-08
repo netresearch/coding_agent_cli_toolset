@@ -1,4 +1,4 @@
-<!-- Managed by agent: keep sections & order; edit content, not structure. Last updated: 2026-01-16 -->
+<!-- Managed by agent: keep sections & order; edit content, not structure. Last updated: 2026-02-06 -->
 
 # tests/ — Test Suite
 
@@ -6,7 +6,7 @@
 
 ## Overview
 
-The test suite validates all 20 modules across Phase 1 (Detection & Auditing) and Phase 2 (Installation & Upgrade Management).
+The test suite validates all 21 modules across Phase 1 (Detection & Auditing) and Phase 2 (Installation & Upgrade Management).
 
 **Test organization:**
 ```
@@ -20,6 +20,7 @@ tests/
 ├── test_local_state.py           # Local state management
 ├── test_logging.py               # Logging configuration
 ├── test_package_managers.py      # Package manager abstractions
+├── test_prerequisites.py         # Prerequisite resolution
 ├── test_reconcile.py             # Duplicate cleanup
 ├── test_upgrade.py               # Upgrade workflows
 ├── test_upstream_cache.py        # Upstream cache management
@@ -28,7 +29,7 @@ tests/
 ```
 
 **Test coverage:**
-- 12 unit test files covering all 20 modules
+- 13 unit test files covering all 21 modules
 - 1 integration test directory
 - Fixtures for mocking external services
 

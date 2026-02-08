@@ -1,4 +1,4 @@
-<!-- Managed by agent: keep sections & order; edit content, not structure. Last updated: 2026-01-16 -->
+<!-- Managed by agent: keep sections & order; edit content, not structure. Last updated: 2026-02-06 -->
 
 # Installation Scripts - Agent Guide
 
@@ -6,7 +6,7 @@
 
 ## Overview
 
-28 Bash scripts for installing developer tools with multiple actions:
+30 Bash scripts for installing developer tools with multiple actions:
 - **install**: Fresh installation (default action)
 - **update**: Upgrade to latest version
 - **uninstall**: Remove installation
@@ -33,6 +33,8 @@
 - `auto_update.sh`: Automatic update runner
 - `set_auto_update.sh`: Enable/disable auto-update per tool
 - `pin_version.sh`, `unpin_version.sh`: Version pinning
+- `reset_pins.sh`: Remove all version pins from all tools
+- `cleanup.sh`: Interactive removal of installed tools
 
 **Reconciliation:**
 - `reconcile_pip_to_uv.sh`: Migrate pip packages to uv
