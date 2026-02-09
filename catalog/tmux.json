@@ -1,0 +1,15 @@
+{
+  "name": "tmux",
+  "category": "general",
+  "install_method": "package_manager",
+  "description": "Terminal multiplexer for managing multiple terminal sessions",
+  "homepage": "https://github.com/tmux/tmux",
+  "github_repo": "tmux/tmux",
+  "binary_name": "tmux",
+  "packages": {
+    "apt": "tmux",
+    "brew": "tmux",
+    "dnf": "tmux",
+    "pacman": "tmux"
+  }
+}
