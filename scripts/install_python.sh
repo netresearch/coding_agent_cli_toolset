@@ -2,12 +2,12 @@
 set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/lib/common.sh
 . "$DIR/lib/common.sh"
+# shellcheck source=scripts/lib/install_strategy.sh
 . "$DIR/lib/install_strategy.sh"
 
 ACTION="${1:-install}"
-
-ensure_uv() { :; }
 
 ensure_python_distro() {
   if ! have python3 && have apt-get; then sudo apt-get update && sudo apt-get install -y python3 python3-pip; fi

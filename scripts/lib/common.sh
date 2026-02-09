@@ -39,7 +39,7 @@ pipx_uninstall() { have pipx && pipx uninstall "$1" || true; }
 
 # nvm helpers
 ensure_nvm_loaded() {
-  # shellcheck disable=SC1090
+  # shellcheck disable=SC1090,SC1091
   [ -s "$HOME/.nvm/nvm.sh" ] && . "$HOME/.nvm/nvm.sh" || true
 }
 
@@ -80,6 +80,28 @@ prefers_rbenv_ruby() {
   local p
   p="$(command -v ruby || true)"
   is_path_under "$p" "$HOME/.rbenv" || return 1
+}
+
+# Ensure uv is available, offer to install if missing
+ensure_uv() {
+  have uv && return 0
+  log "Error: uv is required but not installed."
+  log ""
+  log "Install uv:"
+  log "  curl -LsSf https://astral.sh/uv/install.sh | sh"
+  log ""
+  log "Or run: make upgrade-uv"
+  log ""
+  log "See: https://docs.astral.sh/uv/"
+  # Auto-install if interactive and install script exists
+  local install_script="${DIR:-}/install_uv.sh"
+  if [ -t 0 ] && [ -f "$install_script" ]; then
+    read -rp "Install uv now? [Y/n] " answer
+    case "${answer:-y}" in
+      [Yy]*|"") bash "$install_script" && have uv && return 0 ;;
+    esac
+  fi
+  return 1
 }
 
 # WSL detection
