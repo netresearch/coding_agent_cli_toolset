@@ -62,6 +62,13 @@ detect_install_method() {
       return 0
       ;;
     "/usr/bin/"*|"/bin/"*)
+      # Check if it's a corepack shim
+      local resolved_bp
+      resolved_bp="$(readlink -f "$binary_path" 2>/dev/null || true)"
+      if [ -n "$resolved_bp" ] && [[ "$resolved_bp" == */corepack/* ]]; then
+        echo "corepack"
+        return 0
+      fi
       # Check if it's an apt package
       if command -v dpkg >/dev/null 2>&1; then
         if dpkg -S "$binary_path" >/dev/null 2>&1; then
@@ -100,7 +107,7 @@ detect_install_method() {
 detect_all_installations() {
   local tool="$1"
   local binary="${2:-$tool}"
-  local -A seen_paths=()  # associative array to track duplicates
+  local -A seen_paths=()  # associative array to track duplicates (by resolved path)
 
   # Use type -a to find all binaries in PATH
   while IFS= read -r line; do
@@ -109,9 +116,16 @@ detect_all_installations() {
     [ -z "$path" ] && continue
     [ ! -x "$path" ] && continue
 
-    # Skip duplicates (PATH may have same dir multiple times)
-    [ -n "${seen_paths[$path]:-}" ] && continue
-    seen_paths[$path]=1
+    # Skip venv paths - these are environments, not installations
+    case "$path" in
+      */venv/bin/*|*/.venv/bin/*|*/venvs/*/bin/*|*/virtualenvs/*/bin/*) continue ;;
+    esac
+
+    # Resolve symlinks for deduplication (e.g., /bin/X and /usr/bin/X are the same on Ubuntu)
+    local resolved_path
+    resolved_path="$(readlink -f "$path" 2>/dev/null || realpath "$path" 2>/dev/null || echo "$path")"
+    [ -n "${seen_paths[$resolved_path]:-}" ] && continue
+    seen_paths[$resolved_path]=1
 
     # Classify the installation method based on path
     local method
@@ -170,7 +184,12 @@ classify_install_path() {
       fi
       ;;
     "/usr/bin/"*|"/bin/"*)
-      if command -v dpkg >/dev/null 2>&1 && dpkg -S "$path" >/dev/null 2>&1; then
+      # Check if it's a corepack shim (symlink to corepack dist)
+      local resolved
+      resolved="$(readlink -f "$path" 2>/dev/null || true)"
+      if [ -n "$resolved" ] && [[ "$resolved" == */corepack/* ]]; then
+        echo "corepack"
+      elif command -v dpkg >/dev/null 2>&1 && dpkg -S "$path" >/dev/null 2>&1; then
         echo "apt"
       else
         echo "system"
