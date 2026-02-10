@@ -1,13 +1,13 @@
 {
   "name": "codex",
   "category": "ai",
-  "install_method": "npm",
+  "install_method": "npm_global",
   "description": "OpenAI Codex CLI - lightweight coding agent that runs in your terminal",
   "homepage": "https://github.com/openai/codex",
   "github_repo": "openai/codex",
   "package_name": "@openai/codex",
   "binary_name": "codex",
-  "version_command": "codex --version 2>/dev/null | head -1",
+  "version_command": "codex --version 2>/dev/null | grep -oE '[0-9]+\\.[0-9]+\\.[0-9]+' | head -1",
   "guide": {
     "display_name": "OpenAI Codex CLI",
     "install_action": "upgrade",
