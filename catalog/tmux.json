@@ -6,6 +6,7 @@
   "homepage": "https://github.com/tmux/tmux",
   "github_repo": "tmux/tmux",
   "binary_name": "tmux",
+  "version_command": "tmux -V 2>/dev/null | head -1",
   "packages": {
     "apt": "tmux",
     "brew": "tmux",
