@@ -80,10 +80,12 @@ if ! $installed && have apt-get; then
   pkg="$(echo "$PACKAGES" | jq -r '.apt // empty')"
   if [ "$pkg" != "null" ] && [ -n "$pkg" ]; then
     # Add PPA if specified (for latest versions on Ubuntu/Debian)
+    ppa_added=false
     if [ -n "$PPA" ] && command -v add-apt-repository >/dev/null 2>&1; then
-      if ! grep -q "^deb.*$PPA" /etc/apt/sources.list.d/*.list 2>/dev/null; then
+      if ! grep -rq "$PPA" /etc/apt/sources.list.d/ 2>/dev/null; then
         echo "[$TOOL] Adding PPA: ppa:$PPA" >&2
         sudo add-apt-repository -y "ppa:$PPA" || true
+        ppa_added=true  # add-apt-repository already runs apt-get update
       fi
     fi
 
@@ -95,7 +97,11 @@ if ! $installed && have apt-get; then
       echo "[$TOOL] Installing PHP ${PHP_VERSION}: $pkg" >&2
     fi
 
-    sudo apt-get update && sudo apt-get install -y $pkg || true
+    # Skip apt-get update if PPA was just added (add-apt-repository already updated)
+    if ! $ppa_added; then
+      sudo apt-get update || true
+    fi
+    sudo apt-get install -y $pkg || true
     installed=true
   fi
 fi
@@ -137,6 +143,11 @@ fi
 printf "[%s] before: %s\n" "$DISPLAY_NAME" "${before:-<none>}"
 printf "[%s] after:  %s\n" "$DISPLAY_NAME" "${after:-<none>}"
 if [ -n "$path" ]; then printf "[%s] path:   %s\n" "$DISPLAY_NAME" "$path"; fi
+
+# Warn if version didn't change (package manager can't provide newer version)
+if [ -n "$before" ] && [ -n "$after" ] && [ "$before" = "$after" ]; then
+  printf "[%s] Note: Package manager has no newer version available\n" "$DISPLAY_NAME" >&2
+fi
 
 # Refresh snapshot after successful installation
 # Need to source install_strategy.sh for refresh_snapshot function
