@@ -87,13 +87,20 @@ remove_installation() {
         brew uninstall "$tool" 2>/dev/null || true
       fi
       ;;
-    github_release_binary)
+    github_release_binary|manual)
       local binary_path
       binary_path="$(command -v "$binary" 2>/dev/null || echo "")"
       if [ -n "$binary_path" ] && [ -f "$binary_path" ]; then
         echo "[$tool] Removing binary: $binary_path" >&2
         rm -f "$binary_path" || true
       fi
+      ;;
+    corepack)
+      echo "[$tool] Installed via corepack, skipping removal (will be superseded by new install)" >&2
+      ;;
+    system)
+      echo "[$tool] System-managed binary, cannot remove (managed by OS)" >&2
+      return 1
       ;;
     unknown|none)
       echo "[$tool] Unknown installation method, cannot remove automatically" >&2
@@ -301,8 +308,14 @@ reconcile_tool() {
 
     # Remove current installation
     if ! remove_installation "$tool" "$current_method" "$binary_name"; then
-      echo "[$tool] Error: Failed to remove current installation via $current_method" >&2
-      return 1
+      # If removal fails for unknown/system methods, proceed with install anyway
+      # The new installation via best method will take PATH precedence
+      if [ "$current_method" = "unknown" ] || [ "$current_method" = "system" ]; then
+        echo "[$tool] Warning: Could not remove $current_method installation, proceeding with install via $best_method" >&2
+      else
+        echo "[$tool] Error: Failed to remove current installation via $current_method" >&2
+        return 1
+      fi
     fi
   fi
 
