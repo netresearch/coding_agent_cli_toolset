@@ -76,13 +76,20 @@ def all_tools() -> list[Tool]:
 def filter_tools(names: list[str]) -> list[Tool]:
     """Filter tools by name list.
 
+    Handles multi-version tool names like "node@25" by extracting the base
+    tool name ("node") for matching.
+
     Args:
-        names: List of tool names (case-insensitive)
+        names: List of tool names (case-insensitive), may include @version suffixes
 
     Returns:
         List of matching tools in original order
     """
-    name_set = {n.lower() for n in names}
+    # Extract base tool names (handle tool@version format)
+    name_set = set()
+    for n in names:
+        base = n.split("@")[0] if "@" in n else n
+        name_set.add(base.lower())
     return [t for t in TOOLS if t.name.lower() in name_set]
 
 

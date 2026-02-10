@@ -304,19 +304,44 @@ def cmd_audit(args: argparse.Namespace) -> int:
         # Fresh collection for specific tools
         tools_list = filter_tools(args.tools)
 
+        if not tools_list:
+            if not JSON_MODE:
+                print(f"# No matching tools found for: {', '.join(args.tools)}", file=sys.stderr)
+            return 0
+
         if not JSON_MODE:
             print(f"# Collecting fresh data for {len(tools_list)} tool(s)...", file=sys.stderr)
 
-        # Collect in parallel
+        # Separate multi-version tools from regular tools
+        from cli_audit.catalog import ToolCatalog
+        catalog = ToolCatalog()
+        regular_tools = []
+        mv_tools = {}  # tool_name -> (catalog_data, mv_config)
+        for tool in tools_list:
+            if catalog.has_tool(tool.name):
+                catalog_data = catalog.get_raw_data(tool.name)
+                mv_config = catalog_data.get("multi_version", {})
+                if mv_config.get("enabled"):
+                    mv_tools[tool.name] = (catalog_data, mv_config)
+                    continue
+            regular_tools.append(tool)
+
+        # Collect regular tools in parallel
         results = []
-        with ThreadPoolExecutor(max_workers=min(MAX_WORKERS, len(tools_list))) as executor:
-            future_to_tool = {executor.submit(audit_tool, tool, None): tool for tool in tools_list}
-            for future in as_completed(future_to_tool):
-                try:
-                    result = future.result()
-                    results.append(result)
-                except Exception:
-                    pass
+        if regular_tools:
+            with ThreadPoolExecutor(max_workers=min(MAX_WORKERS, len(regular_tools))) as executor:
+                future_to_tool = {executor.submit(audit_tool, tool, None): tool for tool in regular_tools}
+                for future in as_completed(future_to_tool):
+                    try:
+                        result = future.result()
+                        results.append(result)
+                    except Exception:
+                        pass
+
+        # Collect multi-version tools
+        for tool_name, (catalog_data, mv_config) in mv_tools.items():
+            mv_results = audit_multi_version_tool(tool_name, catalog_data, mv_config)
+            results.extend(mv_results)
 
         tools = results
 
