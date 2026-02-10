@@ -109,6 +109,7 @@ class TestAuditCollectModeMultiVersion:
         env["CLI_AUDIT_JSON"] = "1"
         env["CLI_AUDIT_COLLECT"] = "1"
         env["CLI_AUDIT_MERGE"] = "1"
+        env["PYTHONUTF8"] = "1"
 
         result = subprocess.run(
             [sys.executable, "audit.py", "node@25"],
@@ -132,6 +133,7 @@ class TestAuditCollectModeMultiVersion:
         env["CLI_AUDIT_JSON"] = "1"
         env["CLI_AUDIT_COLLECT"] = "1"
         env["CLI_AUDIT_MERGE"] = "1"
+        env["PYTHONUTF8"] = "1"
 
         result = subprocess.run(
             [sys.executable, "audit.py", "go@1.25"],
@@ -151,6 +153,7 @@ class TestAuditCollectModeMultiVersion:
         env = os.environ.copy()
         env["CLI_AUDIT_JSON"] = "1"
         env["CLI_AUDIT_COLLECT"] = "1"
+        env["PYTHONUTF8"] = "1"
 
         result = subprocess.run(
             [sys.executable, "audit.py", "nonexistent_tool_xyz"],

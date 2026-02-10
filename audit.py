@@ -404,7 +404,7 @@ def cmd_audit(args: argparse.Namespace) -> int:
             enriched_tools.append(enriched)
 
         # Output JSON array to stdout
-        print(json.dumps(enriched_tools, indent=2, ensure_ascii=False))
+        print(json.dumps(enriched_tools, indent=2))
         return 0
 
     # Table output mode
@@ -1074,7 +1074,7 @@ def cmd_versions(args: argparse.Namespace) -> int:
             "runtimes": runtimes_data,
             "total": len(runtimes_data),
         }
-        print(json.dumps(output, indent=2, ensure_ascii=False))
+        print(json.dumps(output, indent=2))
         return 0
 
     # Table output mode
