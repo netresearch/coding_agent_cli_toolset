@@ -67,14 +67,27 @@ uv_install_python() {
   echo "[python] Installing Python $PY_SPEC via uv..." >&2
 
   # Install the requested Python version
-  if ! uv python install "$PY_SPEC" 2>&1; then
-    # If exact version fails, try without patch version
-    local ALT_SPEC="${PY_SPEC%.*}"
-    if [ "$ALT_SPEC" != "$PY_SPEC" ]; then
-      echo "[python] Trying $ALT_SPEC..." >&2
-      uv python install "$ALT_SPEC" 2>&1 || true
+  if uv python install "$PY_SPEC" 2>&1; then
+    return 0
+  fi
+
+  # Exact version not available - try without patch version
+  local ALT_SPEC="${PY_SPEC%.*}"
+  if [ "$ALT_SPEC" != "$PY_SPEC" ]; then
+    echo "[python] Version $PY_SPEC not available via uv, trying $ALT_SPEC..." >&2
+    if uv python install "$ALT_SPEC" 2>&1; then
+      # Report what was actually installed
+      local actual
+      actual="$(uv python list --only-installed 2>/dev/null | grep -E "^cpython-${ALT_SPEC}" | head -1 | sed 's/cpython-\([0-9.]*\).*/\1/' || true)"
+      if [ -n "$actual" ]; then
+        echo "[python] Note: Installed $actual (target $PY_SPEC not yet available in uv)" >&2
+      fi
+      return 0
     fi
   fi
+
+  echo "[python] Warning: Could not install Python $PY_SPEC via uv" >&2
+  return 1
 }
 
 # Create/update a default dev venv using uv if available
