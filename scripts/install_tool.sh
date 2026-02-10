@@ -42,15 +42,23 @@ fi
 
 # Handle uninstall universally - remove ALL installations found
 if [ "$ACTION" = "uninstall" ]; then
+  # For dedicated_script tools, delegate to their own uninstall handler first
+  if [ "$INSTALL_METHOD" = "dedicated_script" ]; then
+    script_name="$(jq -r '.script // ""' "$CATALOG_FILE" 2>/dev/null || true)"
+    if [ -n "$script_name" ] && [ -f "$DIR/$script_name" ]; then
+      "$DIR/$script_name" uninstall || true
+    fi
+  fi
+
   binary_name="$(jq -r '.binary_name // ""' "$CATALOG_FILE" 2>/dev/null || echo "$TOOL")"
   binary_name="${binary_name:-$TOOL}"
 
-  # Detect all installations
+  # Detect remaining installations
   all_installs="$(detect_all_installations "$TOOL" "$binary_name" 2>/dev/null || true)"
   install_count="$(echo "$all_installs" | grep -c . || echo 0)"
 
   if [ "$install_count" -eq 0 ]; then
-    echo "[$TOOL] Not installed"
+    echo "[$TOOL] Successfully removed"
     exit 0
   fi
 
@@ -62,23 +70,28 @@ if [ "$ACTION" = "uninstall" ]; then
     echo "[$TOOL] Removing all installations..."
   fi
 
-  # Remove each installation
-  removed_count=0
+  # Remove each installation (skip system binaries - those can't/shouldn't be removed)
   echo "$all_installs" | while IFS=: read -r method path; do
     [ -z "$method" ] && continue
     # Extract base method (remove version info like "npm(v25.3.0)")
     base_method="${method%%(*}"
+    # Skip system binaries with a clear message
+    if [ "$base_method" = "system" ]; then
+      echo "[$TOOL] Skipping system binary: $path (managed by OS)" >&2
+      continue
+    fi
     remove_installation "$TOOL" "$base_method" "$binary_name"
   done
 
-  # Verify removal
+  # Verify removal (ignore system entries in the check)
   remaining="$(detect_all_installations "$TOOL" "$binary_name" 2>/dev/null || true)"
-  remaining_count="$(echo "$remaining" | grep -c . || echo 0)"
+  remaining_nonsystem="$(echo "$remaining" | grep -v "^system:" || true)"
+  remaining_count="$(echo "$remaining_nonsystem" | grep -c . || echo 0)"
   if [ "$remaining_count" -eq 0 ]; then
     echo "[$TOOL] Successfully removed all installations"
   else
     echo "[$TOOL] Warning: $remaining_count installation(s) could not be removed:"
-    echo "$remaining" | while IFS=: read -r method path; do
+    echo "$remaining_nonsystem" | while IFS=: read -r method path; do
       echo "  • $method: $path"
     done
   fi
