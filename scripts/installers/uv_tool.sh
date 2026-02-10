@@ -29,14 +29,25 @@ if ! command -v uv >/dev/null 2>&1; then
   exit 1
 fi
 
-# Get current version (skip for tools that hang or don't output proper versions)
-# codex/gam binaries hang on --version
-# git-filter-repo outputs git hash instead of version
-if [ "$TOOL" = "codex" ] || [ "$TOOL" = "gam" ] || [ "$TOOL" = "git-filter-repo" ]; then
-  before="<none>"
-else
-  before="$(command -v "$BINARY_NAME" >/dev/null 2>&1 && timeout 2 "$BINARY_NAME" --version </dev/null 2>/dev/null || true)"
-fi
+# Get current version
+# Some tools need special handling for version detection
+VERSION_FLAG="$(jq -r '.version_flag // empty' "$CATALOG_FILE")"
+get_uv_tool_version() {
+  local tool="$1" bin="$2" flag="${3:---version}"
+  # Try the binary with its version flag first
+  if command -v "$bin" >/dev/null 2>&1; then
+    local ver
+    ver="$(timeout 2 "$bin" $flag </dev/null 2>/dev/null || true)"
+    if [ -n "$ver" ]; then
+      echo "$ver"
+      return
+    fi
+  fi
+  # Fallback: extract version from uv tool list
+  uv tool list 2>/dev/null | grep -E "^${PACKAGE_NAME} " | head -1 || true
+}
+
+before="$(get_uv_tool_version "$TOOL" "$BINARY_NAME" "${VERSION_FLAG:---version}")"
 
 # Install or upgrade with optional Python version pinning
 if [ -n "$PYTHON_VERSION" ]; then
@@ -47,13 +58,7 @@ else
 fi
 
 # Report
-if [ "$TOOL" = "codex" ] || [ "$TOOL" = "gam" ] || [ "$TOOL" = "git-filter-repo" ]; then
-  # These tools hang or don't output proper versions - use uv tool list instead
-  # Use the specific package name for this tool to avoid matching wrong package
-  after="$(uv tool list 2>/dev/null | grep -E "^${PACKAGE_NAME} " | head -1 || echo "<failed>")"
-else
-  after="$(command -v "$BINARY_NAME" >/dev/null 2>&1 && timeout 2 "$BINARY_NAME" --version 2>/dev/null || true)"
-fi
+after="$(get_uv_tool_version "$TOOL" "$BINARY_NAME" "${VERSION_FLAG:---version}")"
 path="$(command -v "$BINARY_NAME" 2>/dev/null || true)"
 printf "[%s] before: %s\n" "$TOOL" "${before:-<none>}"
 printf "[%s] after:  %s\n" "$TOOL" "${after:-<none>}"
