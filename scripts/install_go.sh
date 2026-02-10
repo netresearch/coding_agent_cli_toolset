@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$DIR/lib/install_strategy.sh"
+
 have() { command -v "$1" >/dev/null 2>&1; }
 
 TOOL="go"
@@ -140,5 +143,7 @@ path="$(command -v "$BINARY" 2>/dev/null || true)"
 printf "[%s] before: %s\n" "$DISPLAY_NAME" "${before:-<none>}"
 printf "[%s] after:  %s\n"  "$DISPLAY_NAME" "${after:-<none>}"
 if [ -n "$path" ]; then printf "[%s] path:   %s\n" "$DISPLAY_NAME" "$path"; fi
+
+refresh_snapshot "go"
 
 
