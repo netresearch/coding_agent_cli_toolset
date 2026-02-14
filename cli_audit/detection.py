@@ -483,37 +483,22 @@ def detect_multi_versions(
         binary_pattern = multi_version_config.get("binary_pattern", f"{tool_name}{{cycle}}")
         candidate_patterns = multi_version_config.get("candidates", [binary_pattern])
 
-        # For Go: also check the default 'go' binary and map to cycle
+        # For Go: detect the default 'go' binary version as a fallback
+        # (used only when no version-specific binary like go1.25 is found)
+        go_default_info = None
         if tool_name == "go":
             default_go = shutil.which("go")
             if default_go:
                 version_line = get_version_line(default_go, "go", version_flag="version")
                 default_version = extract_version_number(version_line)
                 if default_version:
-                    # Extract major.minor from version (e.g., "1.25.6" -> "1.25")
                     parts = default_version.split(".")
                     if len(parts) >= 2:
-                        default_cycle = f"{parts[0]}.{parts[1]}"
-                        # Pre-populate with the default go binary
-                        for version_info in supported_versions:
-                            if str(version_info.get("cycle", "")) == default_cycle:
-                                # Found matching cycle, add early result
-                                results.append({
-                                    "cycle": default_cycle,
-                                    "latest_upstream": version_info.get("latest", ""),
-                                    "installed": default_version,
-                                    "path": default_go,
-                                    "install_method": detect_install_method(default_go, tool_name),
-                                    "status": version_info.get("status", "unknown"),
-                                    "eol": version_info.get("eol"),
-                                    "lts": version_info.get("lts", False),
-                                })
-                                # Remove this cycle from further processing
-                                supported_versions = [
-                                    v for v in supported_versions
-                                    if str(v.get("cycle", "")) != default_cycle
-                                ]
-                                break
+                        go_default_info = {
+                            "cycle": f"{parts[0]}.{parts[1]}",
+                            "version": default_version,
+                            "path": default_go,
+                        }
 
         for version_info in supported_versions:
             cycle = version_info.get("cycle", "")
@@ -543,6 +528,12 @@ def detect_multi_versions(
                     version_line = get_version_line(found_path, tool_name)
                     installed_version = extract_version_number(version_line)
                     break
+
+            # Go fallback: if no version-specific binary found, check if default
+            # 'go' binary belongs to this cycle (e.g., /usr/local/go/bin/go)
+            if not found_path and go_default_info and str(cycle) == go_default_info["cycle"]:
+                found_path = go_default_info["path"]
+                installed_version = go_default_info["version"]
 
             result = {
                 "cycle": cycle,
