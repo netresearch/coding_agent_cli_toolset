@@ -19,7 +19,18 @@
     "product": "python",
     "max_versions": 5,
     "binary_pattern": "python{cycle}",
-    "candidates": ["python{cycle}", "/usr/bin/python{cycle}"],
-    "version_files": [".python-version", "pyproject.toml", ".tool-versions"]
+    "candidates": [
+      "python{cycle}",
+      "/usr/bin/python{cycle}"
+    ],
+    "version_files": [
+      ".python-version",
+      "pyproject.toml",
+      ".tool-versions"
+    ]
+  },
+  "pinned_versions": {
+    "3.11": "never",
+    "3.10": "never"
   }
 }

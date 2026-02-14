@@ -22,7 +22,14 @@
     "version_prefix": "v",
     "binary_subpath": "bin",
     "binary_name": "node",
-    "version_files": [".nvmrc", ".node-version", "package.json"]
+    "version_files": [
+      ".nvmrc",
+      ".node-version",
+      "package.json"
+    ]
   },
-  "notes": "Managed via nvm (Node Version Manager). Supports multiple concurrent LTS versions."
+  "notes": "Managed via nvm (Node Version Manager). Supports multiple concurrent LTS versions.",
+  "pinned_versions": {
+    "22": "never"
+  }
 }
