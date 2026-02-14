@@ -29,6 +29,16 @@ apt_purge_if_present() {
   done
 }
 
+apt_install_if_missing() {
+  have apt-get || return 1
+  ensure_sudo
+  for pkg in "$@"; do
+    if ! dpkg -s "$pkg" >/dev/null 2>&1; then
+      sudo apt-get update -qq && sudo apt-get install -y "$pkg" || return 1
+    fi
+  done
+}
+
 brew_install() { brew install "$@"; }
 brew_upgrade() { brew upgrade "$@" || true; }
 brew_uninstall() { brew uninstall -f "$@" || true; }

@@ -137,6 +137,47 @@ catalog_get_deprecated_tools() {
   done
 }
 
+# Check if tool's runtime requirements are satisfied
+# Returns 0 if all required tools are available, 1 otherwise
+catalog_check_requires() {
+  local tool="$1"
+  local catalog_dir="$ROOT/catalog"
+
+  if ! command -v jq >/dev/null 2>&1; then
+    return 0  # Can't check, assume OK
+  fi
+
+  local json="$catalog_dir/$tool.json"
+  [ -f "$json" ] || return 0
+
+  local requires
+  requires="$(jq -r '.requires[]? // empty' "$json" 2>/dev/null)"
+  [ -z "$requires" ] && return 0
+
+  for req in $requires; do
+    # Check if the required tool's binary is available
+    local req_binary
+    if [ -f "$catalog_dir/$req.json" ]; then
+      req_binary="$(jq -r '.binary_name // .name' "$catalog_dir/$req.json")"
+    else
+      req_binary="$req"
+    fi
+    if ! command -v "$req_binary" >/dev/null 2>&1; then
+      # Also check nvm for node (nvm may not be loaded in this shell)
+      if [ "$req_binary" = "node" ] && [ -d "${NVM_DIR:-$HOME/.nvm}/versions/node" ]; then
+        local nvm_nodes
+        nvm_nodes="$(ls "${NVM_DIR:-$HOME/.nvm}/versions/node/" 2>/dev/null | head -1)"
+        if [ -n "$nvm_nodes" ]; then
+          continue  # node available via nvm
+        fi
+      fi
+      echo "$req"
+      return 1
+    fi
+  done
+  return 0
+}
+
 # Get guide-specific metadata from catalog
 catalog_get_guide_property() {
   local tool="$1"

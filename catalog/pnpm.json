@@ -6,6 +6,7 @@
   "homepage": "https://pnpm.io/",
   "package_name": "pnpm",
   "binary_name": "pnpm",
+  "requires": ["node"],
   "available_methods": [
     {
       "method": "npm",

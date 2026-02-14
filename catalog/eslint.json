@@ -6,6 +6,7 @@
   "homepage": "https://eslint.org",
   "github_repo": "eslint/eslint",
   "binary_name": "eslint",
+  "requires": ["node"],
   "package_name": "eslint",
   "guide": {
     "display_name": "ESLint",

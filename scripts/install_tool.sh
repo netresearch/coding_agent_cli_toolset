@@ -55,7 +55,7 @@ if [ "$ACTION" = "uninstall" ]; then
 
   # Detect remaining installations
   all_installs="$(detect_all_installations "$TOOL" "$binary_name" 2>/dev/null || true)"
-  install_count="$(echo "$all_installs" | grep -c . || echo 0)"
+  install_count="$(echo "$all_installs" | grep -c . || true)"
 
   if [ "$install_count" -eq 0 ]; then
     echo "[$TOOL] Successfully removed"
@@ -86,7 +86,7 @@ if [ "$ACTION" = "uninstall" ]; then
   # Verify removal (ignore system entries in the check)
   remaining="$(detect_all_installations "$TOOL" "$binary_name" 2>/dev/null || true)"
   remaining_nonsystem="$(echo "$remaining" | grep -v "^system:" || true)"
-  remaining_count="$(echo "$remaining_nonsystem" | grep -c . || echo 0)"
+  remaining_count="$(echo "$remaining_nonsystem" | grep -c . || true)"
   if [ "$remaining_count" -eq 0 ]; then
     echo "[$TOOL] Successfully removed all installations"
   else

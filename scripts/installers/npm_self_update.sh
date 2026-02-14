@@ -20,6 +20,9 @@ fi
 
 BINARY_NAME="npm"
 
+# Load nvm if available (npm is bundled with nvm-managed Node.js)
+ensure_nvm_loaded
+
 # Get current version
 before="$(timeout 2 npm --version </dev/null 2>/dev/null || echo '<none>')"
 

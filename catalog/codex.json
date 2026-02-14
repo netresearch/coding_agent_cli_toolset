@@ -7,6 +7,7 @@
   "github_repo": "openai/codex",
   "package_name": "@openai/codex",
   "binary_name": "codex",
+  "requires": ["node"],
   "version_command": "codex --version 2>/dev/null | grep -oE '[0-9]+\\.[0-9]+\\.[0-9]+' | head -1",
   "guide": {
     "display_name": "OpenAI Codex CLI",

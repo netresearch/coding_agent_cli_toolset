@@ -6,5 +6,6 @@
   "homepage": "https://www.npmjs.com/",
   "package_name": "npm",
   "binary_name": "npm",
+  "requires": ["node"],
   "notes": "npm comes bundled with Node.js but can be upgraded independently using 'npm install -g npm@latest'"
 }

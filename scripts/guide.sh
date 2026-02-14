@@ -176,6 +176,15 @@ process_tool() {
   local homepage="$(catalog_get_property "$catalog_tool" homepage)"
   local auto_update="$(config_get_auto_update "$catalog_tool")"
 
+  # Check if runtime requirements are satisfied (e.g., npm requires node)
+  local missing_req
+  missing_req="$(catalog_check_requires "$catalog_tool")" || true
+  if [ -n "$missing_req" ]; then
+    printf "\n==> ⏭️  %s\n" "$display"
+    printf "    skipped: requires '%s' which is not installed\n" "$missing_req"
+    return 0
+  fi
+
   # Check if migration needed (deprecated install method)
   # But skip migration if native binary already exists and works
   local needs_migration=""
@@ -276,7 +285,7 @@ process_tool() {
   local all_installs
   all_installs="$(detect_all_installations "$catalog_tool" "$binary_name" 2>/dev/null || true)"
   local install_count
-  install_count="$(echo "$all_installs" | grep -c . || echo 0)"
+  install_count="$(echo "$all_installs" | grep -c . || true)"
   if [ "$install_count" -gt 1 ]; then
     printf "    ⚠️  Multiple installations detected (%d):\n" "$install_count"
     echo "$all_installs" | while IFS=: read -r inst_method inst_path; do
@@ -303,20 +312,26 @@ process_tool() {
     printf "      Y = Upgrade now (default)\n"
     printf "      a = Always update (upgrade now + auto-update in future)\n"
     printf "      n = Skip (ask again next time)\n"
-    printf "      s = Skip version %s (ask again if newer available)\n" "$latest"
-    printf "      p = Pin to %s (don't ask for upgrades)\n" "$installed"
+    printf "      s = Skip only %s (ask again when newer patch available)\n" "$latest"
+    if [ -n "$is_multi_version" ]; then
+      printf "      p = Pin %s cycle to %s (don't upgrade)\n" "$version_cycle" "$installed"
+    else
+      printf "      p = Pin to %s (don't ask for upgrades)\n" "$installed"
+    fi
     printf "      r = Remove/uninstall this tool\n"
     if [ -n "$is_multi_version" ]; then
-      printf "      P = Skip all %s versions (never install any)\n" "$catalog_tool"
+      printf "      P = Skip ALL %s cycles (never install any %s)\n" "$catalog_tool" "$catalog_tool"
     fi
   else
     printf "      y = Install now\n"
     printf "      a = Always update (install now + auto-update in future)\n"
     printf "      N = Skip (default, ask again next time)\n"
-    printf "      s = Skip version %s (ask again if newer available)\n" "$latest"
-    printf "      p = Never install (permanently skip this version)\n"
+    printf "      s = Skip only %s (ask again when newer patch available)\n" "$latest"
     if [ -n "$is_multi_version" ]; then
-      printf "      P = Skip all %s versions (never install any)\n" "$catalog_tool"
+      printf "      p = Never install %s (skip entire %s.x cycle)\n" "$display" "$version_cycle"
+      printf "      P = Skip ALL %s cycles (never install any %s)\n" "$catalog_tool" "$catalog_tool"
+    else
+      printf "      p = Never install (permanently skip this tool)\n"
     fi
   fi
 
@@ -453,18 +468,26 @@ process_tool() {
       fi
       ;;
     [Ss])
-      # Skip this specific version
-      printf "    Skipping version %s (will prompt again if newer version available)\n" "$latest"
+      # Skip this specific patch version only
+      printf "    Skipping only %s (will prompt again when newer patch available)\n" "$latest"
       "$ROOT"/scripts/pin_version.sh "$tool" "$latest" || true
       ;;
     [p])
       if [ -n "$installed" ]; then
         # Pin to current version
-        printf "    Pinning to current version %s\n" "$installed"
+        if [ -n "$is_multi_version" ]; then
+          printf "    Pinning %s cycle to %s\n" "$version_cycle" "$installed"
+        else
+          printf "    Pinning to current version %s\n" "$installed"
+        fi
         "$ROOT"/scripts/pin_version.sh "$tool" "$installed" || true
       else
-        # Never install - pin to "never" for this specific version
-        printf "    Marking as 'never install' (permanently skip this version)\n"
+        # Never install - pin to "never" for this version cycle
+        if [ -n "$is_multi_version" ]; then
+          printf "    Marking %s cycle as 'never install'\n" "$version_cycle"
+        else
+          printf "    Marking as 'never install' (permanently skip this tool)\n"
+        fi
         "$ROOT"/scripts/pin_version.sh "$tool" "never" || true
       fi
       ;;
@@ -472,7 +495,22 @@ process_tool() {
       # Remove/uninstall this tool (only for installed tools)
       if [ -n "$installed" ]; then
         printf "    Removing %s...\n" "$tool"
-        "$ROOT"/scripts/install_tool.sh "$catalog_tool" uninstall || true
+        # Pass version cycle for multi-version tools so only that cycle is removed
+        if [ -n "$is_multi_version" ] && [ -n "$version_cycle" ]; then
+          if [ "$catalog_tool" = "node" ]; then
+            NODE_VERSION="$version_cycle" "$ROOT"/scripts/install_tool.sh "$catalog_tool" uninstall || true
+          elif [ "$catalog_tool" = "python" ]; then
+            UV_PYTHON_SPEC="$version_cycle" "$ROOT"/scripts/install_tool.sh "$catalog_tool" uninstall || true
+          elif [ "$catalog_tool" = "go" ]; then
+            GO_VERSION="$version_cycle" "$ROOT"/scripts/install_tool.sh "$catalog_tool" uninstall || true
+          elif [ "$catalog_tool" = "php" ]; then
+            PHP_VERSION="$version_cycle" "$ROOT"/scripts/install_tool.sh "$catalog_tool" uninstall || true
+          else
+            "$ROOT"/scripts/install_tool.sh "$catalog_tool" uninstall || true
+          fi
+        else
+          "$ROOT"/scripts/install_tool.sh "$catalog_tool" uninstall || true
+        fi
 
         # Re-audit to update snapshot
         CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_MERGE=1 "$CLI" audit.py "$tool" >/dev/null 2>&1 || true

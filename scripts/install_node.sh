@@ -92,9 +92,39 @@ update_node() {
 }
 
 uninstall_node() {
-  # remove nvm-managed node
-  if [ -d "$HOME/.nvm" ]; then rm -rf "$HOME/.nvm"; fi
-  apt_remove_if_present nodejs npm || true
+  if [ -n "${NODE_VERSION:-}" ]; then
+    # Multi-version: only remove the specific version cycle, keep nvm and other versions
+    ensure_nvm_loaded
+    if have nvm; then
+      local resolved
+      resolved="$(nvm version "$NODE_VERSION" 2>/dev/null || true)"
+      if [ -n "$resolved" ] && [ "$resolved" != "N/A" ]; then
+        # Don't remove the default/active version without warning
+        local current_default
+        current_default="$(nvm version default 2>/dev/null || true)"
+        if [ "$resolved" = "$current_default" ]; then
+          echo "[node] Warning: node $NODE_VERSION is the current default, switching default first" >&2
+          # Find another installed version to become default
+          local other_ver
+          other_ver="$(nvm ls --no-colors 2>/dev/null | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | grep -v "$resolved" | head -1 || true)"
+          if [ -n "$other_ver" ]; then
+            nvm alias default "$other_ver" || true
+            nvm use "$other_ver" || true
+          fi
+        fi
+        nvm uninstall "$resolved" || true
+        echo "[node] Removed node $resolved (cycle $NODE_VERSION)" >&2
+      else
+        echo "[node] Node $NODE_VERSION not found in nvm" >&2
+      fi
+    fi
+    # Also remove apt if it matches this major version
+    apt_remove_if_present nodejs npm || true
+  else
+    # Full uninstall: remove everything
+    if [ -d "$HOME/.nvm" ]; then rm -rf "$HOME/.nvm"; fi
+    apt_remove_if_present nodejs npm || true
+  fi
 }
 
 reconcile_node() {

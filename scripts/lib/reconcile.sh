@@ -14,6 +14,9 @@ RECONCILE_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$RECONCILE_LIB_DIR/capability.sh"
 . "$RECONCILE_LIB_DIR/policy.sh"
 
+# Ensure nvm is loaded so npm/node are discoverable as install methods
+ensure_nvm_loaded
+
 # Remove an installation via a specific method
 # Args: tool_name, method, binary_name
 remove_installation() {
