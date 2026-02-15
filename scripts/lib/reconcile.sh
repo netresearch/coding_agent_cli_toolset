@@ -132,7 +132,7 @@ install_via_method() {
     apt)
       local package
       if command -v jq >/dev/null 2>&1; then
-        package="$(echo "$config" | jq -r '.package // ""')"
+        package="$(echo "$config" | jq -r '.package // ""' 2>/dev/null)"
       fi
       package="${package:-$tool}"
 
@@ -142,7 +142,7 @@ install_via_method() {
     cargo)
       local crate
       if command -v jq >/dev/null 2>&1; then
-        crate="$(echo "$config" | jq -r '.crate // ""')"
+        crate="$(echo "$config" | jq -r '.crate // ""' 2>/dev/null)"
       fi
       crate="${crate:-$tool}"
 
@@ -152,7 +152,7 @@ install_via_method() {
     npm)
       local package
       if command -v jq >/dev/null 2>&1; then
-        package="$(echo "$config" | jq -r '.package // ""')"
+        package="$(echo "$config" | jq -r '.package // ""' 2>/dev/null)"
       fi
       package="${package:-$tool}"
 
@@ -162,7 +162,7 @@ install_via_method() {
     gem)
       local gem_name
       if command -v jq >/dev/null 2>&1; then
-        gem_name="$(echo "$config" | jq -r '.gem // ""')"
+        gem_name="$(echo "$config" | jq -r '.gem // ""' 2>/dev/null)"
       fi
       gem_name="${gem_name:-$tool}"
 
@@ -172,7 +172,7 @@ install_via_method() {
     pip)
       local package
       if command -v jq >/dev/null 2>&1; then
-        package="$(echo "$config" | jq -r '.package // ""')"
+        package="$(echo "$config" | jq -r '.package // ""' 2>/dev/null)"
       fi
       package="${package:-$tool}"
 
@@ -187,7 +187,7 @@ install_via_method() {
     pipx)
       local package
       if command -v jq >/dev/null 2>&1; then
-        package="$(echo "$config" | jq -r '.package // ""')"
+        package="$(echo "$config" | jq -r '.package // ""' 2>/dev/null)"
       fi
       package="${package:-$tool}"
 
@@ -197,7 +197,7 @@ install_via_method() {
     brew)
       local formula
       if command -v jq >/dev/null 2>&1; then
-        formula="$(echo "$config" | jq -r '.formula // ""')"
+        formula="$(echo "$config" | jq -r '.formula // ""' 2>/dev/null)"
       fi
       formula="${formula:-$tool}"
 
@@ -207,7 +207,7 @@ install_via_method() {
     go)
       local package
       if command -v jq >/dev/null 2>&1; then
-        package="$(echo "$config" | jq -r '.package // ""')"
+        package="$(echo "$config" | jq -r '.package // ""' 2>/dev/null)"
       fi
       if [ -z "$package" ]; then
         echo "[$tool] Error: go method requires 'package' in config" >&2
@@ -295,21 +295,19 @@ reconcile_tool() {
 
   # Reconcile mode: align current with best
   if [ "$current_method" = "$best_method" ]; then
-    # If action is "reconcile" (not update/install), skip if already via best method
+    # If action is "reconcile", skip if already via best method
     if [ "$action" = "reconcile" ]; then
       echo "[$tool] ✓ Already installed via best method: $best_method" >&2
       return 0
     fi
-    # For update/install action, continue to reinstall/upgrade even if via best method
-    echo "[$tool] Upgrading (currently via $best_method)" >&2
-  fi
-
-  if [ "$current_method" = "none" ]; then
+    # For update/install action, reinstall via same method (no removal needed)
+    echo "[$tool] Upgrading via $best_method..." >&2
+  elif [ "$current_method" = "none" ]; then
     echo "[$tool] Not installed, installing via best method: $best_method" >&2
   else
     echo "[$tool] Reconciliation needed: current=$current_method, best=$best_method" >&2
 
-    # Remove current installation
+    # Remove current installation before installing via best method
     if ! remove_installation "$tool" "$current_method" "$binary_name"; then
       # If removal fails for unknown/system methods, proceed with install anyway
       # The new installation via best method will take PATH precedence
@@ -336,7 +334,11 @@ reconcile_tool() {
   if command -v "$binary_name" >/dev/null 2>&1; then
     local new_method
     new_method="$(detect_install_method "$tool" "$binary_name")"
-    echo "[$tool] ✓ Reconciliation complete: now installed via $new_method" >&2
+    if [ "$current_method" = "$best_method" ]; then
+      echo "[$tool] ✓ Upgrade complete (via $new_method)" >&2
+    else
+      echo "[$tool] ✓ Reconciliation complete: now installed via $new_method" >&2
+    fi
     return 0
   else
     echo "[$tool] Error: Installation via $best_method completed but binary not found" >&2
