@@ -26,6 +26,9 @@ done
 # Load catalog query functions
 . "$DIR/lib/catalog.sh"
 
+# Load pin library (user-local version pins)
+. "$DIR/lib/pins.sh"
+
 # Load config query functions (for user preferences like auto_update)
 . "$DIR/lib/config.sh"
 
@@ -410,11 +413,9 @@ process_tool() {
         fi
       else
         # Upgrade succeeded - remove any existing pin to avoid stale pins
-        if catalog_has_tool "$tool"; then
-          local existing_pin="$(catalog_get_property "$tool" pinned_version)"
-          if [ -n "$existing_pin" ] && [ "$existing_pin" != "never" ]; then
-            "$ROOT"/scripts/unpin_version.sh "$tool" || true
-          fi
+        local existing_pin="$(pins_get "$tool")"
+        if [ -n "$existing_pin" ] && [ "$existing_pin" != "never" ]; then
+          "$ROOT"/scripts/unpin_version.sh "$tool" || true
         fi
       fi
       ;;
@@ -459,11 +460,9 @@ process_tool() {
       else
         printf "    ✓ Auto-update enabled. This tool will update automatically in future.\n"
         # Remove any existing pin
-        if catalog_has_tool "$tool"; then
-          local existing_pin_a="$(catalog_get_property "$tool" pinned_version)"
-          if [ -n "$existing_pin_a" ]; then
-            "$ROOT"/scripts/unpin_version.sh "$tool" || true
-          fi
+        local existing_pin_a="$(pins_get "$tool")"
+        if [ -n "$existing_pin_a" ]; then
+          "$ROOT"/scripts/unpin_version.sh "$tool" || true
         fi
       fi
       ;;
@@ -741,12 +740,12 @@ while read -r line; do
       continue
     fi
 
-    # Check if tool is pinned (use catalog name for pin check)
+    # Check if tool is pinned (read from user-local pins file)
     # Skip pin checks if IGNORE_PINS=1
     if [ "$IGNORE_PINS" != "1" ]; then
-      pinned_version="$(catalog_get_property "$catalog_name" pinned_version)"
+      pinned_version="$(pins_get "$catalog_name")"
 
-      # For multi-version tools, check pinned_versions object AND base tool pin
+      # For multi-version tools, check cycle-specific pin AND base tool pin
       if [ -n "$is_multi_version" ]; then
         # First check if the BASE tool (e.g., php) is pinned to "never" - skip ALL versions
         if [ "$pinned_version" = "never" ]; then
@@ -754,7 +753,7 @@ while read -r line; do
         fi
         # Then check version-specific pin
         version_cycle="${tool_name##*@}"
-        multi_pin="$(catalog_get_pinned_version "$catalog_name" "$version_cycle")"
+        multi_pin="$(pins_get_cycle "$catalog_name" "$version_cycle")"
         if [ "$multi_pin" = "never" ]; then
           continue
         fi

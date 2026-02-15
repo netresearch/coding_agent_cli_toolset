@@ -27,8 +27,5 @@
       "go.mod"
     ]
   },
-  "notes": "Go supports 2 versions (current + previous). Uses goenv if available, otherwise single system install.",
-  "pinned_versions": {
-    "1.24": "never"
-  }
+  "notes": "Go supports 2 versions (current + previous). Uses goenv if available, otherwise single system install."
 }

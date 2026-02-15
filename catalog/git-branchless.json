@@ -11,6 +11,5 @@
     "x86_64": "x86_64-unknown-linux-musl"
   },
   "notes": "Only x86_64 Linux builds available. KNOWN ISSUE: v0.10.0 release binary incorrectly reports version 0.9.0 - this is an upstream packaging bug, not an installer issue.",
-  "known_issues": "v0.10.0 release binary reports version 0.9.0 (upstream packaging bug). Upgrade will appear to fail. Wait for v0.10.1+ or build from source.",
-  "pinned_version": "0.10.0"
+  "known_issues": "v0.10.0 release binary reports version 0.9.0 (upstream packaging bug). Upgrade will appear to fail. Wait for v0.10.1+ or build from source."
 }

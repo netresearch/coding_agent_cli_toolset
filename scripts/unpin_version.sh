@@ -5,6 +5,9 @@ set -euo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$DIR/.." && pwd)"
 
+# Load pin library
+. "$DIR/lib/pins.sh"
+
 TOOL="${1:-}"
 
 if [ -z "$TOOL" ]; then
@@ -36,36 +39,26 @@ fi
 
 # Handle multi-version tools differently
 if [ -n "$IS_MULTI_VERSION" ]; then
-  # Check if pinned in pinned_versions object
-  PINNED_VALUE="$(jq -r --arg cycle "$VERSION_CYCLE" '.pinned_versions[$cycle] // empty' "$CATALOG_FILE")"
+  # Check if pinned in pins file
+  PINNED_VALUE="$(pins_get_cycle "$BASE_TOOL" "$VERSION_CYCLE")"
   if [ -z "$PINNED_VALUE" ]; then
     echo "Tool '$TOOL' is not pinned" >&2
     exit 0
   fi
 
   echo "Removing version pin for '$TOOL' (was pinned to: $PINNED_VALUE)..."
-
-  # Remove specific cycle from pinned_versions object
-  TMP_FILE=$(mktemp)
-  jq --arg cycle "$VERSION_CYCLE" 'del(.pinned_versions[$cycle]) | if .pinned_versions == {} then del(.pinned_versions) else . end' "$CATALOG_FILE" > "$TMP_FILE"
-  mv "$TMP_FILE" "$CATALOG_FILE"
-
+  pins_remove_cycle "$BASE_TOOL" "$VERSION_CYCLE"
   echo "✓ Removed pin for '$TOOL'"
 else
   # Check if pinned
-  PINNED_VERSION="$(jq -r '.pinned_version // empty' "$CATALOG_FILE")"
+  PINNED_VERSION="$(pins_get "$BASE_TOOL")"
   if [ -z "$PINNED_VERSION" ]; then
     echo "Tool '$TOOL' is not pinned" >&2
     exit 0
   fi
 
   echo "Removing version pin for '$TOOL' (was pinned to $PINNED_VERSION)..."
-
-  # Remove pinned_version field from catalog
-  TMP_FILE=$(mktemp)
-  jq 'del(.pinned_version)' "$CATALOG_FILE" > "$TMP_FILE"
-  mv "$TMP_FILE" "$CATALOG_FILE"
-
+  pins_remove "$BASE_TOOL"
   echo "✓ Removed pin for '$TOOL'"
 fi
 

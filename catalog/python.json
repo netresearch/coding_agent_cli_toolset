@@ -28,9 +28,5 @@
       "pyproject.toml",
       ".tool-versions"
     ]
-  },
-  "pinned_versions": {
-    "3.11": "never",
-    "3.10": "never"
   }
 }

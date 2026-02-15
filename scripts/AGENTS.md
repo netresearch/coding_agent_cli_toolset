@@ -49,6 +49,7 @@
 **Shared utilities:** `scripts/lib/` directory (10 modules):
 - `lib/common.sh` — Logging and output formatting
 - `lib/config.sh` — Read user config from `~/.config/cli-audit/config.yml`
+- `lib/pins.sh` — Read/write version pins from `~/.config/cli-audit/pins.json`
 - `lib/catalog.sh` — Catalog access utilities
 - `lib/capability.sh`, `lib/dependency.sh` — Capability and dependency checks
 - `lib/install_strategy.sh`, `lib/reconcile.sh` — Installation strategies

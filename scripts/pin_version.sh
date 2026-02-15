@@ -5,6 +5,9 @@ set -euo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$DIR/.." && pwd)"
 
+# Load pin library
+. "$DIR/lib/pins.sh"
+
 TOOL="${1:-}"
 VERSION="${2:-}"
 
@@ -67,12 +70,8 @@ fi
 if [ -n "$IS_MULTI_VERSION" ]; then
   echo "Pinning '$TOOL' (version cycle $VERSION_CYCLE) to: $VERSION..."
 
-  # Update catalog with pinned_versions object
-  TMP_FILE=$(mktemp)
-  jq --arg cycle "$VERSION_CYCLE" --arg version "$VERSION" \
-    '.pinned_versions = ((.pinned_versions // {}) + {($cycle): $version})' \
-    "$CATALOG_FILE" > "$TMP_FILE"
-  mv "$TMP_FILE" "$CATALOG_FILE"
+  # Store pin in user-local pins file
+  pins_set_cycle "$BASE_TOOL" "$VERSION_CYCLE" "$VERSION"
 
   echo "✓ Pinned '$TOOL' to: $VERSION"
   echo ""
@@ -86,10 +85,8 @@ if [ -n "$IS_MULTI_VERSION" ]; then
 else
   echo "Pinning '$TOOL' to version $VERSION..."
 
-  # Update catalog with pinned_version field
-  TMP_FILE=$(mktemp)
-  jq --arg version "$VERSION" '. + {pinned_version: $version}' "$CATALOG_FILE" > "$TMP_FILE"
-  mv "$TMP_FILE" "$CATALOG_FILE"
+  # Store pin in user-local pins file
+  pins_set "$BASE_TOOL" "$VERSION"
 
   echo "✓ Pinned '$TOOL' to version $VERSION"
   echo ""

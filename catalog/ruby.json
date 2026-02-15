@@ -26,9 +26,5 @@
       "Gemfile"
     ]
   },
-  "notes": "Managed via rbenv for version management. Supports multiple concurrent versions.",
-  "pinned_versions": {
-    "3.4": "never",
-    "3.3": "never"
-  }
+  "notes": "Managed via rbenv for version management. Supports multiple concurrent versions."
 }

@@ -28,8 +28,5 @@
       "package.json"
     ]
   },
-  "notes": "Managed via nvm (Node Version Manager). Supports multiple concurrent LTS versions.",
-  "pinned_versions": {
-    "22": "never"
-  }
+  "notes": "Managed via nvm (Node Version Manager). Supports multiple concurrent LTS versions."
 }

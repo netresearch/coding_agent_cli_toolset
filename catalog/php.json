@@ -34,8 +34,5 @@
       "composer.json"
     ]
   },
-  "notes": "Uses ondrej/php PPA for latest PHP version on Ubuntu/Debian. Required for Composer. Supports multiple concurrent versions (8.5, 8.4, 8.3, 8.2).",
-  "pinned_versions": {
-    "8.2": "never"
-  }
+  "notes": "Uses ondrej/php PPA for latest PHP version on Ubuntu/Debian. Required for Composer. Supports multiple concurrent versions (8.5, 8.4, 8.3, 8.2)."
 }

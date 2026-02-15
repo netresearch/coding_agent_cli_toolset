@@ -57,19 +57,34 @@ catalog_get_property() {
 }
 
 # Get pinned version for a specific version cycle (multi-version tools)
+# Reads from user-local pins file, not catalog
 catalog_get_pinned_version() {
   local tool="$1"
   local version_cycle="$2"
-  local catalog_dir="$ROOT/catalog"
 
-  if ! command -v jq >/dev/null 2>&1; then
-    return
+  # Source pins library if not already loaded
+  if ! type pins_get_cycle &>/dev/null; then
+    local lib_dir
+    lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    . "$lib_dir/pins.sh"
   fi
 
-  local json="$catalog_dir/$tool.json"
-  if [ -f "$json" ]; then
-    jq -r --arg cycle "$version_cycle" '.pinned_versions[$cycle] // empty' "$json"
+  pins_get_cycle "$tool" "$version_cycle"
+}
+
+# Get pin for a single-version tool
+# Reads from user-local pins file, not catalog
+catalog_get_pin() {
+  local tool="$1"
+
+  # Source pins library if not already loaded
+  if ! type pins_get &>/dev/null; then
+    local lib_dir
+    lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    . "$lib_dir/pins.sh"
   fi
+
+  pins_get "$tool"
 }
 
 # Check if tool is deprecated
