@@ -56,11 +56,12 @@
       "npm_package": "@anthropic-ai/claude-code"
     },
     "codex": {
-      "latest_tag": "1.8.22",
-      "latest_url": "https://pypi.org/project/codex/",
-      "latest_version": "1.8.22",
-      "tool_url": "https://pypi.org/project/codex/",
-      "upstream_method": "pypi"
+      "latest_tag": "rust-v0.101.0",
+      "latest_url": "https://github.com/openai/codex/releases/tag/rust-v0.101.0",
+      "latest_version": "0.101.0",
+      "tool_url": "https://www.npmjs.com/package/@openai/codex",
+      "upstream_method": "npm",
+      "npm_package": "@openai/codex"
     },
     "compose": {
       "latest_tag": "5.0.1",
