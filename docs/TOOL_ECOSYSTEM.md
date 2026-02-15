@@ -563,6 +563,14 @@ make audit-offline-data-core
 - **Install:** `npm install -g @openai/codex`
 - **Upgrade:** `npm update -g @openai/codex`
 
+### gemini
+- **Purpose:** Google Gemini CLI - AI coding agent
+- **Executable:** `gemini`
+- **Upstream:** npm (@google/gemini-cli)
+- **Use Case:** AI-powered coding agent in your terminal
+- **Install:** `npm install -g @google/gemini-cli`
+- **Upgrade:** `npm update -g @google/gemini-cli`
+
 ### claude
 - **Purpose:** Anthropic Claude Code CLI
 - **Executable:** `claude`

@@ -2,12 +2,12 @@
 
 This file documents which tools have catalog entries and which use dedicated install scripts.
 
-## Tools with Catalog Entries (54)
+## Tools with Catalog Entries (55)
 
 These tools use the catalog-based installation system with generic installers:
 
 - ansible, ast-grep, aws, bandit, bat, black, codex, composer, curlie, dasel
-- delta, direnv, dive, entr, fd, flake8, fx, fzf, gem, gh, git-absorb
+- delta, direnv, dive, entr, fd, flake8, fx, fzf, gem, gemini, gh, git-absorb
 - git-branchless, git-lfs, gitleaks, glab, golangci-lint, httpie, isort, just
 - kubectl, ninja, npm, parallel, pip, pipx, pnpm, poetry, pre-commit, prettier
 - rga, ripgrep, ruff, sd, semgrep, shellcheck, shfmt, sponge, terraform, tfsec

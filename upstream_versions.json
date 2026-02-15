@@ -175,6 +175,14 @@
       "tool_url": "https://github.com/GAM-team/GAM",
       "upstream_method": "gh"
     },
+    "gemini": {
+      "latest_tag": "v0.28.2",
+      "latest_url": "https://github.com/google-gemini/gemini-cli/releases/tag/v0.28.2",
+      "latest_version": "0.28.2",
+      "tool_url": "https://www.npmjs.com/package/@google/gemini-cli",
+      "upstream_method": "npm",
+      "npm_package": "@google/gemini-cli"
+    },
     "gem": {
       "latest_tag": "bundler-v4.0.2",
       "latest_url": "https://github.com/rubygems/rubygems/releases/tag/bundler-v4.0.2",
