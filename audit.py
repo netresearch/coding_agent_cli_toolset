@@ -17,7 +17,9 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Add current directory to path
@@ -42,6 +44,16 @@ from cli_audit.local_state import (  # noqa: E402
     load_local_state, write_local_state, get_local_state_path,
     update_local_installation, merge_for_display, build_legacy_snapshot,
 )
+
+# Strip control characters from externally-sourced strings (e.g. GitHub tags)
+# to prevent terminal escape sequence injection.
+_CONTROL_CHAR_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+
+def _sanitize(s: str) -> str:
+    """Remove control characters from a string for safe terminal display."""
+    return _CONTROL_CHAR_RE.sub("", s) if s else s
+
 
 # Configuration from environment
 OFFLINE_MODE = os.environ.get("CLI_AUDIT_OFFLINE", "0") == "1"
@@ -601,8 +613,8 @@ def cmd_update(args: argparse.Namespace) -> int:
                                 latest_color = BLUE
                                 op = "?"
 
-                            inst_display = inst if inst else "n/a"
-                            latest_display = latest if latest else "n/a"
+                            inst_display = _sanitize(inst) if inst else "n/a"
+                            latest_display = _sanitize(latest) if latest else "n/a"
 
                             # Add pinned/skip markers (reuse catalog from outer scope)
                             markers = []
@@ -643,31 +655,29 @@ def cmd_update(args: argparse.Namespace) -> int:
                     executor.shutdown(wait=False, cancel_futures=True)
                     raise
 
-        # Print grouped summary
+        # Print grouped summary (single-pass counting)
+        status_counts: dict[str, Counter] = {cat: Counter() for cat in sorted_cats}
+        for r in results:
+            cat = r.get("category", "general")
+            if cat in status_counts:
+                status_counts[cat][r.get("status")] += 1
+
         print(f"\n# Summary by category:", file=sys.stderr)
         for category in sorted_cats:
-            cat_tools = categorized[category]
             icon = CATEGORY_ICON.get(category, "📦")
             desc = CATEGORY_DESC.get(category, category)
-            # Count statuses for this category
-            cat_names = {t.name for t in cat_tools}
-            cat_results = [r for r in results if r.get("tool") in cat_names]
-            up_to_date = sum(1 for r in cat_results if r.get("status") == "UP-TO-DATE")
-            outdated = sum(1 for r in cat_results if r.get("status") == "OUTDATED")
-            not_installed = sum(1 for r in cat_results if r.get("status") == "NOT INSTALLED")
-            conflict = sum(1 for r in cat_results if r.get("status") == "CONFLICT")
-            unknown = sum(1 for r in cat_results if r.get("status") == "UNKNOWN")
+            counts = status_counts[category]
             parts = []
-            if up_to_date:
-                parts.append(f"{GREEN}{up_to_date} current{RESET}")
-            if outdated:
-                parts.append(f"{YELLOW}{outdated} outdated{RESET}")
-            if not_installed:
-                parts.append(f"{BLUE}{not_installed} missing{RESET}")
-            if conflict:
-                parts.append(f"{YELLOW}{conflict} conflict{RESET}")
-            if unknown:
-                parts.append(f"{BLUE}{unknown} unknown{RESET}")
+            if counts["UP-TO-DATE"]:
+                parts.append(f"{GREEN}{counts['UP-TO-DATE']} current{RESET}")
+            if counts["OUTDATED"]:
+                parts.append(f"{YELLOW}{counts['OUTDATED']} outdated{RESET}")
+            if counts["NOT INSTALLED"]:
+                parts.append(f"{BLUE}{counts['NOT INSTALLED']} missing{RESET}")
+            if counts["CONFLICT"]:
+                parts.append(f"{YELLOW}{counts['CONFLICT']} conflict{RESET}")
+            if counts["UNKNOWN"]:
+                parts.append(f"{BLUE}{counts['UNKNOWN']} unknown{RESET}")
             summary = ", ".join(parts) if parts else "–"
             print(f"#   {icon} {desc}: {summary}", file=sys.stderr)
 
@@ -700,8 +710,8 @@ def cmd_update(args: argparse.Namespace) -> int:
                         inst_color = BLUE
                         op = "?"
 
-                    inst_display = inst if inst else "n/a"
-                    latest_display = latest if latest else "n/a"
+                    inst_display = _sanitize(inst) if inst else "n/a"
+                    latest_display = _sanitize(latest) if latest else "n/a"
                     inst_fmt = f"{inst_color}{inst_display}{RESET}"
                     latest_fmt = f"{BOLD_GREEN}{latest_display}{RESET}"
                     print(f"#     → {versioned_name}: {inst_fmt} {op} {latest_fmt}", file=sys.stderr, flush=True)

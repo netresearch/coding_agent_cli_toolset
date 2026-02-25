@@ -801,10 +801,7 @@ category_matches_filter() {
 
 # Helper: sort tools alphabetically by name within a category
 sort_tools_by_name() {
-  local tools="$1"
-  for tool in $tools; do
-    echo "$tool"
-  done | sort
+  printf '%s\n' $1 | sort
 }
 
 # Process tools grouped by category (in category order)
