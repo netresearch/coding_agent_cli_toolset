@@ -620,3 +620,313 @@ class TestCatalogDebianNaming:
         assert entry.candidates is not None
         assert "fdfind" in entry.candidates
         assert "fd" in entry.candidates
+
+
+# ===========================================================================
+# 13. Dedicated scripts: uninstall handler contract (Issue #36)
+# ===========================================================================
+
+# All 14 dedicated scripts from the catalog
+DEDICATED_SCRIPTS = [
+    "claude", "composer", "docker", "gem", "go", "node", "parallel",
+    "python", "ruby", "rust", "tmux", "tree", "uv", "yarn",
+]
+
+
+@skip_on_windows
+class TestDedicatedScriptUninstallHandler:
+    """Tests that all 14 dedicated scripts handle the uninstall action (Issue #36)."""
+
+    @pytest.mark.parametrize("catalog_name", DEDICATED_SCRIPTS)
+    def test_dedicated_script_handles_uninstall_action(self, catalog_name):
+        """Each dedicated script must have an 'uninstall)' case branch."""
+        catalog_path = CATALOG_DIR / f"{catalog_name}.json"
+        if not catalog_path.exists():
+            pytest.skip(f"{catalog_name}.json not found")
+        with open(catalog_path) as f:
+            data = json.load(f)
+        script_name = data.get("script", "")
+        assert script_name, f"{catalog_name}: missing 'script' field"
+        script_path = SCRIPTS_DIR / script_name
+        assert script_path.exists(), f"{script_name} not found"
+        content = script_path.read_text()
+        assert "uninstall)" in content, (
+            f"{script_name} must have an 'uninstall)' case to handle "
+            f"'install_tool.sh {catalog_name} uninstall'"
+        )
+
+    @pytest.mark.parametrize("catalog_name", DEDICATED_SCRIPTS)
+    def test_dedicated_script_parses_action_arg(self, catalog_name):
+        """Each dedicated script must parse $1 as an action via case statement."""
+        catalog_path = CATALOG_DIR / f"{catalog_name}.json"
+        if not catalog_path.exists():
+            pytest.skip(f"{catalog_name}.json not found")
+        with open(catalog_path) as f:
+            data = json.load(f)
+        script_name = data.get("script", "")
+        script_path = SCRIPTS_DIR / script_name
+        content = script_path.read_text()
+        # Script must either set ACTION="${1:-...}" or use case "${1:-...}"
+        has_action_var = 'ACTION="${1:-' in content or "ACTION=\"${1:-" in content
+        has_inline_case = 'case "${1:-' in content or "case \"${1:-" in content
+        assert has_action_var or has_inline_case, (
+            f"{script_name} must parse $1 as action "
+            f"(use ACTION=\"${{1:-install}}\" or case \"${{1:-install}}\")"
+        )
+
+    def test_install_go_uninstall_does_not_download(self):
+        """install_go.sh uninstall must NOT trigger any downloads (curl/wget)."""
+        script_path = SCRIPTS_DIR / "install_go.sh"
+        # Run with uninstall action in a sandboxed environment
+        # Override PATH to remove real go/curl/wget and use stubs that fail loudly
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create stub binaries that record invocations
+            marker = Path(tmpdir) / "download_called"
+            for cmd in ("curl", "wget"):
+                stub = Path(tmpdir) / cmd
+                stub.write_text(
+                    f"#!/bin/sh\ntouch '{marker}'\n"
+                    f"echo 'ERROR: {cmd} should not be called during uninstall' >&2\n"
+                    f"exit 1\n"
+                )
+                stub.chmod(0o700)
+
+            # Create a fake go binary so the script thinks go is installed
+            fake_go = Path(tmpdir) / "go"
+            fake_go.write_text("#!/bin/sh\necho 'go version go1.25.0 linux/amd64'\n")
+            fake_go.chmod(0o700)
+
+            # Run the script with uninstall action
+            env = os.environ.copy()
+            # Put our stubs first in PATH, but keep bash/coreutils accessible
+            env["PATH"] = f"{tmpdir}:/usr/bin:/bin"
+            env["HOME"] = tmpdir
+            result = subprocess.run(
+                ["bash", str(script_path), "uninstall"],
+                capture_output=True, text=True, timeout=10,
+                env=env,
+            )
+            assert not marker.exists(), (
+                f"install_go.sh uninstall triggered a download! "
+                f"stdout: {result.stdout}\nstderr: {result.stderr}"
+            )
+
+    def test_install_composer_uninstall_does_not_download(self):
+        """install_composer.sh uninstall must NOT trigger any downloads."""
+        script_path = SCRIPTS_DIR / "install_composer.sh"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            marker = Path(tmpdir) / "download_called"
+            for cmd in ("curl", "wget"):
+                stub = Path(tmpdir) / cmd
+                stub.write_text(
+                    f"#!/bin/sh\ntouch '{marker}'\n"
+                    f"echo 'ERROR: {cmd} should not be called during uninstall' >&2\n"
+                    f"exit 1\n"
+                )
+                stub.chmod(0o700)
+
+            # Create a fake composer binary
+            fake_composer = Path(tmpdir) / "composer"
+            fake_composer.write_text("#!/bin/sh\necho 'Composer version 2.8.0'\n")
+            fake_composer.chmod(0o700)
+
+            env = os.environ.copy()
+            env["PATH"] = f"{tmpdir}:/usr/bin:/bin"
+            env["HOME"] = tmpdir
+            result = subprocess.run(
+                ["bash", str(script_path), "uninstall"],
+                capture_output=True, text=True, timeout=10,
+                env=env,
+            )
+            assert not marker.exists(), (
+                f"install_composer.sh uninstall triggered a download! "
+                f"stdout: {result.stdout}\nstderr: {result.stderr}"
+            )
+
+    def test_install_docker_uninstall_does_not_download(self):
+        """install_docker.sh uninstall must NOT trigger any downloads."""
+        script_path = SCRIPTS_DIR / "install_docker.sh"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            marker = Path(tmpdir) / "download_called"
+            for cmd in ("curl", "wget"):
+                stub = Path(tmpdir) / cmd
+                stub.write_text(
+                    f"#!/bin/sh\ntouch '{marker}'\n"
+                    f"echo 'ERROR: {cmd} should not be called during uninstall' >&2\n"
+                    f"exit 1\n"
+                )
+                stub.chmod(0o700)
+
+            env = os.environ.copy()
+            env["PATH"] = f"{tmpdir}:/usr/bin:/bin"
+            env["HOME"] = tmpdir
+            result = subprocess.run(
+                ["bash", str(script_path), "uninstall"],
+                capture_output=True, text=True, timeout=10,
+                env=env,
+            )
+            assert not marker.exists(), (
+                f"install_docker.sh uninstall triggered a download! "
+                f"stdout: {result.stdout}\nstderr: {result.stderr}"
+            )
+
+    def test_install_parallel_uninstall_does_not_download(self):
+        """install_parallel.sh uninstall must NOT trigger any downloads."""
+        script_path = SCRIPTS_DIR / "install_parallel.sh"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            marker = Path(tmpdir) / "download_called"
+            for cmd in ("curl", "wget"):
+                stub = Path(tmpdir) / cmd
+                stub.write_text(
+                    f"#!/bin/sh\ntouch '{marker}'\n"
+                    f"echo 'ERROR: {cmd} should not be called during uninstall' >&2\n"
+                    f"exit 1\n"
+                )
+                stub.chmod(0o700)
+
+            # Create a fake parallel binary
+            fake_parallel = Path(tmpdir) / "parallel"
+            fake_parallel.write_text("#!/bin/sh\necho 'GNU parallel 20250122'\n")
+            fake_parallel.chmod(0o700)
+
+            env = os.environ.copy()
+            env["PATH"] = f"{tmpdir}:/usr/bin:/bin"
+            env["HOME"] = tmpdir
+            result = subprocess.run(
+                ["bash", str(script_path), "uninstall"],
+                capture_output=True, text=True, timeout=10,
+                env=env,
+            )
+            assert not marker.exists(), (
+                f"install_parallel.sh uninstall triggered a download! "
+                f"stdout: {result.stdout}\nstderr: {result.stderr}"
+            )
+
+
+# ===========================================================================
+# 14. reconcile.sh: sudo-aware removal (Issue #37)
+# ===========================================================================
+
+@skip_on_windows
+class TestReconcileSudoAwareRemoval:
+    """Tests for sudo-aware binary removal in reconcile.sh (Issue #37)."""
+
+    def _source_and_run(self, bash_code: str) -> subprocess.CompletedProcess:
+        """Source reconcile.sh and run bash code."""
+        full_code = f"""
+set -euo pipefail
+source "{SCRIPTS_DIR}/lib/reconcile.sh"
+{bash_code}
+"""
+        return subprocess.run(
+            ["bash", "-c", full_code],
+            capture_output=True, text=True, timeout=10,
+        )
+
+    def test_remove_installation_checks_writability(self):
+        """reconcile.sh should check directory writability before removal."""
+        content = (SCRIPTS_DIR / "lib" / "reconcile.sh").read_text()
+        # The github_release_binary|manual case should check writability
+        assert "-w " in content or "-w \"" in content, (
+            "reconcile.sh remove_installation() must check writability "
+            "with [ -w ] before removing binaries"
+        )
+
+    def test_remove_installation_no_sudo_for_writable_dir(self):
+        """remove_installation should NOT use sudo for writable directories."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a fake binary in a writable directory
+            fake_bin = Path(tmpdir) / "fake_tool"
+            fake_bin.write_text("#!/bin/sh\necho fake")
+            fake_bin.chmod(0o700)
+
+            # Create a sudo stub that records calls
+            sudo_marker = Path(tmpdir) / "sudo_called"
+            sudo_stub = Path(tmpdir) / "sudo"
+            sudo_stub.write_text(
+                f"#!/bin/sh\ntouch '{sudo_marker}'\nexec \"$@\"\n"
+            )
+            sudo_stub.chmod(0o700)
+
+            result = self._source_and_run(f"""
+export PATH="{tmpdir}:$PATH"
+remove_installation "fake_tool" "manual" "fake_tool"
+""")
+            assert result.returncode == 0, f"removal failed: {result.stderr}"
+            assert not fake_bin.exists(), "Binary should have been removed"
+            assert not sudo_marker.exists(), (
+                "sudo should NOT be used for writable directories"
+            )
+
+    def test_remove_installation_uses_sudo_for_nonwritable_dir(self):
+        """remove_installation should use sudo for non-writable directories."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a subdirectory that we'll make non-writable
+            restricted_dir = Path(tmpdir) / "restricted"
+            restricted_dir.mkdir()
+
+            # Create a fake binary
+            fake_bin = restricted_dir / "fake_tool"
+            fake_bin.write_text("#!/bin/sh\necho fake")
+            fake_bin.chmod(0o700)
+
+            # Create a sudo stub that records calls
+            # Note: the stub can't actually remove the file (no real elevated
+            # permissions), so exit code may be non-zero. We only check that
+            # sudo was invoked.
+            sudo_marker = Path(tmpdir) / "sudo_called"
+            sudo_stub = Path(tmpdir) / "sudo"
+            sudo_stub.write_text(
+                f"#!/bin/sh\ntouch '{sudo_marker}'\nexec \"$@\"\n"
+            )
+            sudo_stub.chmod(0o700)
+
+            # Make the directory non-writable
+            restricted_dir.chmod(0o500)
+
+            try:
+                self._source_and_run(f"""
+export PATH="{restricted_dir}:{tmpdir}:$PATH"
+remove_installation "fake_tool" "github_release_binary" "fake_tool" || true
+""")
+                assert sudo_marker.exists(), (
+                    "sudo SHOULD be used for non-writable directories like /usr/local/bin"
+                )
+            finally:
+                # Restore permissions for cleanup
+                restricted_dir.chmod(0o700)
+
+    def test_remove_installation_error_when_no_sudo_and_nonwritable(self):
+        """remove_installation should error gracefully when dir is not writable and sudo is unavailable."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fake_bin = Path(tmpdir) / "fake_tool"
+            fake_bin.write_text("#!/bin/sh\necho fake")
+            fake_bin.chmod(0o700)
+            os.chmod(tmpdir, 0o500)
+            try:
+                result = subprocess.run(
+                    ["bash", "-c", f"""
+                        source scripts/lib/reconcile.sh 2>/dev/null || source scripts/lib/common.sh
+                        source scripts/lib/reconcile.sh
+                        export PATH="{tmpdir}:$PATH"
+                        # Hide sudo
+                        sudo() {{ return 127; }}
+                        export -f sudo
+                        remove_installation "fake_tool" "manual" "fake_tool" 2>&1
+                    """],
+                    capture_output=True, text=True, timeout=10,
+                    cwd=str(Path(__file__).parent.parent),
+                )
+                combined = result.stdout + result.stderr
+                assert "no write access" in combined.lower() or "sudo not available" in combined.lower() or result.returncode != 0
+            finally:
+                os.chmod(tmpdir, 0o700)
+
+    def test_remove_installation_github_release_writability_check(self):
+        """github_release_binary case must check bin_dir writability."""
+        content = (SCRIPTS_DIR / "lib" / "reconcile.sh").read_text()
+        # Find the github_release_binary|manual case and verify it has writability logic
+        # The pattern should be: check -w on the directory, then use sudo if not writable
+        assert "sudo rm" in content, (
+            "reconcile.sh must use 'sudo rm' as fallback for non-writable dirs"
+        )
