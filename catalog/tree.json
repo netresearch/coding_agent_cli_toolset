@@ -1,19 +1,14 @@
 {
   "name": "tree",
   "category": "general",
-  "install_method": "package_manager",
+  "install_method": "dedicated_script",
   "description": "Display directory structure as a tree diagram",
   "homepage": "https://github.com/Old-Man-Programmer/tree",
   "github_repo": "Old-Man-Programmer/tree",
   "binary_name": "tree",
-  "version_command": "tree --version 2>&1 | head -1",
-  "packages": {
-    "apt": "tree",
-    "brew": "tree",
-    "dnf": "tree",
-    "pacman": "tree"
-  },
+  "script": "install_tree.sh",
   "tags": [
     "file-utils"
-  ]
+  ],
+  "notes": "Built from source since apt repos lag behind. No GitHub releases, uses git tags."
 }
