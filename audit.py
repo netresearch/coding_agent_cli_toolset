@@ -551,107 +551,128 @@ def cmd_update(args: argparse.Namespace) -> int:
     # Total includes both regular tools and multi-version entries
     total = len(regular_tools) + len(multi_version_tools)
 
-    # Parallel audit with progress tracking, grouped by category
+    # Parallel audit with progress tracking
+    # All tools submitted to a single executor for maximum parallelism
+    # (no per-category sequential bottleneck)
     results = []
     completed = 0
 
+    # ANSI colors for all platforms
+    GREEN = "\033[32m"
+    BOLD_GREEN = "\033[1;32m"
+    YELLOW = "\033[33m"
+    BLUE = "\033[34m"
+    RESET = "\033[0m"
+
     try:
+        if regular_tools:
+            with ThreadPoolExecutor(max_workers=min(MAX_WORKERS, len(regular_tools))) as executor:
+                future_to_tool = {executor.submit(audit_tool, tool, None): tool for tool in regular_tools}
+
+                try:
+                    for future in as_completed(future_to_tool):
+                        tool = future_to_tool[future]
+                        try:
+                            result = future.result()
+                            results.append(result)
+                            completed += 1
+
+                            # Progress
+                            inst = result.get("installed", "")
+                            latest = result.get("latest_upstream", "")
+                            status = result.get("status", "")
+                            cat = tool.category or "general"
+
+                            # Color the installed version based on status
+                            if status == "UP-TO-DATE":
+                                inst_color = GREEN
+                                latest_color = GREEN
+                                op = "==="
+                            elif status == "OUTDATED":
+                                inst_color = YELLOW
+                                latest_color = BOLD_GREEN
+                                op = "!=="
+                            elif status == "CONFLICT":
+                                inst_color = YELLOW
+                                latest_color = BOLD_GREEN
+                                op = "⚠️"
+                            else:  # NOT INSTALLED, UNKNOWN
+                                inst_color = BLUE
+                                latest_color = BLUE
+                                op = "?"
+
+                            inst_display = inst if inst else "n/a"
+                            latest_display = latest if latest else "n/a"
+
+                            # Add pinned/skip markers (reuse catalog from outer scope)
+                            markers = []
+                            if catalog.is_pinned(tool.name):
+                                markers.append("PINNED")
+                            if catalog.should_skip(tool.name, latest):
+                                markers.append("SKIP")
+
+                            marker_str = f" [{' '.join(markers)}]" if markers else ""
+                            inst_fmt = f"{inst_color}{inst_display}{RESET}"
+                            latest_fmt = f"{latest_color}{latest_display}{RESET}"
+                            msg = f"# [{completed}/{total}] [{cat}] {tool.name} (installed: {inst_fmt} {op} latest: {latest_fmt}){marker_str}"
+
+                            print(msg, file=sys.stderr, flush=True)
+
+                        except Exception as e:
+                            completed += 1
+                            print(f"# [{completed}/{total}] {tool.name} (failed: {e})", file=sys.stderr, flush=True)
+
+                            # Add failure entry
+                            results.append({
+                                "tool": tool.name,
+                                "category": tool.category,
+                                "installed": "",
+                                "installed_method": "",
+                                "installed_version": "",
+                                "installed_path_selected": "",
+                                "classification_reason_selected": "Detection failed",
+                                "latest_upstream": "",
+                                "latest_version": "",
+                                "upstream_method": tool.source_kind,
+                                "status": "UNKNOWN",
+                                "tool_url": tool_homepage_url(tool),
+                                "latest_url": "",
+                                "hint": "",
+                            })
+                except KeyboardInterrupt:
+                    executor.shutdown(wait=False, cancel_futures=True)
+                    raise
+
+        # Print grouped summary
+        print(f"\n# Summary by category:", file=sys.stderr)
         for category in sorted_cats:
             cat_tools = categorized[category]
             icon = CATEGORY_ICON.get(category, "📦")
             desc = CATEGORY_DESC.get(category, category)
-            print(f"\n# {icon} {desc} ({len(cat_tools)} tools)", file=sys.stderr)
-
-            with ThreadPoolExecutor(max_workers=min(MAX_WORKERS, len(cat_tools))) as executor:
-                future_to_tool = {executor.submit(audit_tool, tool, None): tool for tool in cat_tools}
-
-                for future in as_completed(future_to_tool):
-                    tool = future_to_tool[future]
-                    try:
-                        result = future.result()
-                        results.append(result)
-                        completed += 1
-
-                        # Progress
-                        inst = result.get("installed", "")
-                        latest = result.get("latest_upstream", "")
-                        status = result.get("status", "")
-
-                        # ANSI colors for all platforms
-                        GREEN = "\033[32m"
-                        BOLD_GREEN = "\033[1;32m"
-                        YELLOW = "\033[33m"
-                        BLUE = "\033[34m"
-                        RESET = "\033[0m"
-
-                        # Color the installed version based on status
-                        if status == "UP-TO-DATE":
-                            inst_color = GREEN
-                            latest_color = GREEN
-                            op = "==="
-                        elif status == "OUTDATED":
-                            inst_color = YELLOW
-                            latest_color = BOLD_GREEN  # Latest is newer, make it bold green
-                            op = "!=="
-                        elif status == "CONFLICT":
-                            inst_color = YELLOW
-                            latest_color = BOLD_GREEN
-                            op = "⚠️"
-                        else:  # NOT INSTALLED, UNKNOWN
-                            inst_color = BLUE  # Blue for not-installed
-                            latest_color = BLUE
-                            op = "?"
-
-                        inst_display = inst if inst else "n/a"
-                        latest_display = latest if latest else "n/a"
-
-                        # Add pinned/skip markers
-                        from cli_audit.catalog import ToolCatalog
-                        catalog = ToolCatalog()
-                        markers = []
-                        if catalog.is_pinned(tool.name):
-                            markers.append("PINNED")
-                        if catalog.should_skip(tool.name, latest):
-                            markers.append("SKIP")
-
-                        marker_str = f" [{' '.join(markers)}]" if markers else ""
-                        inst_fmt = f"{inst_color}{inst_display}{RESET}"
-                        latest_fmt = f"{latest_color}{latest_display}{RESET}"
-                        msg = f"# [{completed}/{total}] {tool.name} (installed: {inst_fmt} {op} latest: {latest_fmt}){marker_str}"
-
-                        print(msg, file=sys.stderr, flush=True)
-
-                    except Exception as e:
-                        completed += 1
-                        print(f"# [{completed}/{total}] {tool.name} (failed: {e})", file=sys.stderr, flush=True)
-
-                        # Add failure entry
-                        results.append({
-                            "tool": tool.name,
-                            "category": tool.category,
-                            "installed": "",
-                            "installed_method": "",
-                            "installed_version": "",
-                            "installed_path_selected": "",
-                            "classification_reason_selected": "Detection failed",
-                            "latest_upstream": "",
-                            "latest_version": "",
-                            "upstream_method": tool.source_kind,
-                            "status": "UNKNOWN",
-                            "tool_url": tool_homepage_url(tool),
-                            "latest_url": "",
-                            "hint": "",
-                        })
+            # Count statuses for this category
+            cat_names = {t.name for t in cat_tools}
+            cat_results = [r for r in results if r.get("tool") in cat_names]
+            up_to_date = sum(1 for r in cat_results if r.get("status") == "UP-TO-DATE")
+            outdated = sum(1 for r in cat_results if r.get("status") == "OUTDATED")
+            not_installed = sum(1 for r in cat_results if r.get("status") == "NOT INSTALLED")
+            conflict = sum(1 for r in cat_results if r.get("status") == "CONFLICT")
+            unknown = sum(1 for r in cat_results if r.get("status") == "UNKNOWN")
+            parts = []
+            if up_to_date:
+                parts.append(f"{GREEN}{up_to_date} current{RESET}")
+            if outdated:
+                parts.append(f"{YELLOW}{outdated} outdated{RESET}")
+            if not_installed:
+                parts.append(f"{BLUE}{not_installed} missing{RESET}")
+            if conflict:
+                parts.append(f"{YELLOW}{conflict} conflict{RESET}")
+            if unknown:
+                parts.append(f"{BLUE}{unknown} unknown{RESET}")
+            summary = ", ".join(parts) if parts else "–"
+            print(f"#   {icon} {desc}: {summary}", file=sys.stderr)
 
         # Audit multi-version runtimes
         if multi_version_tools:
-            # ANSI colors
-            GREEN = "\033[32m"
-            BOLD_GREEN = "\033[1;32m"
-            YELLOW = "\033[33m"
-            BLUE = "\033[34m"
-            RESET = "\033[0m"
-
             print(f"\n# 🔄 Multi-version runtimes ({len(multi_version_tools)} runtimes)", file=sys.stderr)
 
             for tool_name, (catalog_data, mv_config) in multi_version_tools.items():
@@ -686,8 +707,6 @@ def cmd_update(args: argparse.Namespace) -> int:
                     print(f"#     → {versioned_name}: {inst_fmt} {op} {latest_fmt}", file=sys.stderr, flush=True)
 
     except KeyboardInterrupt:
-        # Shutdown executor immediately without waiting for threads
-        executor.shutdown(wait=False, cancel_futures=True)
         print("\n\n✗ Interrupted", file=sys.stderr)
         # Reset terminal state before exiting
         print("\033[0m", end="", file=sys.stderr, flush=True)
