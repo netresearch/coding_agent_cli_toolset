@@ -170,12 +170,22 @@ uninstall_go() {
     # Remove /usr/local/go (standard manual install location)
     if [ -d "/usr/local/go" ]; then
       echo "[go] Removing /usr/local/go..." >&2
-      sudo rm -rf /usr/local/go
+      if [ -w "/usr/local" ]; then
+        rm -rf /usr/local/go
+      elif command -v sudo >/dev/null 2>&1; then
+        sudo rm -rf /usr/local/go
+      else
+        echo "[go] Error: Cannot remove /usr/local/go (no write access and sudo not available)" >&2
+      fi
     fi
     # Remove symlinks in /usr/local/bin
     for link in /usr/local/bin/go /usr/local/bin/gofmt; do
       if [ -L "$link" ]; then
-        sudo rm -f "$link" 2>/dev/null || true
+        if [ -w "/usr/local/bin" ]; then
+          rm -f "$link" 2>/dev/null || true
+        elif command -v sudo >/dev/null 2>&1; then
+          sudo rm -f "$link" 2>/dev/null || true
+        fi
       fi
     done
     # Remove user Go directories
@@ -194,8 +204,8 @@ uninstall_go() {
     # Remove PATH entries from shell configs
     for rc in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile" "$HOME/.bash_profile"; do
       if [ -f "$rc" ]; then
-        sed -i '/\/usr\/local\/go\/bin/d' "$rc" 2>/dev/null || true
-        sed -i '/GOPATH/d' "$rc" 2>/dev/null || true
+        sed -i '/^[[:space:]]*export.*\/usr\/local\/go\/bin/d' "$rc" 2>/dev/null || true
+        sed -i '/^export GOPATH=/d' "$rc" 2>/dev/null || true
       fi
     done
   fi

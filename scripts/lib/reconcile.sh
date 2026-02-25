@@ -99,8 +99,11 @@ remove_installation() {
         echo "[$tool] Removing binary: $binary_path" >&2
         if [ -w "$bin_dir" ]; then
           rm -f "$binary_path"
-        else
+        elif command -v sudo >/dev/null 2>&1; then
           sudo rm -f "$binary_path"
+        else
+          echo "[$tool] Error: Cannot remove $binary_path (no write access and sudo not available)" >&2
+          return 1
         fi
       fi
       ;;

@@ -896,6 +896,32 @@ remove_installation "fake_tool" "github_release_binary" "fake_tool" || true
                 # Restore permissions for cleanup
                 restricted_dir.chmod(0o755)
 
+    def test_remove_installation_error_when_no_sudo_and_nonwritable(self):
+        """remove_installation should error gracefully when dir is not writable and sudo is unavailable."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fake_bin = Path(tmpdir) / "fake_tool"
+            fake_bin.write_text("#!/bin/sh\necho fake")
+            fake_bin.chmod(0o755)
+            os.chmod(tmpdir, 0o555)
+            try:
+                result = subprocess.run(
+                    ["bash", "-c", f"""
+                        source scripts/lib/reconcile.sh 2>/dev/null || source scripts/lib/common.sh
+                        source scripts/lib/reconcile.sh
+                        export PATH="{tmpdir}:$PATH"
+                        # Hide sudo
+                        sudo() {{ return 127; }}
+                        export -f sudo
+                        remove_installation "fake_tool" "manual" "fake_tool" 2>&1
+                    """],
+                    capture_output=True, text=True, timeout=10,
+                    cwd=str(Path(__file__).parent.parent),
+                )
+                combined = result.stdout + result.stderr
+                assert "no write access" in combined.lower() or "sudo not available" in combined.lower() or result.returncode != 0
+            finally:
+                os.chmod(tmpdir, 0o755)
+
     def test_remove_installation_github_release_writability_check(self):
         """github_release_binary case must check bin_dir writability."""
         content = (SCRIPTS_DIR / "lib" / "reconcile.sh").read_text()
