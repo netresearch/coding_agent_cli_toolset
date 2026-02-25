@@ -87,13 +87,45 @@ install_parallel() {
   return 0
 }
 
+uninstall_parallel() {
+  echo "[$TOOL] Uninstalling parallel..." >&2
+
+  # Remove all parallel-related binaries from install dir
+  for script in parallel parcat parsort parset niceload sql sem env_parallel; do
+    if [ -f "$INSTALL_DIR/$script" ]; then
+      echo "[$TOOL] Removing $INSTALL_DIR/$script" >&2
+      rm -f "$INSTALL_DIR/$script"
+    fi
+  done
+
+  # Also check command -v in case it was installed elsewhere
+  local parallel_bin
+  parallel_bin="$(command -v parallel 2>/dev/null || echo "")"
+  if [ -n "$parallel_bin" ] && [ -f "$parallel_bin" ]; then
+    local bin_dir
+    bin_dir="$(dirname "$parallel_bin")"
+    echo "[$TOOL] Removing $parallel_bin" >&2
+    if [ -w "$bin_dir" ]; then
+      rm -f "$parallel_bin"
+    else
+      echo "[$TOOL] Cannot remove $parallel_bin (no write access), try: sudo rm -f $parallel_bin" >&2
+    fi
+  fi
+
+  echo "[$TOOL] Uninstall complete" >&2
+  refresh_snapshot "$TOOL"
+}
+
 # Main
 case "${1:-install}" in
   install|update)
     install_parallel "${2:-}"
     ;;
+  uninstall)
+    uninstall_parallel
+    ;;
   *)
-    echo "Usage: $0 [install|update] [version]" >&2
+    echo "Usage: $0 [install|update|uninstall] [version]" >&2
     exit 1
     ;;
 esac

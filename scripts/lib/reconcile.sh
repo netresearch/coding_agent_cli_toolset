@@ -94,8 +94,14 @@ remove_installation() {
       local binary_path
       binary_path="$(command -v "$binary" 2>/dev/null || echo "")"
       if [ -n "$binary_path" ] && [ -f "$binary_path" ]; then
+        local bin_dir
+        bin_dir="$(dirname "$binary_path")"
         echo "[$tool] Removing binary: $binary_path" >&2
-        rm -f "$binary_path" || true
+        if [ -w "$bin_dir" ]; then
+          rm -f "$binary_path"
+        else
+          sudo rm -f "$binary_path"
+        fi
       fi
       ;;
     corepack)
