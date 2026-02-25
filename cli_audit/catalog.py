@@ -331,7 +331,7 @@ def resolve_apt_package_name(tool_name: str) -> str:
         packages = data.get("packages", {})
         if "apt" in packages:
             return packages["apt"]
-    except (json.JSONDecodeError, KeyError):
+    except json.JSONDecodeError:
         pass
     return tool_name
 

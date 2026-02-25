@@ -816,34 +816,18 @@ class TestAptPackageNameResolver:
         assert resolve_apt_package_name("ripgrep") == "ripgrep"
 
     def test_resolve_apt_package_name_with_legacy_packages_field(self):
-        """Tools with legacy 'packages' field should still resolve."""
-        from cli_audit.catalog import resolve_apt_package_name
-        import tempfile
+        """Tools using legacy 'packages' field should resolve correctly."""
         import json
-        import os
+        from cli_audit.catalog import resolve_apt_package_name
 
-        # Create a temporary catalog file with legacy packages field
-        with tempfile.TemporaryDirectory() as tmpdir:
-            catalog_file = os.path.join(tmpdir, "legacy_tool.json")
-            data = {
-                "name": "legacy_tool",
-                "install_method": "package_manager",
-                "packages": {"apt": "legacy-tool-pkg"},
-            }
-            with open(catalog_file, "w") as f:
-                json.dump(data, f)
-
-            # Patch the catalog path resolution
-            with patch(
-                "cli_audit.catalog.Path.__truediv__",
-            ) as mock_div:
-                # We need a different approach - patch at function level
-                pass
-
-        # Test via direct file - use the php.json which has packages.apt
-        result = resolve_apt_package_name("php")
-        # php.json has packages.apt field
-        assert result != "php" or result == "php"  # Just verify it doesn't crash
+        fake_json = json.dumps({
+            "name": "legacy_tool",
+            "packages": {"apt": "legacy-apt-pkg"},
+        })
+        with patch("builtins.open", mock_open(read_data=fake_json)):
+            with patch("pathlib.Path.exists", return_value=True):
+                result = resolve_apt_package_name("legacy_tool")
+        assert result == "legacy-apt-pkg"
 
     def test_resolve_apt_package_name_tool_without_apt_method(self):
         """Tools with available_methods but no apt method should fall back."""
@@ -856,24 +840,11 @@ class TestAptPackageNameResolver:
     def test_resolve_apt_package_name_with_malformed_json(self):
         """Malformed catalog JSON should fall back to tool name."""
         from cli_audit.catalog import resolve_apt_package_name
-        import tempfile
-        import os
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            catalog_file = os.path.join(tmpdir, "broken.json")
-            with open(catalog_file, "w") as f:
-                f.write("not valid json{{{")
-
-            with patch("cli_audit.catalog.Path") as MockPath:
-                mock_path = MagicMock()
-                mock_path.exists.return_value = True
-                mock_path.__truediv__ = MagicMock(return_value=mock_path)
-                # Make open() read the malformed file
-                MockPath.return_value.__truediv__.return_value = mock_path
-
-            # The function should handle this gracefully
-            # Since we can't easily mock the path, test with nonexistent tool
-            assert resolve_apt_package_name("nonexistent_xyz_abc") == "nonexistent_xyz_abc"
+        with patch("builtins.open", mock_open(read_data="not valid json{{{")):
+            with patch("pathlib.Path.exists", return_value=True):
+                result = resolve_apt_package_name("broken_tool")
+        assert result == "broken_tool"
 
 
 class TestCheckUpgradeAvailableAptResolved:
