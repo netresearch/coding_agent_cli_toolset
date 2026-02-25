@@ -1,0 +1,33 @@
+{
+  "name": "tokei",
+  "category": "general",
+  "install_method": "auto",
+  "description": "Count your code quickly - statistics on code by language",
+  "homepage": "https://github.com/XAMPPRocky/tokei",
+  "github_repo": "XAMPPRocky/tokei",
+  "binary_name": "tokei",
+  "available_methods": [
+    {
+      "method": "cargo",
+      "priority": 1,
+      "config": {
+        "crate": "tokei"
+      }
+    },
+    {
+      "method": "brew",
+      "priority": 2,
+      "config": {
+        "package": "tokei"
+      }
+    }
+  ],
+  "requires": [
+    "rust"
+  ],
+  "tags": [
+    "code-counter",
+    "statistics"
+  ],
+  "notes": "GitHub releases for v13+ have no binary assets; installed via cargo build from source (~1-2 min)."
+}
