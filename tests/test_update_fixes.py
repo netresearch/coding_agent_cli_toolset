@@ -882,7 +882,7 @@ remove_installation "fake_tool" "manual" "fake_tool"
             sudo_stub.chmod(0o700)
 
             # Make the directory non-writable
-            restricted_dir.chmod(0o555)
+            restricted_dir.chmod(0o500)
 
             try:
                 self._source_and_run(f"""
@@ -902,7 +902,7 @@ remove_installation "fake_tool" "github_release_binary" "fake_tool" || true
             fake_bin = Path(tmpdir) / "fake_tool"
             fake_bin.write_text("#!/bin/sh\necho fake")
             fake_bin.chmod(0o700)
-            os.chmod(tmpdir, 0o555)
+            os.chmod(tmpdir, 0o500)
             try:
                 result = subprocess.run(
                     ["bash", "-c", f"""
