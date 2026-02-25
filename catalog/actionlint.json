@@ -1,0 +1,44 @@
+{
+  "name": "actionlint",
+  "category": "devops",
+  "install_method": "auto",
+  "description": "Static checker for GitHub Actions workflow files",
+  "homepage": "https://github.com/rhysd/actionlint",
+  "github_repo": "rhysd/actionlint",
+  "binary_name": "actionlint",
+  "download_url_template": "https://github.com/rhysd/actionlint/releases/download/{version}/actionlint_{version_nov}_linux_{arch}.tar.gz",
+  "arch_map": {
+    "x86_64": "amd64",
+    "aarch64": "arm64"
+  },
+  "available_methods": [
+    {
+      "method": "github_release_binary",
+      "priority": 1,
+      "config": {
+        "repo": "rhysd/actionlint",
+        "asset_pattern": "actionlint_.*_linux_amd64.tar.gz"
+      }
+    },
+    {
+      "method": "go",
+      "priority": 2,
+      "config": {
+        "package": "github.com/rhysd/actionlint/cmd/actionlint"
+      }
+    },
+    {
+      "method": "brew",
+      "priority": 3,
+      "config": {
+        "package": "actionlint"
+      }
+    }
+  ],
+  "requires": [],
+  "tags": [
+    "linter",
+    "github-actions",
+    "ci"
+  ]
+}
