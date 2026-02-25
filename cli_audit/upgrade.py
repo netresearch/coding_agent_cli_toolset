@@ -308,8 +308,10 @@ def get_available_version(
                     return version_str
 
         elif package_manager == "apt":
+            from .catalog import resolve_apt_package_name
+            apt_pkg = resolve_apt_package_name(tool_name)
             result = subprocess.run(
-                ["apt-cache", "policy", tool_name],
+                ["apt-cache", "policy", apt_pkg],
                 capture_output=True,
                 text=True,
                 timeout=10,

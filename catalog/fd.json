@@ -6,6 +6,7 @@
   "homepage": "https://github.com/sharkdp/fd",
   "github_repo": "sharkdp/fd",
   "binary_name": "fd",
+  "candidates": ["fd", "fdfind"],
   "download_url_template": "https://github.com/sharkdp/fd/releases/download/{version}/fd-{version}-{arch}-unknown-linux-musl.tar.gz",
   "arch_map": {
     "x86_64": "x86_64",
