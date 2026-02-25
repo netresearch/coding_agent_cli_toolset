@@ -689,12 +689,12 @@ class TestDedicatedScriptUninstallHandler:
                     f"echo 'ERROR: {cmd} should not be called during uninstall' >&2\n"
                     f"exit 1\n"
                 )
-                stub.chmod(0o755)
+                stub.chmod(0o700)
 
             # Create a fake go binary so the script thinks go is installed
             fake_go = Path(tmpdir) / "go"
             fake_go.write_text("#!/bin/sh\necho 'go version go1.25.0 linux/amd64'\n")
-            fake_go.chmod(0o755)
+            fake_go.chmod(0o700)
 
             # Run the script with uninstall action
             env = os.environ.copy()
@@ -723,12 +723,12 @@ class TestDedicatedScriptUninstallHandler:
                     f"echo 'ERROR: {cmd} should not be called during uninstall' >&2\n"
                     f"exit 1\n"
                 )
-                stub.chmod(0o755)
+                stub.chmod(0o700)
 
             # Create a fake composer binary
             fake_composer = Path(tmpdir) / "composer"
             fake_composer.write_text("#!/bin/sh\necho 'Composer version 2.8.0'\n")
-            fake_composer.chmod(0o755)
+            fake_composer.chmod(0o700)
 
             env = os.environ.copy()
             env["PATH"] = f"{tmpdir}:/usr/bin:/bin"
@@ -755,7 +755,7 @@ class TestDedicatedScriptUninstallHandler:
                     f"echo 'ERROR: {cmd} should not be called during uninstall' >&2\n"
                     f"exit 1\n"
                 )
-                stub.chmod(0o755)
+                stub.chmod(0o700)
 
             env = os.environ.copy()
             env["PATH"] = f"{tmpdir}:/usr/bin:/bin"
@@ -782,12 +782,12 @@ class TestDedicatedScriptUninstallHandler:
                     f"echo 'ERROR: {cmd} should not be called during uninstall' >&2\n"
                     f"exit 1\n"
                 )
-                stub.chmod(0o755)
+                stub.chmod(0o700)
 
             # Create a fake parallel binary
             fake_parallel = Path(tmpdir) / "parallel"
             fake_parallel.write_text("#!/bin/sh\necho 'GNU parallel 20250122'\n")
-            fake_parallel.chmod(0o755)
+            fake_parallel.chmod(0o700)
 
             env = os.environ.copy()
             env["PATH"] = f"{tmpdir}:/usr/bin:/bin"
@@ -838,7 +838,7 @@ source "{SCRIPTS_DIR}/lib/reconcile.sh"
             # Create a fake binary in a writable directory
             fake_bin = Path(tmpdir) / "fake_tool"
             fake_bin.write_text("#!/bin/sh\necho fake")
-            fake_bin.chmod(0o755)
+            fake_bin.chmod(0o700)
 
             # Create a sudo stub that records calls
             sudo_marker = Path(tmpdir) / "sudo_called"
@@ -846,7 +846,7 @@ source "{SCRIPTS_DIR}/lib/reconcile.sh"
             sudo_stub.write_text(
                 f"#!/bin/sh\ntouch '{sudo_marker}'\nexec \"$@\"\n"
             )
-            sudo_stub.chmod(0o755)
+            sudo_stub.chmod(0o700)
 
             result = self._source_and_run(f"""
 export PATH="{tmpdir}:$PATH"
@@ -868,7 +868,7 @@ remove_installation "fake_tool" "manual" "fake_tool"
             # Create a fake binary
             fake_bin = restricted_dir / "fake_tool"
             fake_bin.write_text("#!/bin/sh\necho fake")
-            fake_bin.chmod(0o755)
+            fake_bin.chmod(0o700)
 
             # Create a sudo stub that records calls
             # Note: the stub can't actually remove the file (no real elevated
@@ -879,7 +879,7 @@ remove_installation "fake_tool" "manual" "fake_tool"
             sudo_stub.write_text(
                 f"#!/bin/sh\ntouch '{sudo_marker}'\nexec \"$@\"\n"
             )
-            sudo_stub.chmod(0o755)
+            sudo_stub.chmod(0o700)
 
             # Make the directory non-writable
             restricted_dir.chmod(0o555)
@@ -894,14 +894,14 @@ remove_installation "fake_tool" "github_release_binary" "fake_tool" || true
                 )
             finally:
                 # Restore permissions for cleanup
-                restricted_dir.chmod(0o755)
+                restricted_dir.chmod(0o700)
 
     def test_remove_installation_error_when_no_sudo_and_nonwritable(self):
         """remove_installation should error gracefully when dir is not writable and sudo is unavailable."""
         with tempfile.TemporaryDirectory() as tmpdir:
             fake_bin = Path(tmpdir) / "fake_tool"
             fake_bin.write_text("#!/bin/sh\necho fake")
-            fake_bin.chmod(0o755)
+            fake_bin.chmod(0o700)
             os.chmod(tmpdir, 0o555)
             try:
                 result = subprocess.run(
@@ -920,7 +920,7 @@ remove_installation "fake_tool" "github_release_binary" "fake_tool" || true
                 combined = result.stdout + result.stderr
                 assert "no write access" in combined.lower() or "sudo not available" in combined.lower() or result.returncode != 0
             finally:
-                os.chmod(tmpdir, 0o755)
+                os.chmod(tmpdir, 0o700)
 
     def test_remove_installation_github_release_writability_check(self):
         """github_release_binary case must check bin_dir writability."""
