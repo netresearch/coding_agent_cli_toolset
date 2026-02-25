@@ -99,7 +99,7 @@ Example (abridged):
 Note: Not all of these are expected to be installed globally; the report simply surfaces what is present and how it compares upstream.
 
 ## Requirements
-- Python 3.9+
+- Python 3.14+
 - Network access to query GitHub/PyPI/crates.io/npm
 
 ## Quick Start
@@ -451,19 +451,29 @@ If `source_kind` is `skip`, upstream lookup is disabled for that tool.
 python3 -m pyflakes cli_audit.py
 ```
 
-- Run tests (n/a): This repo currently ships without tests. PRs welcome.
+- Run tests:
+```bash
+make test              # Run all 493+ tests
+make test-unit         # Unit tests only
+make test-coverage     # With coverage report
+make test-parallel     # Parallel via pytest-xdist
+```
 
 ## Installation scripts
 
-Language-agnostic core tools and language-specific stacks are provided under `scripts/`:
+All 89 cataloged tools can be installed, upgraded, uninstalled, or reconciled via generic Make targets:
 
 ```bash
-make scripts-perms
+# Generic pattern targets - work for ANY cataloged tool
+make install-<tool>      # e.g., make install-jq, make install-semgrep
+make upgrade-<tool>      # e.g., make upgrade-ripgrep
+make uninstall-<tool>    # e.g., make uninstall-bat
+make reconcile-<tool>    # e.g., make reconcile-node
 
-# Core simple tools (fd, fzf, ripgrep, jq, yq, bat, delta, just)
-make install-core
+# Group install by catalog tag
+make install-core        # Core tools (fd, fzf, ripgrep, jq, yq, bat, delta, just)
 
-# Language stacks
+# Language stacks (dedicated scripts with full lifecycle management)
 make install-python
 make install-node
 make install-go
@@ -478,7 +488,7 @@ make install-brew
 make install-rust
 ```
 
-These scripts prefer the most up-to-date sources (e.g., nvm for Node, vendor installers for AWS CLI and kubectl) when feasible.
+The pattern targets use a fallback chain: if a dedicated script exists (`scripts/install_<tool>.sh`), it is used; otherwise, the generic installer (`scripts/install_tool.sh`) reads the tool's catalog JSON entry and delegates to the appropriate method-specific installer. This means adding support for a new tool only requires creating a `catalog/<tool>.json` file.
 
 ### Role-focused quick checks (local-only)
 
@@ -520,20 +530,19 @@ The audit attempts to identify how a tool was installed by inspecting the resolv
 
 When ambiguous, the audit may report a generic bucket (e.g., `~/.local/bin`). The JSON output includes `installed_path_resolved` and `classification_reason` to aid debugging.
 
-### Actions: install, update, uninstall, reconcile
+### Actions: install, upgrade, uninstall, reconcile
 
-All scripts accept an action argument. Defaults to `install`.
+All pattern targets (`install-%`, `upgrade-%`, `uninstall-%`, `reconcile-%`) work for any of the 89 cataloged tools. They use a three-step fallback: dedicated script, then generic installer, then error.
 
 ```bash
-# Update existing toolchains
-make update-core
-make update-python
-make update-node
-make update-go
-make update-aws
+# Upgrade any tool
+make upgrade-fd
+make upgrade-python
+make upgrade-node
 
-# Uninstall
+# Uninstall any tool
 make uninstall-node
+make uninstall-semgrep
 
 # Reconcile preferred method
 # Example: remove distro Node and switch to nvm-managed

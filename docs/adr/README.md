@@ -102,6 +102,8 @@ ADRs are **immutable** once accepted. To change a decision:
 | [004](ADR-004-always-latest-version-policy.md) | Always-Latest Version Policy | Accepted | 2025-10-09 | versioning, upgrades |
 | [005](ADR-005-environment-detection.md) | Environment Detection Logic | Accepted | 2025-10-09 | environment-detection, context-aware |
 | [006](ADR-006-configuration-file-format.md) | Configuration File Format | Accepted | 2025-10-09 | configuration, yaml |
+| [007](ADR-007-generic-tool-installation-architecture.md) | Generic Tool Installation Architecture | Accepted | 2026-02-25 | installation, catalog, generic-installer |
+| [008](ADR-008-makefile-pattern-target-fallback.md) | Makefile Pattern Target Fallback Chain | Accepted | 2026-02-25 | makefile, installation, pattern-targets |
 
 ---
 
@@ -113,6 +115,8 @@ ADRs are **immutable** once accepted. To change a decision:
 - ADR-001: Context-Aware Installation Modes
 - ADR-002: Package Manager Preference Hierarchy
 - ADR-003: Parallel Installation Approach
+- ADR-007: Generic Tool Installation Architecture
+- ADR-008: Makefile Pattern Target Fallback Chain
 
 **Version Management:**
 - ADR-004: Always-Latest Version Policy
@@ -123,12 +127,16 @@ ADRs are **immutable** once accepted. To change a decision:
 
 ### By Tag
 
-**installation:** ADR-001, ADR-002, ADR-003
+**installation:** ADR-001, ADR-002, ADR-003, ADR-007, ADR-008
 **environment-detection:** ADR-001, ADR-005
 **versioning:** ADR-004
 **configuration:** ADR-006
 **reconciliation:** ADR-003
 **package-managers:** ADR-002
+**catalog:** ADR-007
+**makefile:** ADR-008
+**pattern-targets:** ADR-008
+**generic-installer:** ADR-007
 
 ---
 
@@ -169,5 +177,5 @@ ADRs are **immutable** once accepted. To change a decision:
 
 ---
 
-**Last Updated:** 2025-10-09
+**Last Updated:** 2026-02-25
 **Maintainer:** AI CLI Preparation Team

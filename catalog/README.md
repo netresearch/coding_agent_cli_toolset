@@ -68,8 +68,10 @@ Install tools via system package managers (apt, brew, dnf, pacman).
 ## Adding a New Tool
 
 1. Create `catalog/<tool>.json` with appropriate metadata
-2. The tool will automatically use the generic installer for its method
+2. The tool will automatically be available via `make install-<tool>`, `make upgrade-<tool>`, `make uninstall-<tool>`, and `make reconcile-<tool>`
 3. No need to create a custom install script!
+
+Currently **89 tools** are cataloged.
 
 ## Environment Variables
 
@@ -92,14 +94,8 @@ INSTALL_STRATEGY=GLOBAL scripts/install_tool.sh terraform
 make upgrade
 ```
 
-## Migration Status
+## Architecture
 
-Tools with catalog entries use the new system. Tools without catalog entries fall back to legacy `install_core.sh`.
+All 89 tools have catalog entries. The generic installer (`scripts/install_tool.sh`) reads a tool's catalog JSON and delegates to the appropriate method-specific installer under `scripts/installers/`. Tools with complex installation needs (python, node, docker, rust, etc.) use `install_method: "dedicated_script"` to route to their existing bespoke scripts.
 
-**Migrated:**
-- kubectl
-- terraform
-- aws
-- semgrep
-
-**To migrate:** Add catalog entries for remaining tools from `install_core.sh`
+See [ADR-007](../docs/adr/ADR-007-generic-tool-installation-architecture.md) for the full architectural decision record.
