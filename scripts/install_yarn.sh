@@ -7,11 +7,16 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ACTION="${1:-update}"
 
 check_nvm_node() {
-  # Check if Node.js is nvm-managed
+  # Check if Node.js is nvm-managed (resolve symlinks)
   local node_path
   node_path="$(command -v node 2>/dev/null || echo '')"
+  [ -z "$node_path" ] && return 1
 
-  case "$node_path" in
+  # Resolve symlinks (e.g., ~/.local/bin/node -> ~/.nvm/versions/...)
+  local resolved
+  resolved="$(readlink -f "$node_path" 2>/dev/null || echo "$node_path")"
+
+  case "$resolved" in
     "$HOME/.nvm/"*)
       return 0  # nvm-managed
       ;;
