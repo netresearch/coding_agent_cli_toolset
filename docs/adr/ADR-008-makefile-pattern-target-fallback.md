@@ -104,6 +104,8 @@ These are evaluated at Makefile parse time, not at target execution time. The `i
 | `uninstall-%` | `uninstall` |
 | `reconcile-%` | `reconcile` |
 
+**Note on upgrade/update naming:** The user-facing Make target is `upgrade-%`, but it passes `update` as the action parameter to the underlying scripts. This is for historical compatibility -- the installer scripts originally used `update` as the action name. The Makefile uses the more intuitive `upgrade` terminology for the user interface.
+
 ### Testing the fallback
 
 ```bash

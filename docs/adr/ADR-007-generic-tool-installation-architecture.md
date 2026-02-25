@@ -25,12 +25,16 @@ Each tool is described by a `catalog/<tool>.json` file containing metadata and i
 
 ```json
 {
-  "name": "fd",
+  "name": "shfmt",
   "install_method": "github_release_binary",
-  "binary_name": "fd",
-  "github_repo": "sharkdp/fd",
-  "download_url_template": "https://github.com/sharkdp/fd/releases/download/v{version}/fd-v{version}-{arch}-unknown-linux-gnu.tar.gz",
-  "tags": ["core", "search"]
+  "binary_name": "shfmt",
+  "github_repo": "mvdan/sh",
+  "download_url_template": "https://github.com/mvdan/sh/releases/download/{version}/shfmt_{version}_linux_{arch}",
+  "arch_map": {
+    "x86_64": "amd64",
+    "aarch64": "arm64",
+    "armv7l": "arm"
+  }
 }
 ```
 
@@ -48,7 +52,12 @@ Generic installer scripts under `scripts/installers/` implement each installatio
 | `uv_tool.sh` | `uv tool install` for Python packages | semgrep, ruff, black |
 | `npm_global.sh` | `npm install -g` | eslint, prettier |
 | `package_manager.sh` | System package managers (apt/brew/dnf) | sponge, pipx |
+| `docker_plugin.sh` | Docker plugins | compose |
+| `github_clone.sh` | Clone and build from source | rbenv, ruby-build |
+| `npm_self_update.sh` | NPM self-update | npm |
 | `dedicated_script.sh` | Delegate to a tool-specific script | python, node, docker |
+
+**Note on `auto` install method:** 11 tools (including fd, ripgrep, bat, and hyperfine) use `"install_method": "auto"` instead of specifying a fixed installer. The `auto` method uses the reconciliation system (`scripts/lib/reconcile.sh`) to detect existing installations and choose the best available method from the tool's `available_methods` list in the catalog. This allows the system to adapt to the user's environment (e.g., preferring a GitHub binary release over cargo over apt, depending on what is already installed and available).
 
 ### Tier 3: Orchestrator
 

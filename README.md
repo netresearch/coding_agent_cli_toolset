@@ -453,7 +453,7 @@ python3 -m pyflakes cli_audit.py
 
 - Run tests:
 ```bash
-make test              # Run all 493+ tests
+make test              # Run all 490+ tests
 make test-unit         # Unit tests only
 make test-coverage     # With coverage report
 make test-parallel     # Parallel via pytest-xdist
