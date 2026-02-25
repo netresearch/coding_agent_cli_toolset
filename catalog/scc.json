@@ -6,6 +6,7 @@
   "homepage": "https://github.com/boyter/scc",
   "github_repo": "boyter/scc",
   "binary_name": "scc",
+  "version_flag": "--version",
   "download_url_template": "https://github.com/boyter/scc/releases/download/{version}/scc_Linux_{arch}.tar.gz",
   "arch_map": {
     "x86_64": "x86_64",
