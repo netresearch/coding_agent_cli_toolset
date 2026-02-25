@@ -1,4 +1,4 @@
-<!-- Managed by agent: keep sections and order; edit content, not structure. Last updated: 2026-02-06 -->
+<!-- Managed by agent: keep sections and order; edit content, not structure. Last updated: 2026-02-25 -->
 
 # AGENTS.md (root)
 
@@ -59,6 +59,10 @@ uv run python audit.py --help    # Verify CLI works
 | `make update` | Collect fresh versions (~10s) |
 | `make update-local` | Update only local state (no network) |
 | `make update-baseline` | Update upstream baseline for commit |
+| `make install-<tool>` | Install any cataloged tool (e.g., `make install-jq`) |
+| `make upgrade-<tool>` | Upgrade any tool (e.g., `make upgrade-ripgrep`) |
+| `make uninstall-<tool>` | Uninstall any tool (e.g., `make uninstall-jq`) |
+| `make reconcile-<tool>` | Reconcile install method (e.g., `make reconcile-node`) |
 | `make upgrade` | Interactive upgrade guide |
 | `make cleanup` | Interactive tool removal |
 | `make upgrade-managed` | Upgrade all package managers |
@@ -83,7 +87,7 @@ uv run python audit.py --help    # Verify CLI works
 
 **AI CLI Preparation v2.0** — Tool version auditing and installation management for AI coding agents.
 
-- **Architecture:** 21 Python modules, 79 JSON tool catalogs
+- **Architecture:** 21 Python modules, 89 JSON tool catalogs
 - **Phase 1:** Detection & auditing (complete)
 - **Phase 2:** Installation & upgrade management (complete)
 - **Entry point:** `audit.py` → `cli_audit` package

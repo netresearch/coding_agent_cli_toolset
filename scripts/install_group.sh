@@ -47,15 +47,8 @@ echo "[$TAG] Found ${#TOOLS[@]} tools: ${TOOLS[*]}"
 # Install/update/uninstall each tool
 for tool in "${TOOLS[@]}"; do
   case "$ACTION" in
-    install|reconcile)
-      "$DIR/install_tool.sh" "$tool"
-      ;;
-    update)
-      "$DIR/install_tool.sh" "$tool"
-      ;;
-    uninstall)
-      # For uninstall, we'd need to implement uninstall support in installers
-      echo "[$tool] Uninstall not yet implemented" >&2
+    install|update|reconcile|uninstall)
+      "$DIR/install_tool.sh" "$tool" "$ACTION" || echo_warn "Failed to $ACTION $tool"
       ;;
     *)
       echo "Unknown action: $ACTION" >&2

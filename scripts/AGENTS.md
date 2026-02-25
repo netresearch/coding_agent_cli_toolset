@@ -1,4 +1,4 @@
-<!-- Managed by agent: keep sections & order; edit content, not structure. Last updated: 2026-02-06 -->
+<!-- Managed by agent: keep sections & order; edit content, not structure. Last updated: 2026-02-25 -->
 
 # Installation Scripts - Agent Guide
 
@@ -92,13 +92,21 @@ make scripts-perms  # Ensure all scripts are executable
 ./scripts/install_node.sh reconcile
 ```
 
-**Via Make:**
+**Via Make (works for all 89 cataloged tools):**
 ```bash
-make install-python              # Install Python toolchain
-make update-python               # Update Python toolchain
+make install-python              # Install Python toolchain (dedicated script)
+make upgrade-python              # Upgrade Python toolchain
 make uninstall-python            # Uninstall Python toolchain
 make reconcile-node              # Switch Node.js to nvm-managed
+make install-jq                  # Install any catalog tool (generic fallback)
+make upgrade-ripgrep             # Upgrade any catalog tool
+make uninstall-bat               # Uninstall any catalog tool
 ```
+
+Pattern targets (`install-%`, `upgrade-%`, `uninstall-%`, `reconcile-%`) use a fallback chain:
+1. Dedicated script (`scripts/install_<tool>.sh`) if it exists
+2. Generic installer (`scripts/install_tool.sh <tool>`) for catalog entries
+3. Error if neither found
 
 **Smoke test:**
 ```bash

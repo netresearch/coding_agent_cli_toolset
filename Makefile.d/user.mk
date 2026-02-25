@@ -89,7 +89,13 @@ reset-pins: scripts-perms ## Remove all version pins from all tools
 guide: upgrade ## Alias for upgrade (deprecated)
 
 upgrade-%: scripts-perms ## Upgrade tool (e.g., make upgrade-python)
-	./scripts/install_$*.sh update
+	@if [ -f "./scripts/install_$*.sh" ]; then \
+		./scripts/install_$*.sh update; \
+	elif [ -f "./catalog/$*.json" ]; then \
+		./scripts/install_tool.sh "$*" update; \
+	else \
+		echo "Error: No installer found for '$*'" >&2; exit 1; \
+	fi
 
 upgrade-managed: scripts-perms ## Upgrade all package managers and their packages
 	SCOPE=all ./scripts/auto_update.sh update
@@ -145,7 +151,7 @@ update-debug: ## Collect with verbose debug output (shows network calls)
 # ----------------------------------------------------------------------------
 
 install-core: scripts-perms ## Install core tools (fd, fzf, ripgrep, jq, yq, bat, delta, just)
-	./scripts/install_core.sh
+	./scripts/install_group.sh core install
 
 install-python: scripts-perms ## Install Python toolchain via uv
 	./scripts/install_python.sh
@@ -157,13 +163,13 @@ install-go: scripts-perms ## Install Go runtime
 	./scripts/install_go.sh
 
 install-aws: scripts-perms ## Install AWS CLI
-	./scripts/install_aws.sh
+	./scripts/install_tool.sh aws install
 
 install-kubectl: scripts-perms ## Install Kubernetes CLI
-	./scripts/install_kubectl.sh
+	./scripts/install_tool.sh kubectl install
 
 install-terraform: scripts-perms ## Install Terraform
-	./scripts/install_terraform.sh
+	./scripts/install_tool.sh terraform install
 
 install-ansible: scripts-perms ## Install Ansible
 	./scripts/install_ansible.sh
@@ -177,12 +183,31 @@ install-brew: scripts-perms ## Install Homebrew (macOS/Linux)
 install-rust: scripts-perms ## Install Rust via rustup
 	./scripts/install_rust.sh
 
+install-uv: scripts-perms ## Install uv package manager
+	./scripts/install_uv.sh
+
+# Generic fallback: install any cataloged tool (e.g., make install-jq)
+install-%: scripts-perms
+	@if [ -f "./scripts/install_$*.sh" ]; then \
+		./scripts/install_$*.sh; \
+	elif [ -f "./catalog/$*.json" ]; then \
+		./scripts/install_tool.sh "$*" install; \
+	else \
+		echo "Error: No installer found for '$*'" >&2; exit 1; \
+	fi
+
 # ----------------------------------------------------------------------------
 # UNINSTALL / RECONCILE
 # ----------------------------------------------------------------------------
 
 uninstall-%: scripts-perms ## Uninstall tool (e.g., make uninstall-python)
-	./scripts/install_$*.sh uninstall
+	@if [ -f "./scripts/install_$*.sh" ]; then \
+		./scripts/install_$*.sh uninstall; \
+	elif [ -f "./catalog/$*.json" ]; then \
+		./scripts/install_tool.sh "$*" uninstall; \
+	else \
+		echo "Error: No installer found for '$*'" >&2; exit 1; \
+	fi
 
 reconcile-pip-to-uv: scripts-perms ## Migrate user pip packages to UV tools
 	@./scripts/reconcile_pip_to_uv.sh
@@ -191,7 +216,13 @@ reconcile-pipx-to-uv: scripts-perms ## Migrate pipx tools to UV
 	@./scripts/reconcile_pipx_to_uv.sh
 
 reconcile-%: scripts-perms ## Reconcile tool installation (e.g., make reconcile-node)
-	./scripts/install_$*.sh reconcile
+	@if [ -f "./scripts/install_$*.sh" ]; then \
+		./scripts/install_$*.sh reconcile; \
+	elif [ -f "./catalog/$*.json" ]; then \
+		./scripts/install_tool.sh "$*" reconcile; \
+	else \
+		echo "Error: No installer found for '$*'" >&2; exit 1; \
+	fi
 
 # ----------------------------------------------------------------------------
 # SYSTEM MANAGEMENT
