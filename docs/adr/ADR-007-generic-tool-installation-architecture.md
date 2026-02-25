@@ -56,6 +56,7 @@ Generic installer scripts under `scripts/installers/` implement each installatio
 | `github_clone.sh` | Clone and build from source | rbenv, ruby-build |
 | `npm_self_update.sh` | NPM self-update | npm |
 | `dedicated_script.sh` | Delegate to a tool-specific script | python, node, docker |
+| *(planned)* `go_install.sh` | Install via `go install` | templ |
 
 **Note on `auto` install method:** 11 tools (including fd, ripgrep, bat, and hyperfine) use `"install_method": "auto"` instead of specifying a fixed installer. The `auto` method uses the reconciliation system (`scripts/lib/reconcile.sh`) to detect existing installations and choose the best available method from the tool's `available_methods` list in the catalog. This allows the system to adapt to the user's environment (e.g., preferring a GitHub binary release over cargo over apt, depending on what is already installed and available).
 
