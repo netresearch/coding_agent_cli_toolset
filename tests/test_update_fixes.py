@@ -540,3 +540,83 @@ class TestCatalogValidity:
             assert installer.exists(), (
                 f"{catalog_name}: installer {installer} not found for install_method={method}"
             )
+
+
+# ===========================================================================
+# 12. Debian/Ubuntu package naming mismatches (#35)
+# ===========================================================================
+
+class TestCatalogDebianNaming:
+    """Tests for #35: Debian/Ubuntu package naming mismatches."""
+
+    def test_bat_has_batcat_candidate(self):
+        """bat.json must include 'batcat' in candidates for Debian detection."""
+        with open(CATALOG_DIR / "bat.json") as f:
+            data = json.load(f)
+        candidates = data.get("candidates", [])
+        assert "batcat" in candidates, (
+            "bat.json should have 'batcat' in candidates for Debian/Ubuntu"
+        )
+        assert "bat" in candidates, (
+            "bat.json should also keep 'bat' in candidates"
+        )
+
+    def test_fd_has_fdfind_candidate(self):
+        """fd.json must include 'fdfind' in candidates for Debian detection."""
+        with open(CATALOG_DIR / "fd.json") as f:
+            data = json.load(f)
+        candidates = data.get("candidates", [])
+        assert "fdfind" in candidates, (
+            "fd.json should have 'fdfind' in candidates for Debian/Ubuntu"
+        )
+        assert "fd" in candidates, (
+            "fd.json should also keep 'fd' in candidates"
+        )
+
+    def test_delta_has_apt_method(self):
+        """delta.json must have an apt available_method with package 'git-delta'."""
+        with open(CATALOG_DIR / "delta.json") as f:
+            data = json.load(f)
+        methods = data.get("available_methods", [])
+        apt_methods = [m for m in methods if m.get("method") == "apt"]
+        assert len(apt_methods) == 1, (
+            "delta.json should have exactly one apt available_method"
+        )
+        apt_config = apt_methods[0].get("config", {})
+        assert apt_config.get("package") == "git-delta", (
+            "delta.json apt config should have package 'git-delta'"
+        )
+
+    def test_delta_has_available_methods(self):
+        """delta.json must have available_methods field."""
+        with open(CATALOG_DIR / "delta.json") as f:
+            data = json.load(f)
+        assert "available_methods" in data, (
+            "delta.json should have available_methods field"
+        )
+        # Should still have github_release_binary
+        methods = data["available_methods"]
+        method_names = [m.get("method") for m in methods]
+        assert "github_release_binary" in method_names, (
+            "delta.json should keep github_release_binary method"
+        )
+
+    def test_bat_candidates_field_preserved_in_catalog_entry(self):
+        """ToolCatalogEntry.from_dict should parse candidates from bat.json."""
+        from cli_audit.catalog import ToolCatalogEntry
+        with open(CATALOG_DIR / "bat.json") as f:
+            data = json.load(f)
+        entry = ToolCatalogEntry.from_dict(data)
+        assert entry.candidates is not None
+        assert "batcat" in entry.candidates
+        assert "bat" in entry.candidates
+
+    def test_fd_candidates_field_preserved_in_catalog_entry(self):
+        """ToolCatalogEntry.from_dict should parse candidates from fd.json."""
+        from cli_audit.catalog import ToolCatalogEntry
+        with open(CATALOG_DIR / "fd.json") as f:
+            data = json.load(f)
+        entry = ToolCatalogEntry.from_dict(data)
+        assert entry.candidates is not None
+        assert "fdfind" in entry.candidates
+        assert "fd" in entry.candidates

@@ -301,6 +301,41 @@ class ToolCatalog:
         ]
 
 
+def resolve_apt_package_name(tool_name: str) -> str:
+    """Resolve the apt package name for a tool from its catalog entry.
+
+    Reads available_methods from the catalog JSON and returns the apt
+    package name if configured, otherwise falls back to tool_name.
+
+    Args:
+        tool_name: Tool name to resolve
+
+    Returns:
+        The apt package name from the catalog, or tool_name as fallback
+    """
+    catalog_path = Path(__file__).parent.parent / "catalog" / f"{tool_name}.json"
+    if not catalog_path.exists():
+        return tool_name
+    try:
+        with open(catalog_path) as f:
+            data = json.load(f)
+        # Check available_methods for apt entry (modern format)
+        for method in data.get("available_methods", []):
+            if method.get("method") == "apt":
+                return method.get("config", {}).get("package", tool_name)
+        # Check legacy package_managers field
+        pkg_mgrs = data.get("package_managers", {})
+        if "apt" in pkg_mgrs:
+            return pkg_mgrs["apt"]
+        # Check legacy packages field
+        packages = data.get("packages", {})
+        if "apt" in packages:
+            return packages["apt"]
+    except json.JSONDecodeError:
+        pass
+    return tool_name
+
+
 def detect_package_manager() -> tuple[str, str] | None:
     """Detect the current OS package manager and upgrade command.
 
