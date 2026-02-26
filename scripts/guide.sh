@@ -139,6 +139,27 @@ osc8() {
   [ -n "$url" ] && printf '\e]8;;%s\e\\%s\e]8;;\e\\' "$url" "$text" || printf '%s' "$text"
 }
 
+# Check for multiple installations and print warning if found
+# Args: catalog_tool_name
+# Returns: 0 always (informational only)
+check_multi_installs() {
+  local catalog_tool="$1"
+  local binary_name
+  binary_name="$(catalog_get_property "$catalog_tool" binary_name)"
+  binary_name="${binary_name:-$catalog_tool}"
+  local all_installs
+  all_installs="$(detect_all_installations "$catalog_tool" "$binary_name" 2>/dev/null || true)"
+  local install_count
+  install_count="$(echo "$all_installs" | grep -c . || true)"
+  if [ "$install_count" -gt 1 ]; then
+    printf "    ⚠️  Multiple installations detected (%d):\n" "$install_count"
+    echo "$all_installs" | while IFS=: read -r inst_method inst_path; do
+      printf "       • %s: %s\n" "$inst_method" "$inst_path"
+    done
+  fi
+  return 0
+}
+
 # Generic tool processing function - reads ALL metadata from catalog
 process_tool() {
   local tool="$1"
@@ -219,6 +240,7 @@ process_tool() {
     printf "\n==> %s %s\n" "$icon" "$display"
     printf "    installed: %s via %s\n" "$installed" "$method"
     printf "    target:    %s (same)\n" "$(osc8 "$url" "$latest")"
+    check_multi_installs "$catalog_tool"
     printf "    up-to-date; skipping.\n"
     return 0
   fi
@@ -244,6 +266,7 @@ process_tool() {
     printf "\n==> %s %s [auto-update]\n" "$icon" "$display"
     printf "    installed: %s via %s\n" "${installed:-<none>}" "${method:-unknown}"
     printf "    target:    %s\n" "$(osc8 "$url" "${latest:-<unknown>}")"
+    check_multi_installs "$catalog_tool"
     printf "    auto-updating...\n"
 
     # Build install command from catalog metadata (use catalog_tool for script name)
@@ -281,20 +304,7 @@ process_tool() {
   [ -n "$homepage" ] && printf "    Homepage: %s\n" "$(osc8 "$homepage" "$homepage")"
   printf "    installed: %s via %s\n" "${installed:-<none>}" "${method:-unknown}"
 
-  # Check for multiple installations and warn
-  local binary_name
-  binary_name="$(catalog_get_property "$catalog_tool" binary_name)"
-  binary_name="${binary_name:-$catalog_tool}"
-  local all_installs
-  all_installs="$(detect_all_installations "$catalog_tool" "$binary_name" 2>/dev/null || true)"
-  local install_count
-  install_count="$(echo "$all_installs" | grep -c . || true)"
-  if [ "$install_count" -gt 1 ]; then
-    printf "    ⚠️  Multiple installations detected (%d):\n" "$install_count"
-    echo "$all_installs" | while IFS=: read -r inst_method inst_path; do
-      printf "       • %s: %s\n" "$inst_method" "$inst_path"
-    done
-  fi
+  check_multi_installs "$catalog_tool"
 
   printf "    target:    %s\n" "$(osc8 "$url" "${latest:-<unknown>}")"
 
