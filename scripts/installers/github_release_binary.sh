@@ -281,6 +281,9 @@ printf "[%s] after:  %s\n" "$TOOL" "${after:-<none>}"
 if [ -n "$path" ]; then printf "[%s] path:   %s\n" "$TOOL" "$path"; fi
 if [ "$BINARY_ALREADY_CURRENT" = "true" ]; then
   printf "[%s] note:   binary already matches target release %s (upstream version string may be stale)\n" "$TOOL" "$LATEST"
+  # Signal already-current status to callers (e.g., guide.sh)
+  mkdir -p /tmp/.cli-audit
+  echo "$LATEST" > "/tmp/.cli-audit/${TOOL}.already-current"
 fi
 
 # Refresh snapshot after successful installation

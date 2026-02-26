@@ -295,6 +295,8 @@ process_tool() {
     # Re-audit with fresh collection for this specific tool
     CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_MERGE=1 "$CLI" audit.py "$tool" >/dev/null 2>&1 || true
     reload_audit_json
+    # Clean up any already-current marker left by installer
+    rm -f "/tmp/.cli-audit/${catalog_tool}.already-current"
     return 0
   fi
 
@@ -407,10 +409,20 @@ process_tool() {
 
       # Check if upgrade succeeded by comparing versions
       local new_installed="$(json_field "$tool" installed)"
+      # Check if installer flagged binary as already at target (hash match)
+      local already_current_marker="/tmp/.cli-audit/${catalog_tool}.already-current"
+      local binary_already_current=""
+      if [ -f "$already_current_marker" ]; then
+        binary_already_current="true"
+        rm -f "$already_current_marker"
+      fi
       if [ "$upgrade_success" = "0" ]; then
         # Install script failed
         printf "\n    ⚠️  Upgrade failed (install script error)\n"
         prompt_pin_version "$tool" "$installed"
+      elif [ -n "$binary_already_current" ]; then
+        # Binary hash matches target release - upgrade succeeded despite version string
+        printf "\n    ✓ Binary already matches target release (upstream version string may be stale)\n"
       elif [ "$new_installed" = "$installed" ] && [ "$new_installed" != "$latest" ]; then
         # Version didn't change and not at target
         # BUT: if installed is a prefix of latest (e.g., 3.13 vs 3.13.11), consider it success
@@ -456,9 +468,18 @@ process_tool() {
 
       # Check if upgrade succeeded
       local new_installed_a="$(json_field "$tool" installed)"
+      # Check if installer flagged binary as already at target (hash match)
+      local already_current_marker_a="/tmp/.cli-audit/${catalog_tool}.already-current"
+      local binary_already_current_a=""
+      if [ -f "$already_current_marker_a" ]; then
+        binary_already_current_a="true"
+        rm -f "$already_current_marker_a"
+      fi
       if [ "$upgrade_success_a" = "0" ]; then
         printf "\n    ⚠️  Upgrade failed (install script error)\n"
         printf "    Auto-update is still enabled - will try again next time.\n"
+      elif [ -n "$binary_already_current_a" ]; then
+        printf "    ✓ Auto-update enabled. Binary already matches target release.\n"
       elif [ "$new_installed_a" = "$installed" ] && [ "$new_installed_a" != "$latest" ]; then
         # Version didn't change - but check for prefix match (e.g., 3.13 vs 3.13.11)
         if [[ "$latest" == "$new_installed_a"* ]] || [[ "$new_installed_a" == "$latest"* ]]; then
