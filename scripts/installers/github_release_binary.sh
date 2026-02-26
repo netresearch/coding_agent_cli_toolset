@@ -225,6 +225,17 @@ fi
 # - Clean fallback if ~/.local/bin version is removed
 # - System packages can still satisfy dependencies for other tools
 
+# Check if binary is already at target version by comparing SHA256 hashes
+# This catches cases where upstream version string is wrong (e.g., sd v1.1.0 reports 1.0.0)
+BINARY_ALREADY_CURRENT=""
+if [ -f "$BIN_DIR/$BINARY_NAME" ] && [ -f "$BINARY_PATH" ]; then
+  OLD_HASH="$(sha256sum "$BIN_DIR/$BINARY_NAME" 2>/dev/null | awk '{print $1}')"
+  NEW_HASH="$(sha256sum "$BINARY_PATH" 2>/dev/null | awk '{print $1}')"
+  if [ -n "$OLD_HASH" ] && [ -n "$NEW_HASH" ] && [ "$OLD_HASH" = "$NEW_HASH" ]; then
+    BINARY_ALREADY_CURRENT="true"
+  fi
+fi
+
 # Install
 if [ -n "$PRESERVE_DIR" ] && [ -n "$EXTRACT_DIR" ]; then
   # Tool requires full directory structure (e.g., GAM with bundled Python)
@@ -268,6 +279,9 @@ path="$(command -v "$BINARY_NAME" 2>/dev/null || true)"
 printf "[%s] before: %s\n" "$TOOL" "${before:-<none>}"
 printf "[%s] after:  %s\n" "$TOOL" "${after:-<none>}"
 if [ -n "$path" ]; then printf "[%s] path:   %s\n" "$TOOL" "$path"; fi
+if [ "$BINARY_ALREADY_CURRENT" = "true" ]; then
+  printf "[%s] note:   binary already matches target release %s (upstream version string may be stale)\n" "$TOOL" "$LATEST"
+fi
 
 # Refresh snapshot after successful installation
 refresh_snapshot "$TOOL"
