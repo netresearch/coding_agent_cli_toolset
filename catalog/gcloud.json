@@ -1,0 +1,10 @@
+{
+  "name": "gcloud",
+  "category": "platform",
+  "install_method": "custom_installer",
+  "description": "Google Cloud CLI for managing Google Cloud resources",
+  "homepage": "https://cloud.google.com/sdk/gcloud",
+  "binary_name": "gcloud",
+  "skip_upstream": true,
+  "notes": "Installed via Google Cloud SDK installer; self-updates with 'gcloud components update'"
+}

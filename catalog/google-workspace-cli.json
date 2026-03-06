@@ -1,0 +1,10 @@
+{
+  "name": "google-workspace-cli",
+  "category": "platform",
+  "install_method": "github_release_binary",
+  "description": "Google Workspace command-line interface",
+  "homepage": "https://github.com/googleworkspace/cli",
+  "github_repo": "googleworkspace/cli",
+  "binary_name": "google-workspace-cli",
+  "auto_update": true
+}
