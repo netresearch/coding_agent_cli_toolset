@@ -5,6 +5,5 @@
   "description": "Google Workspace command-line interface",
   "homepage": "https://github.com/googleworkspace/cli",
   "github_repo": "googleworkspace/cli",
-  "binary_name": "google-workspace-cli",
-  "auto_update": true
+  "binary_name": "gws"
 }
