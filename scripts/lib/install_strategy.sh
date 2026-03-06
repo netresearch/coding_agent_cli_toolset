@@ -10,6 +10,46 @@ get_install_dir() {
   local prefix="${PREFIX:-$HOME/.local}"
   local bin_dir=""
 
+  # Check for per-tool target_dir override from catalog
+  if [ -n "$tool_name" ] && [ -n "${CATALOG_FILE:-}" ] && [ -f "${CATALOG_FILE:-}" ]; then
+    local target_dir
+    target_dir="$(jq -r '.target_dir // empty' "$CATALOG_FILE" 2>/dev/null || true)"
+    if [ -n "$target_dir" ]; then
+      case "$target_dir" in
+        go_bin)
+          # Go binary convention: update in place, fresh install to best-guess GOPATH/bin
+          local current_path
+          current_path="$(command -v "$tool_name" 2>/dev/null || true)"
+          if [ -n "$current_path" ]; then
+            # Already installed - keep it where it is
+            echo "$(dirname "$current_path")"
+          else
+            # Fresh install - best-guess Go bin folder:
+            # 1. GOPATH/bin if GOPATH is set
+            # 2. `go env GOPATH`/bin if go is available
+            # 3. ~/go/bin (Go's default GOPATH)
+            if [ -n "${GOPATH:-}" ]; then
+              echo "$GOPATH/bin"
+            elif command -v go >/dev/null 2>&1; then
+              echo "$(go env GOPATH 2>/dev/null)/bin"
+            else
+              echo "$HOME/go/bin"
+            fi
+          fi
+          return
+          ;;
+        *)
+          # Generic target_dir: expand ~ and $HOME
+          target_dir="${target_dir/#\~/$HOME}"
+          target_dir="${target_dir//\$\{HOME\}/$HOME}"
+          target_dir="${target_dir//\$HOME/$HOME}"
+          echo "$target_dir"
+          return
+          ;;
+      esac
+    fi
+  fi
+
   case "$strategy" in
     CURRENT)
       # Keep tool where it is currently installed
