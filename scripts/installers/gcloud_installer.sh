@@ -14,27 +14,42 @@ if [ ! -f "$CATALOG_FILE" ]; then
 fi
 
 BINARY_NAME="$(jq -r '.binary_name' "$CATALOG_FILE")"
+GCLOUD_SDK="$HOME/google-cloud-sdk"
+GCLOUD_BIN="$GCLOUD_SDK/bin"
+
+# Ensure SDK bin is in PATH for detection and post-install
+if [ -d "$GCLOUD_BIN" ]; then
+  export PATH="$GCLOUD_BIN:$PATH"
+fi
 
 # Get current version
 before="$(command -v "$BINARY_NAME" >/dev/null 2>&1 && "$BINARY_NAME" version 2>/dev/null | head -1 || true)"
 
 if command -v "$BINARY_NAME" >/dev/null 2>&1; then
-  # Already installed - use built-in update
-  "$BINARY_NAME" components update --quiet 2>&1 || true
+  # Already installed - use built-in update (quiet)
+  "$BINARY_NAME" components update --quiet 2>&1 | tail -1
+elif [ -d "$GCLOUD_SDK" ]; then
+  # SDK directory exists but gcloud not functional - try to recover
+  if [ -x "$GCLOUD_BIN/$BINARY_NAME" ]; then
+    "$GCLOUD_BIN/$BINARY_NAME" components update --quiet 2>&1 | tail -1
+  else
+    echo "[$TOOL] Error: $GCLOUD_SDK exists but gcloud not found in $GCLOUD_BIN" >&2
+    echo "[$TOOL] Remove $GCLOUD_SDK and re-run to reinstall" >&2
+    exit 1
+  fi
 else
-  # Fresh install via Google Cloud SDK installer
+  # Fresh install via Google Cloud SDK installer (quiet)
   TMP="$(mktemp -d)"
-  cd "$TMP"
-  curl -fsSL https://sdk.cloud.google.com -o install.sh
-  bash install.sh --disable-prompts --install-dir="$HOME" 2>&1
-  cd - >/dev/null
+  INSTALLER_URL="https://dl.google.com/dl/cloudsdk/channels/rapid/google-cloud-sdk.tar.gz"
+  echo "[$TOOL] Downloading Google Cloud SDK..."
+  curl -fsSL "$INSTALLER_URL" -o "$TMP/google-cloud-sdk.tar.gz"
+  tar -xzf "$TMP/google-cloud-sdk.tar.gz" -C "$HOME"
   rm -rf "$TMP"
 
-  # Add to PATH if not already present
-  GCLOUD_BIN="$HOME/google-cloud-sdk/bin"
-  if [ -d "$GCLOUD_BIN" ] && ! command -v "$BINARY_NAME" >/dev/null 2>&1; then
-    export PATH="$GCLOUD_BIN:$PATH"
-  fi
+  # Run install script quietly (no prompts, no PATH modification, no usage reporting)
+  "$GCLOUD_SDK/install.sh" --quiet --usage-reporting false --command-completion false --path-update false 2>&1 | tail -1
+
+  export PATH="$GCLOUD_BIN:$PATH"
 fi
 
 # Report
