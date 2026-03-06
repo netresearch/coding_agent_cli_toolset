@@ -70,11 +70,11 @@ install_go() {
         echo "Downloading Go ${FULL_VERSION} SDK..."
         "$FULL_BINARY" download || true
 
-        # Create symlink from go1.24 -> go1.24.12 for convenience
+        # Update symlink from go1.24 -> go1.24.12
         GOBIN="$(go env GOPATH)/bin"
-        if [ -x "$GOBIN/$FULL_BINARY" ] && [ ! -e "$GOBIN/$BINARY" ]; then
+        if [ -x "$GOBIN/$FULL_BINARY" ]; then
           ln -sf "$FULL_BINARY" "$GOBIN/$BINARY" 2>/dev/null || true
-          echo "Created symlink: $BINARY -> $FULL_BINARY"
+          echo "Updated symlink: $BINARY -> $FULL_BINARY"
         fi
       fi
     else
