@@ -1,11 +1,12 @@
 {
   "name": "vhs",
-  "category": "general",
+  "category": "go",
   "install_method": "github_release_binary",
   "description": "CLI home video recorder - write terminal GIFs as code",
   "homepage": "https://github.com/charmbracelet/vhs",
   "github_repo": "charmbracelet/vhs",
   "binary_name": "vhs",
+  "target_dir": "go_bin",
   "download_url_template": "https://github.com/charmbracelet/vhs/releases/download/{version}/vhs_{version_nov}_Linux_{arch}.tar.gz",
   "arch_map": {
     "x86_64": "x86_64",
