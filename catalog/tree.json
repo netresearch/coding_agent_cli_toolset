@@ -6,6 +6,7 @@
   "homepage": "https://github.com/Old-Man-Programmer/tree",
   "github_repo": "Old-Man-Programmer/tree",
   "binary_name": "tree",
+  "version_flag": "--version",
   "script": "install_tree.sh",
   "tags": [
     "file-utils"
