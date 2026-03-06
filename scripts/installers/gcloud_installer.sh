@@ -52,6 +52,15 @@ else
   export PATH="$GCLOUD_BIN:$PATH"
 fi
 
+# Symlink gcloud (and gsutil, bq) into user bin so it's in PATH without SDK-specific setup
+BIN_DIR="$(get_install_dir "$BINARY_NAME")"
+mkdir -p "$BIN_DIR" 2>/dev/null || true
+for cmd in gcloud gsutil bq; do
+  if [ -x "$GCLOUD_BIN/$cmd" ]; then
+    ln -sf "$GCLOUD_BIN/$cmd" "$BIN_DIR/$cmd"
+  fi
+done
+
 # Report
 after="$(command -v "$BINARY_NAME" >/dev/null 2>&1 && "$BINARY_NAME" version 2>/dev/null | head -1 || true)"
 path="$(command -v "$BINARY_NAME" 2>/dev/null || true)"
