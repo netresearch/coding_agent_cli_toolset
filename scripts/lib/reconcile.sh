@@ -65,6 +65,11 @@ remove_installation() {
         npm uninstall -g "$tool" 2>/dev/null || true
       fi
       ;;
+    nvm)
+      # nvm-managed binaries: these are node versions, not directly removable via nvm here
+      # Skip removal — nvm versions are managed by install_node.sh
+      echo "[$tool] Skipping nvm-managed binary (use install_node.sh to manage)" >&2
+      ;;
     gem)
       if command -v gem >/dev/null 2>&1; then
         echo "[$tool] Uninstalling gem: $tool" >&2

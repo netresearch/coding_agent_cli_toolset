@@ -24,14 +24,17 @@ SUMMARY_FAILED=0
 SUMMARY_REMOVED=0
 
 print_summary() {
+  local label="${1:-interrupted}"
   echo "================================================================================"
-  echo "Summary (interrupted)"
+  echo "Summary${label:+ ($label)}"
   echo "================================================================================"
-  printf "  Updated:  %d\n" "$SUMMARY_UPDATED"
-  printf "  Removed:  %d\n" "$SUMMARY_REMOVED"
-  printf "  Skipped:  %d\n" "$SUMMARY_SKIPPED"
-  printf "  Failed:   %d\n" "$SUMMARY_FAILED"
+  printf "  Installed: %d\n" "$SUMMARY_INSTALLED"
+  printf "  Updated:   %d\n" "$SUMMARY_UPDATED"
+  printf "  Removed:   %d\n" "$SUMMARY_REMOVED"
+  printf "  Skipped:   %d\n" "$SUMMARY_SKIPPED"
+  printf "  Failed:    %d\n" "$SUMMARY_FAILED"
   echo
+  echo "Re-run: make audit"
 }
 
 # Category filter: CATEGORY=python,go or --category=python
@@ -293,7 +296,13 @@ process_tool() {
     else
       printf "    installed: %s via %s\n" "$installed" "${method:-unknown}"
     fi
-    printf "    target:    %s\n" "$(osc8 "$url" "${latest:-<unknown>}")"
+    # Show target; for self-managed tools (skip_upstream) show "self-managed" instead of <unknown>
+    local target_display="${latest:-<unknown>}"
+    local skip_upstream="$(catalog_get_property "$catalog_tool" skip_upstream)"
+    if [ "$target_display" = "<unknown>" ] && [ "$skip_upstream" = "true" ]; then
+      target_display="self-managed"
+    fi
+    printf "    target:    %s\n" "$(osc8 "$url" "$target_display")"
     check_multi_installs "$catalog_tool"
     printf "    auto-updating...\n"
 
@@ -306,18 +315,19 @@ process_tool() {
     fi
 
     # Execute the install with version-specific environment variables
+    local auto_update_success=0
     if [ "$catalog_tool" = "python" ] || [ -n "$is_multi_version" ] && [ "$catalog_tool" = "python" ]; then
-      UV_PYTHON_SPEC="$latest" "$ROOT"/scripts/$install_cmd || true
+      UV_PYTHON_SPEC="$latest" "$ROOT"/scripts/$install_cmd && auto_update_success=1 || true
     elif [ "$catalog_tool" = "ruby" ]; then
-      RUBY_VERSION="$latest" "$ROOT"/scripts/$install_cmd || true
+      RUBY_VERSION="$latest" "$ROOT"/scripts/$install_cmd && auto_update_success=1 || true
     elif [ "$catalog_tool" = "php" ] && [ -n "$version_cycle" ]; then
-      PHP_VERSION="$version_cycle" "$ROOT"/scripts/$install_cmd || true
+      PHP_VERSION="$version_cycle" "$ROOT"/scripts/$install_cmd && auto_update_success=1 || true
     elif [ "$catalog_tool" = "node" ] && [ -n "$version_cycle" ]; then
-      NODE_VERSION="$version_cycle" "$ROOT"/scripts/$install_cmd || true
+      NODE_VERSION="$version_cycle" "$ROOT"/scripts/$install_cmd && auto_update_success=1 || true
     elif [ "$catalog_tool" = "go" ] && [ -n "$version_cycle" ]; then
-      GO_VERSION="$version_cycle" "$ROOT"/scripts/$install_cmd || true
+      GO_VERSION="$version_cycle" "$ROOT"/scripts/$install_cmd && auto_update_success=1 || true
     else
-      "$ROOT"/scripts/$install_cmd || true
+      "$ROOT"/scripts/$install_cmd && auto_update_success=1 || true
     fi
 
     # Re-audit with fresh collection for this specific tool
@@ -325,7 +335,13 @@ process_tool() {
     reload_audit_json
     # Clean up any already-current marker left by installer
     rm -f "/tmp/.cli-audit/${catalog_tool}.already-current"
-    SUMMARY_UPDATED=$((SUMMARY_UPDATED + 1))
+    if [ "$auto_update_success" = "0" ]; then
+      SUMMARY_FAILED=$((SUMMARY_FAILED + 1))
+    elif [ -z "$installed" ]; then
+      SUMMARY_INSTALLED=$((SUMMARY_INSTALLED + 1))
+    else
+      SUMMARY_UPDATED=$((SUMMARY_UPDATED + 1))
+    fi
     return 0
   fi
 
@@ -341,7 +357,13 @@ process_tool() {
 
   check_multi_installs "$catalog_tool"
 
-  printf "    target:    %s\n" "$(osc8 "$url" "${latest:-<unknown>}")"
+  # Show target; for self-managed tools (skip_upstream) show "self-managed" instead of <unknown>
+  local target_display_p="${latest:-<unknown>}"
+  local skip_upstream_p="$(catalog_get_property "$catalog_tool" skip_upstream)"
+  if [ "$target_display_p" = "<unknown>" ] && [ "$skip_upstream_p" = "true" ]; then
+    target_display_p="self-managed"
+  fi
+  printf "    target:    %s\n" "$(osc8 "$url" "$target_display_p")"
 
   # Build install command from catalog metadata (use catalog_tool for script name)
   local install_cmd="install_tool.sh $catalog_tool"
@@ -593,7 +615,16 @@ process_tool() {
           printf "    ✓ %s has been removed\n" "$tool"
           SUMMARY_REMOVED=$((SUMMARY_REMOVED + 1))
         else
-          printf "    ⚠️  %s may not have been fully removed (still detected: %s)\n" "$tool" "$still_installed"
+          # Check if remaining installation is a system/apt binary that we can't remove
+          local remaining_method="$(json_field "$tool" installed_method)"
+          if [ "$remaining_method" = "apt" ] || [ "$remaining_method" = "system" ]; then
+            printf "    ✓ User-managed %s removed (system %s still present at %s — managed by OS)\n" \
+              "$tool" "$still_installed" "$remaining_method"
+            SUMMARY_REMOVED=$((SUMMARY_REMOVED + 1))
+          else
+            printf "    ⚠️  %s may not have been fully removed (still detected: %s via %s)\n" "$tool" "$still_installed" "${remaining_method:-unknown}"
+            SUMMARY_FAILED=$((SUMMARY_FAILED + 1))
+          fi
         fi
       else
         printf "    Tool is not installed, nothing to remove\n"
@@ -980,12 +1011,4 @@ fi
 
 # Print final summary
 echo
-echo "================================================================================"
-echo "Summary"
-echo "================================================================================"
-printf "  Updated:  %d\n" "$SUMMARY_UPDATED"
-printf "  Removed:  %d\n" "$SUMMARY_REMOVED"
-printf "  Skipped:  %d\n" "$SUMMARY_SKIPPED"
-printf "  Failed:   %d\n" "$SUMMARY_FAILED"
-echo
-echo "Re-run: make audit"
+print_summary ""

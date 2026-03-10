@@ -3,6 +3,7 @@
 set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+. "$DIR/lib/common.sh"
 . "$DIR/lib/install_strategy.sh"
 
 TOOL="${1:-gcloud}"
@@ -14,6 +15,7 @@ if [ ! -f "$CATALOG_FILE" ]; then
 fi
 
 BINARY_NAME="$(jq -r '.binary_name' "$CATALOG_FILE")"
+VERSION_COMMAND="$(jq -r '.version_command // empty' "$CATALOG_FILE")"
 GCLOUD_SDK="$HOME/google-cloud-sdk"
 GCLOUD_BIN="$GCLOUD_SDK/bin"
 
@@ -22,8 +24,17 @@ if [ -d "$GCLOUD_BIN" ]; then
   export PATH="$GCLOUD_BIN:$PATH"
 fi
 
+# Version detection helper
+get_gcloud_version() {
+  if [ -n "$VERSION_COMMAND" ]; then
+    timeout 5 bash -c "$VERSION_COMMAND" 2>/dev/null || true
+  elif command -v "$BINARY_NAME" >/dev/null 2>&1; then
+    "$BINARY_NAME" version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true
+  fi
+}
+
 # Get current version
-before="$(command -v "$BINARY_NAME" >/dev/null 2>&1 && "$BINARY_NAME" version 2>/dev/null | head -1 || true)"
+before="$(get_gcloud_version)"
 
 if command -v "$BINARY_NAME" >/dev/null 2>&1; then
   # Already installed - use built-in update (quiet)
@@ -62,7 +73,7 @@ for cmd in gcloud gsutil bq; do
 done
 
 # Report
-after="$(command -v "$BINARY_NAME" >/dev/null 2>&1 && "$BINARY_NAME" version 2>/dev/null | head -1 || true)"
+after="$(get_gcloud_version)"
 path="$(command -v "$BINARY_NAME" 2>/dev/null || true)"
 printf "[%s] before: %s\n" "$TOOL" "${before:-<none>}"
 printf "[%s] after:  %s\n" "$TOOL" "${after:-<none>}"

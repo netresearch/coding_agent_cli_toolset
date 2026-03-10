@@ -49,7 +49,7 @@ detect_install_method() {
       return 0
       ;;
     "$HOME/.nvm/"*)
-      echo "npm"
+      echo "nvm"
       return 0
       ;;
     "/usr/local/bin/"*)
@@ -133,9 +133,11 @@ detect_all_installations() {
     [ -z "$path" ] && continue
     [ ! -x "$path" ] && continue
 
-    # Skip venv paths - these are environments, not installations
+    # Skip venv/virtualenv paths - these are environments, not installations
     case "$path" in
-      */venv/bin/*|*/.venv/bin/*|*/venvs/*/bin/*|*/virtualenvs/*/bin/*|*/envs/*/bin/*|*/conda/*/bin/*) continue ;;
+      */venv/bin/*|*/.venv/bin/*|*/venvs/*/bin/*|*/.venvs/*/bin/*|*/virtualenvs/*/bin/*|*/.virtualenvs/*/bin/*) continue ;;
+      */envs/*/bin/*|*/conda/*/bin/*|*/miniconda*/bin/*|*/anaconda*/bin/*) continue ;;
+      */env/bin/*) continue ;;
       /mnt/[a-z]/*) continue ;;  # Skip Windows paths on WSL
     esac
 
@@ -184,7 +186,7 @@ classify_install_path() {
       # Extract node version for context
       local node_version="${path#$HOME/.nvm/versions/node/}"
       node_version="${node_version%%/*}"
-      echo "npm($node_version)"
+      echo "nvm($node_version)"
       ;;
     "$HOME/.local/pipx/venvs/"*)
       local pkg="${path#$HOME/.local/pipx/venvs/}"

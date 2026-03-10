@@ -3,6 +3,7 @@
 set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+. "$DIR/lib/common.sh"
 
 TOOL="${1:-}"
 if [ -z "$TOOL" ]; then
@@ -77,6 +78,9 @@ fi
 
 # Report
 after="$(get_uv_tool_version "$TOOL" "$BINARY_NAME" "${VERSION_FLAG:---version}")"
+# Normalize multi-line or verbose version output to a clean version string
+before="$(normalize_version_output "${before:-}")"
+after="$(normalize_version_output "${after:-}")"
 path="$(command -v "$BINARY_NAME" 2>/dev/null || true)"
 printf "[%s] before: %s\n" "$TOOL" "${before:-<none>}"
 printf "[%s] after:  %s\n" "$TOOL" "${after:-<none>}"

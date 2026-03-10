@@ -222,14 +222,26 @@ uninstall_py_tools() {
 
     echo "[python] Removing Python $short_ver..." >&2
 
+    # Pre-cache sudo credentials to avoid repeated password prompts
+    if have sudo && have apt-get; then
+      sudo -v 2>/dev/null || true
+    fi
+
     # Remove via uv if available
     if command -v uv >/dev/null 2>&1; then
       uv python uninstall "$short_ver" 2>/dev/null || true
     fi
 
     # Remove version-specific apt packages (e.g., python3.10)
+    # BUT skip if this version is the system default python3 (dependency of python3 metapackage)
     if have apt-get; then
-      apt_remove_if_present "python${short_ver}" "python${short_ver}-venv" "python${short_ver}-dev" 2>/dev/null || true
+      local system_py_ver=""
+      system_py_ver="$(/usr/bin/python3 --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+' | head -1 || true)"
+      if [ "$short_ver" = "$system_py_ver" ]; then
+        echo "[python] Skipping apt removal: python${short_ver} is the system Python (dependency of python3)" >&2
+      else
+        apt_remove_if_present "python${short_ver}" "python${short_ver}-venv" "python${short_ver}-dev" 2>/dev/null || true
+      fi
     fi
 
     # Remove version-specific brew formula if it exists

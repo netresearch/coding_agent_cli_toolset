@@ -26,6 +26,10 @@ fi
 
 # Parse catalog
 PACKAGE_NAME="$(jq -r '.package_name // .name' "$CATALOG_FILE")"
+BINARY_NAME="$(jq -r '.binary_name // empty' "$CATALOG_FILE")"
+BINARY_NAME="${BINARY_NAME:-$TOOL}"
+VERSION_COMMAND="$(jq -r '.version_command // empty' "$CATALOG_FILE")"
+VERSION_FLAG="$(jq -r '.version_flag // empty' "$CATALOG_FILE")"
 
 # Detect available package manager (pnpm > npm > yarn)
 # Only use pnpm if it's properly configured with a global bin directory
@@ -47,32 +51,47 @@ if [ -z "$PKG_MANAGER" ]; then
   exit 1
 fi
 
+# Version detection helper (uses catalog version_command/version_flag if available)
+get_npm_tool_version() {
+  if [ -n "$VERSION_COMMAND" ]; then
+    timeout 2 bash -c "$VERSION_COMMAND" 2>/dev/null || true
+    return
+  fi
+  local bin="$1"
+  if command -v "$bin" >/dev/null 2>&1; then
+    if [ -n "$VERSION_FLAG" ]; then
+      timeout 2 "$bin" $VERSION_FLAG </dev/null 2>/dev/null | head -1 || true
+    else
+      timeout 2 "$bin" --version </dev/null 2>/dev/null | head -1 || true
+    fi
+  fi
+}
+
 # Get current version
-before=""
-if command -v "$TOOL" >/dev/null 2>&1; then
-  before="$("$TOOL" --version 2>/dev/null || true)"
-fi
+before="$(get_npm_tool_version "$BINARY_NAME")"
 
 # Install or upgrade globally
 echo "[$TOOL] Installing package globally via $PKG_MANAGER: $PACKAGE_NAME" >&2
 case "$PKG_MANAGER" in
   pnpm)
-    # Use @latest to ensure we get the newest version
-    pnpm add -g "${PACKAGE_NAME}@latest" || {
+    pnpm add -g "${PACKAGE_NAME}@latest" 2>&1 | grep -v "^npm warn deprecated" || {
       echo "[$TOOL] Error: pnpm install failed" >&2
       exit 1
     }
     ;;
   npm)
-    # Use @latest to ensure we get the newest version (bypasses npm cache issues)
-    npm install -g "${PACKAGE_NAME}@latest" || {
-      echo "[$TOOL] Error: npm install failed" >&2
-      exit 1
-    }
+    # Try normal install first; retry with --force on EEXIST errors
+    if ! npm install -g "${PACKAGE_NAME}@latest" 2>&1 | grep -v "^npm warn deprecated"; then
+      if npm install -g --force "${PACKAGE_NAME}@latest" 2>&1 | grep -v "^npm warn deprecated"; then
+        : # Force install succeeded
+      else
+        echo "[$TOOL] Error: npm install failed" >&2
+        exit 1
+      fi
+    fi
     ;;
   yarn)
-    # Use @latest to ensure we get the newest version
-    yarn global add "${PACKAGE_NAME}@latest" || {
+    yarn global add "${PACKAGE_NAME}@latest" 2>&1 | grep -v "^npm warn deprecated" || {
       echo "[$TOOL] Error: yarn install failed" >&2
       exit 1
     }
@@ -80,12 +99,9 @@ case "$PKG_MANAGER" in
 esac
 
 # Report
-after=""
-if command -v "$TOOL" >/dev/null 2>&1; then
-  after="$("$TOOL" --version 2>/dev/null || true)"
-fi
+after="$(get_npm_tool_version "$BINARY_NAME")"
 
-path="$(command -v "$TOOL" 2>/dev/null || true)"
+path="$(command -v "$BINARY_NAME" 2>/dev/null || true)"
 printf "[%s] before: %s\n" "$TOOL" "${before:-<none>}"
 printf "[%s] after:  %s\n" "$TOOL" "${after:-<none>}"
 if [ -n "$path" ]; then printf "[%s] path:   %s\n" "$TOOL" "$path"; fi

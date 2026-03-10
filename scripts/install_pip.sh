@@ -39,7 +39,14 @@ install_pip() {
   fi
 
   # Upgrade pip to latest
-  python3 -m pip install --upgrade pip 2>&1 || true
+  # Use uv if available (avoids externally-managed-environment errors)
+  if command -v uv >/dev/null 2>&1; then
+    # uv manages Python installations; pip upgrade is best left to uv's Python
+    echo "[pip] pip is managed by the Python distribution (uv/brew). Skipping standalone upgrade." >&2
+  else
+    # Only attempt pip upgrade if not in an externally-managed environment
+    python3 -m pip install --upgrade pip 2>&1 | grep -v "externally-managed-environment" || true
+  fi
 
   after="$(get_pip_version)"
   path="$(command -v pip3 2>/dev/null || command -v pip 2>/dev/null || true)"
