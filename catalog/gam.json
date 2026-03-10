@@ -7,6 +7,8 @@
   "github_repo": "GAM-team/GAM",
   "binary_name": "gam",
   "version_flag": "version",
+  "version_command": "gam version 2>/dev/null | head -1 | grep -oE 'GAM [0-9]+\\.[0-9]+\\.[0-9]+' | awk '{print $2}'",
+  "version_regex": "([0-9]+\\.[0-9]+\\.[0-9]+)",
   "package_name": "gam7",
   "auto_update": true
 }

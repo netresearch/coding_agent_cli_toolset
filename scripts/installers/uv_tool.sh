@@ -32,9 +32,20 @@ fi
 # Get current version
 # Some tools need special handling for version detection
 VERSION_FLAG="$(jq -r '.version_flag // empty' "$CATALOG_FILE")"
+VERSION_COMMAND="$(jq -r '.version_command // empty' "$CATALOG_FILE")"
+
 get_uv_tool_version() {
   local tool="$1" bin="$2" flag="${3:---version}"
-  # Try the binary with its version flag first
+  # Use catalog-specified version command if available (most reliable)
+  if [ -n "$VERSION_COMMAND" ]; then
+    local ver
+    ver="$(timeout 2 bash -c "$VERSION_COMMAND" 2>/dev/null || true)"
+    if [ -n "$ver" ]; then
+      echo "$ver"
+      return
+    fi
+  fi
+  # Try the binary with its version flag
   if command -v "$bin" >/dev/null 2>&1; then
     local ver
     ver="$(timeout 2 "$bin" $flag </dev/null 2>/dev/null || true)"
@@ -48,13 +59,20 @@ get_uv_tool_version() {
 }
 
 before="$(get_uv_tool_version "$TOOL" "$BINARY_NAME" "${VERSION_FLAG:---version}")"
+# Fallback: if binary version detection failed, try uv tool list directly
+if [ -z "$before" ] || [ "$before" = "<none>" ]; then
+  before="$(uv tool list 2>/dev/null | grep -E "^${PACKAGE_NAME} " | head -1 | sed 's/^[^ ]* //' || true)"
+fi
 
 # Install or upgrade with optional Python version pinning
+# Use --upgrade (not --force) to avoid unnecessary reinstalls
 if [ -n "$PYTHON_VERSION" ]; then
   echo "[$TOOL] Installing with Python $PYTHON_VERSION..."
-  uv tool install --force --upgrade --python "$PYTHON_VERSION" "$PACKAGE_NAME" || true
+  uv tool install --upgrade --python "$PYTHON_VERSION" "$PACKAGE_NAME" || \
+    uv tool install --force --upgrade --python "$PYTHON_VERSION" "$PACKAGE_NAME" || true
 else
-  uv tool install --force --upgrade "$PACKAGE_NAME" || true
+  uv tool install --upgrade "$PACKAGE_NAME" || \
+    uv tool install --force --upgrade "$PACKAGE_NAME" || true
 fi
 
 # Report

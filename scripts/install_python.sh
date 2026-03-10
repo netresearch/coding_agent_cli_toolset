@@ -210,11 +210,42 @@ update_py_stack() {
 }
 
 uninstall_py_tools() {
-  local tools=(black isort flake8 bandit httpie pre-commit poetry semgrep)
-  if command -v uv >/dev/null 2>&1; then
-    for p in "${tools[@]}"; do uv tool uninstall "$p" >/dev/null 2>&1 || true; done
+  local PY_SPEC="${UV_PYTHON_SPEC:-}"
+
+  if [ -n "$PY_SPEC" ]; then
+    # Version-specific removal (e.g., UV_PYTHON_SPEC=3.10)
+    local short_ver="${PY_SPEC}"
+    # Extract major.minor from full version like 3.10.19
+    case "$PY_SPEC" in
+      *.*.*)  short_ver="${PY_SPEC%.*}" ;;
+    esac
+
+    echo "[python] Removing Python $short_ver..." >&2
+
+    # Remove via uv if available
+    if command -v uv >/dev/null 2>&1; then
+      uv python uninstall "$short_ver" 2>/dev/null || true
+    fi
+
+    # Remove version-specific apt packages (e.g., python3.10)
+    if have apt-get; then
+      apt_remove_if_present "python${short_ver}" "python${short_ver}-venv" "python${short_ver}-dev" 2>/dev/null || true
+    fi
+
+    # Remove version-specific brew formula if it exists
+    if have brew; then
+      brew uninstall "python@${short_ver}" 2>/dev/null || true
+    fi
+
+    echo "[python] Python $short_ver removal complete" >&2
   else
-    for p in "${tools[@]}"; do pipx uninstall "$p" >/dev/null 2>&1 || true; done
+    # Full uninstall: remove all CLI tools
+    local tools=(black isort flake8 bandit httpie pre-commit poetry semgrep)
+    if command -v uv >/dev/null 2>&1; then
+      for p in "${tools[@]}"; do uv tool uninstall "$p" >/dev/null 2>&1 || true; done
+    else
+      for p in "${tools[@]}"; do pipx uninstall "$p" >/dev/null 2>&1 || true; done
+    fi
   fi
 }
 

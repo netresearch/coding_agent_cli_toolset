@@ -23,6 +23,11 @@ BINARY_NAME="npm"
 # Load nvm if available (npm is bundled with nvm-managed Node.js)
 ensure_nvm_loaded
 
+# Ensure we're using the nvm-managed node (not brew's node)
+if command -v nvm >/dev/null 2>&1; then
+  nvm use default >/dev/null 2>&1 || true
+fi
+
 # Get current version
 before="$(timeout 2 npm --version </dev/null 2>/dev/null || echo '<none>')"
 

@@ -1,15 +1,38 @@
 #!/usr/bin/env bash
 set -euo pipefail
 trap '' PIPE
+# Graceful interrupt handling
+INTERRUPTED=0
+trap 'INTERRUPTED=1; echo; echo "⚠️  Interrupted. Partial summary:"; print_summary; exit 130' INT
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$DIR/.." && pwd)"
 VERBOSE="${VERBOSE:-0}"
+# Suppress Homebrew auto-update during upgrade runs to reduce noise
+export HOMEBREW_NO_AUTO_UPDATE=1
 OFFLINE="${OFFLINE:-0}"
 CLI="${PYTHON:-python3}"
 
 # Ignore pins: IGNORE_PINS=1 to show all tools regardless of pin status
 IGNORE_PINS="${IGNORE_PINS:-0}"
+
+# Summary counters
+SUMMARY_UPDATED=0
+SUMMARY_INSTALLED=0
+SUMMARY_SKIPPED=0
+SUMMARY_FAILED=0
+SUMMARY_REMOVED=0
+
+print_summary() {
+  echo "================================================================================"
+  echo "Summary (interrupted)"
+  echo "================================================================================"
+  printf "  Updated:  %d\n" "$SUMMARY_UPDATED"
+  printf "  Removed:  %d\n" "$SUMMARY_REMOVED"
+  printf "  Skipped:  %d\n" "$SUMMARY_SKIPPED"
+  printf "  Failed:   %d\n" "$SUMMARY_FAILED"
+  echo
+}
 
 # Category filter: CATEGORY=python,go or --category=python
 CATEGORY_FILTER="${CATEGORY:-}"
@@ -241,6 +264,7 @@ process_tool() {
     printf "    installed: %s via %s\n" "$installed" "$method"
     printf "    target:    %s (same)\n" "$(osc8 "$url" "$latest")"
     check_multi_installs "$catalog_tool"
+    SUMMARY_SKIPPED=$((SUMMARY_SKIPPED + 1))
     printf "    up-to-date; skipping.\n"
     return 0
   fi
@@ -264,7 +288,11 @@ process_tool() {
   # BUT: multi-version tools always prompt (more significant operation)
   if [ "$auto_update" = "true" ] && [ -z "$is_multi_version" ]; then
     printf "\n==> %s %s [auto-update]\n" "$icon" "$display"
-    printf "    installed: %s via %s\n" "${installed:-<none>}" "${method:-unknown}"
+    if [ -z "$installed" ]; then
+      printf "    installed: not installed\n"
+    else
+      printf "    installed: %s via %s\n" "$installed" "${method:-unknown}"
+    fi
     printf "    target:    %s\n" "$(osc8 "$url" "${latest:-<unknown>}")"
     check_multi_installs "$catalog_tool"
     printf "    auto-updating...\n"
@@ -297,6 +325,7 @@ process_tool() {
     reload_audit_json
     # Clean up any already-current marker left by installer
     rm -f "/tmp/.cli-audit/${catalog_tool}.already-current"
+    SUMMARY_UPDATED=$((SUMMARY_UPDATED + 1))
     return 0
   fi
 
@@ -304,7 +333,11 @@ process_tool() {
   printf "\n==> %s %s\n" "$icon" "$display"
   [ -n "$description" ] && printf "    %s\n" "$description"
   [ -n "$homepage" ] && printf "    Homepage: %s\n" "$(osc8 "$homepage" "$homepage")"
-  printf "    installed: %s via %s\n" "${installed:-<none>}" "${method:-unknown}"
+  if [ -z "$installed" ]; then
+    printf "    installed: not installed\n"
+  else
+    printf "    installed: %s via %s\n" "$installed" "${method:-unknown}"
+  fi
 
   check_multi_installs "$catalog_tool"
 
@@ -335,7 +368,7 @@ process_tool() {
     fi
     printf "      r = Remove/uninstall this tool\n"
     if [ -n "$is_multi_version" ]; then
-      printf "      P = Skip ALL %s cycles (never install any %s)\n" "$catalog_tool" "$catalog_tool"
+      printf "      P = Skip ALL outdated %s cycles\n" "$catalog_tool"
     fi
   else
     printf "      y = Install now\n"
@@ -344,7 +377,7 @@ process_tool() {
     printf "      s = Skip only %s (ask again when newer patch available)\n" "$latest"
     if [ -n "$is_multi_version" ]; then
       printf "      p = Never install %s (skip entire %s.x cycle)\n" "$display" "$version_cycle"
-      printf "      P = Skip ALL %s cycles (never install any %s)\n" "$catalog_tool" "$catalog_tool"
+      printf "      P = Skip ALL outdated %s cycles\n" "$catalog_tool"
     else
       printf "      p = Never install (permanently skip this tool)\n"
     fi
@@ -419,6 +452,7 @@ process_tool() {
       if [ "$upgrade_success" = "0" ]; then
         # Install script failed
         printf "\n    ⚠️  Upgrade failed (install script error)\n"
+        SUMMARY_FAILED=$((SUMMARY_FAILED + 1))
         prompt_pin_version "$tool" "$installed"
       elif [ -n "$binary_already_current" ]; then
         # Binary hash matches target release - upgrade succeeded despite version string
@@ -435,6 +469,7 @@ process_tool() {
         fi
       else
         # Upgrade succeeded - remove any existing pin to avoid stale pins
+        SUMMARY_UPDATED=$((SUMMARY_UPDATED + 1))
         local existing_pin="$(pins_get "$tool")"
         if [ -n "$existing_pin" ] && [ "$existing_pin" != "never" ]; then
           "$ROOT"/scripts/unpin_version.sh "$tool" || true
@@ -478,18 +513,23 @@ process_tool() {
       if [ "$upgrade_success_a" = "0" ]; then
         printf "\n    ⚠️  Upgrade failed (install script error)\n"
         printf "    Auto-update is still enabled - will try again next time.\n"
+        SUMMARY_FAILED=$((SUMMARY_FAILED + 1))
       elif [ -n "$binary_already_current_a" ]; then
         printf "    ✓ Auto-update enabled. Binary already matches target release.\n"
+        SUMMARY_UPDATED=$((SUMMARY_UPDATED + 1))
       elif [ "$new_installed_a" = "$installed" ] && [ "$new_installed_a" != "$latest" ]; then
         # Version didn't change - but check for prefix match (e.g., 3.13 vs 3.13.11)
         if [[ "$latest" == "$new_installed_a"* ]] || [[ "$new_installed_a" == "$latest"* ]]; then
           printf "    ✓ Auto-update enabled. This tool will update automatically in future.\n"
+          SUMMARY_UPDATED=$((SUMMARY_UPDATED + 1))
         else
           printf "\n    ⚠️  Upgrade did not succeed (version unchanged)\n"
           printf "    Auto-update is still enabled - will try again next time.\n"
+          SUMMARY_FAILED=$((SUMMARY_FAILED + 1))
         fi
       else
         printf "    ✓ Auto-update enabled. This tool will update automatically in future.\n"
+        SUMMARY_UPDATED=$((SUMMARY_UPDATED + 1))
         # Remove any existing pin
         local existing_pin_a="$(pins_get "$tool")"
         if [ -n "$existing_pin_a" ]; then
@@ -501,6 +541,7 @@ process_tool() {
       # Skip this specific patch version only
       printf "    Skipping only %s (will prompt again when newer patch available)\n" "$latest"
       "$ROOT"/scripts/pin_version.sh "$tool" "$latest" || true
+      SUMMARY_SKIPPED=$((SUMMARY_SKIPPED + 1))
       ;;
     [p])
       if [ -n "$installed" ]; then
@@ -550,6 +591,7 @@ process_tool() {
         local still_installed="$(json_field "$tool" installed)"
         if [ -z "$still_installed" ]; then
           printf "    ✓ %s has been removed\n" "$tool"
+          SUMMARY_REMOVED=$((SUMMARY_REMOVED + 1))
         else
           printf "    ⚠️  %s may not have been fully removed (still detected: %s)\n" "$tool" "$still_installed"
         fi
@@ -570,6 +612,7 @@ process_tool() {
       ;;
     *)
       # User declined (N or empty)
+      SUMMARY_SKIPPED=$((SUMMARY_SKIPPED + 1))
       ;;
   esac
 }
@@ -863,7 +906,7 @@ for category in $(printf '%s\n' "${!CATEGORY_TOOLS[@]}" | while read c; do echo 
   # Category-level prompt (skip if auto-yes mode)
   if [ "${AUTO_YES_ALL:-}" != "1" ]; then
     printf "  Tools: %s\n" "$(echo $tools | tr ' ' ', ' | sed 's/^, //')"
-    printf "  Process this category? [Y/n/a=all/s=skip-all] "
+    printf "  Process this category? [Y/n/a=all categories/s=skip-all] "
 
     cat_ans=""
     if [ -t 0 ]; then
@@ -935,5 +978,14 @@ if [ -n "$DEPRECATED_TOOLS" ]; then
   fi
 fi
 
+# Print final summary
 echo
-echo "All done. Re-run: make audit"
+echo "================================================================================"
+echo "Summary"
+echo "================================================================================"
+printf "  Updated:  %d\n" "$SUMMARY_UPDATED"
+printf "  Removed:  %d\n" "$SUMMARY_REMOVED"
+printf "  Skipped:  %d\n" "$SUMMARY_SKIPPED"
+printf "  Failed:   %d\n" "$SUMMARY_FAILED"
+echo
+echo "Re-run: make audit"

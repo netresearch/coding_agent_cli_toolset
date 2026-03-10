@@ -61,6 +61,23 @@ detect_install_method() {
       fi
       return 0
       ;;
+    "/home/linuxbrew/.linuxbrew/"*|"/opt/homebrew/"*)
+      # Check if it's an npm global installed under brew's node (symlink to lib/node_modules/...)
+      local resolved_brew
+      resolved_brew="$(readlink -f "$binary_path" 2>/dev/null || true)"
+      if [ -n "$resolved_brew" ] && [[ "$resolved_brew" == */node_modules/* ]]; then
+        echo "npm"
+      elif command -v brew >/dev/null 2>&1 && brew list --formula 2>/dev/null | grep -q "^${tool}\$"; then
+        echo "brew"
+      else
+        echo "unknown"
+      fi
+      return 0
+      ;;
+    "$HOME/.local/share/pnpm/"*)
+      echo "npm"
+      return 0
+      ;;
     "/usr/bin/"*|"/bin/"*)
       # Check if it's a corepack shim
       local resolved_bp
@@ -118,7 +135,8 @@ detect_all_installations() {
 
     # Skip venv paths - these are environments, not installations
     case "$path" in
-      */venv/bin/*|*/.venv/bin/*|*/venvs/*/bin/*|*/virtualenvs/*/bin/*) continue ;;
+      */venv/bin/*|*/.venv/bin/*|*/venvs/*/bin/*|*/virtualenvs/*/bin/*|*/envs/*/bin/*|*/conda/*/bin/*) continue ;;
+      /mnt/[a-z]/*) continue ;;  # Skip Windows paths on WSL
     esac
 
     # Resolve symlinks for deduplication (e.g., /bin/X and /usr/bin/X are the same on Ubuntu)
@@ -174,7 +192,14 @@ classify_install_path() {
       echo "pipx($pkg)"
       ;;
     "/home/linuxbrew/.linuxbrew/bin/"*|"/opt/homebrew/bin/"*)
-      echo "brew"
+      # Check if it's an npm global installed under brew's node (symlink to lib/node_modules/...)
+      local resolved_brew
+      resolved_brew="$(readlink -f "$path" 2>/dev/null || true)"
+      if [ -n "$resolved_brew" ] && [[ "$resolved_brew" == */node_modules/* ]]; then
+        echo "npm"
+      else
+        echo "brew"
+      fi
       ;;
     "/usr/local/bin/"*)
       if command -v brew >/dev/null 2>&1 && brew list --formula 2>/dev/null | grep -q "^${tool}\$"; then
@@ -197,6 +222,9 @@ classify_install_path() {
       ;;
     "/snap/bin/"*)
       echo "snap"
+      ;;
+    "$HOME/.local/share/pnpm/"*)
+      echo "npm"
       ;;
     *)
       echo "unknown"

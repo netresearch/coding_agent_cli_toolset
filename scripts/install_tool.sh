@@ -48,6 +48,10 @@ if [ "$ACTION" = "uninstall" ]; then
     if [ -n "$script_name" ] && [ -f "$DIR/$script_name" ]; then
       "$DIR/$script_name" uninstall || true
     fi
+    # Dedicated scripts handle their own cleanup completely
+    # Don't try to detect and remove additional installations
+    # (especially important for multi-version tools like node, python, go)
+    exit 0
   fi
 
   binary_name="$(jq -r '.binary_name // ""' "$CATALOG_FILE" 2>/dev/null || echo "$TOOL")"
