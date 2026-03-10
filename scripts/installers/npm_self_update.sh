@@ -12,6 +12,12 @@ if [ -z "$TOOL" ]; then
   exit 1
 fi
 
+# Validate tool name to prevent path traversal
+if [[ "$TOOL" == *"/"* ]] || [[ "$TOOL" == *".."* ]]; then
+  echo "Error: Invalid tool name: $TOOL" >&2
+  exit 1
+fi
+
 CATALOG_FILE="$DIR/../catalog/$TOOL.json"
 if [ ! -f "$CATALOG_FILE" ]; then
   echo "Error: Catalog file not found: $CATALOG_FILE" >&2
@@ -22,6 +28,11 @@ BINARY_NAME="npm"
 
 # Load nvm if available (npm is bundled with nvm-managed Node.js)
 ensure_nvm_loaded
+
+# Ensure we're using the nvm-managed node (not brew's node)
+if command -v nvm >/dev/null 2>&1; then
+  nvm use default >/dev/null 2>&1 || true
+fi
 
 # Get current version
 before="$(timeout 2 npm --version </dev/null 2>/dev/null || echo '<none>')"

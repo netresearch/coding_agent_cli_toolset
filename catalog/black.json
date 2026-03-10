@@ -4,5 +4,6 @@
   "install_method": "uv_tool",
   "description": "The uncompromising Python code formatter",
   "homepage": "https://github.com/psf/black",
-  "package_name": "black"
+  "package_name": "black",
+  "version_command": "black --version 2>/dev/null | head -1"
 }

@@ -12,6 +12,12 @@ if [ -z "$TOOL" ]; then
   exit 1
 fi
 
+# Validate tool name to prevent path traversal
+if [[ "$TOOL" == *"/"* ]] || [[ "$TOOL" == *".."* ]]; then
+  echo "Error: Invalid tool name: $TOOL" >&2
+  exit 1
+fi
+
 CATALOG_FILE="$DIR/../catalog/$TOOL.json"
 if [ ! -f "$CATALOG_FILE" ]; then
   echo "Error: Catalog file not found: $CATALOG_FILE" >&2
@@ -41,8 +47,18 @@ BIN_DIR="$(get_install_dir "$BINARY_NAME")"
 get_install_cmd "$BIN_DIR"
 mkdir -p "$BIN_DIR" 2>/dev/null || true
 
-# Remove distro package first if it exists
-apt_remove_if_present "$BINARY_NAME" || true
+# Only remove apt package if current installation is from apt
+# (avoid unnecessary sudo prompts when tool isn't apt-managed)
+if command -v "$BINARY_NAME" >/dev/null 2>&1; then
+  current_path="$(command -v "$BINARY_NAME")"
+  case "$current_path" in
+    /usr/bin/*|/usr/sbin/*)
+      if command -v dpkg >/dev/null 2>&1 && dpkg -S "$current_path" >/dev/null 2>&1; then
+        apt_remove_if_present "$BINARY_NAME" || true
+      fi
+      ;;
+  esac
+fi
 
 # Get latest version from GitHub releases
 LATEST_TAG=""

@@ -119,4 +119,27 @@ is_wsl() {
   grep -qi microsoft /proc/version 2>/dev/null
 }
 
+# Normalize version output to a concise single-line format
+# Extracts the first version-like string (X.Y.Z or X.Y) from potentially verbose output
+# Usage: normalize_version_output "golangci-lint has version 2.11.3 built with go1.26.1..."
+#        → "2.11.3"
+normalize_version_output() {
+  local raw="$1"
+  [ -z "$raw" ] && return
+  # Take only first line
+  raw="$(echo "$raw" | head -1)"
+  # Try to extract a version number (X.Y.Z or X.Y)
+  local ver
+  ver="$(echo "$raw" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
+  if [ -z "$ver" ]; then
+    ver="$(echo "$raw" | grep -oE '[0-9]+\.[0-9]+' | head -1)"
+  fi
+  # If we got a version, print it; otherwise print the raw first line (trimmed)
+  if [ -n "$ver" ]; then
+    echo "$ver"
+  else
+    echo "$raw"
+  fi
+}
+
 

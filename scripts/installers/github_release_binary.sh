@@ -7,9 +7,22 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$DIR/lib/common.sh"
 . "$DIR/lib/install_strategy.sh"
 
+# Cleanup temp files on interrupt
+_grb_cleanup() {
+  rm -f "/tmp/${BINARY_NAME:-tool}.$$" 2>/dev/null || true
+  rm -rf "/tmp/${BINARY_NAME:-tool}-extract.$$" 2>/dev/null || true
+}
+trap '_grb_cleanup; exit 130' INT TERM
+
 TOOL="${1:-}"
 if [ -z "$TOOL" ]; then
   echo "Usage: $0 TOOL_NAME" >&2
+  exit 1
+fi
+
+# Validate tool name to prevent path traversal
+if [[ "$TOOL" == *"/"* ]] || [[ "$TOOL" == *".."* ]]; then
+  echo "Error: Invalid tool name: $TOOL" >&2
   exit 1
 fi
 
@@ -275,6 +288,9 @@ if command -v "$BINARY_NAME" >/dev/null 2>&1; then
              timeout 2 "$BINARY_NAME" version </dev/null 2>/dev/null | head -1 || true)"
   fi
 fi
+# Normalize verbose version output
+before="$(normalize_version_output "${before:-}")"
+after="$(normalize_version_output "${after:-}")"
 path="$(command -v "$BINARY_NAME" 2>/dev/null || true)"
 printf "[%s] before: %s\n" "$TOOL" "${before:-<none>}"
 printf "[%s] after:  %s\n" "$TOOL" "${after:-<none>}"

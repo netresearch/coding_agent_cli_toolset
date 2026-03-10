@@ -62,7 +62,8 @@ self_update_uv() {
 upgrade_uv_tools() {
   command -v uv >/dev/null 2>&1 || return 0
   echo "Checking uv-managed tools..."
-  uv tool upgrade --all || true
+  # Only show tool name and version changes, not dependency details
+  uv tool upgrade --all 2>&1 | grep -E '^(Updated |Modified |Installed |No updates)' || true
 }
 
 reconcile_uv() {
@@ -75,8 +76,6 @@ reconcile_uv() {
   fi
   # Try self-update to latest stable
   self_update_uv || true
-  # Upgrade all uv-managed tools
-  upgrade_uv_tools || true
   # Verify final state
   echo "uv path: $(command -v uv 2>/dev/null || echo '<none>')"
   uv --version 2>/dev/null || true

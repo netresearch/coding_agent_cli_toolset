@@ -38,6 +38,8 @@ get_specific_node_version() {
 install_node() {
   ensure_nvm
   nvm install "$NODE_CHANNEL"
+  # Re-source nvm to ensure the new version is active in this shell
+  ensure_nvm_loaded
 
   # Only set default if this is NOT a multi-version install
   # (multi-version = specific major version like 24, 25)
@@ -66,6 +68,8 @@ install_node() {
 update_node() {
   ensure_nvm
   nvm install "$NODE_CHANNEL"
+  # Re-source nvm to ensure the new version is active in this shell
+  ensure_nvm_loaded
 
   # Only set default and update global packages if NOT a multi-version install
   if [ -z "${NODE_VERSION:-}" ]; then
