@@ -17,6 +17,12 @@ if [ -z "$TOOL" ]; then
   exit 1
 fi
 
+# Validate tool name to prevent path traversal
+if [[ "$TOOL" == *"/"* ]] || [[ "$TOOL" == *".."* ]]; then
+  echo "[$TOOL] Error: Invalid tool name" >&2
+  exit 1
+fi
+
 CATALOG_FILE="$DIR/../catalog/$TOOL.json"
 
 # Check if tool has catalog entry

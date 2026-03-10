@@ -165,6 +165,17 @@ osc8() {
   [ -n "$url" ] && printf '\e]8;;%s\e\\%s\e]8;;\e\\' "$url" "$text" || printf '%s' "$text"
 }
 
+# Print installed status line (reusable for auto-update and interactive prompts)
+print_installed_status() {
+  local installed="$1"
+  local method="$2"
+  if [ -z "$installed" ]; then
+    printf "    installed: not installed\n"
+  else
+    printf "    installed: %s via %s\n" "$installed" "${method:-unknown}"
+  fi
+}
+
 # Check for multiple installations and print warning if found
 # Args: catalog_tool_name
 # Returns: 0 always (informational only)
@@ -291,11 +302,7 @@ process_tool() {
   # BUT: multi-version tools always prompt (more significant operation)
   if [ "$auto_update" = "true" ] && [ -z "$is_multi_version" ]; then
     printf "\n==> %s %s [auto-update]\n" "$icon" "$display"
-    if [ -z "$installed" ]; then
-      printf "    installed: not installed\n"
-    else
-      printf "    installed: %s via %s\n" "$installed" "${method:-unknown}"
-    fi
+    print_installed_status "$installed" "$method"
     # Show target; for self-managed tools (skip_upstream) show "self-managed" instead of <unknown>
     local target_display="${latest:-<unknown>}"
     local skip_upstream="$(catalog_get_property "$catalog_tool" skip_upstream)"
@@ -349,11 +356,7 @@ process_tool() {
   printf "\n==> %s %s\n" "$icon" "$display"
   [ -n "$description" ] && printf "    %s\n" "$description"
   [ -n "$homepage" ] && printf "    Homepage: %s\n" "$(osc8 "$homepage" "$homepage")"
-  if [ -z "$installed" ]; then
-    printf "    installed: not installed\n"
-  else
-    printf "    installed: %s via %s\n" "$installed" "${method:-unknown}"
-  fi
+  print_installed_status "$installed" "$method"
 
   check_multi_installs "$catalog_tool"
 

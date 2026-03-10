@@ -7,6 +7,13 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$DIR/lib/install_strategy.sh"
 
 TOOL="${1:-gcloud}"
+
+# Validate tool name to prevent path traversal
+if [[ "$TOOL" == *"/"* ]] || [[ "$TOOL" == *".."* ]]; then
+  echo "Error: Invalid tool name: $TOOL" >&2
+  exit 1
+fi
+
 CATALOG_FILE="$DIR/../catalog/$TOOL.json"
 
 if [ ! -f "$CATALOG_FILE" ]; then
