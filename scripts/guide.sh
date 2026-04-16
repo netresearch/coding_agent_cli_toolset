@@ -165,6 +165,40 @@ osc8() {
   [ -n "$url" ] && printf '\e]8;;%s\e\\%s\e]8;;\e\\' "$url" "$text" || printf '%s' "$text"
 }
 
+# Probe the installed version directly from the binary — bypasses the
+# snapshot round-trip. Used as a fallback in upgrade-success checks so a
+# stale snapshot (e.g. after a transient endoflife failure) doesn't mask a
+# genuinely successful install.
+#
+# Args: catalog_tool [version_cycle]
+# Echoes version number (e.g. "3.14.4") on success, empty on failure.
+probe_installed_version() {
+  local catalog_tool="$1"
+  local version_cycle="${2:-}"
+  local binary pattern bin_path ver
+
+  if [ -n "$version_cycle" ]; then
+    pattern="$(catalog_get_property "$catalog_tool" "multi_version.binary_pattern" 2>/dev/null)"
+    [ -z "$pattern" ] && pattern="${catalog_tool}{cycle}"
+    binary="${pattern//\{cycle\}/$version_cycle}"
+  else
+    binary="$(catalog_get_property "$catalog_tool" "binary_name" 2>/dev/null)"
+    [ -z "$binary" ] && binary="$catalog_tool"
+  fi
+
+  if [[ "$binary" == /* ]]; then
+    [ -x "$binary" ] || return 1
+    bin_path="$binary"
+  else
+    bin_path="$(command -v "$binary" 2>/dev/null)" || return 1
+  fi
+
+  # Try --version first, then -v, capture both stdout and stderr. Extract
+  # the first dotted version number we see.
+  ver="$("$bin_path" --version 2>&1 || "$bin_path" -v 2>&1 || true)"
+  printf '%s\n' "$ver" | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -n1
+}
+
 # Print installed status line (reusable for auto-update and interactive prompts)
 print_installed_status() {
   local installed="$1"
@@ -475,6 +509,16 @@ process_tool() {
 
       # Check if upgrade succeeded by comparing versions
       local new_installed="$(json_field "$tool" installed)"
+      # If the snapshot still reports the pre-install version, the refresh
+      # may have hit a transient failure (endoflife timeout, flaky audit).
+      # Probe the binary directly as a tiebreaker — it's the ground truth.
+      if [ -z "$new_installed" ] || [ "$new_installed" = "$installed" ]; then
+        local probed_y
+        probed_y="$(probe_installed_version "$catalog_tool" "$version_cycle" 2>/dev/null || true)"
+        if [ -n "$probed_y" ] && [ "$probed_y" != "$installed" ]; then
+          new_installed="$probed_y"
+        fi
+      fi
       # Check if installer flagged binary as already at target (hash match)
       local already_current_marker="/tmp/.cli-audit/${catalog_tool}.already-current"
       local binary_already_current=""
@@ -537,6 +581,14 @@ process_tool() {
 
       # Check if upgrade succeeded
       local new_installed_a="$(json_field "$tool" installed)"
+      # Binary-probe fallback (see [Yy] branch for rationale).
+      if [ -z "$new_installed_a" ] || [ "$new_installed_a" = "$installed" ]; then
+        local probed_a
+        probed_a="$(probe_installed_version "$catalog_tool" "$version_cycle" 2>/dev/null || true)"
+        if [ -n "$probed_a" ] && [ "$probed_a" != "$installed" ]; then
+          new_installed_a="$probed_a"
+        fi
+      fi
       # Check if installer flagged binary as already at target (hash match)
       local already_current_marker_a="/tmp/.cli-audit/${catalog_tool}.already-current"
       local binary_already_current_a=""
