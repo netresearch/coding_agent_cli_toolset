@@ -26,10 +26,12 @@ if [ -z "$TOOL" ]; then
   exit 1
 fi
 
-# Validate tool exists in catalog
-CATALOG_FILE="$ROOT/catalog/$TOOL.json"
+# Validate tool exists in catalog (strip @cycle suffix for multi-version tools
+# like python@3.13 — the catalog file is the base tool, python.json)
+BASE_TOOL="${TOOL%%@*}"
+CATALOG_FILE="$ROOT/catalog/$BASE_TOOL.json"
 if [ ! -f "$CATALOG_FILE" ]; then
-  echo "Error: Tool '$TOOL' not found in catalog" >&2
+  echo "Error: Tool '$BASE_TOOL' not found in catalog" >&2
   exit 1
 fi
 

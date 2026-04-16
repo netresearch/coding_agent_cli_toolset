@@ -235,7 +235,14 @@ process_tool() {
   local install_action="$(catalog_get_guide_property "$catalog_tool" install_action "")"
   local description="$(catalog_get_property "$catalog_tool" description)"
   local homepage="$(catalog_get_property "$catalog_tool" homepage)"
-  local auto_update="$(config_get_auto_update "$catalog_tool")"
+  # Multi-version tools (python@3.13, php@8.3, etc.) store auto-update per cycle,
+  # so 'a' on one cycle doesn't silently apply to other cycles. Non-multi-version
+  # tools use the bare catalog name.
+  local auto_update_key="$catalog_tool"
+  if [ -n "$is_multi_version" ]; then
+    auto_update_key="$tool"
+  fi
+  local auto_update="$(config_get_auto_update "$auto_update_key")"
 
   # Check if runtime requirements are satisfied (e.g., npm requires node)
   local missing_req
@@ -298,9 +305,10 @@ process_tool() {
     return 0
   fi
 
-  # Check if auto_update is enabled - install without prompting
-  # BUT: multi-version tools always prompt (more significant operation)
-  if [ "$auto_update" = "true" ] && [ -z "$is_multi_version" ]; then
+  # Check if auto_update is enabled - install without prompting.
+  # For multi-version tools the key is cycle-qualified (e.g. python@3.13), so
+  # each cycle opts in independently.
+  if [ "$auto_update" = "true" ]; then
     printf "\n==> %s %s [auto-update]\n" "$icon" "$display"
     print_installed_status "$installed" "$method"
     # Show target; for self-managed tools (skip_upstream) show "self-managed" instead of <unknown>
@@ -502,9 +510,10 @@ process_tool() {
       fi
       ;;
     [Aa])
-      # Install/upgrade AND enable auto-update for future (use catalog_tool for settings)
+      # Install/upgrade AND enable auto-update for future. Use the cycle-qualified
+      # key for multi-version tools so other cycles still prompt.
       printf "    Enabling auto-update for future upgrades...\n"
-      "$ROOT"/scripts/set_auto_update.sh "$catalog_tool" true >/dev/null 2>&1 || true
+      "$ROOT"/scripts/set_auto_update.sh "$auto_update_key" true >/dev/null 2>&1 || true
 
       # Handle tool-specific version environment variables
       local upgrade_success_a=0
