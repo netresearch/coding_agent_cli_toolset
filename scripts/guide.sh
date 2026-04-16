@@ -165,6 +165,40 @@ osc8() {
   [ -n "$url" ] && printf '\e]8;;%s\e\\%s\e]8;;\e\\' "$url" "$text" || printf '%s' "$text"
 }
 
+# Probe the installed version directly from the binary — bypasses the
+# snapshot round-trip. Used as a fallback in upgrade-success checks so a
+# stale snapshot (e.g. after a transient endoflife failure) doesn't mask a
+# genuinely successful install.
+#
+# Args: catalog_tool [version_cycle]
+# Echoes version number (e.g. "3.14.4") on success, empty on failure.
+probe_installed_version() {
+  local catalog_tool="$1"
+  local version_cycle="${2:-}"
+  local binary pattern bin_path ver
+
+  if [ -n "$version_cycle" ]; then
+    pattern="$(catalog_get_property "$catalog_tool" "multi_version.binary_pattern" 2>/dev/null)"
+    [ -z "$pattern" ] && pattern="${catalog_tool}{cycle}"
+    binary="${pattern//\{cycle\}/$version_cycle}"
+  else
+    binary="$(catalog_get_property "$catalog_tool" "binary_name" 2>/dev/null)"
+    [ -z "$binary" ] && binary="$catalog_tool"
+  fi
+
+  if [[ "$binary" == /* ]]; then
+    [ -x "$binary" ] || return 1
+    bin_path="$binary"
+  else
+    bin_path="$(command -v "$binary" 2>/dev/null)" || return 1
+  fi
+
+  # Try --version first, then -v, capture both stdout and stderr. Extract
+  # the first dotted version number we see.
+  ver="$("$bin_path" --version 2>&1 || "$bin_path" -v 2>&1 || true)"
+  printf '%s\n' "$ver" | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -n1
+}
+
 # Print installed status line (reusable for auto-update and interactive prompts)
 print_installed_status() {
   local installed="$1"
@@ -235,7 +269,14 @@ process_tool() {
   local install_action="$(catalog_get_guide_property "$catalog_tool" install_action "")"
   local description="$(catalog_get_property "$catalog_tool" description)"
   local homepage="$(catalog_get_property "$catalog_tool" homepage)"
-  local auto_update="$(config_get_auto_update "$catalog_tool")"
+  # Multi-version tools (python@3.13, php@8.3, etc.) store auto-update per cycle,
+  # so 'a' on one cycle doesn't silently apply to other cycles. Non-multi-version
+  # tools use the bare catalog name.
+  local auto_update_key="$catalog_tool"
+  if [ -n "$is_multi_version" ]; then
+    auto_update_key="$tool"
+  fi
+  local auto_update="$(config_get_auto_update "$auto_update_key")"
 
   # Check if runtime requirements are satisfied (e.g., npm requires node)
   local missing_req
@@ -298,9 +339,10 @@ process_tool() {
     return 0
   fi
 
-  # Check if auto_update is enabled - install without prompting
-  # BUT: multi-version tools always prompt (more significant operation)
-  if [ "$auto_update" = "true" ] && [ -z "$is_multi_version" ]; then
+  # Check if auto_update is enabled - install without prompting.
+  # For multi-version tools the key is cycle-qualified (e.g. python@3.13), so
+  # each cycle opts in independently.
+  if [ "$auto_update" = "true" ]; then
     printf "\n==> %s %s [auto-update]\n" "$icon" "$display"
     print_installed_status "$installed" "$method"
     # Show target; for self-managed tools (skip_upstream) show "self-managed" instead of <unknown>
@@ -467,6 +509,16 @@ process_tool() {
 
       # Check if upgrade succeeded by comparing versions
       local new_installed="$(json_field "$tool" installed)"
+      # If the snapshot still reports the pre-install version, the refresh
+      # may have hit a transient failure (endoflife timeout, flaky audit).
+      # Probe the binary directly as a tiebreaker — it's the ground truth.
+      if [ -z "$new_installed" ] || [ "$new_installed" = "$installed" ]; then
+        local probed_y
+        probed_y="$(probe_installed_version "$catalog_tool" "$version_cycle" 2>/dev/null || true)"
+        if [ -n "$probed_y" ] && [ "$probed_y" != "$installed" ]; then
+          new_installed="$probed_y"
+        fi
+      fi
       # Check if installer flagged binary as already at target (hash match)
       local already_current_marker="/tmp/.cli-audit/${catalog_tool}.already-current"
       local binary_already_current=""
@@ -502,9 +554,10 @@ process_tool() {
       fi
       ;;
     [Aa])
-      # Install/upgrade AND enable auto-update for future (use catalog_tool for settings)
+      # Install/upgrade AND enable auto-update for future. Use the cycle-qualified
+      # key for multi-version tools so other cycles still prompt.
       printf "    Enabling auto-update for future upgrades...\n"
-      "$ROOT"/scripts/set_auto_update.sh "$catalog_tool" true >/dev/null 2>&1 || true
+      "$ROOT"/scripts/set_auto_update.sh "$auto_update_key" true >/dev/null 2>&1 || true
 
       # Handle tool-specific version environment variables
       local upgrade_success_a=0
@@ -528,6 +581,14 @@ process_tool() {
 
       # Check if upgrade succeeded
       local new_installed_a="$(json_field "$tool" installed)"
+      # Binary-probe fallback (see [Yy] branch for rationale).
+      if [ -z "$new_installed_a" ] || [ "$new_installed_a" = "$installed" ]; then
+        local probed_a
+        probed_a="$(probe_installed_version "$catalog_tool" "$version_cycle" 2>/dev/null || true)"
+        if [ -n "$probed_a" ] && [ "$probed_a" != "$installed" ]; then
+          new_installed_a="$probed_a"
+        fi
+      fi
       # Check if installer flagged binary as already at target (hash match)
       local already_current_marker_a="/tmp/.cli-audit/${catalog_tool}.already-current"
       local binary_already_current_a=""

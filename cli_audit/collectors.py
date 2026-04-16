@@ -11,11 +11,49 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
+import time
 import urllib.request
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+# Persistent cache for endoflife.date responses. Acts as a fallback when the
+# live API fetch fails (timeout, rate limit, network blip) so a transient
+# failure doesn't silently produce an empty supported-versions list — which
+# would cause downstream multi-version detection to skip every cycle.
+_ENDOFLIFE_CACHE_PATH = os.environ.get(
+    "CLI_AUDIT_ENDOFLIFE_CACHE",
+    os.path.join(
+        os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache"),
+        "cli-audit",
+        "endoflife.json",
+    ),
+)
+# In-process memoization, keyed by f"{product}:{max_versions}". Stays valid
+# for the lifetime of a single audit.py run.
+_endoflife_memo: dict[str, list[dict[str, Any]]] = {}
+
+
+def _load_endoflife_cache() -> dict[str, Any]:
+    try:
+        with open(_ENDOFLIFE_CACHE_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def _save_endoflife_cache(data: dict[str, Any]) -> None:
+    try:
+        os.makedirs(os.path.dirname(_ENDOFLIFE_CACHE_PATH), exist_ok=True)
+        tmp = _ENDOFLIFE_CACHE_PATH + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+        os.replace(tmp, _ENDOFLIFE_CACHE_PATH)
+    except OSError as e:
+        logger.debug(f"Failed to write endoflife cache: {e}")
 
 
 class CollectionError(Exception):
@@ -597,7 +635,13 @@ def collect_endoflife(
     """
     from datetime import datetime
 
+    memo_key = f"{product}:{max_versions}"
+    if memo_key in _endoflife_memo:
+        return _endoflife_memo[memo_key]
+
     today = datetime.now().strftime("%Y-%m-%d")
+    supported_versions: list[dict[str, Any]] = []
+    fetched_ok = False
 
     try:
         url = f"https://endoflife.date/api/{product}.json"
@@ -605,61 +649,77 @@ def collect_endoflife(
 
         if not isinstance(data, list):
             logger.warning(f"endoflife.date {product}: Unexpected response format")
-            return []
+        else:
+            for entry in data:
+                cycle = entry.get("cycle", "")
+                eol = entry.get("eol")
+                support = entry.get("support")
+                latest = entry.get("latest", "")
 
-        supported_versions = []
+                # Determine if version is still supported
+                # eol can be False (still supported) or a date string
+                if eol is False:
+                    is_supported = True
+                elif isinstance(eol, str):
+                    is_supported = eol > today
+                else:
+                    is_supported = False
 
-        for entry in data:
-            cycle = entry.get("cycle", "")
-            eol = entry.get("eol")
-            support = entry.get("support")
-            latest = entry.get("latest", "")
+                if not is_supported:
+                    continue
 
-            # Determine if version is still supported
-            # eol can be False (still supported) or a date string
-            if eol is False:
-                is_supported = True
-            elif isinstance(eol, str):
-                is_supported = eol > today
-            else:
-                is_supported = False
+                # Determine status: active (full support) vs security (security fixes only)
+                if support is None or support is False:
+                    status = "active"
+                elif isinstance(support, str) and support > today:
+                    status = "active"
+                else:
+                    status = "security"
 
-            if not is_supported:
-                continue
+                supported_versions.append({
+                    "cycle": str(cycle),
+                    "latest": latest,
+                    "status": status,
+                    "eol": eol,
+                    "support": support,
+                    "release_date": entry.get("releaseDate"),
+                    "lts": entry.get("lts", False),
+                })
 
-            # Determine status: active (full support) vs security (security fixes only)
-            if support is None or support is False:
-                status = "active"
-            elif isinstance(support, str) and support > today:
-                status = "active"
-            else:
-                status = "security"
+                if len(supported_versions) >= max_versions:
+                    break
 
-            supported_versions.append({
-                "cycle": str(cycle),
-                "latest": latest,
-                "status": status,
-                "eol": eol,
-                "support": support,
-                "release_date": entry.get("releaseDate"),
-                "lts": entry.get("lts", False),
-            })
-
-            if len(supported_versions) >= max_versions:
-                break
-
-        logger.debug(f"endoflife.date {product}: Found {len(supported_versions)} supported versions")
-        return supported_versions
+            fetched_ok = True
+            logger.debug(f"endoflife.date {product}: Found {len(supported_versions)} supported versions")
 
     except Exception as e:
         logger.debug(f"endoflife.date failed for {product}: {e}")
 
-    # Use offline cache if available
+    if fetched_ok:
+        _endoflife_memo[memo_key] = supported_versions
+        cache = _load_endoflife_cache()
+        cache[memo_key] = {"at": int(time.time()), "entries": supported_versions}
+        _save_endoflife_cache(cache)
+        return supported_versions
+
+    # HTTP failed (or response was malformed). Try persistent file cache next —
+    # stale data beats silently pretending the product has no supported cycles.
+    cache = _load_endoflife_cache()
+    cached = cache.get(memo_key)
+    if isinstance(cached, dict) and isinstance(cached.get("entries"), list):
+        age = int(time.time()) - int(cached.get("at", 0))
+        logger.debug(f"endoflife.date {product}: using file cache (age {age}s)")
+        _endoflife_memo[memo_key] = cached["entries"]
+        return cached["entries"]
+
+    # Legacy offline_cache argument (from write_upstream_cache dumps).
     if offline_cache and product in offline_cache:
         logger.debug(f"endoflife.date {product}: Using offline cache")
+        _endoflife_memo[memo_key] = offline_cache[product]
         return offline_cache[product]
 
     logger.warning(f"endoflife.date {product}: No versions found")
+    _endoflife_memo[memo_key] = []
     return []
 
 
