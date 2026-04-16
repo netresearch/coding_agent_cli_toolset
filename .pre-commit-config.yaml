@@ -1,0 +1,47 @@
+# See https://pre-commit.com for usage.
+#
+# Install:  uv run pre-commit install
+# Run all:  uv run pre-commit run --all-files
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+        args: ['--fix=lf']
+
+  - repo: https://github.com/PyCQA/flake8
+    rev: 7.3.0
+    hooks:
+      - id: flake8
+        files: ^(cli_audit|tests)/
+
+  - repo: https://github.com/PyCQA/isort
+    rev: 8.0.1
+    hooks:
+      - id: isort
+        files: ^(cli_audit|tests)/
+        args: ['--profile=black']
+
+  - repo: https://github.com/psf/black
+    rev: 26.3.1
+    hooks:
+      - id: black
+        files: ^(cli_audit|tests)/
+
+  - repo: https://github.com/koalaman/shellcheck-precommit
+    rev: v0.11.0
+    hooks:
+      - id: shellcheck
+        files: ^scripts/.*\.sh$
+        args: ['--severity=warning']
+
+ci:
+  autofix_commit_msg: 'chore: pre-commit autofixes'
+  autoupdate_commit_msg: 'chore(deps): pre-commit autoupdate'
