@@ -7,8 +7,10 @@ dependency resolution, and atomic rollback capability.
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
+import tempfile
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -350,7 +352,7 @@ def generate_rollback_script(results: Sequence[InstallResult], verbose: bool = F
         Path to generated rollback script
     """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    script_path = f"/tmp/rollback_{timestamp}.sh"
+    script_path = os.path.join(tempfile.gettempdir(), f"rollback_{timestamp}.sh")
 
     with open(script_path, "w") as f:
         f.write("#!/bin/bash\n")

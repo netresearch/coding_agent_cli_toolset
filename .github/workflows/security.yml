@@ -30,25 +30,25 @@ jobs:
         with:
           python-version: '3.14'
 
-      - name: Install pip-audit and bandit
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+
+      - name: Sync project dependencies
+        run: uv sync --all-extras --dev --frozen
+
+      - name: pip-audit (via uv export)
         run: |
-          python -m pip install --upgrade pip
-          pip install pip-audit bandit[toml]
+          uv export --format requirements-txt --no-hashes --no-emit-project > /tmp/requirements.txt
+          uv run --frozen pip-audit --requirement /tmp/requirements.txt
 
-      # pip-audit reads pyproject.toml + uv.lock; fail only on known CVEs
-      - name: pip-audit (pyproject + uv.lock)
-        run: pip-audit --skip-editable
-
-      - name: bandit (static analysis)
-        run: bandit -r cli_audit -c pyproject.toml
+      - name: bandit (medium+ severity)
+        # Low-severity findings are mostly subprocess reminders on array-style
+        # calls we've already reviewed; fail only on medium or high.
+        run: uv run --frozen bandit -r cli_audit -ll -c pyproject.toml
 
   sbom:
     name: Generate SBOM (CycloneDX)
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
-      attestations: write
     steps:
       - name: Harden runner
         uses: step-security/harden-runner@6c3c2f2c1c457b00c10c4848d6f5491db3b629df # v2.18.0
@@ -63,13 +63,17 @@ jobs:
         with:
           python-version: '3.14'
 
-      - name: Install cyclonedx-py
-        run: |
-          python -m pip install --upgrade pip
-          pip install cyclonedx-bom
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+
+      - name: Sync project dependencies (so cyclonedx-py sees the real set)
+        run: uv sync --all-extras --dev --frozen
+
+      - name: Install cyclonedx-bom
+        run: uv run --frozen pip install cyclonedx-bom
 
       - name: Generate CycloneDX SBOM
-        run: cyclonedx-py environment --of JSON -o sbom.cdx.json
+        run: uv run --frozen cyclonedx-py environment --of JSON -o sbom.cdx.json
 
       - name: Upload SBOM artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

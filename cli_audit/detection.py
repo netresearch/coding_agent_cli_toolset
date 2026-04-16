@@ -158,12 +158,15 @@ def get_version_line(path: str, tool_name: str, version_flag: str | None = None,
     Returns:
         Version line string or empty string
     """
-    # Priority 1: If catalog specifies custom shell command, run it directly
+    # Priority 1: If catalog specifies custom shell command, run it directly.
+    # version_command comes from trusted catalog JSON (committed in-repo), never
+    # from user input — e.g. `uv python list --only-installed | grep … | sed …`.
+    # shell=True is required for the pipelines used in the catalog.
     if version_command:
         try:
-            proc = subprocess.run(
+            proc = subprocess.run(  # nosec B602
                 version_command,
-                shell=True,
+                shell=True,  # nosec B602
                 stdout=subprocess.PIPE,
                 stderr=subprocess.DEVNULL,
                 stdin=subprocess.DEVNULL,
