@@ -1,5 +1,11 @@
 # AI CLI Preparation
 
+[![CI](https://github.com/netresearch/coding_agent_cli_toolset/actions/workflows/ci.yml/badge.svg)](https://github.com/netresearch/coding_agent_cli_toolset/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/netresearch/coding_agent_cli_toolset/actions/workflows/codeql.yml/badge.svg)](https://github.com/netresearch/coding_agent_cli_toolset/actions/workflows/codeql.yml)
+[![codecov](https://codecov.io/gh/netresearch/coding_agent_cli_toolset/branch/main/graph/badge.svg)](https://codecov.io/gh/netresearch/coding_agent_cli_toolset)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/netresearch/coding_agent_cli_toolset/badge)](https://scorecard.dev/viewer/?uri=github.com/netresearch/coding_agent_cli_toolset)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A minimal utility to verify that tools used by AI coding agents are installed and up to date on your system. It audits versions of common agent toolchain CLIs against the latest upstream releases and prints a pipe-delimited report suitable for quick human scan or downstream tooling.
 
 ## Quick Start
