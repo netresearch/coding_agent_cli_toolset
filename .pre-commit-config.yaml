@@ -20,20 +20,20 @@ repos:
     rev: 7.3.0
     hooks:
       - id: flake8
-        files: ^(cli_audit|tests)/
+        files: ^(cli_audit/|tests/|audit\.py$)
 
   - repo: https://github.com/PyCQA/isort
     rev: 8.0.1
     hooks:
       - id: isort
-        files: ^(cli_audit|tests)/
+        files: ^(cli_audit/|tests/|audit\.py$)
         args: ['--profile=black']
 
   - repo: https://github.com/psf/black
     rev: 26.3.1
     hooks:
       - id: black
-        files: ^(cli_audit|tests)/
+        files: ^(cli_audit/|tests/|audit\.py$)
 
   - repo: https://github.com/koalaman/shellcheck-precommit
     rev: v0.11.0

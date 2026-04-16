@@ -9,9 +9,9 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ### Added
 - Governance files: `SECURITY.md`, `CODEOWNERS`, PR template, `CHANGELOG.md`.
-- `.github/workflows/codeql.yml`, `scorecard.yml`, `dependency-review.yml` for supply-chain scanning.
-- `.pre-commit-config.yaml` for local hook enforcement.
-- README badges (CI, Codecov, License).
+- `.github/workflows/scorecard.yml`, `dependency-review.yml`, and a dedicated `security.yml` (pip-audit + bandit + CycloneDX SBOM) for supply-chain scanning. CodeQL continues to run via GitHub's default code-scanning setup.
+- `.pre-commit-config.yaml` for local hook enforcement (flake8, black, isort, shellcheck).
+- README badges: CI, Codecov, OpenSSF Scorecard, License.
 - AGENTS.md structural sections (Commands, Setup, Testing, Architecture, Development).
 - Per-cycle `auto_update` storage for multi-version tools (`python@3.13` vs `python@3.14`).
 - Persistent endoflife.date cache at `~/.cache/cli-audit/endoflife.json` with fallback on HTTP failure.
