@@ -1,4 +1,4 @@
-<!-- Managed by agent: keep sections and order; edit content, not structure. Last updated: 2026-02-25 -->
+<!-- Managed by agent: keep sections and order; edit content, not structure. Last updated: 2026-04-16 -->
 
 # AGENTS.md (root)
 
@@ -39,10 +39,22 @@ uv run python -m mypy cli_audit  # mypy (optional)
 uv run python audit.py --help    # Verify CLI works
 ```
 
+## Project maintenance vs. tool feature
+
+This repo **is** a CLI tool manager, so the word "upgrade" is overloaded:
+
+| You want to… | Run |
+|--------------|-----|
+| Maintain **this repo's** Python deps (pyproject.toml / uv.lock) | `uv lock --upgrade && uv sync --all-extras --dev && pytest` |
+| Run the **tool's feature** that upgrades the user's system-wide CLI tooling | `make upgrade-all` |
+| Run only the **interactive** per-tool upgrade guide | `make upgrade` |
+
+`make upgrade-project-deps` targets `pip install -r requirements.txt` which does not match this repo's uv layout — use uv directly.
+
 ## Index of scoped AGENTS.md
 
 - [cli_audit/AGENTS.md](./cli_audit/AGENTS.md) — Python package (21 modules)
-- [scripts/AGENTS.md](./scripts/AGENTS.md) — Installation scripts (Bash, 30 scripts)
+- [scripts/AGENTS.md](./scripts/AGENTS.md) — Installation scripts (Bash, 33 scripts)
 - [tests/AGENTS.md](./tests/AGENTS.md) — Test suite (pytest, 14 test files)
 
 ## Quick reference
@@ -82,6 +94,10 @@ uv run python audit.py --help    # Verify CLI works
 
 **User configuration:**
 - `~/.config/cli-audit/config.yml` — User preferences (auto_update, tool overrides)
+  - Multi-version tools (python, node, php, ruby, go) store `auto_update` per cycle (e.g. `python@3.13`), not per base tool.
+
+**Caches:**
+- `~/.cache/cli-audit/endoflife.json` — endoflife.date response cache, used as fallback on transient HTTP failures (override path via `CLI_AUDIT_ENDOFLIFE_CACHE`).
 
 ## Project overview
 

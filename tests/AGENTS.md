@@ -1,4 +1,4 @@
-<!-- Managed by agent: keep sections & order; edit content, not structure. Last updated: 2026-02-06 -->
+<!-- Managed by agent: keep sections & order; edit content, not structure. Last updated: 2026-04-16 -->
 
 # tests/ — Test Suite
 
@@ -22,6 +22,7 @@ tests/
 ├── test_package_managers.py      # Package manager abstractions
 ├── test_prerequisites.py         # Prerequisite resolution
 ├── test_reconcile.py             # Duplicate cleanup
+├── test_update_fixes.py          # cmd_update_local / multi-version merge regressions
 ├── test_upgrade.py               # Upgrade workflows
 ├── test_upstream_cache.py        # Upstream cache management
 └── integration/
@@ -29,7 +30,7 @@ tests/
 ```
 
 **Test coverage:**
-- 13 unit test files covering all 21 modules
+- 14 unit test files covering all 21 modules
 - 1 integration test directory
 - Fixtures for mocking external services
 

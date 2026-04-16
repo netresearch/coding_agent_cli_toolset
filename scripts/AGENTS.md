@@ -1,4 +1,4 @@
-<!-- Managed by agent: keep sections & order; edit content, not structure. Last updated: 2026-02-25 -->
+<!-- Managed by agent: keep sections & order; edit content, not structure. Last updated: 2026-04-16 -->
 
 # Installation Scripts - Agent Guide
 
@@ -6,7 +6,7 @@
 
 ## Overview
 
-30 Bash scripts for installing developer tools with multiple actions:
+33 Bash scripts for installing developer tools with multiple actions:
 - **install**: Fresh installation (default action)
 - **update**: Upgrade to latest version
 - **uninstall**: Remove installation
@@ -19,6 +19,7 @@
 - `install_go.sh`: Go via official installer
 - `install_ruby.sh`: Ruby via rbenv/ruby-build
 - `install_uv.sh`: uv package manager
+- `install_pip.sh`: pip bootstrap / update
 
 **Installation scripts** (tools & services):
 - `install_tool.sh`: Main orchestrator - reads catalog, delegates to installers
@@ -26,6 +27,7 @@
 - `install_claude.sh`: Claude Code CLI (native installer)
 - `install_ansible.sh`, `install_brew.sh`, `install_composer.sh`
 - `install_docker.sh`, `install_gem.sh`, `install_parallel.sh`, `install_yarn.sh`
+- `install_tmux.sh`, `install_tree.sh` (single-binary utilities)
 
 **Upgrade & management:**
 - `guide.sh`: Interactive upgrade guide (supports 'a' for auto-update)
