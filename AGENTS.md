@@ -13,7 +13,7 @@
 - Ask before: heavy deps, full rewrites, breaking changes
 - Never commit secrets, PII, or credentials
 
-## Package management (uv)
+## Setup
 
 **This project uses [uv](https://docs.astral.sh/uv/) for package management.** Always use `uv run` to execute Python commands.
 
@@ -29,7 +29,11 @@ uv run python -m flake8          # Run linter
 
 **Why uv?** Fast dependency resolution, proper lockfile support, and isolated environments without manual venv activation.
 
-## Minimal pre-commit checks
+**Prerequisites:** Python ≥ 3.14, `uv`, and a POSIX shell (most installer scripts are Bash).
+
+## Development
+
+Minimal pre-commit checks (also enforced by `.pre-commit-config.yaml`):
 
 ```bash
 uv run python -m pytest          # All tests (required)
@@ -38,6 +42,21 @@ uv run python -m mypy cli_audit  # mypy (optional)
 ./scripts/test_smoke.sh          # Smoke tests (required)
 uv run python audit.py --help    # Verify CLI works
 ```
+
+Install the git hooks once per checkout: `uv run pre-commit install`.
+New features and bug fixes go on a feature branch (`fix/…`, `feat/…`, `chore/…`) → PR against `main` → signed commits (`git commit -S --signoff`).
+See [`SECURITY.md`](./SECURITY.md) for vulnerability reporting and [`CHANGELOG.md`](./CHANGELOG.md) for release history.
+
+## Testing
+
+```bash
+uv run pytest                    # Full suite (546 tests)
+uv run pytest -x -q              # Fail-fast, quiet
+uv run pytest tests/test_upgrade.py -k multi_version  # Focused run
+uv run pytest --cov=cli_audit --cov-report=term  # With coverage
+```
+
+Test layout and conventions: see [`tests/AGENTS.md`](./tests/AGENTS.md). Integration suite under `tests/integration/` is collected separately — CI runs it as its own step.
 
 ## Project maintenance vs. tool feature
 
@@ -57,7 +76,7 @@ This repo **is** a CLI tool manager, so the word "upgrade" is overloaded:
 - [scripts/AGENTS.md](./scripts/AGENTS.md) — Installation scripts (Bash, 33 scripts)
 - [tests/AGENTS.md](./tests/AGENTS.md) — Test suite (pytest, 14 test files)
 
-## Quick reference
+## Commands (verified 2026-04-16)
 
 | Command | Purpose |
 |---------|---------|
@@ -99,14 +118,27 @@ This repo **is** a CLI tool manager, so the word "upgrade" is overloaded:
 **Caches:**
 - `~/.cache/cli-audit/endoflife.json` — endoflife.date response cache, used as fallback on transient HTTP failures (override path via `CLI_AUDIT_ENDOFLIFE_CACHE`).
 
-## Project overview
+## Architecture
 
 **AI CLI Preparation v2.0** — Tool version auditing and installation management for AI coding agents.
 
-- **Architecture:** 21 Python modules, 89 JSON tool catalogs
+- **Modules:** 21 Python modules under `cli_audit/` (see [`cli_audit/AGENTS.md`](./cli_audit/AGENTS.md))
+- **Catalog:** 89 JSON tool definitions under `catalog/`
+- **Installers:** 33 Bash scripts under `scripts/` (see [`scripts/AGENTS.md`](./scripts/AGENTS.md))
 - **Phase 1:** Detection & auditing (complete)
 - **Phase 2:** Installation & upgrade management (complete)
 - **Entry point:** `audit.py` → `cli_audit` package
+
+### Project structure
+
+```
+audit.py               # CLI dispatcher (cmd_audit, cmd_update, cmd_install, …)
+cli_audit/             # Core library (detection, collectors, snapshot, installer, …)
+catalog/               # Per-tool JSON definitions (binary_name, version_command, multi_version)
+scripts/               # Installer / upgrade / reconcile shell scripts + scripts/lib helpers
+tests/                 # pytest suite (unit + integration)
+Makefile / Makefile.d/ # Task runner: `make audit`, `make upgrade`, `make upgrade-all`
+```
 
 ## Multi-version runtimes
 
@@ -125,3 +157,7 @@ CLI_AUDIT_JSON=1 uv run python audit.py --versions
 ## When instructions conflict
 
 Nearest AGENTS.md wins. User prompts override all files.
+
+---
+
+*Last verified: 2026-04-16 (against `main` at HEAD).*
