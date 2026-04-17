@@ -1,0 +1,23 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  audit:
+    # Pinned to feat/python-audit-workflow until netresearch/.github#19 merges.
+    # Switch to @main after merge.
+    uses: netresearch/.github/.github/workflows/python-audit.yml@feat/python-audit-workflow
+    permissions:
+      contents: read
+    with:
+      python-version-file: pyproject.toml
+      package-manager: uv

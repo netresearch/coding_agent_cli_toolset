@@ -495,7 +495,9 @@ class TestGenerateRollbackScript:
         script_path = generate_rollback_script([result])
 
         assert os.path.exists(script_path)
-        assert script_path.startswith("/tmp/rollback_")
+        # Use tempfile.gettempdir() — on macOS this is /var/folders/..., not /tmp.
+        expected_prefix = os.path.join(tempfile.gettempdir(), "rollback_")
+        assert script_path.startswith(expected_prefix)
         assert script_path.endswith(".sh")
 
         # Check script content

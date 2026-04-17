@@ -39,6 +39,9 @@ tools_snapshot.json
 # Node.js
 node_modules/
 
+# Vendored dependencies (this project uses uv; vendor/ is reserved for ad-hoc checkouts)
+vendor/
+
 # AI agent session context (not committed)
 claudedocs/
 .serena/

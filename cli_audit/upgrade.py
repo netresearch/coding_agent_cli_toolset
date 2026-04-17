@@ -562,7 +562,8 @@ def cleanup_old_backups(retention_days: int = 7, verbose: bool = False):
     """
     import glob
 
-    backup_dirs = glob.glob("/tmp/upgrade_backup_*")
+    # Mirror the location used by create_upgrade_backup() (tempfile.mkdtemp).
+    backup_dirs = glob.glob(os.path.join(tempfile.gettempdir(), "upgrade_backup_*"))
     cutoff = time.time() - (retention_days * 86400)
 
     for backup_dir in backup_dirs:

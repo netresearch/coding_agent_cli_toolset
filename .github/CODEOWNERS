@@ -1,0 +1,15 @@
+# See https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-security/customizing-your-repository/about-code-owners
+# Order matters — the last matching rule wins.
+
+# Default reviewers.
+*                           @netresearch/netresearch @netresearch/typo3
+
+# CI / release / security automation.
+/.github/                   @netresearch/netresearch
+
+# Python package + audit.
+/cli_audit/                 @netresearch/netresearch
+/audit.py                   @netresearch/netresearch
+
+# Installer / upgrade shell scripts.
+/scripts/                   @netresearch/netresearch
