@@ -1,6 +1,7 @@
 # AI CLI Preparation
 
 [![CI](https://github.com/netresearch/coding_agent_cli_toolset/actions/workflows/ci.yml/badge.svg)](https://github.com/netresearch/coding_agent_cli_toolset/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/netresearch/coding_agent_cli_toolset/branch/main/graph/badge.svg)](https://codecov.io/gh/netresearch/coding_agent_cli_toolset)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 <!-- CodeQL runs via GitHub's default code-scanning setup; results are visible in the Security tab. -->
