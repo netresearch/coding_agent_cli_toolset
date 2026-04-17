@@ -13,9 +13,7 @@ permissions: {}
 
 jobs:
   audit:
-    # Pinned to feat/python-audit-workflow until netresearch/.github#19 merges.
-    # Switch to @main after merge.
-    uses: netresearch/.github/.github/workflows/python-audit.yml@feat/python-audit-workflow
+    uses: netresearch/.github/.github/workflows/python-audit.yml@main
     permissions:
       contents: read
     with:
