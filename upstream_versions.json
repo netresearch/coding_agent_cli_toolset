@@ -175,6 +175,13 @@
       "tool_url": "https://github.com/GAM-team/GAM",
       "upstream_method": "gh"
     },
+    "gem": {
+      "latest_tag": "bundler-v4.0.2",
+      "latest_url": "https://github.com/rubygems/rubygems/releases/tag/bundler-v4.0.2",
+      "latest_version": "4.0.2",
+      "tool_url": "https://github.com/rubygems/rubygems",
+      "upstream_method": "gh"
+    },
     "gemini": {
       "latest_tag": "v0.28.2",
       "latest_url": "https://github.com/google-gemini/gemini-cli/releases/tag/v0.28.2",
@@ -182,13 +189,6 @@
       "tool_url": "https://www.npmjs.com/package/@google/gemini-cli",
       "upstream_method": "npm",
       "npm_package": "@google/gemini-cli"
-    },
-    "gem": {
-      "latest_tag": "bundler-v4.0.2",
-      "latest_url": "https://github.com/rubygems/rubygems/releases/tag/bundler-v4.0.2",
-      "latest_version": "4.0.2",
-      "tool_url": "https://github.com/rubygems/rubygems",
-      "upstream_method": "gh"
     },
     "gh": {
       "latest_tag": "2.83.2",
@@ -329,6 +329,13 @@
       "latest_version": "11.7.0",
       "tool_url": "https://www.npmjs.com/package/npm",
       "upstream_method": "npm"
+    },
+    "opengrep": {
+      "latest_tag": "1.19.0",
+      "latest_url": "https://github.com/opengrep/opengrep/releases/tag/1.19.0",
+      "latest_version": "1.19.0",
+      "tool_url": "https://github.com/opengrep/opengrep",
+      "upstream_method": "gh"
     },
     "parallel": {
       "latest_tag": "20251122",
@@ -538,13 +545,6 @@
       "latest_url": "https://github.com/mikefarah/yq/releases/tag/4.50.1",
       "latest_version": "4.50.1",
       "tool_url": "https://github.com/mikefarah/yq",
-      "upstream_method": "gh"
-    },
-    "opengrep": {
-      "latest_tag": "1.19.0",
-      "latest_url": "https://github.com/opengrep/opengrep/releases/tag/1.19.0",
-      "latest_version": "1.19.0",
-      "tool_url": "https://github.com/opengrep/opengrep",
       "upstream_method": "gh"
     }
   }

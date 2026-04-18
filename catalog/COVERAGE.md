@@ -46,7 +46,7 @@ Most now in catalog, one dedicated script:
 
 ## Installation Method Distribution
 
-- **github_release_binary**: 31 tools
+- **github_release_binary**: 32 tools
 - **uv_tool**: 8 tools (Python CLI tools)
 - **package_manager**: 10 tools (pip, pipx, poetry, npm, pnpm, yarn, gem, composer, sponge, entr)
 - **hashicorp_zip**: 1 tool (terraform)
@@ -56,9 +56,9 @@ Most now in catalog, one dedicated script:
 - **dedicated_script**: 10 tools (runtimes: go, rust, python, node; special: uv, docker, git, ctags, gam)
 - **system_package**: 2 tools (cscope, rename variants)
 
-## Total: 69 tools tracked
+## Total: 71 tools tracked
 
-- **54 tools** have catalog entries
+- **56 tools** have catalog entries
 - **10 tools** use dedicated scripts (runtimes + special cases)
 - **5 tools** are system packages only
 
