@@ -1,0 +1,16 @@
+{
+  "name": "opengrep",
+  "category": "devops",
+  "install_method": "github_release_binary",
+  "description": "Fully open-source static analysis (SAST) engine — CLI-compatible fork of Semgrep (LGPL-2.1)",
+  "homepage": "https://github.com/opengrep/opengrep",
+  "github_repo": "opengrep/opengrep",
+  "binary_name": "opengrep",
+  "download_url_template": "https://github.com/opengrep/opengrep/releases/download/{version}/opengrep_manylinux_{arch}",
+  "arch_map": {
+    "x86_64": "x86",
+    "aarch64": "aarch64"
+  },
+  "version_flag": "--version",
+  "auto_update": true
+}
