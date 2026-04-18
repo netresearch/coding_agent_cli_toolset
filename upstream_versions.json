@@ -539,6 +539,13 @@
       "latest_version": "4.50.1",
       "tool_url": "https://github.com/mikefarah/yq",
       "upstream_method": "gh"
+    },
+    "opengrep": {
+      "latest_tag": "1.19.0",
+      "latest_url": "https://github.com/opengrep/opengrep/releases/tag/1.19.0",
+      "latest_version": "1.19.0",
+      "tool_url": "https://github.com/opengrep/opengrep",
+      "upstream_method": "gh"
     }
   }
 }
