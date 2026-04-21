@@ -58,7 +58,8 @@ def _sanitize(s: str) -> str:
 # Configuration from environment
 OFFLINE_MODE = os.environ.get("CLI_AUDIT_OFFLINE", "0") == "1"
 MAX_WORKERS = int(os.environ.get("CLI_AUDIT_MAX_WORKERS", "16"))
-SHOW_HINTS = os.environ.get("CLI_AUDIT_HINTS", "1") == "1"
+# (CLI_AUDIT_HINTS is gone; canned hints added no information — the row
+# state and tool name already tell the user what action is available.)
 COLLECT_MODE = os.environ.get("CLI_AUDIT_COLLECT", "0") == "1"
 RENDER_MODE = os.environ.get("CLI_AUDIT_RENDER", "0") == "1"
 JSON_MODE = os.environ.get("CLI_AUDIT_JSON", "0") == "1"
@@ -201,13 +202,10 @@ def audit_multi_version_tool(
         else:
             classification_reason = "No installation detected"
 
-        # Hint for not installed or outdated
-        if status == "NOT INSTALLED":
-            hint = f"Install {tool_name} {cycle}: check your package manager or version manager"
-        elif status == "OUTDATED":
-            hint = f"Upgrade {tool_name} {cycle}: {installed} → {latest}"
-        else:
-            hint = ""
+        # Hint comes from catalog when provided (empty for generic runtimes —
+        # the tool name + state already tell the user what to do, and a
+        # canned "check your package manager" line adds no value).
+        hint = catalog_data.get("hint", "")
 
         results.append({
             "tool": versioned_name,
@@ -453,7 +451,7 @@ def cmd_audit(args: argparse.Namespace) -> int:
     print("", file=sys.stderr)
 
     # Render table
-    render_table(tools, show_hints=SHOW_HINTS)
+    render_table(tools)
 
     # Print summary
     print_summary(snapshot, tools)
@@ -931,12 +929,9 @@ def cmd_update_local(args: argparse.Namespace) -> int:
                         "version_cycle": cycle,
                         "lifecycle_status": info.get("status", "unknown"),
                     })
-                    if status_v == "OUTDATED":
-                        entry["hint"] = f"Upgrade {tool.name} {cycle}: {installed_v} \u2192 {latest_v}"
-                    elif status_v == "NOT INSTALLED":
-                        entry["hint"] = f"Install {tool.name} {cycle}: check your package manager or version manager"
-                    else:
-                        entry["hint"] = ""
+                    # Hint stays empty for generic multi-version runtimes;
+                    # the tool name + state already tell the user what to do.
+                    entry["hint"] = ""
                     tools_by_name[versioned] = entry
 
         # Write merged snapshot

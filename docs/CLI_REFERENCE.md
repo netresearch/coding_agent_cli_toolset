@@ -183,7 +183,6 @@ CLI_AUDIT_OFFLINE=1 CLI_AUDIT_RENDER=1 python3 cli_audit.py
 | `CLI_AUDIT_TIMINGS` | bool | `1` | Show timing information |
 | `CLI_AUDIT_SORT` | string | `order` | Sort mode: `order` or `alpha` |
 | `CLI_AUDIT_GROUP` | bool | `1` | Group output by category |
-| `CLI_AUDIT_HINTS` | bool | `1` | Show remediation hints |
 
 ### Snapshot Configuration
 
