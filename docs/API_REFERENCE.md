@@ -86,7 +86,6 @@ class ToolCatalogEntry:
     install_method: str = ""
     package_name: str = ""
     script: str = ""
-    pinned_version: str = ""
     notes: str = ""
     candidates: list[str] | None = None
     category: str = ""

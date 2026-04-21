@@ -32,7 +32,6 @@ class ToolCatalogEntry:
     install_method: str = ""
     package_name: str = ""
     script: str = ""
-    pinned_version: str = ""
     notes: str = ""
     candidates: list[str] | None = None  # NEW: Binary names to search for (defaults to [binary_name])
     category: str = ""  # NEW: Tool category (runtimes, search, editors, etc.)
@@ -52,7 +51,6 @@ class ToolCatalogEntry:
             install_method=data.get("install_method", ""),
             package_name=data.get("package_name", ""),
             script=data.get("script", ""),
-            pinned_version=data.get("pinned_version", ""),
             notes=data.get("notes", ""),
             candidates=data.get("candidates"),  # NEW
             category=data.get("category", ""),  # NEW
@@ -220,57 +218,6 @@ class ToolCatalog:
             Raw catalog JSON data or empty dict if not found
         """
         return self._raw_data.get(tool_name, {})
-
-    def is_pinned(self, tool_name: str) -> bool:
-        """Check if a tool has a pinned version.
-
-        Args:
-            tool_name: Tool name
-
-        Returns:
-            True if tool has pinned version (not empty and not "never")
-        """
-        entry = self.get(tool_name)
-        if not entry:
-            return False
-
-        pinned = entry.pinned_version
-        return bool(pinned and pinned != "never")
-
-    def get_pinned_version(self, tool_name: str) -> str:
-        """Get pinned version for a tool.
-
-        Args:
-            tool_name: Tool name
-
-        Returns:
-            Pinned version string or empty string if not pinned
-        """
-        entry = self.get(tool_name)
-        if not entry:
-            return ""
-
-        pinned = entry.pinned_version
-        if pinned and pinned != "never":
-            return pinned
-        return ""
-
-    def should_skip(self, tool_name: str, latest_version: str) -> bool:
-        """Check if tool should be skipped (pinned and already at pinned version).
-
-        Args:
-            tool_name: Tool name
-            latest_version: Latest available version
-
-        Returns:
-            True if tool should be skipped
-        """
-        pinned = self.get_pinned_version(tool_name)
-        if not pinned:
-            return False
-
-        # Simple version comparison - if pinned matches latest, skip
-        return pinned == latest_version
 
     def all_tools(self) -> list[str]:
         """Get list of all tool names in catalog.
