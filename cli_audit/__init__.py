@@ -60,6 +60,7 @@ from .pins import (  # noqa: E402
     is_pinned,
     is_never,
     should_skip,
+    apply_pin_to_status,
 )
 from .install_plan import InstallPlan, InstallStep, generate_install_plan, dry_run_install  # noqa: E402
 
@@ -183,6 +184,7 @@ __all__ = [
     "is_pinned",
     "is_never",
     "should_skip",
+    "apply_pin_to_status",
     "InstallPlan",
     "InstallStep",
     "generate_install_plan",

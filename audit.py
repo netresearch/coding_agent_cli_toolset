@@ -30,6 +30,7 @@ from cli_audit.tools import Tool, all_tools, filter_tools, tool_homepage_url, la
 from cli_audit.detection import audit_tool_installation, detect_multi_versions  # noqa: E402
 from cli_audit.snapshot import load_snapshot, write_snapshot, render_from_snapshot, get_snapshot_path  # noqa: E402
 from cli_audit.render import render_table, print_summary, status_icon  # noqa: E402
+from cli_audit.pins import lookup_pin, should_skip as _pin_should_skip  # noqa: E402
 from cli_audit.collectors import get_github_rate_limit, get_github_rate_limit_help, get_gitlab_rate_limit, is_wsl, collect_endoflife  # noqa: E402
 from cli_audit import collectors  # noqa: E402
 from cli_audit.logging_config import setup_logging  # noqa: E402
@@ -615,7 +616,6 @@ def cmd_update(args: argparse.Namespace) -> int:
                             latest_display = _sanitize(latest) if latest else "n/a"
 
                             # Add pinned/skip markers from user pins file
-                            from cli_audit.pins import lookup_pin, should_skip as _pin_should_skip
                             pin_val = lookup_pin(tool.name)
                             markers = []
                             if pin_val:

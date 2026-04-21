@@ -8,6 +8,8 @@ import os
 import sys
 from typing import Any
 
+from .pins import apply_pin_to_status, load_pins, lookup_pin
+
 
 # Environment options
 USE_EMOJI = os.environ.get("CLI_AUDIT_EMOJI", "1") == "1"
@@ -121,7 +123,6 @@ CATEGORY_DESC = {
 def render_table(tools: list[dict[str, Any]]) -> None:
     """Render tools as pipe-delimited table, optionally grouped by category."""
     from .config import load_config
-    from .pins import load_pins
 
     # Header — 5 columns. Pin info lives next to the ``installed`` value
     # it constrains; ``notes`` carries install method and auto-update flag.
@@ -168,39 +169,6 @@ def _pin_suffix(pin: str) -> str:
     return f" [PIN:{pin}]"
 
 
-def _apply_pin_to_status(status: str, installed: str, latest: str, pin: str) -> str:
-    """Adjust the snapshot status using the user's pin as the target.
-
-    The snapshot's ``status`` was computed against ``latest_upstream`` with
-    no knowledge of pins. A pin is the user's stated target — rendering
-    must respect it so ``✅`` never appears on a row whose installed
-    version diverges from the pin.
-
-    Rules (``pin == "never"`` is effectively ``installed must stay empty``):
-
-    - ``pin`` empty          → pass through, pin doesn't apply
-    - ``pin == "never"``
-        - nothing installed  → ``UP-TO-DATE`` (the pin is honored)
-        - something installed→ ``CONFLICT`` (user said never, but it's here)
-    - specific version pin
-        - nothing installed  → ``NOT INSTALLED`` (unchanged)
-        - installed == pin   → ``UP-TO-DATE`` (regardless of latest)
-        - installed != pin   → ``CONFLICT`` (pin is being violated)
-    """
-    if not pin:
-        return status
-    if pin == "never":
-        if not installed:
-            return "UP-TO-DATE"
-        return "CONFLICT"
-    # Specific-version pin.
-    if not installed:
-        return "NOT INSTALLED"
-    if installed == pin:
-        return "UP-TO-DATE"
-    return "CONFLICT"
-
-
 def _build_notes(tool: dict[str, Any], config: Any) -> str:
     """Compose the ``notes`` cell: ``method · auto``.
 
@@ -227,8 +195,6 @@ def _render_tool_row(
     config: Any,
 ) -> None:
     """Render a single tool row."""
-    from .pins import lookup_pin
-
     name = tool.get("tool", "")
     installed = tool.get("installed", "")
     latest = tool.get("latest_upstream", "")
@@ -240,7 +206,7 @@ def _render_tool_row(
     # snapshot's ``status`` is computed against latest_upstream and does
     # not know about pins, so fix it up here before choosing icon/colors.
     pin_value = lookup_pin(name, pins)
-    status = _apply_pin_to_status(raw_status, installed, latest, pin_value)
+    status = apply_pin_to_status(raw_status, installed, pin_value)
 
     # Icon
     icon = status_icon(status, installed)
@@ -291,18 +257,15 @@ def print_summary(snapshot: dict[str, Any], tools: list[dict[str, Any]]) -> None
         snapshot: Snapshot metadata
         tools: List of tool dictionaries
     """
-    from .pins import load_pins, lookup_pin
-
     meta = snapshot.get("__meta__", {})
     total = meta.get("count", len(tools))
 
     pins = load_pins()
 
     def _effective(t: dict[str, Any]) -> str:
-        return _apply_pin_to_status(
+        return apply_pin_to_status(
             t.get("status", "UNKNOWN"),
             t.get("installed", ""),
-            t.get("latest_upstream", ""),
             lookup_pin(t.get("tool", ""), pins),
         )
 

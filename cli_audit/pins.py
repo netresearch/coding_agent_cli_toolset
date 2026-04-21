@@ -85,6 +85,10 @@ def lookup_pin(tool_name: str, pins: dict[str, Any] | None = None) -> str:
     """Return the pinned value for a tool, or empty string if not pinned.
 
     ``"never"`` is a valid return value and means "never update/install".
+
+    Shape-mismatched lookups (flat pin queried with ``tool@cycle``, or a
+    nested pin queried bare) return empty — callers are expected to match
+    the pin file's structure, and silent fallbacks would mask bugs.
     """
     pins = pins if pins is not None else load_pins()
     base, cycle = _split_tool(tool_name)
@@ -92,10 +96,14 @@ def lookup_pin(tool_name: str, pins: dict[str, Any] | None = None) -> str:
     if entry is None:
         return ""
     if isinstance(entry, dict):
+        # Nested (multi-version) pin: caller must supply a cycle.
         if cycle is None:
             return ""
         value = entry.get(cycle, "")
         return value if isinstance(value, str) else ""
+    # Flat (single-version) pin: caller must not supply a cycle.
+    if cycle is not None:
+        return ""
     return entry if isinstance(entry, str) else ""
 
 
@@ -121,3 +129,35 @@ def should_skip(tool_name: str, latest_version: str, pins: dict[str, Any] | None
     if pin == "never":
         return True
     return pin == latest_version
+
+
+def apply_pin_to_status(status: str, installed: str, pin: str) -> str:
+    """Adjust a snapshot status value using the user's pin as the target.
+
+    The snapshot's ``status`` is computed against ``latest_upstream`` and
+    has no knowledge of pins. The pin is the user's stated target, so any
+    downstream consumer (rendering, summary counts, bulk decisions) must
+    respect it — ``UP-TO-DATE`` must not be reported on a row whose
+    installed version diverges from the pin.
+
+    Rules:
+
+    - ``pin`` empty        → pass through (no pin applies).
+    - ``pin == "never"``
+        - nothing installed  → ``UP-TO-DATE`` (the pin is honored).
+        - something installed→ ``CONFLICT`` (user said never).
+    - specific version pin
+        - nothing installed  → ``NOT INSTALLED`` (unchanged).
+        - installed == pin   → ``UP-TO-DATE`` (regardless of latest).
+        - installed != pin   → ``CONFLICT`` (pin is being violated).
+    """
+    if not pin:
+        return status
+    if pin == "never":
+        return "UP-TO-DATE" if not installed else "CONFLICT"
+    # Specific-version pin.
+    if not installed:
+        return "NOT INSTALLED"
+    if installed == pin:
+        return "UP-TO-DATE"
+    return "CONFLICT"
