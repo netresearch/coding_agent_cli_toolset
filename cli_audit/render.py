@@ -228,8 +228,16 @@ def _render_tool_row(
     # Hyperlinks
     name_display = osc8(tool_url, name) if tool_url else name
 
+    # Strip the ``CONFLICT:`` sentinel before colorizing so the prefix
+    # check can't be fooled by ANSI escape codes. The raw string is what
+    # originates the sentinel (see detection of multiple install
+    # conflicts), so check it first.
+    installed_clean = installed
+    if installed_clean.startswith("CONFLICT: "):
+        installed_clean = installed_clean[len("CONFLICT: "):]
+
     # Apply colors to installed and latest
-    installed_display = colorize(installed, inst_color)
+    installed_display = colorize(installed_clean, inst_color)
     latest_display = colorize(latest, latest_color)
 
     # Apply hyperlinks (after colorization, hyperlinks wrap the colored text)
@@ -242,10 +250,6 @@ def _render_tool_row(
     installed_display = f"{installed_display}{_pin_suffix(pin_value)}"
 
     notes = _build_notes(tool, config)
-
-    # Add CONFLICT message to installed display
-    if status == "CONFLICT" and installed_display.startswith("CONFLICT:"):
-        installed_display = installed_display.replace("CONFLICT: ", "")  # Show clean message
 
     print("|".join((icon, name_display, installed_display, latest_display, notes)))
 

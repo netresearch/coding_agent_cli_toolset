@@ -62,10 +62,24 @@ class TestLoadPins:
         path.write_text("{ not valid json")
         assert load_pins(str(path)) == {}
 
+    def test_invalid_json_logs_warning(self, tmp_path: Path, caplog: pytest.LogCaptureFixture):
+        path = tmp_path / "pins.json"
+        path.write_text("{ not valid json")
+        with caplog.at_level("WARNING", logger="cli_audit.pins"):
+            load_pins(str(path))
+        assert any("not valid JSON" in r.message for r in caplog.records), caplog.records
+
     def test_top_level_list_rejected(self, tmp_path: Path):
         path = tmp_path / "pins.json"
         path.write_text("[1, 2, 3]")
         assert load_pins(str(path)) == {}
+
+    def test_top_level_list_logs_warning(self, tmp_path: Path, caplog: pytest.LogCaptureFixture):
+        path = tmp_path / "pins.json"
+        path.write_text("[1, 2, 3]")
+        with caplog.at_level("WARNING", logger="cli_audit.pins"):
+            load_pins(str(path))
+        assert any("top-level object" in r.message for r in caplog.records)
 
     def test_cache_returns_same_object(self, pins_file: Path):
         first = load_pins(str(pins_file))

@@ -26,9 +26,13 @@ plain single-version name. :func:`lookup_pin` handles both.
 from __future__ import annotations
 
 import json
+import logging
 import os
 from functools import lru_cache
 from typing import Any
+
+
+logger = logging.getLogger(__name__)
 
 
 DEFAULT_PINS_PATH = os.path.expanduser(
@@ -50,9 +54,24 @@ def _load_pins_cached(path: str) -> dict[str, Any]:
     try:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
-    except (OSError, json.JSONDecodeError):
+    except json.JSONDecodeError as e:
+        logger.warning(
+            "pins file %s is not valid JSON (%s); treating as empty. "
+            "Run `scripts/reset_pins.sh` to rewrite, or edit the file by hand.",
+            path,
+            e,
+        )
         return {}
-    return data if isinstance(data, dict) else {}
+    except OSError as e:
+        logger.warning("cannot read pins file %s: %s; treating as empty.", path, e)
+        return {}
+    if not isinstance(data, dict):
+        logger.warning(
+            "pins file %s is valid JSON but not a top-level object; treating as empty.",
+            path,
+        )
+        return {}
+    return data
 
 
 def load_pins(path: str | None = None) -> dict[str, Any]:
