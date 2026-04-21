@@ -30,6 +30,7 @@ from cli_audit.tools import Tool, all_tools, filter_tools, tool_homepage_url, la
 from cli_audit.detection import audit_tool_installation, detect_multi_versions  # noqa: E402
 from cli_audit.snapshot import load_snapshot, write_snapshot, render_from_snapshot, get_snapshot_path  # noqa: E402
 from cli_audit.render import render_table, print_summary, status_icon  # noqa: E402
+from cli_audit.pins import lookup_pin, should_skip as _pin_should_skip  # noqa: E402
 from cli_audit.collectors import get_github_rate_limit, get_github_rate_limit_help, get_gitlab_rate_limit, is_wsl, collect_endoflife  # noqa: E402
 from cli_audit import collectors  # noqa: E402
 from cli_audit.logging_config import setup_logging  # noqa: E402
@@ -58,7 +59,8 @@ def _sanitize(s: str) -> str:
 # Configuration from environment
 OFFLINE_MODE = os.environ.get("CLI_AUDIT_OFFLINE", "0") == "1"
 MAX_WORKERS = int(os.environ.get("CLI_AUDIT_MAX_WORKERS", "16"))
-SHOW_HINTS = os.environ.get("CLI_AUDIT_HINTS", "1") == "1"
+# (CLI_AUDIT_HINTS is gone; canned hints added no information — the row
+# state and tool name already tell the user what action is available.)
 COLLECT_MODE = os.environ.get("CLI_AUDIT_COLLECT", "0") == "1"
 RENDER_MODE = os.environ.get("CLI_AUDIT_RENDER", "0") == "1"
 JSON_MODE = os.environ.get("CLI_AUDIT_JSON", "0") == "1"
@@ -201,13 +203,10 @@ def audit_multi_version_tool(
         else:
             classification_reason = "No installation detected"
 
-        # Hint for not installed or outdated
-        if status == "NOT INSTALLED":
-            hint = f"Install {tool_name} {cycle}: check your package manager or version manager"
-        elif status == "OUTDATED":
-            hint = f"Upgrade {tool_name} {cycle}: {installed} → {latest}"
-        else:
-            hint = ""
+        # Hint comes from catalog when provided (empty for generic runtimes —
+        # the tool name + state already tell the user what to do, and a
+        # canned "check your package manager" line adds no value).
+        hint = catalog_data.get("hint", "")
 
         results.append({
             "tool": versioned_name,
@@ -453,7 +452,7 @@ def cmd_audit(args: argparse.Namespace) -> int:
     print("", file=sys.stderr)
 
     # Render table
-    render_table(tools, show_hints=SHOW_HINTS)
+    render_table(tools)
 
     # Print summary
     print_summary(snapshot, tools)
@@ -616,11 +615,12 @@ def cmd_update(args: argparse.Namespace) -> int:
                             inst_display = _sanitize(inst) if inst else "n/a"
                             latest_display = _sanitize(latest) if latest else "n/a"
 
-                            # Add pinned/skip markers (reuse catalog from outer scope)
+                            # Add pinned/skip markers from user pins file
+                            pin_val = lookup_pin(tool.name)
                             markers = []
-                            if catalog.is_pinned(tool.name):
-                                markers.append("PINNED")
-                            if catalog.should_skip(tool.name, latest):
+                            if pin_val:
+                                markers.append("NEVER" if pin_val == "never" else f"PIN:{pin_val}")
+                            if _pin_should_skip(tool.name, latest):
                                 markers.append("SKIP")
 
                             marker_str = f" [{' '.join(markers)}]" if markers else ""
@@ -929,12 +929,9 @@ def cmd_update_local(args: argparse.Namespace) -> int:
                         "version_cycle": cycle,
                         "lifecycle_status": info.get("status", "unknown"),
                     })
-                    if status_v == "OUTDATED":
-                        entry["hint"] = f"Upgrade {tool.name} {cycle}: {installed_v} \u2192 {latest_v}"
-                    elif status_v == "NOT INSTALLED":
-                        entry["hint"] = f"Install {tool.name} {cycle}: check your package manager or version manager"
-                    else:
-                        entry["hint"] = ""
+                    # Hint stays empty for generic multi-version runtimes;
+                    # the tool name + state already tell the user what to do.
+                    entry["hint"] = ""
                     tools_by_name[versioned] = entry
 
         # Write merged snapshot

@@ -131,9 +131,6 @@ CLI_AUDIT_LINKS=0 python3 cli_audit.py
 
 # Hide timing info
 CLI_AUDIT_TIMINGS=0 python3 cli_audit.py
-
-# Disable hints
-CLI_AUDIT_HINTS=0 python3 cli_audit.py
 ```
 
 ## Common Workflows

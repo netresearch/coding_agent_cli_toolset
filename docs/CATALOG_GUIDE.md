@@ -47,10 +47,11 @@ print(f"GitHub: {entry.github_repo}")
 if catalog.has("fzf"):
     fzf = catalog.get("fzf")
 
-# Get pinned version
-ctags = catalog.get("ctags")
-if ctags.pinned_version:
-    print(f"ctags pinned to {ctags.pinned_version}")
+# Check pin (pins live in ~/.config/cli-audit/pins.json, not the catalog)
+from cli_audit.pins import lookup_pin
+pin = lookup_pin("ctags")
+if pin:
+    print(f"ctags pinned to {pin}")
 
 # Iterate all entries
 for name, entry in catalog.items():
@@ -85,9 +86,12 @@ for name, entry in catalog.items():
   ],
   "requires": ["string (dependency names)"],
   "tags": ["string (categorization)"],
-  "pinned_version": "string (optional, pins to specific version)",
   "notes": "string (optional, additional context)"
 }
+
+// Note: version pins are stored per user in
+// ~/.config/cli-audit/pins.json (managed by scripts/pin_version.sh),
+// not in the catalog.
 ```
 
 ### Field Descriptions
@@ -165,11 +169,6 @@ for name, entry in catalog.items():
 - Categorization tags
 - Common tags: `"core"`, `"optional"`, `"dev"`
 - Used for filtering and organization
-
-**`pinned_version`** (string)
-- Pin tool to specific version
-- Prevents upgrade suggestions
-- Example: `"1.2.3"` or `"v1.2.3"`
 
 **`notes`** (string)
 - Additional context or caveats
@@ -252,8 +251,7 @@ for name, entry in catalog.items():
   "homepage": "https://github.com/universal-ctags/ctags",
   "github_repo": "universal-ctags/ctags",
   "binary_name": "ctags",
-  "pinned_version": "5.9.0",
-  "notes": "Pinned to 5.9.0 for compatibility"
+  "notes": "Users typically pin this via `make pin-ctags 5.9.0` for compatibility"
 }
 ```
 
@@ -421,27 +419,41 @@ tool -V          # Capital variant
 
 ### Pinning Versions
 
+**Where pins live:** `~/.config/cli-audit/pins.json` — per-user, not in the
+catalog. Pins are a user preference, not a property of the tool definition.
+
 **When to Pin:**
 - Breaking changes in new versions
 - Compatibility requirements
 - Stability for production use
 - Testing specific version behavior
 
-**How to Pin:**
+**How to Pin:** use the shell helpers that read/write the pins file:
+
+```bash
+# Single-version tool
+scripts/pin_version.sh ripgrep 14.1.0
+
+# Multi-version runtime (cycle-aware)
+scripts/pin_version.sh python@3.12 3.12.7
+scripts/pin_version.sh node@22 never      # hard skip
+scripts/unpin_version.sh python@3.12
+scripts/reset_pins.sh                      # wipe all pins
+```
+
+The resulting `pins.json` looks like:
 ```json
 {
-  "pinned_version": "1.2.3",   // Without 'v'
-  "notes": "Pinned for compatibility with project X"
+  "ripgrep": "14.1.0",
+  "python":  {"3.12": "3.12.7"},
+  "node":    {"22": "never"}
 }
 ```
 
-**Unpinning:**
-```json
-{
-  "pinned_version": "",  // Empty string
-  // OR remove field entirely
-}
-```
+Rendered in `make audit` as `[PIN:14.1.0]`, `[PIN:3.12.7]`, and
+`[PIN:never]` appended to the `installed` column, next to the version
+the pin constrains. The separate `notes` column carries install
+method and auto-update flags (e.g. `apt · auto`).
 
 ## Fallback to Python TOOLS
 
@@ -579,7 +591,6 @@ entry.binary_name: str
 entry.install_method: str
 entry.package_name: str
 entry.script: str
-entry.pinned_version: str
 entry.notes: str
 ```
 

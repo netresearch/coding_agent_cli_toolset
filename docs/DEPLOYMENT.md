@@ -30,7 +30,6 @@ Render audit table from snapshot (render-only mode, no network).
 **Environment:**
 - `CLI_AUDIT_RENDER=1` - Render-only mode
 - `CLI_AUDIT_GROUP=0` - No category grouping
-- `CLI_AUDIT_HINTS=1` - Show remediation hints
 - `CLI_AUDIT_LINKS=1` - Enable hyperlinks
 - `CLI_AUDIT_EMOJI=1` - Use emoji status icons
 
@@ -574,7 +573,6 @@ CLI_AUDIT_LINKS=1
 CLI_AUDIT_EMOJI=1
 CLI_AUDIT_TIMINGS=1
 CLI_AUDIT_GROUP=1
-CLI_AUDIT_HINTS=1
 
 # Performance
 CLI_AUDIT_MAX_WORKERS=16

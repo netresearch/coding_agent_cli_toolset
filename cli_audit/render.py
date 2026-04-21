@@ -8,6 +8,8 @@ import os
 import sys
 from typing import Any
 
+from .pins import apply_pin_to_status, load_pins, lookup_pin
+
 
 # Environment options
 USE_EMOJI = os.environ.get("CLI_AUDIT_EMOJI", "1") == "1"
@@ -33,26 +35,29 @@ def status_icon(status: str, installed: str) -> str:
     Returns:
         Status icon string
     """
+    # Status takes precedence: a PIN:never row that is correctly absent
+    # has ``UP-TO-DATE`` status with empty ``installed`` and should render
+    # green, not red-X.
     if not USE_EMOJI:
-        if installed == "X" or installed == "" or status == "NOT INSTALLED":
-            return "x"
         if status == "UP-TO-DATE":
             return "✓"
         if status == "OUTDATED":
             return "↑"
         if status == "CONFLICT":
             return "⚠"
+        if installed == "X" or installed == "" or status == "NOT INSTALLED":
+            return "x"
         return "?"
 
     # Emoji icons (using consistent single-width Unicode)
-    if installed == "X" or installed == "" or status == "NOT INSTALLED":
-        return "❌"
     if status == "UP-TO-DATE":
         return "✅"
     if status == "OUTDATED":
         return "⬆"  # Single-width arrow without variation selector
     if status == "CONFLICT":
         return "⚠️"
+    if installed == "X" or installed == "" or status == "NOT INSTALLED":
+        return "❌"
     return "❓"
 
 
@@ -115,21 +120,21 @@ CATEGORY_DESC = {
 }
 
 
-def render_table(tools: list[dict[str, Any]], show_hints: bool = False) -> None:
-    """Render tools as pipe-delimited table, optionally grouped by category.
+def render_table(tools: list[dict[str, Any]]) -> None:
+    """Render tools as pipe-delimited table, optionally grouped by category."""
+    from .config import load_config
 
-    Args:
-        tools: List of tool dictionaries
-        show_hints: Whether to show installation hints
-    """
-    from .catalog import ToolCatalog
-
-    # Header
-    headers = ("state", "tool", "installed", "latest_upstream")
+    # Header — 5 columns. Pin info lives next to the ``installed`` value
+    # it constrains; ``notes`` carries install method and auto-update flag.
+    headers = ("state", "tool", "installed", "latest_upstream", "notes")
     print("|".join(headers))
 
-    # Load catalog for pinned versions
-    catalog = ToolCatalog()
+    # Load once so each row render is cheap.
+    pins = load_pins()
+    try:
+        config = load_config()
+    except Exception:
+        config = None
 
     # Group tools by category if enabled
     if GROUP_BY_CATEGORY:
@@ -149,20 +154,59 @@ def render_table(tools: list[dict[str, Any]], show_hints: bool = False) -> None:
             desc = CATEGORY_DESC.get(cat, cat)
             print(f"# {icon} {desc} ({len(cat_tools)} tools)", file=sys.stderr)
             for tool in cat_tools:
-                _render_tool_row(tool, catalog, show_hints)
+                _render_tool_row(tool, pins, config)
     else:
         for tool in tools:
-            _render_tool_row(tool, catalog, show_hints)
+            _render_tool_row(tool, pins, config)
 
 
-def _render_tool_row(tool: dict[str, Any], catalog: Any, show_hints: bool) -> None:
+def _pin_suffix(pin: str) -> str:
+    """Format a pin value as an appendable suffix (empty if no pin)."""
+    if not pin:
+        return ""
+    if pin == "never":
+        return " [PIN:never]"
+    return f" [PIN:{pin}]"
+
+
+def _build_notes(tool: dict[str, Any], config: Any) -> str:
+    """Compose the ``notes`` cell: ``method · auto``.
+
+    Pin info is rendered in the ``installed`` column, not here.
+    """
+    parts: list[str] = []
+    method = tool.get("installed_method") or ""
+    if method:
+        parts.append(method)
+
+    if config is not None:
+        name = tool.get("tool", "")
+        base = name.split("@", 1)[0] if "@" in name else name
+        tool_cfg = config.tools.get(name) or config.tools.get(base)
+        if tool_cfg is not None and tool_cfg.auto_update is True:
+            parts.append("auto")
+
+    return " · ".join(parts)
+
+
+def _render_tool_row(
+    tool: dict[str, Any],
+    pins: dict[str, Any],
+    config: Any,
+) -> None:
     """Render a single tool row."""
     name = tool.get("tool", "")
     installed = tool.get("installed", "")
     latest = tool.get("latest_upstream", "")
-    status = tool.get("status", "UNKNOWN")
+    raw_status = tool.get("status", "UNKNOWN")
     tool_url = tool.get("tool_url", "")
     latest_url = tool.get("latest_url", "")
+
+    # A pin overrides the "upgrade target" for display purposes. The
+    # snapshot's ``status`` is computed against latest_upstream and does
+    # not know about pins, so fix it up here before choosing icon/colors.
+    pin_value = lookup_pin(name, pins)
+    status = apply_pin_to_status(raw_status, installed, pin_value)
 
     # Icon
     icon = status_icon(status, installed)
@@ -184,35 +228,30 @@ def _render_tool_row(tool: dict[str, Any], catalog: Any, show_hints: bool) -> No
     # Hyperlinks
     name_display = osc8(tool_url, name) if tool_url else name
 
-    # Apply colors to installed and latest (before adding markers/hints)
-    installed_display = colorize(installed, inst_color)
+    # Strip the ``CONFLICT:`` sentinel before colorizing so the prefix
+    # check can't be fooled by ANSI escape codes. The raw string is what
+    # originates the sentinel (see detection of multiple install
+    # conflicts), so check it first.
+    installed_clean = installed
+    if installed_clean.startswith("CONFLICT: "):
+        installed_clean = installed_clean[len("CONFLICT: "):]
+
+    # Apply colors to installed and latest
+    installed_display = colorize(installed_clean, inst_color)
     latest_display = colorize(latest, latest_color)
 
     # Apply hyperlinks (after colorization, hyperlinks wrap the colored text)
     if latest_url:
         latest_display = osc8(latest_url, latest_display)
 
-    # Add pinned/skip markers
-    markers = []
-    if catalog.is_pinned(name):
-        markers.append("PINNED")
-    if catalog.should_skip(name, latest):
-        markers.append("SKIP")
+    # Attach pin marker to the version it constrains (installed column).
+    # The suffix renders outside the hyperlink so it stays readable when
+    # nothing is installed.
+    installed_display = f"{installed_display}{_pin_suffix(pin_value)}"
 
-    if markers:
-        latest_display = f"{latest_display}  [{' '.join(markers)}]"
+    notes = _build_notes(tool, config)
 
-    # Hint
-    if show_hints and status in ("NOT INSTALLED", "OUTDATED", "CONFLICT"):
-        hint = tool.get("hint", "")
-        if hint:
-            latest_display = f"{latest_display}  [{hint}]"
-
-    # Add CONFLICT message to installed display
-    if status == "CONFLICT" and installed_display.startswith("CONFLICT:"):
-        installed_display = installed_display.replace("CONFLICT: ", "")  # Show clean message
-
-    print("|".join((icon, name_display, installed_display, latest_display)))
+    print("|".join((icon, name_display, installed_display, latest_display, notes)))
 
 
 def print_summary(snapshot: dict[str, Any], tools: list[dict[str, Any]]) -> None:
@@ -224,10 +263,21 @@ def print_summary(snapshot: dict[str, Any], tools: list[dict[str, Any]]) -> None
     """
     meta = snapshot.get("__meta__", {})
     total = meta.get("count", len(tools))
-    missing = sum(1 for t in tools if t.get("status") == "NOT INSTALLED")
-    outdated = sum(1 for t in tools if t.get("status") == "OUTDATED")
-    conflicts = sum(1 for t in tools if t.get("status") == "CONFLICT")
-    unknown = sum(1 for t in tools if t.get("status") == "UNKNOWN")
+
+    pins = load_pins()
+
+    def _effective(t: dict[str, Any]) -> str:
+        return apply_pin_to_status(
+            t.get("status", "UNKNOWN"),
+            t.get("installed", ""),
+            lookup_pin(t.get("tool", ""), pins),
+        )
+
+    effective = [_effective(t) for t in tools]
+    missing = sum(1 for s in effective if s == "NOT INSTALLED")
+    outdated = sum(1 for s in effective if s == "OUTDATED")
+    conflicts = sum(1 for s in effective if s == "CONFLICT")
+    unknown = sum(1 for s in effective if s == "UNKNOWN")
     offline_tag = " (offline)" if meta.get("offline") else ""
 
     # Build summary message
