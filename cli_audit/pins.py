@@ -150,7 +150,36 @@ def should_skip(tool_name: str, latest_version: str, pins: dict[str, Any] | None
     return pin == latest_version
 
 
-def apply_pin_to_status(status: str, installed: str, pin: str) -> str:
+def classify_pin(pin: str, cycle: str | None) -> str:
+    """Classify a pin value against the row's cycle (if any).
+
+    The ``pins.json`` schema stores pins as strings but the same slot
+    can mean three different things:
+
+    - ``"never"``         → deliberately-not-installed sentinel
+    - pin equal to cycle  → "hold this cycle, accept any patch"
+    - anything else       → specific version pin (patch-level intent)
+
+    For single-version tools ``cycle`` is ``None`` and every non-never
+    pin is treated as a specific version.
+
+    Returns one of: ``"none"``, ``"never"``, ``"cycle"``, ``"version"``.
+    """
+    if not pin:
+        return "none"
+    if pin == "never":
+        return "never"
+    if cycle is not None and pin == cycle:
+        return "cycle"
+    return "version"
+
+
+def apply_pin_to_status(
+    status: str,
+    installed: str,
+    pin: str,
+    cycle: str | None = None,
+) -> str:
     """Adjust a snapshot status value using the user's pin as the target.
 
     The snapshot's ``status`` is computed against ``latest_upstream`` and
@@ -159,24 +188,77 @@ def apply_pin_to_status(status: str, installed: str, pin: str) -> str:
     respect it — ``UP-TO-DATE`` must not be reported on a row whose
     installed version diverges from the pin.
 
+    Cycle-awareness (see :func:`classify_pin`): a pin value equal to the
+    row's ``cycle`` (e.g. ``"3.12"`` on ``python@3.12``) means "hold this
+    cycle, any patch", so an installed ``3.12.7`` is up-to-date with
+    respect to the pin. For multi-version tools, a stale patch-level pin
+    (installed differs from pin and pin is not the cycle) is left at its
+    upstream status rather than escalated to ``CONFLICT``: the schema
+    can't distinguish a deliberate patch-hold from a skip-marker that
+    guide.sh left behind after the world moved on.
+
     Rules:
 
-    - ``pin`` empty        → pass through (no pin applies).
-    - ``pin == "never"``
-        - nothing installed  → ``UP-TO-DATE`` (the pin is honored).
+    - pin kind ``none``    → pass through.
+    - pin kind ``never``
+        - nothing installed  → ``UP-TO-DATE`` (pin honored).
         - something installed→ ``CONFLICT`` (user said never).
-    - specific version pin
-        - nothing installed  → ``NOT INSTALLED`` (unchanged).
-        - installed == pin   → ``UP-TO-DATE`` (regardless of latest).
-        - installed != pin   → ``CONFLICT`` (pin is being violated).
+    - pin kind ``cycle``
+        - nothing installed  → ``NOT INSTALLED``.
+        - installed in cycle → ``UP-TO-DATE``.
+        - installed elsewhere→ ``CONFLICT``.
+    - pin kind ``version``
+        - nothing installed  → ``NOT INSTALLED``.
+        - installed == pin   → ``UP-TO-DATE``.
+        - installed != pin, multi-version row → pass through (stale).
+        - installed != pin, single-version row → ``CONFLICT``.
     """
-    if not pin:
+    kind = classify_pin(pin, cycle)
+    if kind == "none":
         return status
-    if pin == "never":
+    if kind == "never":
         return "UP-TO-DATE" if not installed else "CONFLICT"
-    # Specific-version pin.
+    if kind == "cycle":
+        if not installed:
+            return "NOT INSTALLED"
+        # installed is within the pinned cycle if it equals the cycle
+        # (e.g. bare "3.12") or looks like "3.12.x".
+        assert cycle is not None  # guaranteed by classify_pin
+        if installed == cycle or installed.startswith(cycle + "."):
+            return "UP-TO-DATE"
+        return "CONFLICT"
+    # kind == "version" — specific patch/exact pin.
     if not installed:
         return "NOT INSTALLED"
     if installed == pin:
         return "UP-TO-DATE"
+    if cycle is not None:
+        # Multi-version: the patch-pin is either stale or the world
+        # moved past it (see module docstring). Don't elevate.
+        return status
     return "CONFLICT"
+
+
+def pin_label(pin: str, cycle: str | None, installed: str) -> str:
+    """Human-readable label for the pin suffix in the ``installed`` column.
+
+    Returns an empty string when there's no pin. Otherwise one of:
+
+    - ``PIN:never``
+    - ``CYCLE:3.12``          (cycle-hold — pin matches the row's cycle)
+    - ``PIN:8.5.3``           (explicit patch-hold, currently honored)
+    - ``PIN:8.5.3 stale``     (patch-hold on a multi-version row where
+                               installed no longer matches the pin — treated
+                               as fossil data, kept visible for awareness)
+    """
+    kind = classify_pin(pin, cycle)
+    if kind == "none":
+        return ""
+    if kind == "never":
+        return "PIN:never"
+    if kind == "cycle":
+        return f"CYCLE:{pin}"
+    # version
+    if installed and installed != pin and cycle is not None:
+        return f"PIN:{pin} stale"
+    return f"PIN:{pin}"

@@ -9,10 +9,12 @@ import pytest
 
 from cli_audit.pins import (
     apply_pin_to_status,
+    classify_pin,
     is_never,
     is_pinned,
     load_pins,
     lookup_pin,
+    pin_label,
     reset_cache,
     should_skip,
 )
@@ -177,6 +179,72 @@ class TestApplyPinToStatus:
 
     def test_specific_pin_with_nothing_installed_is_not_installed(self):
         assert apply_pin_to_status("NOT INSTALLED", "", "1.2.3") == "NOT INSTALLED"
+
+
+class TestClassifyPin:
+    def test_empty(self):
+        assert classify_pin("", None) == "none"
+
+    def test_never(self):
+        assert classify_pin("never", "3.12") == "never"
+
+    def test_cycle_hold(self):
+        assert classify_pin("3.12", "3.12") == "cycle"
+
+    def test_version_when_no_cycle(self):
+        assert classify_pin("14.1.0", None) == "version"
+
+    def test_version_when_pin_differs_from_cycle(self):
+        assert classify_pin("3.12.7", "3.12") == "version"
+
+
+class TestApplyPinToStatusCycleAware:
+    """Cycle-aware branch of apply_pin_to_status."""
+
+    def test_cycle_hold_with_matching_installed(self):
+        # installed within the pinned cycle → UP-TO-DATE, latest ignored.
+        assert apply_pin_to_status("OUTDATED", "3.12.7", "3.12", "3.12") == "UP-TO-DATE"
+
+    def test_cycle_hold_bare_installed(self):
+        # installed that *equals* the cycle string is within-cycle too.
+        assert apply_pin_to_status("OUTDATED", "3.12", "3.12", "3.12") == "UP-TO-DATE"
+
+    def test_cycle_hold_cross_cycle_is_conflict(self):
+        # Pin says hold 3.12, but installed is 3.13.1 — row shouldn't exist.
+        assert apply_pin_to_status("OUTDATED", "3.13.1", "3.12", "3.12") == "CONFLICT"
+
+    def test_cycle_hold_with_nothing_installed(self):
+        assert apply_pin_to_status("NOT INSTALLED", "", "3.12", "3.12") == "NOT INSTALLED"
+
+    def test_patch_pin_multi_version_mismatch_passes_through(self):
+        # Multi-version row, pin is patch-level, installed differs → stale.
+        # Original status (OUTDATED here) must stand — no CONFLICT escalation.
+        assert apply_pin_to_status("OUTDATED", "8.5.5", "8.5.3", "8.5") == "OUTDATED"
+
+    def test_patch_pin_single_version_mismatch_conflicts(self):
+        # Single-version tool: no cycle, pin mismatch IS a real conflict.
+        assert apply_pin_to_status("UP-TO-DATE", "14.1.0", "14.0.0", None) == "CONFLICT"
+
+
+class TestPinLabel:
+    def test_no_pin(self):
+        assert pin_label("", None, "") == ""
+
+    def test_never(self):
+        assert pin_label("never", "3.12", "") == "PIN:never"
+
+    def test_cycle(self):
+        assert pin_label("3.12", "3.12", "3.12.7") == "CYCLE:3.12"
+
+    def test_patch_honored(self):
+        assert pin_label("8.5.3", "8.5", "8.5.3") == "PIN:8.5.3"
+
+    def test_patch_stale_on_multi_version(self):
+        assert pin_label("8.5.3", "8.5", "8.5.5") == "PIN:8.5.3 stale"
+
+    def test_single_version_mismatch_not_marked_stale(self):
+        # Without a cycle we don't know it's a multi-version stale case.
+        assert pin_label("14.0.0", None, "14.1.0") == "PIN:14.0.0"
 
 
 class TestDefaultPath:
