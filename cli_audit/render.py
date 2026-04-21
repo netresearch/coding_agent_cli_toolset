@@ -8,7 +8,8 @@ import os
 import sys
 from typing import Any
 
-from .pins import apply_pin_to_status, load_pins, lookup_pin
+from .config import load_config
+from .pins import apply_pin_to_status, load_pins, lookup_pin, pin_label
 
 
 # Environment options
@@ -122,8 +123,6 @@ CATEGORY_DESC = {
 
 def render_table(tools: list[dict[str, Any]]) -> None:
     """Render tools as pipe-delimited table, optionally grouped by category."""
-    from .config import load_config
-
     # Header — 5 columns. Pin info lives next to the ``installed`` value
     # it constrains; ``notes`` carries install method and auto-update flag.
     headers = ("state", "tool", "installed", "latest_upstream", "notes")
@@ -160,33 +159,71 @@ def render_table(tools: list[dict[str, Any]]) -> None:
             _render_tool_row(tool, pins, config)
 
 
-def _pin_suffix(pin: str) -> str:
-    """Format a pin value as an appendable suffix (empty if no pin)."""
-    if not pin:
-        return ""
-    if pin == "never":
-        return " [PIN:never]"
-    return f" [PIN:{pin}]"
+def _row_cycle(tool: dict[str, Any]) -> str | None:
+    """Extract the cycle string for a multi-version row, else None.
 
-
-def _build_notes(tool: dict[str, Any], config: Any) -> str:
-    """Compose the ``notes`` cell: ``method · auto``.
-
-    Pin info is rendered in the ``installed`` column, not here.
+    Prefer the snapshot field ``version_cycle``; fall back to splitting
+    the tool name on ``@`` so callers don't need to synthesize the field.
     """
-    parts: list[str] = []
+    if tool.get("is_multi_version"):
+        cycle = tool.get("version_cycle")
+        if cycle:
+            return str(cycle)
+    name = tool.get("tool", "")
+    if "@" in name:
+        return name.split("@", 1)[1] or None
+    return None
+
+
+def _auto_update_explicit(tool: dict[str, Any], config: Any) -> bool | None:
+    """Return the explicit auto_update state for a tool, or ``None``.
+
+    Only reports ``True`` / ``False`` when the user wrote an explicit
+    ``auto_update`` for this tool (cycle-qualified or base) in config.yml.
+    The global ``preferences.auto_upgrade`` default is intentionally
+    *not* reflected — it would put a marker on every row and drown the
+    signal.
+    """
+    if config is None:
+        return None
+    name = tool.get("tool", "")
+    base = name.split("@", 1)[0] if "@" in name else name
+    tool_cfg = config.tools.get(name) or config.tools.get(base)
+    if tool_cfg is None:
+        return None
+    return tool_cfg.auto_update  # may be None if the key isn't set
+
+
+def _installed_markers(pin: str, cycle: str | None, installed: str, auto: bool | None) -> str:
+    """Build the bracketed suffix that appends to the ``installed`` column.
+
+    Collects, in order: the pin label (if any) and the AUTO marker (if
+    explicitly enabled). Markers are space-separated and wrapped in a
+    single pair of square brackets. Empty when no marker applies.
+
+    ``AUTO`` is suppressed when the pin says ``never`` — the two states
+    contradict each other and showing both confuses the row.
+    """
+    markers: list[str] = []
+    label = pin_label(pin, cycle, installed)
+    if label:
+        markers.append(label)
+    if auto is True and pin != "never":
+        markers.append("AUTO")
+    if not markers:
+        return ""
+    return " [" + " ".join(markers) + "]"
+
+
+def _build_notes(tool: dict[str, Any]) -> str:
+    """Compose the ``notes`` cell — now just the install method.
+
+    Pin info and auto-update flag render in the ``installed`` column
+    (see :func:`_installed_markers`) so the ``notes`` column is
+    reserved for provenance (``apt`` / ``cargo`` / ``manual``).
+    """
     method = tool.get("installed_method") or ""
-    if method:
-        parts.append(method)
-
-    if config is not None:
-        name = tool.get("tool", "")
-        base = name.split("@", 1)[0] if "@" in name else name
-        tool_cfg = config.tools.get(name) or config.tools.get(base)
-        if tool_cfg is not None and tool_cfg.auto_update is True:
-            parts.append("auto")
-
-    return " · ".join(parts)
+    return method
 
 
 def _render_tool_row(
@@ -205,8 +242,11 @@ def _render_tool_row(
     # A pin overrides the "upgrade target" for display purposes. The
     # snapshot's ``status`` is computed against latest_upstream and does
     # not know about pins, so fix it up here before choosing icon/colors.
+    # ``cycle`` is passed so cycle-holds (``pin == "3.12"`` on
+    # ``python@3.12``) are interpreted as "any patch of 3.12 is fine".
     pin_value = lookup_pin(name, pins)
-    status = apply_pin_to_status(raw_status, installed, pin_value)
+    cycle = _row_cycle(tool)
+    status = apply_pin_to_status(raw_status, installed, pin_value, cycle)
 
     # Icon
     icon = status_icon(status, installed)
@@ -244,12 +284,13 @@ def _render_tool_row(
     if latest_url:
         latest_display = osc8(latest_url, latest_display)
 
-    # Attach pin marker to the version it constrains (installed column).
-    # The suffix renders outside the hyperlink so it stays readable when
-    # nothing is installed.
-    installed_display = f"{installed_display}{_pin_suffix(pin_value)}"
+    # Attach pin + AUTO markers to the version they describe (installed
+    # column). The suffix renders outside the hyperlink so it stays
+    # readable when nothing is installed.
+    auto = _auto_update_explicit(tool, config)
+    installed_display = f"{installed_display}{_installed_markers(pin_value, cycle, installed, auto)}"
 
-    notes = _build_notes(tool, config)
+    notes = _build_notes(tool)
 
     print("|".join((icon, name_display, installed_display, latest_display, notes)))
 
@@ -271,6 +312,7 @@ def print_summary(snapshot: dict[str, Any], tools: list[dict[str, Any]]) -> None
             t.get("status", "UNKNOWN"),
             t.get("installed", ""),
             lookup_pin(t.get("tool", ""), pins),
+            _row_cycle(t),
         )
 
     effective = [_effective(t) for t in tools]
