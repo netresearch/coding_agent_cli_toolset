@@ -450,8 +450,10 @@ The resulting `pins.json` looks like:
 }
 ```
 
-Rendered in `make audit` as `PIN:14.1.0`, `PIN:3.12.7`, and `PIN:never`
-in the `notes` column.
+Rendered in `make audit` as `[PIN:14.1.0]`, `[PIN:3.12.7]`, and
+`[PIN:never]` appended to the `installed` column, next to the version
+the pin constrains. The separate `notes` column carries install
+method and auto-update flags (e.g. `apt · auto`).
 
 ## Fallback to Python TOOLS
 
