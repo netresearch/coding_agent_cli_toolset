@@ -54,6 +54,13 @@ from .config import (  # noqa: E402
     validate_config,
 )
 from .package_managers import PackageManager, select_package_manager, get_available_package_managers  # noqa: E402
+from .pins import (  # noqa: E402
+    load_pins,
+    lookup_pin,
+    is_pinned,
+    is_never,
+    should_skip,
+)
 from .install_plan import InstallPlan, InstallStep, generate_install_plan, dry_run_install  # noqa: E402
 
 # Installation
@@ -170,6 +177,12 @@ __all__ = [
     "PackageManager",
     "select_package_manager",
     "get_available_package_managers",
+    # Pins
+    "load_pins",
+    "lookup_pin",
+    "is_pinned",
+    "is_never",
+    "should_skip",
     "InstallPlan",
     "InstallStep",
     "generate_install_plan",

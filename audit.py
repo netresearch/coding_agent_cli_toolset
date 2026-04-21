@@ -616,11 +616,13 @@ def cmd_update(args: argparse.Namespace) -> int:
                             inst_display = _sanitize(inst) if inst else "n/a"
                             latest_display = _sanitize(latest) if latest else "n/a"
 
-                            # Add pinned/skip markers (reuse catalog from outer scope)
+                            # Add pinned/skip markers from user pins file
+                            from cli_audit.pins import lookup_pin, should_skip as _pin_should_skip
+                            pin_val = lookup_pin(tool.name)
                             markers = []
-                            if catalog.is_pinned(tool.name):
-                                markers.append("PINNED")
-                            if catalog.should_skip(tool.name, latest):
+                            if pin_val:
+                                markers.append("NEVER" if pin_val == "never" else f"PIN:{pin_val}")
+                            if _pin_should_skip(tool.name, latest):
                                 markers.append("SKIP")
 
                             marker_str = f" [{' '.join(markers)}]" if markers else ""
