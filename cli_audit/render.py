@@ -123,8 +123,8 @@ CATEGORY_DESC = {
 
 def render_table(tools: list[dict[str, Any]]) -> None:
     """Render tools as pipe-delimited table, optionally grouped by category."""
-    # Header — 5 columns. Pin info lives next to the ``installed`` value
-    # it constrains; ``notes`` carries install method and auto-update flag.
+    # Header — 5 columns. Auto-update and pin markers live next to the
+    # ``installed`` value they constrain; ``notes`` carries install method only.
     headers = ("state", "tool", "installed", "latest_upstream", "notes")
     print("|".join(headers))
 

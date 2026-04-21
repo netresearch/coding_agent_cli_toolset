@@ -47,8 +47,26 @@ if [ ! -f "$PINS_FILE" ]; then
   exit 0
 fi
 
+# Validate a file is a JSON object. Explicit error messages for invalid /
+# non-object payloads — silent "no pins found" on bad JSON was masking
+# real problems (reviewer: gemini, copilot on PR #79).
+validate_json_object() {
+  local path="$1" label="$2"
+  if ! jq -e 'type == "object"' "$path" >/dev/null 2>&1; then
+    if ! jq -e . "$path" >/dev/null 2>&1; then
+      echo "Error: $label ($path) is not valid JSON." >&2
+    else
+      echo "Error: $label ($path) is valid JSON but not a top-level object." >&2
+    fi
+    return 1
+  fi
+  return 0
+}
+
+validate_json_object "$PINS_FILE" "pins file" || exit 1
+
 if [ "$MODE" = "all" ]; then
-  current="$(jq -r 'to_entries[] | if (.value | type) == "object" then "\(.key): \(.value | to_entries | map("\(.key)=\(.value)") | join(", "))" else "\(.key): \(.value)" end' "$PINS_FILE" 2>/dev/null || true)"
+  current="$(jq -r 'to_entries[] | if (.value | type) == "object" then "\(.key): \(.value | to_entries | map("\(.key)=\(.value)") | join(", "))" else "\(.key): \(.value)" end' "$PINS_FILE")"
   if [ -z "$current" ]; then
     echo "No pins found."
     exit 0
@@ -76,8 +94,10 @@ if [ ! -f "$SNAP_FILE" ]; then
   exit 1
 fi
 
+validate_json_object "$SNAP_FILE" "snapshot" || exit 1
+
 # Walk the pins file and decide per-entry. jq does the shape work; the
-# loop here formats the decision and emits the updated JSON.
+# loop here formats the decision and classifies each pin.
 mapfile -t actions < <(
   jq -r --slurpfile snap "$SNAP_FILE" '
     # Build a map (tool_name -> installed) from the snapshot tools array.
@@ -95,7 +115,11 @@ mapfile -t actions < <(
   ' "$PINS_FILE"
 )
 
-to_remove=()  # "tool\tcycle" pairs (cycle blank for flat)
+# Collect removals as tab-separated lines in an array; only materialise a
+# temp file when we actually need to hand work to the pins_remove loop.
+# (Reviewer: gemini, copilot — use mktemp, skip the file in dry-run,
+#  install the trap *before* writing.)
+remove_lines=()
 to_keep=()
 for line in "${actions[@]}"; do
   IFS=$'\t' read -r row_name cycle pin installed <<< "$line"
@@ -110,7 +134,6 @@ for line in "${actions[@]}"; do
     continue
   fi
   if [ -z "$installed" ]; then
-    # Nothing installed — pin is intent-to-stay-at-absent; leave it.
     to_keep+=("$row_name: PIN:$pin (kept — not installed)")
     continue
   fi
@@ -119,29 +142,30 @@ for line in "${actions[@]}"; do
     continue
   fi
   # Stale patch-level pin.
-  to_remove+=("$row_name: PIN:$pin → installed $installed (removing)")
-  if [ -n "$cycle" ]; then
-    printf 'REMOVE\t%s\t%s\n' "$tool" "$cycle" >> /tmp/.cli-audit-stale-pins.$$
-  else
-    printf 'REMOVE\t%s\t\n' "$tool" >> /tmp/.cli-audit-stale-pins.$$
-  fi
+  remove_lines+=("$(printf '%s\t%s' "$tool" "$cycle")")
 done
 
-trap 'rm -f /tmp/.cli-audit-stale-pins.$$' EXIT
-
+# Present the plan.
 if [ "${#to_keep[@]}" -gt 0 ]; then
   echo "Preserved:"
   printf '  %s\n' "${to_keep[@]}"
   echo ""
 fi
 
-if [ "${#to_remove[@]}" -eq 0 ]; then
+if [ "${#remove_lines[@]}" -eq 0 ]; then
   echo "No stale pins found."
   exit 0
 fi
 
 echo "Stale pins to remove:"
-printf '  %s\n' "${to_remove[@]}"
+for rl in "${remove_lines[@]}"; do
+  IFS=$'\t' read -r tool cycle <<< "$rl"
+  if [ -n "$cycle" ]; then
+    echo "  ${tool}@${cycle}"
+  else
+    echo "  ${tool}"
+  fi
+done
 echo ""
 
 if [ "$DRY_RUN" -eq 1 ]; then
@@ -149,16 +173,19 @@ if [ "$DRY_RUN" -eq 1 ]; then
   exit 0
 fi
 
-if [ ! -s /tmp/.cli-audit-stale-pins.$$ ]; then
-  exit 0
-fi
+# Create the temp file securely and set the trap immediately; even if
+# the pins_remove loop dies, cleanup still fires.
+STALE_LIST="$(mktemp -t cli-audit-stale-pins.XXXXXX)"
+trap 'rm -f "$STALE_LIST"' EXIT INT TERM
 
-while IFS=$'\t' read -r _ tool cycle; do
+printf '%s\n' "${remove_lines[@]}" > "$STALE_LIST"
+
+while IFS=$'\t' read -r tool cycle; do
   if [ -n "$cycle" ]; then
     pins_remove_cycle "$tool" "$cycle"
   else
     pins_remove "$tool"
   fi
-done < /tmp/.cli-audit-stale-pins.$$
+done < "$STALE_LIST"
 
-echo "✓ Removed ${#to_remove[@]} stale pin(s)."
+echo "✓ Removed ${#remove_lines[@]} stale pin(s)."
