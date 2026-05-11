@@ -1,0 +1,21 @@
+{
+  "name": "gh-aw-firewall",
+  "category": "platform",
+  "install_method": "github_release_binary",
+  "description": "GitHub Agentic Workflows Firewall: Squid-proxy-based egress firewall that sandboxes AI agent commands in a Docker container with a domain allowlist",
+  "homepage": "https://github.com/github/gh-aw-firewall",
+  "github_repo": "github/gh-aw-firewall",
+  "binary_name": "awf",
+  "download_url_template": "https://github.com/github/gh-aw-firewall/releases/download/{version}/awf-linux-{arch}",
+  "arch_map": {
+    "x86_64": "x64",
+    "aarch64": "arm64"
+  },
+  "notes": "Direct binary download, not an archive. Upstream uses 'x64' (not 'amd64') in asset names. Requires Docker at runtime to launch the sandboxed Squid proxy.",
+  "tags": [
+    "github",
+    "ci",
+    "agentic",
+    "security"
+  ]
+}

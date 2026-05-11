@@ -1,0 +1,21 @@
+{
+  "name": "gh-aw",
+  "category": "platform",
+  "install_method": "github_release_binary",
+  "description": "GitHub Agentic Workflows: gh extension that compiles natural-language Markdown workflow definitions into hardened GitHub Actions workflows",
+  "homepage": "https://github.com/github/gh-aw",
+  "github_repo": "github/gh-aw",
+  "binary_name": "gh-aw",
+  "download_url_template": "https://github.com/github/gh-aw/releases/download/{version}/linux-{arch}",
+  "arch_map": {
+    "x86_64": "amd64",
+    "aarch64": "arm64",
+    "armv7l": "arm"
+  },
+  "notes": "Direct binary download, not an archive. Upstream's preferred install path is 'gh extension install github/gh-aw' (requires the gh CLI). The catalog uses a standalone binary install since gh extensions are not yet modeled as an install_method.",
+  "tags": [
+    "github",
+    "ci",
+    "agentic"
+  ]
+}

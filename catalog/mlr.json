@@ -1,0 +1,21 @@
+{
+  "name": "mlr",
+  "category": "general",
+  "install_method": "github_release_binary",
+  "description": "Like awk/sed/cut/jq for name-indexed data such as CSV, TSV, JSON and JSON Lines",
+  "homepage": "https://miller.readthedocs.io/",
+  "github_repo": "johnkerl/miller",
+  "binary_name": "mlr",
+  "download_url_template": "https://github.com/johnkerl/miller/releases/download/{version}/miller-{version_nov}-linux-{arch}.tar.gz",
+  "arch_map": {
+    "x86_64": "amd64",
+    "aarch64": "arm64",
+    "armv7l": "armv7"
+  },
+  "tags": [
+    "data",
+    "csv",
+    "json",
+    "text-utils"
+  ]
+}
