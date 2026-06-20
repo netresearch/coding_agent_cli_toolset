@@ -344,8 +344,12 @@ reconcile_tool() {
     return 1
   fi
 
-  # Verify installation
-  if command -v "$binary_name" >/dev/null 2>&1; then
+  # Verify installation. Resolve via PATH first, then npm's global bin dir --
+  # an npm install can land in a prefix that is not on PATH, which previously
+  # made a successful install look like "binary not found".
+  local resolved_bin
+  resolved_bin="$(resolve_global_bin "$binary_name")"
+  if [ -n "$resolved_bin" ]; then
     local new_method
     new_method="$(detect_install_method "$tool" "$binary_name")"
     if [ "$current_method" = "$best_method" ]; then
@@ -353,6 +357,7 @@ reconcile_tool() {
     else
       echo "[$tool] ✓ Reconciliation complete: now installed via $new_method" >&2
     fi
+    warn_if_bin_off_path "$tool" "$resolved_bin"
     return 0
   else
     echo "[$tool] Error: Installation via $best_method completed but binary not found" >&2

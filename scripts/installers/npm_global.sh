@@ -3,6 +3,7 @@
 set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+. "$DIR/lib/common.sh"
 . "$DIR/lib/install_strategy.sh"
 
 # Load nvm if available (needed for node-based package managers)
@@ -57,24 +58,29 @@ if [ -z "$PKG_MANAGER" ]; then
   exit 1
 fi
 
-# Version detection helper (uses catalog version_command/version_flag if available)
+# Version detection helper (uses catalog version_command/version_flag if available).
+# Takes the resolved binary PATH (which may live in npm's global bin dir even
+# when that dir is off PATH) so detection works regardless of PATH state.
 get_npm_tool_version() {
+  local bin_path="$1"
+  local bin_dir=""
+  [ -n "$bin_path" ] && bin_dir="$(dirname "$bin_path")"
   if [ -n "$VERSION_COMMAND" ]; then
-    timeout 2 bash -c "$VERSION_COMMAND" 2>/dev/null || true
+    # Prepend the resolved bin dir so a version_command that calls the bare
+    # binary name still resolves when that dir is not on PATH.
+    PATH="${bin_dir:+$bin_dir:}$PATH" timeout 8 bash -c "$VERSION_COMMAND" 2>/dev/null | head -1 || true
     return
   fi
-  local bin="$1"
-  if command -v "$bin" >/dev/null 2>&1; then
-    if [ -n "$VERSION_FLAG" ]; then
-      timeout 2 "$bin" $VERSION_FLAG </dev/null 2>/dev/null | head -1 || true
-    else
-      timeout 2 "$bin" --version </dev/null 2>/dev/null | head -1 || true
-    fi
+  [ -z "$bin_path" ] && return
+  if [ -n "$VERSION_FLAG" ]; then
+    timeout 8 "$bin_path" $VERSION_FLAG </dev/null 2>/dev/null | head -1 || true
+  else
+    timeout 8 "$bin_path" --version </dev/null 2>/dev/null | head -1 || true
   fi
 }
 
-# Get current version
-before="$(get_npm_tool_version "$BINARY_NAME")"
+# Get current version (resolve_global_bin also checks npm's global bin dir)
+before="$(get_npm_tool_version "$(resolve_global_bin "$BINARY_NAME")")"
 
 # Install or upgrade globally
 echo "[$TOOL] Installing package globally via $PKG_MANAGER: $PACKAGE_NAME" >&2
@@ -105,12 +111,16 @@ case "$PKG_MANAGER" in
 esac
 
 # Report
-after="$(get_npm_tool_version "$BINARY_NAME")"
-
-path="$(command -v "$BINARY_NAME" 2>/dev/null || true)"
+path="$(resolve_global_bin "$BINARY_NAME")"
+after="$(get_npm_tool_version "$path")"
 printf "[%s] before: %s\n" "$TOOL" "${before:-<none>}"
 printf "[%s] after:  %s\n" "$TOOL" "${after:-<none>}"
-if [ -n "$path" ]; then printf "[%s] path:   %s\n" "$TOOL" "$path"; fi
+if [ -n "$path" ]; then
+  printf "[%s] path:   %s\n" "$TOOL" "$path"
+  # Surface the real reason a freshly-installed tool can be "missing": npm put
+  # it in a global bin dir that is not on PATH.
+  warn_if_bin_off_path "$TOOL" "$path"
+fi
 
 # Refresh snapshot after successful installation
 refresh_snapshot "$TOOL"
