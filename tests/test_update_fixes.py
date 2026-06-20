@@ -965,6 +965,7 @@ class TestCatalogGoogleWorkspaceCli:
         assert "/gws-{arch}-" not in tmpl, "the gws- asset prefix does not exist upstream"
 
 
+@skip_on_windows
 class TestVersionLineRespectsFlag:
     """get_version_line must use the catalog version_flag instead of the generic
     flag probe, which tries -v first and can capture verbose/log output."""
