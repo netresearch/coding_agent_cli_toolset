@@ -66,9 +66,19 @@ get_npm_tool_version() {
   local bin_dir=""
   [ -n "$bin_path" ] && bin_dir="$(dirname "$bin_path")"
   if [ -n "$VERSION_COMMAND" ]; then
-    # Prepend the resolved bin dir so a version_command that calls the bare
-    # binary name still resolves when that dir is not on PATH.
-    PATH="${bin_dir:+$bin_dir:}$PATH" timeout 8 bash -c "$VERSION_COMMAND" 2>/dev/null | head -1 || true
+    # version_command runs even when bin_path is empty (the catalog command may
+    # locate the tool itself). Only extend PATH when the resolved bin dir is
+    # genuinely off PATH: this lets a bare-name version_command resolve an
+    # off-PATH npm-global install, without letting that dir shadow normal PATH
+    # lookups (or a hostile npm prefix plant a sibling binary) in the common case.
+    local pfx=""
+    if [ -n "$bin_dir" ]; then
+      case ":$PATH:" in
+        *":$bin_dir:"*) : ;;
+        *) pfx="$bin_dir:" ;;
+      esac
+    fi
+    PATH="${pfx}$PATH" timeout 8 bash -c "$VERSION_COMMAND" 2>/dev/null | head -1 || true
     return
   fi
   [ -z "$bin_path" ] && return

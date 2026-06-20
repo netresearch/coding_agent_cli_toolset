@@ -127,7 +127,7 @@ warn_if_bin_off_path() {
   case ":$PATH:" in
     *":$d:"*) return 0 ;;
   esac
-  log "[$label] warning: $d is not on PATH; your shell will not find '$(basename "$bin_path")' until that directory is on PATH (e.g. make it your nvm default, then run 'hash -r')"
+  log "[$label] warning: $d is not on PATH; your shell will not find '$(basename "$bin_path")' until you add that directory to PATH (for an nvm global bin, make it your nvm default, then run 'hash -r')"
 }
 
 # Ensure uv is available, offer to install if missing

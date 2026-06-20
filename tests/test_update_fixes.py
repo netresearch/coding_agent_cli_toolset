@@ -989,8 +989,10 @@ class TestVersionLineRespectsFlag:
         from cli_audit.detection import extract_version_number, get_version_line
         path = self._fake_yq(tmp_path)
         line = get_version_line(path, "fakeyq")
-        # The bug: extracts millis from the debug timestamp, not the version
-        assert extract_version_number(line) != "4.53.3"
+        # The bug: -v emits a DEBUG line whose timestamp (…44.047…) is misparsed
+        # as the version. Pin the exact misparse so this fails loudly if the
+        # generic probe ever stops exercising the -v-first behavior the fix guards.
+        assert extract_version_number(line) == "44.047"
 
     def test_with_version_flag_returns_clean_version(self, tmp_path):
         """Fix: catalog version_flag=--version yields the real version."""

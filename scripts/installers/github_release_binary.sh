@@ -44,23 +44,25 @@ VERSION_FLAG="$(jq -r '.version_flag // empty' "$CATALOG_FILE")"
 
 # Detect the installed tool's version string.
 # Prefers stdout but falls back to stderr, because some tools (e.g. gh-aw)
-# print their --version output to stderr. Echoes empty if not detectable.
+# print their --version output to stderr. The stderr fallback only accepts a
+# line containing a version-like token so a stderr banner/warning is not
+# surfaced as the version. Echoes empty if not detectable.
 detect_version_string() {
   command -v "$BINARY_NAME" >/dev/null 2>&1 || return 0
   local out=""
   if [ -n "$VERSION_COMMAND" ]; then
     out="$(timeout 3 bash -c "$VERSION_COMMAND" 2>/dev/null | head -1 || true)"
-    [ -z "$out" ] && out="$(timeout 3 bash -c "$VERSION_COMMAND" 2>&1 >/dev/null | head -1 || true)"
+    [ -z "$out" ] && out="$(timeout 3 bash -c "$VERSION_COMMAND" 2>&1 >/dev/null | grep -m1 -E '[0-9]+\.[0-9]+' || true)"
   elif [ -n "$VERSION_FLAG" ]; then
     out="$(timeout 3 "$BINARY_NAME" $VERSION_FLAG </dev/null 2>/dev/null | head -1 || true)"
-    [ -z "$out" ] && out="$(timeout 3 "$BINARY_NAME" $VERSION_FLAG </dev/null 2>&1 >/dev/null | head -1 || true)"
+    [ -z "$out" ] && out="$(timeout 3 "$BINARY_NAME" $VERSION_FLAG </dev/null 2>&1 >/dev/null | grep -m1 -E '[0-9]+\.[0-9]+' || true)"
   else
     out="$(timeout 3 "$BINARY_NAME" --version </dev/null 2>/dev/null | head -1 || true)"
     [ -z "$out" ] && out="$(timeout 3 "$BINARY_NAME" version --client </dev/null 2>/dev/null | head -1 || true)"
     [ -z "$out" ] && out="$(timeout 3 "$BINARY_NAME" version </dev/null 2>/dev/null | head -1 || true)"
     # Last resort: capture stderr (tools like gh-aw print --version there)
-    [ -z "$out" ] && out="$(timeout 3 "$BINARY_NAME" --version </dev/null 2>&1 >/dev/null | head -1 || true)"
-    [ -z "$out" ] && out="$(timeout 3 "$BINARY_NAME" version </dev/null 2>&1 >/dev/null | head -1 || true)"
+    [ -z "$out" ] && out="$(timeout 3 "$BINARY_NAME" --version </dev/null 2>&1 >/dev/null | grep -m1 -E '[0-9]+\.[0-9]+' || true)"
+    [ -z "$out" ] && out="$(timeout 3 "$BINARY_NAME" version </dev/null 2>&1 >/dev/null | grep -m1 -E '[0-9]+\.[0-9]+' || true)"
   fi
   printf '%s' "$out"
 }
