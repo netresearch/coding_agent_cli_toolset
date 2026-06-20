@@ -70,6 +70,9 @@ UPDATE_LOCAL_ONLY = os.environ.get("CLI_AUDIT_UPDATE_LOCAL", "0") == "1"
 UPDATE_BASELINE_ONLY = os.environ.get("CLI_AUDIT_UPDATE_BASELINE", "0") == "1"
 USE_SPLIT_FILES = os.environ.get("CLI_AUDIT_SPLIT_FILES", "0") == "1"
 
+# Audit status value (named to avoid duplicating the literal across call sites)
+STATUS_NOT_INSTALLED = "NOT INSTALLED"
+
 
 def normalize_version(version: str) -> str:
     """Normalize version string for comparison.
@@ -113,7 +116,7 @@ def compute_status(installed: str, latest: str) -> str:
     installed -> NOT INSTALLED; missing latest -> UNKNOWN.
     """
     if not installed:
-        return "NOT INSTALLED"
+        return STATUS_NOT_INSTALLED
     if not latest:
         return "UNKNOWN"
     from cli_audit.upgrade import compare_versions
@@ -282,7 +285,7 @@ def audit_tool(tool: Tool, offline_cache: dict[str, tuple[str, str]] | None = No
     if version_line and version_line.startswith("CONFLICT:"):
         status = "CONFLICT"
     elif version_line == "X" or not installed:
-        status = "NOT INSTALLED"
+        status = STATUS_NOT_INSTALLED
     elif version_num and latest_num:
         # Directional: installed >= latest is UP-TO-DATE (also handles being
         # ahead of a stale baseline and "7.28.00" vs "7.28.0").
@@ -316,7 +319,7 @@ def audit_tool(tool: Tool, offline_cache: dict[str, tuple[str, str]] | None = No
         "status": status,
         "tool_url": tool_url,
         "latest_url": latest_url,
-        "hint": tool.hint if status in ("NOT INSTALLED", "OUTDATED", "CONFLICT") else "",
+        "hint": tool.hint if status in (STATUS_NOT_INSTALLED, "OUTDATED", "CONFLICT") else "",
     }
 
 
@@ -684,7 +687,7 @@ def cmd_update(args: argparse.Namespace) -> int:
                 parts.append(f"{GREEN}{counts['UP-TO-DATE']} current{RESET}")
             if counts["OUTDATED"]:
                 parts.append(f"{YELLOW}{counts['OUTDATED']} outdated{RESET}")
-            if counts["NOT INSTALLED"]:
+            if counts[STATUS_NOT_INSTALLED]:
                 parts.append(f"{BLUE}{counts['NOT INSTALLED']} missing{RESET}")
             if counts["CONFLICT"]:
                 parts.append(f"{YELLOW}{counts['CONFLICT']} conflict{RESET}")
@@ -834,7 +837,7 @@ def cmd_update_local(args: argparse.Namespace) -> int:
                         installation.installed_version, cached.latest_version
                     )
                 elif not installation.installed_version:
-                    installation.status = "NOT INSTALLED"
+                    installation.status = STATUS_NOT_INSTALLED
                 else:
                     installation.status = "UNKNOWN"
 
@@ -920,7 +923,7 @@ def cmd_update_local(args: argparse.Namespace) -> int:
                     elif installed_v:
                         status_v = "OUTDATED"
                     else:
-                        status_v = "NOT INSTALLED"
+                        status_v = STATUS_NOT_INSTALLED
                     method = info.get("install_method")
                     versioned = f"{tool.name}@{cycle}"
                     entry = dict(tools_by_name.get(versioned, {}))
