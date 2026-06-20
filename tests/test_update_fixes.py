@@ -1192,3 +1192,34 @@ class TestNpmGlobalVersionDetection:
         tool.write_text("#!/bin/sh\necho 1.0.0\n")
         tool.chmod(0o755)
         assert "1.0.0" in self._run(str(tool), "faketool", extra_path=f'export PATH="{onp}:$PATH"')
+
+
+class TestComputeStatusDirection:
+    """audit.compute_status uses DIRECTIONAL comparison: a tool ahead of the
+    (possibly stale) baseline is UP-TO-DATE, not OUTDATED. Regression for the
+    'make update (3 outdated) vs make upgrade (53 outdated)' data-model bug."""
+
+    def test_installed_ahead_of_stale_baseline_is_up_to_date(self):
+        import audit
+        # ansible-core ahead of a stale committed baseline must NOT be OUTDATED
+        assert audit.compute_status("2.21.1", "2.20.1") == "UP-TO-DATE"
+        assert audit.compute_status("0.141.0", "0.101.0") == "UP-TO-DATE"
+
+    def test_installed_behind_is_outdated(self):
+        import audit
+        assert audit.compute_status("0.9.0", "0.10.0") == "OUTDATED"
+
+    def test_equal_is_up_to_date(self):
+        import audit
+        assert audit.compute_status("1.2.3", "1.2.3") == "UP-TO-DATE"
+        # trailing-zero normalization
+        assert audit.compute_status("7.28.00", "7.28.0") == "UP-TO-DATE"
+
+    def test_missing_installed_is_not_installed(self):
+        import audit
+        assert audit.compute_status("", "1.0.0") == "NOT INSTALLED"
+
+    def test_missing_latest_is_unknown(self):
+        import audit
+        # no known latest -> UNKNOWN, never a false OUTDATED
+        assert audit.compute_status("1.0.0", "") == "UNKNOWN"

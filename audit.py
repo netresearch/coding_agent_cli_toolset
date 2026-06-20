@@ -103,6 +103,25 @@ def normalize_version(version: str) -> str:
     return '.'.join(normalized_parts)
 
 
+def compute_status(installed: str, latest: str) -> str:
+    """Determine audit status from installed vs latest using DIRECTIONAL version
+    comparison.
+
+    ``installed >= latest`` is UP-TO-DATE -- a tool that is *ahead* of the known
+    latest (e.g. ahead of a stale committed baseline) needs no upgrade and must
+    not be reported as OUTDATED. Only ``installed < latest`` is OUTDATED. Missing
+    installed -> NOT INSTALLED; missing latest -> UNKNOWN.
+    """
+    if not installed:
+        return "NOT INSTALLED"
+    if not latest:
+        return "UNKNOWN"
+    from cli_audit.upgrade import compare_versions
+    if compare_versions(normalize_version(installed), normalize_version(latest)) < 0:
+        return "OUTDATED"
+    return "UP-TO-DATE"
+
+
 def collect_latest_version(tool: Tool, offline_cache: dict[str, tuple[str, str]] | None = None) -> tuple[str, str]:
     """Collect latest version for a tool.
 
@@ -185,14 +204,8 @@ def audit_multi_version_tool(
         method = version_info.get("install_method", "")
         status_lifecycle = version_info.get("status", "unknown")
 
-        # Determine audit status
-        if installed:
-            if installed == latest:
-                status = "UP-TO-DATE"
-            else:
-                status = "OUTDATED"
-        else:
-            status = "NOT INSTALLED"
+        # Determine audit status (directional: installed >= latest is current)
+        status = compute_status(installed, latest)
 
         # Build versioned tool name
         versioned_name = f"{tool_name}@{cycle}"
@@ -271,10 +284,9 @@ def audit_tool(tool: Tool, offline_cache: dict[str, tuple[str, str]] | None = No
     elif version_line == "X" or not installed:
         status = "NOT INSTALLED"
     elif version_num and latest_num:
-        # Normalize versions for comparison (handles "7.28.00" vs "7.28.0")
-        normalized_installed = normalize_version(version_num)
-        normalized_latest = normalize_version(latest_num)
-        status = "UP-TO-DATE" if normalized_installed == normalized_latest else "OUTDATED"
+        # Directional: installed >= latest is UP-TO-DATE (also handles being
+        # ahead of a stale baseline and "7.28.00" vs "7.28.0").
+        status = compute_status(version_num, latest_num)
     elif version_num and not latest_num:
         status = "UNKNOWN"
     else:
@@ -732,6 +744,11 @@ def cmd_update(args: argparse.Namespace) -> int:
         print(f"✓ Snapshot updated: {get_snapshot_path()}", file=sys.stderr)
         print(f"✓ Collected {meta['count']} tools", file=sys.stderr)
 
+        # Print the same Readiness summary the render (make upgrade) shows, so
+        # make update and make upgrade report identical totals. The per-category
+        # summary above omits multi-version cycles; this grand total includes them.
+        print_summary({"__meta__": {"count": len(results), "offline": OFFLINE_MODE}}, results)
+
         # Report GitHub rate limit status
         rate_limit = get_github_rate_limit()
         if rate_limit:
@@ -813,12 +830,9 @@ def cmd_update_local(args: argparse.Namespace) -> int:
                 # Determine status using cached upstream
                 cached = upstream_cache.versions.get(tool.name)
                 if cached and installation.installed_version:
-                    norm_inst = normalize_version(installation.installed_version)
-                    norm_latest = normalize_version(cached.latest_version)
-                    if norm_inst == norm_latest:
-                        installation.status = "UP-TO-DATE"
-                    else:
-                        installation.status = "OUTDATED"
+                    installation.status = compute_status(
+                        installation.installed_version, cached.latest_version
+                    )
                 elif not installation.installed_version:
                     installation.status = "NOT INSTALLED"
                 else:
