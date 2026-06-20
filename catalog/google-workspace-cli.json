@@ -6,7 +6,7 @@
   "homepage": "https://github.com/googleworkspace/cli",
   "github_repo": "googleworkspace/cli",
   "binary_name": "gws",
-  "download_url_template": "https://github.com/googleworkspace/cli/releases/download/{version}/gws-{arch}-unknown-linux-gnu.tar.gz",
+  "download_url_template": "https://github.com/googleworkspace/cli/releases/download/{version}/google-workspace-cli-{arch}-unknown-linux-gnu.tar.gz",
   "arch_map": {
     "x86_64": "x86_64",
     "aarch64": "aarch64"
