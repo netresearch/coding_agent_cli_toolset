@@ -1223,3 +1223,40 @@ class TestComputeStatusDirection:
         import audit
         # no known latest -> UNKNOWN, never a false OUTDATED
         assert audit.compute_status("1.0.0", "") == "UNKNOWN"
+
+
+@skip_on_windows
+class TestUpdateLocalPreservesLatest:
+    """A full `--update-local` refreshes installed_version + status from live
+    detection but PRESERVES each tool's existing latest_version, so a network-free
+    refresh never clobbers the upstream data `make update` collected (which would
+    show a target lower than installed and make update/upgrade disagree)."""
+
+    def test_refreshes_installed_but_preserves_latest(self, tmp_path):
+        snap = tmp_path / "snap.json"
+        # git is present in CI; seed a stale installed + a deliberately-high latest
+        snap.write_text(json.dumps({
+            "__meta__": {"count": 1},
+            "tools": [{"tool": "git", "installed_version": "0.0.1",
+                       "latest_version": "999.0.0", "status": "OUTDATED"}],
+        }))
+        env = os.environ.copy()
+        env.update({
+            "CLI_AUDIT_SNAPSHOT_FILE": str(snap),
+            "CLI_AUDIT_LOCAL_FILE": str(tmp_path / "local.json"),
+            "CLI_AUDIT_UPSTREAM_FILE": str(tmp_path / "upstream.json"),
+            "CLI_AUDIT_OFFLINE": "1",
+            "PYTHONUTF8": "1",
+        })
+        r = subprocess.run(
+            [sys.executable, "audit.py", "--update-local", "git"],
+            capture_output=True, text=True, cwd=str(PROJECT_ROOT), env=env, timeout=60,
+        )
+        assert r.returncode == 0, r.stderr
+        entry = next(t for t in json.loads(snap.read_text())["tools"] if t["tool"] == "git")
+        # latest PRESERVED (not rebuilt from the empty/baseline upstream cache)
+        assert entry["latest_version"] == "999.0.0", "latest must be preserved"
+        # installed REFRESHED to the real git version (not the seeded 0.0.1)
+        assert entry["installed_version"] not in ("", "0.0.1"), "installed must be refreshed"
+        # directional status: real git (e.g. 2.x) < 999.0.0 -> OUTDATED
+        assert entry["status"] == "OUTDATED"

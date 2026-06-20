@@ -955,10 +955,34 @@ def cmd_update_local(args: argparse.Namespace) -> int:
         merged_tools = list(tools_by_name.values())
         write_snapshot(merged_tools, offline=OFFLINE_MODE)
     else:
-        # Full update: replace entire snapshot
-        legacy_snapshot = build_legacy_snapshot(upstream_cache, local_state)
-        write_snapshot(legacy_snapshot.get("tools", []), offline=OFFLINE_MODE)
-        print(f"✓ Legacy snapshot updated: {get_snapshot_path()}", file=sys.stderr)
+        # Full update: refresh the snapshot's installed_version + status from the
+        # fresh local detection, but PRESERVE each tool's existing latest_version.
+        # A network-free refresh must NOT clobber the upstream "latest" that
+        # `make update` collected (the committed baseline is older) -- otherwise
+        # make-update and make-upgrade disagree and the guide shows a target that
+        # is lower than the installed version.
+        existing = load_snapshot().get("tools", [])
+        if existing:
+            for entry in existing:
+                name = entry.get("tool", "")
+                if "@" in name:
+                    continue  # multi-version cycle: no per-cycle local-only data
+                inst = local_state.tools.get(name)
+                if inst is None:
+                    continue
+                latest = entry.get("latest_version", "")
+                entry["installed"] = inst.installed_version
+                entry["installed_version"] = inst.installed_version
+                entry["installed_method"] = inst.installed_method
+                entry["installed_path_selected"] = inst.installed_path
+                entry["status"] = compute_status(inst.installed_version, latest)
+            write_snapshot(existing, offline=OFFLINE_MODE)
+            print(f"✓ Legacy snapshot refreshed (installed state): {get_snapshot_path()}", file=sys.stderr)
+        else:
+            # No snapshot yet -- build one from the upstream baseline.
+            legacy_snapshot = build_legacy_snapshot(upstream_cache, local_state)
+            write_snapshot(legacy_snapshot.get("tools", []), offline=OFFLINE_MODE)
+            print(f"✓ Legacy snapshot updated: {get_snapshot_path()}", file=sys.stderr)
 
     return 0
 

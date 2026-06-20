@@ -96,7 +96,12 @@ reload_audit_json() {
   fi
 }
 
-echo "Gathering current tool status from snapshot..."
+# Refresh the snapshot's installed state (network-free) so the displayed
+# "installed:" matches what the installers detect live as "before:". The refresh
+# preserves the cached upstream "latest", so it stays offline and consistent with
+# `make update` (no target regression, no make-update/make-upgrade disagreement).
+echo "Refreshing installed status (no network)..."
+(cd "$ROOT" && "$CLI" audit.py --update-local >/dev/null 2>&1) || true
 AUDIT_OUTPUT="$(cd "$ROOT" && CLI_AUDIT_RENDER=1 CLI_AUDIT_LINKS=0 CLI_AUDIT_EMOJI=0 "$CLI" audit.py || true)"
 AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" audit.py || true)"
 
