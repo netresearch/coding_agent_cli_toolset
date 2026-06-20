@@ -63,22 +63,21 @@ fi
 # when that dir is off PATH) so detection works regardless of PATH state.
 get_npm_tool_version() {
   local bin_path="$1"
-  local bin_dir=""
-  [[ -n "$bin_path" ]] && bin_dir="$(dirname "$bin_path")"
+  # Nothing to probe if the binary was not found on PATH or in npm's global bin.
+  # (A bare-name version_command could not resolve it either, so skip the run.)
+  [[ -z "$bin_path" ]] && return
+  local bin_dir
+  bin_dir="$(dirname "$bin_path")"
   if [[ -n "$VERSION_COMMAND" ]]; then
-    # version_command runs even when bin_path is empty (the catalog command may
-    # locate the tool itself). Only extend PATH when the resolved bin dir is
-    # genuinely off PATH: this lets a bare-name version_command resolve an
-    # off-PATH npm-global install, without letting that dir shadow normal PATH
-    # lookups (or a hostile npm prefix plant a sibling binary) in the common case.
+    # Only extend PATH when the resolved bin dir is genuinely off PATH: this lets
+    # a bare-name version_command resolve an off-PATH npm-global install, without
+    # letting that dir shadow normal PATH lookups (or a hostile npm prefix plant a
+    # sibling binary) in the common case.
     local pfx=""
-    if [[ -n "$bin_dir" ]] && ! path_contains_dir "$bin_dir"; then
-      pfx="$bin_dir:"
-    fi
+    path_contains_dir "$bin_dir" || pfx="$bin_dir:"
     PATH="${pfx}$PATH" timeout 8 bash -c "$VERSION_COMMAND" 2>/dev/null | head -1 || true
     return
   fi
-  [[ -z "$bin_path" ]] && return
   if [[ -n "$VERSION_FLAG" ]]; then
     timeout 8 "$bin_path" $VERSION_FLAG </dev/null 2>/dev/null | head -1 || true
   else

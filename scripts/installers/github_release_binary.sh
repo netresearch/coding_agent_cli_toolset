@@ -53,21 +53,32 @@ GRB_VERSION_RE='[0-9]+\.[0-9]+|[0-9]{8}'
 # line containing a version-like token so a stderr banner/warning is not
 # surfaced as the version. Echoes empty if not detectable.
 detect_version_string() {
-  command -v "$BINARY_NAME" >/dev/null 2>&1 || return 0
+  # Resolve the binary: prefer PATH, fall back to the install dir. On a
+  # first-time install that dir may not be on PATH yet, so command -v alone
+  # would miss a binary we just placed there.
+  local bin_path bin_dir
+  bin_path="$(command -v "$BINARY_NAME" 2>/dev/null || true)"
+  if [[ -z "$bin_path" ]]; then
+    local target_dir
+    target_dir="$(get_install_dir "$BINARY_NAME" 2>/dev/null || true)"
+    [[ -n "$target_dir" ]] && [[ -x "$target_dir/$BINARY_NAME" ]] && bin_path="$target_dir/$BINARY_NAME"
+  fi
+  [[ -z "$bin_path" ]] && return 0
+  bin_dir="$(dirname "$bin_path")"
   local out=""
   if [[ -n "$VERSION_COMMAND" ]]; then
-    out="$(timeout 3 bash -c "$VERSION_COMMAND" 2>/dev/null | head -1 || true)"
-    [[ -z "$out" ]] && out="$(timeout 3 bash -c "$VERSION_COMMAND" 2>&1 >/dev/null | grep -m1 -E "$GRB_VERSION_RE" || true)"
+    out="$(PATH="$bin_dir:$PATH" timeout 3 bash -c "$VERSION_COMMAND" 2>/dev/null | head -1 || true)"
+    [[ -z "$out" ]] && out="$(PATH="$bin_dir:$PATH" timeout 3 bash -c "$VERSION_COMMAND" 2>&1 >/dev/null | grep -m1 -E "$GRB_VERSION_RE" || true)"
   elif [[ -n "$VERSION_FLAG" ]]; then
-    out="$(timeout 3 "$BINARY_NAME" $VERSION_FLAG </dev/null 2>/dev/null | head -1 || true)"
-    [[ -z "$out" ]] && out="$(timeout 3 "$BINARY_NAME" $VERSION_FLAG </dev/null 2>&1 >/dev/null | grep -m1 -E "$GRB_VERSION_RE" || true)"
+    out="$(timeout 3 "$bin_path" $VERSION_FLAG </dev/null 2>/dev/null | head -1 || true)"
+    [[ -z "$out" ]] && out="$(timeout 3 "$bin_path" $VERSION_FLAG </dev/null 2>&1 >/dev/null | grep -m1 -E "$GRB_VERSION_RE" || true)"
   else
-    out="$(timeout 3 "$BINARY_NAME" --version </dev/null 2>/dev/null | head -1 || true)"
-    [[ -z "$out" ]] && out="$(timeout 3 "$BINARY_NAME" version --client </dev/null 2>/dev/null | head -1 || true)"
-    [[ -z "$out" ]] && out="$(timeout 3 "$BINARY_NAME" version </dev/null 2>/dev/null | head -1 || true)"
+    out="$(timeout 3 "$bin_path" --version </dev/null 2>/dev/null | head -1 || true)"
+    [[ -z "$out" ]] && out="$(timeout 3 "$bin_path" version --client </dev/null 2>/dev/null | head -1 || true)"
+    [[ -z "$out" ]] && out="$(timeout 3 "$bin_path" version </dev/null 2>/dev/null | head -1 || true)"
     # Last resort: capture stderr (tools like gh-aw print --version there)
-    [[ -z "$out" ]] && out="$(timeout 3 "$BINARY_NAME" --version </dev/null 2>&1 >/dev/null | grep -m1 -E "$GRB_VERSION_RE" || true)"
-    [[ -z "$out" ]] && out="$(timeout 3 "$BINARY_NAME" version </dev/null 2>&1 >/dev/null | grep -m1 -E "$GRB_VERSION_RE" || true)"
+    [[ -z "$out" ]] && out="$(timeout 3 "$bin_path" --version </dev/null 2>&1 >/dev/null | grep -m1 -E "$GRB_VERSION_RE" || true)"
+    [[ -z "$out" ]] && out="$(timeout 3 "$bin_path" version </dev/null 2>&1 >/dev/null | grep -m1 -E "$GRB_VERSION_RE" || true)"
   fi
   printf '%s' "$out"
 }

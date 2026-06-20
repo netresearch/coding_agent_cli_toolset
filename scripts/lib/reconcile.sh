@@ -350,8 +350,11 @@ reconcile_tool() {
   local resolved_bin
   resolved_bin="$(resolve_global_bin "$binary_name")"
   if [ -n "$resolved_bin" ]; then
-    local new_method
-    new_method="$(detect_install_method "$tool" "$binary_name")"
+    # Prepend the resolved binary's dir so detect_install_method (which uses
+    # command -v) can classify a binary that landed off PATH.
+    local bin_dir new_method
+    bin_dir="$(dirname "$resolved_bin")"
+    new_method="$(PATH="${bin_dir:+$bin_dir:}$PATH" detect_install_method "$tool" "$binary_name")"
     if [ "$current_method" = "$best_method" ]; then
       echo "[$tool] ✓ Upgrade complete (via $new_method)" >&2
     else
