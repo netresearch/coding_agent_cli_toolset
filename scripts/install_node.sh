@@ -17,10 +17,25 @@ if [ -n "${NODE_VERSION:-}" ]; then
 fi
 
 ensure_nvm() {
-  if ! have nvm; then
-    curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-  fi
+  # Load nvm first. nvm is a shell function, so `have nvm` is false until
+  # nvm.sh is sourced. Checking before loading made this re-run the web
+  # installer on every invocation -- and that installer reads NODE_VERSION and
+  # tries to install a matching node, producing confusing "Failed to install
+  # Node.js <ver>" noise during ordinary upgrades.
   ensure_nvm_loaded
+  if ! have nvm; then
+    # nvm genuinely missing -- bootstrap it. Clear NODE_VERSION so the nvm
+    # installer does not additionally install a node for our channel variable.
+    curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | NODE_VERSION="" bash
+    ensure_nvm_loaded
+    # Guard against an endless re-bootstrap loop: if nvm.sh exists but sourcing
+    # it still does not define `nvm` (e.g. a truncated/corrupt install), stop
+    # rather than silently re-downloading on every invocation.
+    if ! have nvm; then
+      log "[node] Error: nvm bootstrap did not yield a usable 'nvm' (corrupt ~/.nvm/nvm.sh?)"
+      return 1
+    fi
+  fi
 }
 
 # Get version of a specific Node.js major version (e.g., "24" -> "v24.13.0")

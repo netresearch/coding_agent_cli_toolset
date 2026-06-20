@@ -6,6 +6,7 @@
   "homepage": "https://github.com/mikefarah/yq",
   "github_repo": "mikefarah/yq",
   "binary_name": "yq",
+  "version_flag": "--version",
   "download_url_template": "https://github.com/mikefarah/yq/releases/download/{version}/yq_linux_{arch}",
   "arch_map": {
     "x86_64": "amd64",

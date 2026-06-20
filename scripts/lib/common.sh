@@ -66,6 +66,9 @@ is_path_under() { case "$1" in "$2"*) return 0 ;; *) return 1 ;; esac }
 prefers_nvm_node() {
   local p
   p="$(command -v node || true)"
+  # Resolve symlinks: a ~/.local/bin/node shim often points into ~/.nvm, in
+  # which case node is still nvm-managed and must not trigger the apt path.
+  [ -n "$p" ] && p="$(readlink -f "$p" 2>/dev/null || echo "$p")"
   is_path_under "$p" "$HOME/.nvm" || return 1
 }
 
@@ -90,6 +93,48 @@ prefers_rbenv_ruby() {
   local p
   p="$(command -v ruby || true)"
   is_path_under "$p" "$HOME/.rbenv" || return 1
+}
+
+# True if directory $1 is an exact member of PATH.
+path_contains_dir() {
+  case ":$PATH:" in
+    *":$1:"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# npm installs global packages into `npm prefix -g`/bin, which is NOT always on
+# PATH (e.g. when a stale node shim hijacks the prefix). These helpers locate a
+# globally-installed binary even when it landed off PATH, so a successful
+# install is not misreported as <none> or "binary not found".
+npm_global_bin_dir() {
+  command -v npm >/dev/null 2>&1 || return 0
+  local p
+  p="$(npm prefix -g 2>/dev/null || true)"
+  [[ -n "$p" ]] && printf '%s/bin' "$p"
+  return 0
+}
+
+# Resolve a global CLI binary path: prefer PATH, fall back to npm's global bin.
+resolve_global_bin() {
+  local bin="$1" p
+  p="$(command -v "$bin" 2>/dev/null || true)"
+  if [[ -z "$p" ]]; then
+    local gdir
+    gdir="$(npm_global_bin_dir)"
+    [[ -n "$gdir" ]] && [[ -x "$gdir/$bin" ]] && p="$gdir/$bin"
+  fi
+  printf '%s' "$p"
+}
+
+# Warn (to stderr) when a binary's directory is not on PATH.
+warn_if_bin_off_path() {
+  local label="$1" bin_path="$2"
+  [[ -z "$bin_path" ]] && return 0
+  local d
+  d="$(dirname "$bin_path")"
+  path_contains_dir "$d" && return 0
+  log "[$label] warning: $d is not on PATH; your shell will not find '$(basename "$bin_path")' until you add that directory to PATH (for an nvm global bin, make it your nvm default, then run 'hash -r')"
 }
 
 # Ensure uv is available, offer to install if missing

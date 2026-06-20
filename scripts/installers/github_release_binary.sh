@@ -42,22 +42,49 @@ PRESERVE_DIR="$(jq -r '.preserve_directory // empty' "$CATALOG_FILE")"
 VERSION_COMMAND="$(jq -r '.version_command // empty' "$CATALOG_FILE")"
 VERSION_FLAG="$(jq -r '.version_flag // empty' "$CATALOG_FILE")"
 
-# Get current version
-before=""
-if command -v "$BINARY_NAME" >/dev/null 2>&1; then
-  if [ -n "$VERSION_COMMAND" ]; then
-    # Use catalog-specified shell command
-    before="$(timeout 2 bash -c "$VERSION_COMMAND" 2>/dev/null || true)"
-  elif [ -n "$VERSION_FLAG" ]; then
-    # Use catalog-specified version flag/subcommand
-    before="$(timeout 2 "$BINARY_NAME" $VERSION_FLAG </dev/null 2>/dev/null | head -1 || true)"
-  else
-    # Fallback: try multiple version command formats
-    before="$(timeout 2 "$BINARY_NAME" --version </dev/null 2>/dev/null || \
-             timeout 2 "$BINARY_NAME" version --client </dev/null 2>/dev/null | head -1 || \
-             timeout 2 "$BINARY_NAME" version </dev/null 2>/dev/null | head -1 || true)"
+# A version-like token: a dotted version (1.2.3) or an 8-digit date (20240101),
+# matching what normalize_version_output accepts. Used to gate the stderr
+# fallback so a banner/warning line is not surfaced as the version.
+GRB_VERSION_RE='[0-9]+\.[0-9]+|[0-9]{8}'
+
+# Detect the installed tool's version string.
+# Prefers stdout but falls back to stderr, because some tools (e.g. gh-aw)
+# print their --version output to stderr. The stderr fallback only accepts a
+# line containing a version-like token so a stderr banner/warning is not
+# surfaced as the version. Echoes empty if not detectable.
+detect_version_string() {
+  # Resolve the binary: prefer PATH, fall back to the install dir. On a
+  # first-time install that dir may not be on PATH yet, so command -v alone
+  # would miss a binary we just placed there.
+  local bin_path bin_dir
+  bin_path="$(command -v "$BINARY_NAME" 2>/dev/null || true)"
+  if [[ -z "$bin_path" ]]; then
+    local target_dir
+    target_dir="$(get_install_dir "$BINARY_NAME" 2>/dev/null || true)"
+    [[ -n "$target_dir" ]] && [[ -x "$target_dir/$BINARY_NAME" ]] && bin_path="$target_dir/$BINARY_NAME"
   fi
-fi
+  [[ -z "$bin_path" ]] && return 0
+  bin_dir="$(dirname "$bin_path")"
+  local out=""
+  if [[ -n "$VERSION_COMMAND" ]]; then
+    out="$(PATH="$bin_dir:$PATH" timeout 3 bash -c "$VERSION_COMMAND" 2>/dev/null | head -1 || true)"
+    [[ -z "$out" ]] && out="$(PATH="$bin_dir:$PATH" timeout 3 bash -c "$VERSION_COMMAND" 2>&1 >/dev/null | grep -m1 -E "$GRB_VERSION_RE" || true)"
+  elif [[ -n "$VERSION_FLAG" ]]; then
+    out="$(timeout 3 "$bin_path" $VERSION_FLAG </dev/null 2>/dev/null | head -1 || true)"
+    [[ -z "$out" ]] && out="$(timeout 3 "$bin_path" $VERSION_FLAG </dev/null 2>&1 >/dev/null | grep -m1 -E "$GRB_VERSION_RE" || true)"
+  else
+    out="$(timeout 3 "$bin_path" --version </dev/null 2>/dev/null | head -1 || true)"
+    [[ -z "$out" ]] && out="$(timeout 3 "$bin_path" version --client </dev/null 2>/dev/null | head -1 || true)"
+    [[ -z "$out" ]] && out="$(timeout 3 "$bin_path" version </dev/null 2>/dev/null | head -1 || true)"
+    # Last resort: capture stderr (tools like gh-aw print --version there)
+    [[ -z "$out" ]] && out="$(timeout 3 "$bin_path" --version </dev/null 2>&1 >/dev/null | grep -m1 -E "$GRB_VERSION_RE" || true)"
+    [[ -z "$out" ]] && out="$(timeout 3 "$bin_path" version </dev/null 2>&1 >/dev/null | grep -m1 -E "$GRB_VERSION_RE" || true)"
+  fi
+  printf '%s' "$out"
+}
+
+# Get current version
+before="$(detect_version_string)"
 
 # Detect OS and architecture
 OS="linux"
@@ -276,18 +303,7 @@ if [ -n "$EXTRACT_DIR" ] && [ -d "$EXTRACT_DIR" ]; then
 fi
 
 # Report
-after=""
-if command -v "$BINARY_NAME" >/dev/null 2>&1; then
-  if [ -n "$VERSION_COMMAND" ]; then
-    after="$(timeout 2 bash -c "$VERSION_COMMAND" 2>/dev/null || true)"
-  elif [ -n "$VERSION_FLAG" ]; then
-    after="$(timeout 2 "$BINARY_NAME" $VERSION_FLAG </dev/null 2>/dev/null | head -1 || true)"
-  else
-    after="$(timeout 2 "$BINARY_NAME" --version </dev/null 2>/dev/null || \
-             timeout 2 "$BINARY_NAME" version --client </dev/null 2>/dev/null | head -1 || \
-             timeout 2 "$BINARY_NAME" version </dev/null 2>/dev/null | head -1 || true)"
-  fi
-fi
+after="$(detect_version_string)"
 # Normalize verbose version output
 before="$(normalize_version_output "${before:-}")"
 after="$(normalize_version_output "${after:-}")"
