@@ -930,3 +930,172 @@ remove_installation "fake_tool" "github_release_binary" "fake_tool" || true
         assert "sudo rm" in content, (
             "reconcile.sh must use 'sudo rm' as fallback for non-writable dirs"
         )
+
+
+# ===========================================================================
+# make upgrade version-reporting fixes
+# (yq verbose flag, gh-aw stderr, gws URL, node symlink, npm off-PATH)
+# ===========================================================================
+
+
+class TestCatalogYq:
+    """yq.json detection fix: -v means --verbose for mikefarah yq, so the
+    generic probe captured a DEBUG-log timestamp instead of the version."""
+
+    def test_yq_has_explicit_version_flag(self):
+        with open(CATALOG_DIR / "yq.json") as f:
+            data = json.load(f)
+        assert data.get("version_flag") == "--version", (
+            "yq needs version_flag=--version; its -v flag is --verbose and emits "
+            "a debug log whose timestamp the version regex misparses"
+        )
+
+
+class TestCatalogGoogleWorkspaceCli:
+    """google-workspace-cli download URL fix: asset is named
+    google-workspace-cli-<arch>-..., not gws-<arch>-..."""
+
+    def test_download_url_uses_correct_asset_prefix(self):
+        with open(CATALOG_DIR / "google-workspace-cli.json") as f:
+            data = json.load(f)
+        tmpl = data["download_url_template"]
+        assert "google-workspace-cli-{arch}-unknown-linux-gnu.tar.gz" in tmpl, (
+            "asset prefix must be 'google-workspace-cli-', the real release asset name"
+        )
+        assert "/gws-{arch}-" not in tmpl, "the gws- asset prefix does not exist upstream"
+
+
+class TestVersionLineRespectsFlag:
+    """get_version_line must use the catalog version_flag instead of the generic
+    flag probe, which tries -v first and can capture verbose/log output."""
+
+    def _fake_yq(self, tmp_path: Path) -> str:
+        # Mimics mikefarah yq: -v is verbose (debug log to stderr with a
+        # timestamp), --version prints the real version.
+        script = tmp_path / "fakeyq"
+        script.write_text(
+            "#!/bin/sh\n"
+            'case "$1" in\n'
+            '  -v) echo \'time=2026-06-20T16:17:44.047+02:00 level=DEBUG '
+            'msg="processed args: []"\' >&2 ;;\n'
+            "  --version) echo 'fakeyq (https://example/) version v4.53.3' ;;\n"
+            "esac\n"
+        )
+        script.chmod(0o755)
+        return str(script)
+
+    def test_without_flag_misparses_verbose_output(self, tmp_path):
+        """Regression: the generic probe (-v first) grabs the log timestamp."""
+        from cli_audit.detection import extract_version_number, get_version_line
+        path = self._fake_yq(tmp_path)
+        line = get_version_line(path, "fakeyq")
+        # The bug: extracts millis from the debug timestamp, not the version
+        assert extract_version_number(line) != "4.53.3"
+
+    def test_with_version_flag_returns_clean_version(self, tmp_path):
+        """Fix: catalog version_flag=--version yields the real version."""
+        from cli_audit.detection import extract_version_number, get_version_line
+        path = self._fake_yq(tmp_path)
+        line = get_version_line(path, "fakeyq", version_flag="--version")
+        assert extract_version_number(line) == "4.53.3"
+
+
+@skip_on_windows
+class TestGithubReleaseStderrVersion:
+    """github_release_binary.sh must detect versions printed to stderr (gh-aw
+    prints `gh aw version vX.Y.Z` to stderr)."""
+
+    def _content(self) -> str:
+        return (SCRIPTS_DIR / "installers" / "github_release_binary.sh").read_text()
+
+    def test_detect_version_helper_exists(self):
+        assert "detect_version_string()" in self._content()
+
+    def test_detect_version_falls_back_to_stderr(self):
+        # `2>&1 >/dev/null` captures stderr while discarding stdout
+        assert "2>&1 >/dev/null" in self._content(), (
+            "version detection must fall back to stderr for tools like gh-aw"
+        )
+
+    def test_before_and_after_use_helper(self):
+        content = self._content()
+        assert 'before="$(detect_version_string)"' in content
+        assert 'after="$(detect_version_string)"' in content
+
+
+@skip_on_windows
+class TestPrefersNvmNodeSymlink:
+    """prefers_nvm_node must resolve symlinks: a ~/.local/bin/node shim pointing
+    into ~/.nvm is still nvm-managed and must not trigger the apt removal path."""
+
+    def test_symlinked_node_is_detected_as_nvm(self, tmp_path):
+        nvm_bin = tmp_path / ".nvm" / "versions" / "node" / "v26.0.0" / "bin"
+        nvm_bin.mkdir(parents=True)
+        real_node = nvm_bin / "node"
+        real_node.write_text("#!/bin/sh\necho v26.0.0")
+        real_node.chmod(0o755)
+        local_bin = tmp_path / ".local" / "bin"
+        local_bin.mkdir(parents=True)
+        (local_bin / "node").symlink_to(real_node)
+
+        result = subprocess.run(
+            ["bash", "-c", f"""
+                export HOME="{tmp_path}"
+                source scripts/lib/common.sh
+                export PATH="{local_bin}:$PATH"
+                if prefers_nvm_node; then echo NVM; else echo NOTNVM; fi
+            """],
+            capture_output=True, text=True, timeout=10, cwd=str(PROJECT_ROOT),
+        )
+        assert "NVM" in result.stdout and "NOTNVM" not in result.stdout
+
+
+@skip_on_windows
+class TestResolveGlobalBin:
+    """resolve_global_bin must find a binary in npm's global bin dir even when
+    that dir is not on PATH (off-PATH npm prefix → eslint/gemini/pnpm <none>)."""
+
+    def test_finds_binary_in_npm_global_bin_off_path(self, tmp_path):
+        prefix_bin = tmp_path / "prefix" / "bin"
+        prefix_bin.mkdir(parents=True)
+        tool = prefix_bin / "faketool"
+        tool.write_text("#!/bin/sh\necho 1.2.3")
+        tool.chmod(0o755)
+        fake_bin = tmp_path / "fakebin"
+        fake_bin.mkdir()
+        npm = fake_bin / "npm"
+        # `npm prefix -g` -> our prefix; faketool itself is NOT on PATH
+        npm.write_text(f'#!/bin/sh\n[ "$1" = "prefix" ] && echo "{tmp_path}/prefix"\nexit 0\n')
+        npm.chmod(0o755)
+
+        result = subprocess.run(
+            ["bash", "-c", f"""
+                source scripts/lib/common.sh
+                export PATH="{fake_bin}:/usr/bin:/bin"
+                resolve_global_bin faketool
+            """],
+            capture_output=True, text=True, timeout=10, cwd=str(PROJECT_ROOT),
+        )
+        assert str(tool) in result.stdout
+
+    def test_warn_if_bin_off_path_warns_when_off_path(self):
+        result = subprocess.run(
+            ["bash", "-c", """
+                source scripts/lib/common.sh
+                export PATH="/usr/bin:/bin"
+                warn_if_bin_off_path mytool /opt/nowhere/bin/mytool 2>&1
+            """],
+            capture_output=True, text=True, timeout=10, cwd=str(PROJECT_ROOT),
+        )
+        assert "not on PATH" in result.stdout
+
+    def test_warn_if_bin_off_path_silent_when_on_path(self):
+        result = subprocess.run(
+            ["bash", "-c", """
+                source scripts/lib/common.sh
+                export PATH="/usr/bin:/bin"
+                warn_if_bin_off_path mytool /bin/mytool 2>&1
+            """],
+            capture_output=True, text=True, timeout=10, cwd=str(PROJECT_ROOT),
+        )
+        assert "not on PATH" not in result.stdout
