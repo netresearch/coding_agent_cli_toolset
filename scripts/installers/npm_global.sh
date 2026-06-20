@@ -64,25 +64,22 @@ fi
 get_npm_tool_version() {
   local bin_path="$1"
   local bin_dir=""
-  [ -n "$bin_path" ] && bin_dir="$(dirname "$bin_path")"
-  if [ -n "$VERSION_COMMAND" ]; then
+  [[ -n "$bin_path" ]] && bin_dir="$(dirname "$bin_path")"
+  if [[ -n "$VERSION_COMMAND" ]]; then
     # version_command runs even when bin_path is empty (the catalog command may
     # locate the tool itself). Only extend PATH when the resolved bin dir is
     # genuinely off PATH: this lets a bare-name version_command resolve an
     # off-PATH npm-global install, without letting that dir shadow normal PATH
     # lookups (or a hostile npm prefix plant a sibling binary) in the common case.
     local pfx=""
-    if [ -n "$bin_dir" ]; then
-      case ":$PATH:" in
-        *":$bin_dir:"*) : ;;
-        *) pfx="$bin_dir:" ;;
-      esac
+    if [[ -n "$bin_dir" ]] && ! path_contains_dir "$bin_dir"; then
+      pfx="$bin_dir:"
     fi
     PATH="${pfx}$PATH" timeout 8 bash -c "$VERSION_COMMAND" 2>/dev/null | head -1 || true
     return
   fi
-  [ -z "$bin_path" ] && return
-  if [ -n "$VERSION_FLAG" ]; then
+  [[ -z "$bin_path" ]] && return
+  if [[ -n "$VERSION_FLAG" ]]; then
     timeout 8 "$bin_path" $VERSION_FLAG </dev/null 2>/dev/null | head -1 || true
   else
     timeout 8 "$bin_path" --version </dev/null 2>/dev/null | head -1 || true
@@ -125,7 +122,7 @@ path="$(resolve_global_bin "$BINARY_NAME")"
 after="$(get_npm_tool_version "$path")"
 printf "[%s] before: %s\n" "$TOOL" "${before:-<none>}"
 printf "[%s] after:  %s\n" "$TOOL" "${after:-<none>}"
-if [ -n "$path" ]; then
+if [[ -n "$path" ]]; then
   printf "[%s] path:   %s\n" "$TOOL" "$path"
   # Surface the real reason a freshly-installed tool can be "missing": npm put
   # it in a global bin dir that is not on PATH.

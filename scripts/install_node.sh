@@ -28,6 +28,13 @@ ensure_nvm() {
     # installer does not additionally install a node for our channel variable.
     curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | NODE_VERSION="" bash
     ensure_nvm_loaded
+    # Guard against an endless re-bootstrap loop: if nvm.sh exists but sourcing
+    # it still does not define `nvm` (e.g. a truncated/corrupt install), stop
+    # rather than silently re-downloading on every invocation.
+    if ! have nvm; then
+      log "[node] Error: nvm bootstrap did not yield a usable 'nvm' (corrupt ~/.nvm/nvm.sh?)"
+      return 1
+    fi
   fi
 }
 

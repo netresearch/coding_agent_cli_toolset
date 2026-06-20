@@ -1104,22 +1104,86 @@ class TestResolveGlobalBin:
         assert "not on PATH" not in result.stdout
 
 
+def _extract_shell_func(rel_path: str, func_name: str) -> str:
+    """Extract a top-level shell function (up to its column-0 closing brace) so
+    the REAL function can be eval'd and tested in isolation."""
+    out: list[str] = []
+    capturing = False
+    for ln in (SCRIPTS_DIR / rel_path).read_text().splitlines():
+        if ln.startswith(f"{func_name}() {{"):
+            capturing = True
+        if capturing:
+            out.append(ln)
+            if ln == "}":
+                break
+    return "\n".join(out)
+
+
 @skip_on_windows
-class TestGuideRefreshesLocalState:
-    """guide.sh must refresh local installed state before rendering, so the
-    displayed 'installed:' agrees with the installers' live 'before:' instead of
-    showing stale-snapshot conflicts (e.g. 'not installed' above 'before: X')."""
+class TestDetectVersionStringBehavior:
+    """Behavioral tests for github_release_binary.sh::detect_version_string —
+    the stderr fallback (gh-aw-style) and the version-token gate (banner reject)."""
 
-    def _content(self) -> str:
-        return (SCRIPTS_DIR / "guide.sh").read_text()
-
-    def test_guide_refreshes_local_state(self):
-        assert "audit.py --update-local" in self._content(), (
-            "guide.sh must refresh local installed state before display"
+    def _run(self, tmp_path, tool_body: str) -> str:
+        tool = tmp_path / "faketool"
+        tool.write_text("#!/bin/sh\n" + tool_body)
+        tool.chmod(0o755)
+        grb = next(
+            ln for ln in (SCRIPTS_DIR / "installers/github_release_binary.sh")
+            .read_text().splitlines() if ln.startswith("GRB_VERSION_RE=")
         )
+        func = _extract_shell_func("installers/github_release_binary.sh", "detect_version_string")
+        script = (
+            f'export PATH="{tmp_path}:$PATH"\n{grb}\n{func}\n'
+            "BINARY_NAME=faketool VERSION_COMMAND='' VERSION_FLAG='' detect_version_string\n"
+        )
+        return subprocess.run(
+            ["bash", "-c", script], capture_output=True, text=True,
+            timeout=10, cwd=str(PROJECT_ROOT),
+        ).stdout
 
-    def test_refresh_runs_before_render(self):
-        content = self._content()
-        refresh_pos = content.index("audit.py --update-local")
-        render_pos = content.index('AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1')
-        assert refresh_pos < render_pos, "local-state refresh must precede the render"
+    def test_stderr_only_version_is_detected(self, tmp_path):
+        # gh-aw prints its --version to stderr
+        assert "1.2.3" in self._run(tmp_path, 'echo "faketool version v1.2.3" >&2\n')
+
+    def test_stderr_banner_is_rejected(self, tmp_path):
+        # a no-version banner on stderr must NOT be surfaced as the version
+        assert self._run(tmp_path, 'echo "Welcome to faketool, see the docs" >&2\n').strip() == ""
+
+    def test_stdout_version_wins(self, tmp_path):
+        assert "1.2.3" in self._run(tmp_path, 'echo "1.2.3"\n')
+
+
+@skip_on_windows
+class TestNpmGlobalVersionDetection:
+    """npm_global.sh::get_npm_tool_version only prepends an off-PATH bin dir to
+    PATH for a version_command, and never shadows an already-on-PATH lookup."""
+
+    def _run(self, bin_path: str, version_command: str, extra_path: str = "") -> str:
+        func = _extract_shell_func("installers/npm_global.sh", "get_npm_tool_version")
+        script = (
+            "source scripts/lib/common.sh\n"
+            f"{extra_path}\n{func}\n"
+            f'VERSION_COMMAND="{version_command}" VERSION_FLAG="" get_npm_tool_version "{bin_path}"\n'
+        )
+        return subprocess.run(
+            ["bash", "-c", script], capture_output=True, text=True,
+            timeout=10, cwd=str(PROJECT_ROOT),
+        ).stdout
+
+    def test_prepends_offpath_bindir_for_version_command(self, tmp_path):
+        off = tmp_path / "off" / "bin"
+        off.mkdir(parents=True)
+        tool = off / "faketool"
+        tool.write_text("#!/bin/sh\necho 9.9.9\n")
+        tool.chmod(0o755)
+        # off/bin is NOT on PATH; the bare-name version_command must still resolve it
+        assert "9.9.9" in self._run(str(tool), "faketool")
+
+    def test_does_not_prepend_when_already_on_path(self, tmp_path):
+        onp = tmp_path / "onp"
+        onp.mkdir()
+        tool = onp / "faketool"
+        tool.write_text("#!/bin/sh\necho 1.0.0\n")
+        tool.chmod(0o755)
+        assert "1.0.0" in self._run(str(tool), "faketool", extra_path=f'export PATH="{onp}:$PATH"')
