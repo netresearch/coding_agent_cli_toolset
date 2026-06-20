@@ -42,22 +42,31 @@ PRESERVE_DIR="$(jq -r '.preserve_directory // empty' "$CATALOG_FILE")"
 VERSION_COMMAND="$(jq -r '.version_command // empty' "$CATALOG_FILE")"
 VERSION_FLAG="$(jq -r '.version_flag // empty' "$CATALOG_FILE")"
 
-# Get current version
-before=""
-if command -v "$BINARY_NAME" >/dev/null 2>&1; then
+# Detect the installed tool's version string.
+# Prefers stdout but falls back to stderr, because some tools (e.g. gh-aw)
+# print their --version output to stderr. Echoes empty if not detectable.
+detect_version_string() {
+  command -v "$BINARY_NAME" >/dev/null 2>&1 || return 0
+  local out=""
   if [ -n "$VERSION_COMMAND" ]; then
-    # Use catalog-specified shell command
-    before="$(timeout 2 bash -c "$VERSION_COMMAND" 2>/dev/null || true)"
+    out="$(timeout 3 bash -c "$VERSION_COMMAND" 2>/dev/null | head -1 || true)"
+    [ -z "$out" ] && out="$(timeout 3 bash -c "$VERSION_COMMAND" 2>&1 >/dev/null | head -1 || true)"
   elif [ -n "$VERSION_FLAG" ]; then
-    # Use catalog-specified version flag/subcommand
-    before="$(timeout 2 "$BINARY_NAME" $VERSION_FLAG </dev/null 2>/dev/null | head -1 || true)"
+    out="$(timeout 3 "$BINARY_NAME" $VERSION_FLAG </dev/null 2>/dev/null | head -1 || true)"
+    [ -z "$out" ] && out="$(timeout 3 "$BINARY_NAME" $VERSION_FLAG </dev/null 2>&1 >/dev/null | head -1 || true)"
   else
-    # Fallback: try multiple version command formats
-    before="$(timeout 2 "$BINARY_NAME" --version </dev/null 2>/dev/null || \
-             timeout 2 "$BINARY_NAME" version --client </dev/null 2>/dev/null | head -1 || \
-             timeout 2 "$BINARY_NAME" version </dev/null 2>/dev/null | head -1 || true)"
+    out="$(timeout 3 "$BINARY_NAME" --version </dev/null 2>/dev/null | head -1 || true)"
+    [ -z "$out" ] && out="$(timeout 3 "$BINARY_NAME" version --client </dev/null 2>/dev/null | head -1 || true)"
+    [ -z "$out" ] && out="$(timeout 3 "$BINARY_NAME" version </dev/null 2>/dev/null | head -1 || true)"
+    # Last resort: capture stderr (tools like gh-aw print --version there)
+    [ -z "$out" ] && out="$(timeout 3 "$BINARY_NAME" --version </dev/null 2>&1 >/dev/null | head -1 || true)"
+    [ -z "$out" ] && out="$(timeout 3 "$BINARY_NAME" version </dev/null 2>&1 >/dev/null | head -1 || true)"
   fi
-fi
+  printf '%s' "$out"
+}
+
+# Get current version
+before="$(detect_version_string)"
 
 # Detect OS and architecture
 OS="linux"
@@ -276,18 +285,7 @@ if [ -n "$EXTRACT_DIR" ] && [ -d "$EXTRACT_DIR" ]; then
 fi
 
 # Report
-after=""
-if command -v "$BINARY_NAME" >/dev/null 2>&1; then
-  if [ -n "$VERSION_COMMAND" ]; then
-    after="$(timeout 2 bash -c "$VERSION_COMMAND" 2>/dev/null || true)"
-  elif [ -n "$VERSION_FLAG" ]; then
-    after="$(timeout 2 "$BINARY_NAME" $VERSION_FLAG </dev/null 2>/dev/null | head -1 || true)"
-  else
-    after="$(timeout 2 "$BINARY_NAME" --version </dev/null 2>/dev/null || \
-             timeout 2 "$BINARY_NAME" version --client </dev/null 2>/dev/null | head -1 || \
-             timeout 2 "$BINARY_NAME" version </dev/null 2>/dev/null | head -1 || true)"
-  fi
-fi
+after="$(detect_version_string)"
 # Normalize verbose version output
 before="$(normalize_version_output "${before:-}")"
 after="$(normalize_version_output "${after:-}")"
