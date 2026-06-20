@@ -970,12 +970,12 @@ def cmd_update_local(args: argparse.Namespace) -> int:
                 inst = local_state.tools.get(name)
                 if inst is None:
                     continue
-                latest = entry.get("latest_version", "")
-                entry["installed"] = inst.installed_version
-                entry["installed_version"] = inst.installed_version
-                entry["installed_method"] = inst.installed_method
-                entry["installed_path_selected"] = inst.installed_path
-                entry["status"] = compute_status(inst.installed_version, latest)
+                latest = entry.get("latest_version") or ""
+                entry["installed"] = inst.installed_version or ""
+                entry["installed_version"] = inst.installed_version or ""
+                entry["installed_method"] = inst.installed_method or ""
+                entry["installed_path_selected"] = inst.installed_path or ""
+                entry["status"] = compute_status(inst.installed_version or "", latest)
             write_snapshot(existing, offline=OFFLINE_MODE)
             print(f"✓ Legacy snapshot refreshed (installed state): {get_snapshot_path()}", file=sys.stderr)
         else:
