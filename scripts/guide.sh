@@ -96,13 +96,7 @@ reload_audit_json() {
   fi
 }
 
-# Refresh local installation state first (network-free). The installers detect
-# the live "before:" version, so rendering "installed:" from a stale snapshot
-# can contradict it (e.g. "installed: not installed" right above
-# "before: 10.5.0"). Refreshing here keeps both in agreement. Upstream "target"
-# versions still come from the cached baseline, so this stays offline.
-echo "Refreshing local tool status (no network)..."
-(cd "$ROOT" && "$CLI" audit.py --update-local >/dev/null 2>&1) || true
+echo "Gathering current tool status from snapshot..."
 AUDIT_OUTPUT="$(cd "$ROOT" && CLI_AUDIT_RENDER=1 CLI_AUDIT_LINKS=0 CLI_AUDIT_EMOJI=0 "$CLI" audit.py || true)"
 AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" audit.py || true)"
 
