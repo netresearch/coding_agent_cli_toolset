@@ -1134,7 +1134,10 @@ class TestDetectVersionStringBehavior:
         )
         func = _extract_shell_func("installers/github_release_binary.sh", "detect_version_string")
         script = (
-            f'export PATH="{tmp_path}:$PATH"\n{grb}\n{func}\n'
+            f'export PATH="{tmp_path}:$PATH"\n'
+            # macOS/BSD has no `timeout`; shim it as a passthrough so the test is portable
+            'if ! command -v timeout >/dev/null 2>&1; then timeout() { shift; "$@"; }; fi\n'
+            f'{grb}\n{func}\n'
             "BINARY_NAME=faketool VERSION_COMMAND='' VERSION_FLAG='' detect_version_string\n"
         )
         return subprocess.run(
@@ -1163,6 +1166,8 @@ class TestNpmGlobalVersionDetection:
         func = _extract_shell_func("installers/npm_global.sh", "get_npm_tool_version")
         script = (
             "source scripts/lib/common.sh\n"
+            # macOS/BSD has no `timeout`; shim it as a passthrough so the test is portable
+            'if ! command -v timeout >/dev/null 2>&1; then timeout() { shift; "$@"; }; fi\n'
             f"{extra_path}\n{func}\n"
             f'VERSION_COMMAND="{version_command}" VERSION_FLAG="" get_npm_tool_version "{bin_path}"\n'
         )
