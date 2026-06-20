@@ -1099,3 +1099,24 @@ class TestResolveGlobalBin:
             capture_output=True, text=True, timeout=10, cwd=str(PROJECT_ROOT),
         )
         assert "not on PATH" not in result.stdout
+
+
+@skip_on_windows
+class TestGuideRefreshesLocalState:
+    """guide.sh must refresh local installed state before rendering, so the
+    displayed 'installed:' agrees with the installers' live 'before:' instead of
+    showing stale-snapshot conflicts (e.g. 'not installed' above 'before: X')."""
+
+    def _content(self) -> str:
+        return (SCRIPTS_DIR / "guide.sh").read_text()
+
+    def test_guide_refreshes_local_state(self):
+        assert "audit.py --update-local" in self._content(), (
+            "guide.sh must refresh local installed state before display"
+        )
+
+    def test_refresh_runs_before_render(self):
+        content = self._content()
+        refresh_pos = content.index("audit.py --update-local")
+        render_pos = content.index('AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1')
+        assert refresh_pos < render_pos, "local-state refresh must precede the render"

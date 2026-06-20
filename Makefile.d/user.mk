@@ -20,7 +20,7 @@ update: ## Collect fresh version data with network calls and update snapshot (~1
 	@$(MAKE) check-python-managers 2>/dev/null || true
 	@$(MAKE) check-node-managers 2>/dev/null || true
 
-upgrade: scripts-perms ## Run interactive upgrade guide (uses snapshot, no network calls)
+upgrade: scripts-perms ## Run interactive upgrade guide (refreshes local state first, no network calls)
 	@bash scripts/guide.sh
 
 cleanup: scripts-perms ## Interactive removal of installed tools
