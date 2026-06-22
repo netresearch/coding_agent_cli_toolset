@@ -7,7 +7,7 @@
 
 AI CLI Preparation is a specialized environment audit tool designed to ensure AI coding agents (like Claude Code) have access to all necessary developer tools. This documentation provides comprehensive technical details for developers, contributors, and integrators.
 
-**Architecture:** Modular design with 18 specialized Python modules and 73 JSON tool catalog entries, evolved from a 3,387-line monolith to a maintainable, extensible system.
+**Architecture:** Modular design with 21 specialized Python modules and 97 JSON tool catalog entries, evolved from a 3,387-line monolith to a maintainable, extensible system.
 
 **Project Status:**
 - **Phase 1 (Detection & Auditing):** ✅ Complete - Modular refactoring complete (v2.0.0)
@@ -34,7 +34,7 @@ AI CLI Preparation is a specialized environment audit tool designed to ensure AI
 
 2. **[CATALOG_GUIDE.md](CATALOG_GUIDE.md)** - JSON Catalog System ⭐ **NEW**
    - Tool definition schema and structure
-   - 73 JSON catalog entries
+   - 97 JSON catalog entries
    - Creating and managing catalog entries
    - ToolCatalog API and usage patterns
    - Community contribution workflows

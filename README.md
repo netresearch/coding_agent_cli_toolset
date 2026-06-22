@@ -100,7 +100,7 @@ Example (abridged):
 - Security & compliance: `semgrep`, `bandit`, `gitleaks`, `trivy`
 - Git helpers: `git-absorb`, `git-branchless`
 - Formatters & linters: `black`, `isort`, `flake8`, `eslint`, `prettier`, `shfmt`, `shellcheck`
-- VCS & platforms: `git`, `gh` (GitHub CLI), `glab` (GitLab CLI)
+- VCS & platforms: `git`, `gh` (GitHub CLI), `glab` (GitLab CLI), `jj` (Jujutsu, Git-compatible VCS)
 - Cloud & infra: `aws`, `kubectl`, `terraform`, `docker`, `dive`
 
 Note: Not all of these are expected to be installed globally; the report simply surfaces what is present and how it compares upstream.
@@ -468,7 +468,7 @@ make test-parallel     # Parallel via pytest-xdist
 
 ## Installation scripts
 
-All 89 cataloged tools can be installed, upgraded, uninstalled, or reconciled via generic Make targets:
+All 97 cataloged tools can be installed, upgraded, uninstalled, or reconciled via generic Make targets:
 
 ```bash
 # Generic pattern targets - work for ANY cataloged tool
@@ -539,7 +539,7 @@ When ambiguous, the audit may report a generic bucket (e.g., `~/.local/bin`). Th
 
 ### Actions: install, upgrade, uninstall, reconcile
 
-All pattern targets (`install-%`, `upgrade-%`, `uninstall-%`, `reconcile-%`) work for any of the 89 cataloged tools. They use a three-step fallback: dedicated script, then generic installer, then error.
+All pattern targets (`install-%`, `upgrade-%`, `uninstall-%`, `reconcile-%`) work for any of the 97 cataloged tools. They use a three-step fallback: dedicated script, then generic installer, then error.
 
 ```bash
 # Upgrade any tool
