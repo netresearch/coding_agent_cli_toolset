@@ -7,7 +7,7 @@
   "github_repo": "jj-vcs/jj",
   "binary_name": "jj",
   "version_flag": "--version",
-  "download_url_template": "https://github.com/jj-vcs/jj/releases/download/{version}/jj-{version}-{arch}-unknown-linux-musl.tar.gz",
+  "download_url_template": "https://github.com/jj-vcs/jj/releases/download/v{version_nov}/jj-v{version_nov}-{arch}-unknown-linux-musl.tar.gz",
   "arch_map": {
     "x86_64": "x86_64",
     "aarch64": "aarch64"
@@ -18,7 +18,7 @@
       "priority": 1,
       "config": {
         "repo": "jj-vcs/jj",
-        "asset_pattern": "jj-.*-x86_64-unknown-linux-musl.tar.gz"
+        "asset_pattern": "jj-.*-unknown-linux-musl.tar.gz"
       }
     },
     {
