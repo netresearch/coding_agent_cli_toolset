@@ -123,7 +123,7 @@ This repo **is** a CLI tool manager, so the word "upgrade" is overloaded:
 **AI CLI Preparation v2.0** — Tool version auditing and installation management for AI coding agents.
 
 - **Modules:** 21 Python modules under `cli_audit/` (see [`cli_audit/AGENTS.md`](./cli_audit/AGENTS.md))
-- **Catalog:** 89 JSON tool definitions under `catalog/`
+- **Catalog:** 97 JSON tool definitions under `catalog/`
 - **Installers:** 33 Bash scripts under `scripts/` (see [`scripts/AGENTS.md`](./scripts/AGENTS.md))
 - **Phase 1:** Detection & auditing (complete)
 - **Phase 2:** Installation & upgrade management (complete)

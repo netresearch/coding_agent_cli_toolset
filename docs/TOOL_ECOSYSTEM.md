@@ -4,7 +4,7 @@ Complete catalog of all tools tracked by AI CLI Preparation, organized by catego
 
 ## Overview
 
-AI CLI Preparation tracks **68 developer tools** across 11 categories, optimized for AI coding agent environments. Each tool is classified by installation method and tracked against upstream releases.
+AI CLI Preparation tracks **69 developer tools** across 11 categories, optimized for AI coding agent environments. Each tool is classified by installation method and tracked against upstream releases.
 
 ## Categories
 
@@ -15,7 +15,7 @@ AI CLI Preparation tracks **68 developer tools** across 11 categories, optimized
 - [HTTP Clients](#http-clients) - HTTP/API testing tools (2 tools)
 - [Automation & Watch](#automation--watch) - File watching and automation (6 tools)
 - [Security & Compliance](#security--compliance) - Security scanning tools (5 tools)
-- [Git Tools](#git-tools) - Version control and Git helpers (8 tools)
+- [Git Tools](#git-tools) - Version control and Git helpers (9 tools)
 - [Formatters & Linters](#formatters--linters) - Code formatting and linting (12 tools)
 - [Cloud & Infrastructure](#cloud--infrastructure) - Cloud and container tools (5 tools)
 - [Build Systems](#build-systems) - Build automation and compilation tools (1 tool)
@@ -462,6 +462,14 @@ make audit-offline-data-core
 - **Use Case:** Advanced git workflows
 - **Install:** `cargo install git-branchless`
 - **Upgrade:** `cargo install --force git-branchless`
+
+### jj
+- **Purpose:** Jujutsu, a Git-compatible version control system that is both simple and powerful
+- **Executable:** `jj`
+- **Upstream:** GitHub (jj-vcs/jj)
+- **Use Case:** Simpler, more powerful VCS workflow that interoperates with existing Git repositories
+- **Install:** `make install-jj` (GitHub release binary) or `brew install jj`
+- **Upgrade:** `make upgrade-jj`
 
 ### just
 - **Purpose:** Command runner for project-specific tasks

@@ -122,7 +122,7 @@ class ToolCatalog:
 ```python
 from cli_audit import ToolCatalog
 
-# Load catalog (73 tools)
+# Load catalog (97 tools)
 catalog = ToolCatalog()
 entries = catalog.load_all()
 
@@ -137,7 +137,7 @@ if catalog.has("fzf"):
     fzf = catalog.get("fzf")
 
 # List all tools
-all_tools = catalog.list_all()  # Returns list of 73 tool names
+all_tools = catalog.list_all()  # Returns list of 97 tool names
 ```
 
 #### `cli_audit.collectors` - Upstream Version Collection
