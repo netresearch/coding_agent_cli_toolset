@@ -1,0 +1,37 @@
+{
+  "name": "jj",
+  "category": "git",
+  "install_method": "auto",
+  "description": "Jujutsu - a Git-compatible VCS that is both simple and powerful",
+  "homepage": "https://github.com/jj-vcs/jj",
+  "github_repo": "jj-vcs/jj",
+  "binary_name": "jj",
+  "version_flag": "--version",
+  "download_url_template": "https://github.com/jj-vcs/jj/releases/download/{version}/jj-{version}-{arch}-unknown-linux-musl.tar.gz",
+  "arch_map": {
+    "x86_64": "x86_64",
+    "aarch64": "aarch64"
+  },
+  "available_methods": [
+    {
+      "method": "github_release_binary",
+      "priority": 1,
+      "config": {
+        "repo": "jj-vcs/jj",
+        "asset_pattern": "jj-.*-x86_64-unknown-linux-musl.tar.gz"
+      }
+    },
+    {
+      "method": "brew",
+      "priority": 2,
+      "config": {
+        "package": "jj"
+      }
+    }
+  ],
+  "notes": "Release assets keep the 'v' prefix in the filename (jj-v0.42.0-...). Only musl Linux builds are published. cargo is intentionally omitted: the 'jujutsu' crate on crates.io is abandoned (last 0.7.2); the current cargo path is a git build.",
+  "tags": [
+    "git",
+    "vcs"
+  ]
+}
