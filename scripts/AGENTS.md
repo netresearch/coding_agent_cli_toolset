@@ -95,7 +95,7 @@ make scripts-perms  # Ensure all scripts are executable
 ./scripts/install_node.sh reconcile
 ```
 
-**Via Make (works for all 97 cataloged tools):**
+**Via Make (works for all 98 cataloged tools):**
 ```bash
 make install-python              # Install Python toolchain (dedicated script)
 make upgrade-python              # Upgrade Python toolchain
