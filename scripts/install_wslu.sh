@@ -60,6 +60,11 @@ install_wslu() {
 }
 
 uninstall_wslu() {
+  if ! is_wsl; then
+    echo "[wslu] Not running under WSL - nothing to do."
+    echo "[wslu] If wslu was installed manually elsewhere, remove it with your package manager (e.g. sudo apt-get remove wslu)."
+    return 0
+  fi
   if have apt-get; then
     apt_remove_if_present wslu
   elif have dnf; then
