@@ -1,0 +1,17 @@
+{
+  "name": "wslu",
+  "category": "platform",
+  "install_method": "dedicated_script",
+  "description": "WSL utilities; provides wslview to open URLs/files in the Windows default browser",
+  "homepage": "https://wslutiliti.es/wslu/",
+  "binary_name": "wslview",
+  "script": "install_wslu.sh",
+  "requires_wsl": true,
+  "skip_upstream": true,
+  "tags": ["platform", "wsl"],
+  "guide": {
+    "display_name": "wslu (wslview)",
+    "install_action": "install",
+    "order": 210
+  }
+}

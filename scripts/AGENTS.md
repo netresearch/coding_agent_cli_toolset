@@ -6,7 +6,7 @@
 
 ## Overview
 
-33 Bash scripts for installing developer tools with multiple actions:
+34 Bash scripts for installing developer tools with multiple actions:
 - **install**: Fresh installation (default action)
 - **update**: Upgrade to latest version
 - **uninstall**: Remove installation
@@ -28,6 +28,7 @@
 - `install_ansible.sh`, `install_brew.sh`, `install_composer.sh`
 - `install_docker.sh`, `install_gem.sh`, `install_parallel.sh`, `install_yarn.sh`
 - `install_tmux.sh`, `install_tree.sh` (single-binary utilities)
+- `install_wslu.sh`: WSL utilities (`wslview`) — installs only under WSL; optionally sets `wslview` as the default browser
 
 **Upgrade & management:**
 - `guide.sh`: Interactive upgrade guide (supports 'a' for auto-update)
@@ -94,7 +95,7 @@ make scripts-perms  # Ensure all scripts are executable
 ./scripts/install_node.sh reconcile
 ```
 
-**Via Make (works for all 97 cataloged tools):**
+**Via Make (works for all 98 cataloged tools):**
 ```bash
 make install-python              # Install Python toolchain (dedicated script)
 make upgrade-python              # Upgrade Python toolchain
