@@ -8,6 +8,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 ## [Unreleased]
 
 ### Added
+- `wslu`/`wslview` catalog entry (`catalog/wslu.json` + `scripts/install_wslu.sh`), gated by a new `requires_wsl` catalog flag so it is only surfaced and installed under WSL. Its installer also points the xdg default browser at `wslview` (so links open in the Windows browser); opt out with `WSLU_SET_DEFAULT_BROWSER=0`.
 - Governance files: PR template, `CHANGELOG.md`. Security reporting is covered by the [org-level SECURITY.md](https://github.com/netresearch/.github/blob/main/SECURITY.md).
 - `.github/workflows/dependency-review.yml` and a dedicated `security.yml` (pip-audit + bandit + CycloneDX SBOM). CodeQL continues to run via GitHub's default code-scanning setup.
 - `.pre-commit-config.yaml` for local hook enforcement (flake8, black, isort, shellcheck).

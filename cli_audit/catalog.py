@@ -230,10 +230,21 @@ class ToolCatalog:
     def all_tool_definitions(self) -> list[Tool]:  # noqa: F821
         """Get all tools as Tool instances.
 
+        Tools flagged ``requires_wsl`` in their catalog JSON are only included
+        when running under WSL, so non-WSL machines are not prompted to install
+        (or shown as missing) a tool that has no meaning there.
+
         Returns:
             List of Tool instances generated from catalog
         """
-        return [entry.to_tool() for entry in self._entries.values()]
+        from cli_audit.collectors import is_wsl  # lazy import: avoids import cycle
+
+        on_wsl = is_wsl()
+        return [
+            entry.to_tool()
+            for entry in self._entries.values()
+            if on_wsl or not self.get_raw_data(entry.name).get("requires_wsl")
+        ]
 
     def get_package_manager_tools(self) -> list[ToolCatalogEntry]:
         """Get tools that use package_manager install method.

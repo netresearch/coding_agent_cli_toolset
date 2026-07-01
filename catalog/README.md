@@ -71,7 +71,7 @@ Install tools via system package managers (apt, brew, dnf, pacman).
 2. The tool will automatically be available via `make install-<tool>`, `make upgrade-<tool>`, `make uninstall-<tool>`, and `make reconcile-<tool>`
 3. No need to create a custom install script!
 
-Currently **97 tools** are cataloged.
+Currently **98 tools** are cataloged.
 
 ## Environment Variables
 
@@ -96,6 +96,6 @@ make upgrade
 
 ## Architecture
 
-All 97 tools have catalog entries. The generic installer (`scripts/install_tool.sh`) reads a tool's catalog JSON and delegates to the appropriate method-specific installer under `scripts/installers/`. Tools with complex installation needs (python, node, docker, rust, etc.) use `install_method: "dedicated_script"` to route to their existing bespoke scripts.
+All 98 tools have catalog entries. The generic installer (`scripts/install_tool.sh`) reads a tool's catalog JSON and delegates to the appropriate method-specific installer under `scripts/installers/`. Tools with complex installation needs (python, node, docker, rust, etc.) use `install_method: "dedicated_script"` to route to their existing bespoke scripts.
 
 See [ADR-007](../docs/adr/ADR-007-generic-tool-installation-architecture.md) for the full architectural decision record.
