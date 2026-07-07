@@ -18,7 +18,6 @@ IGNORE_PINS="${IGNORE_PINS:-0}"
 
 # Summary counters
 SUMMARY_UPDATED=0
-SUMMARY_INSTALLED=0
 SUMMARY_SKIPPED=0
 SUMMARY_FAILED=0
 SUMMARY_REMOVED=0
@@ -28,7 +27,6 @@ print_summary() {
   echo "================================================================================"
   echo "Summary${label:+ ($label)}"
   echo "================================================================================"
-  printf "  Installed: %d\n" "$SUMMARY_INSTALLED"
   printf "  Updated:   %d\n" "$SUMMARY_UPDATED"
   printf "  Removed:   %d\n" "$SUMMARY_REMOVED"
   printf "  Skipped:   %d\n" "$SUMMARY_SKIPPED"
@@ -348,6 +346,17 @@ process_tool() {
   # For multi-version tools the key is cycle-qualified (e.g. python@3.13), so
   # each cycle opts in independently.
   if [ "$auto_update" = "true" ]; then
+    # Auto-update keeps *existing* tools current; it must never bootstrap a
+    # missing tool. Tools like pip are intentionally left to uv/bun rather than
+    # installed on our behalf. When the tool isn't installed, report the skip
+    # and return. Deliberate installs are offered only by the interactive
+    # prompt below, which is reached when auto-update is not enabled.
+    if [ -z "$installed" ]; then
+      printf "\n==> ⏭️  %s [auto-update]\n" "$display"
+      printf "    not installed; skipping (auto-update upgrades existing tools only)\n"
+      SUMMARY_SKIPPED=$((SUMMARY_SKIPPED + 1))
+      return 0
+    fi
     printf "\n==> %s %s [auto-update]\n" "$icon" "$display"
     print_installed_status "$installed" "$method"
     # Show target; for self-managed tools (skip_upstream) show "self-managed" instead of <unknown>
@@ -360,12 +369,12 @@ process_tool() {
     check_multi_installs "$catalog_tool"
     printf "    auto-updating...\n"
 
-    # Build install command from catalog metadata (use catalog_tool for script name)
-    local install_cmd="install_tool.sh $catalog_tool"
+    # Build the upgrade command from catalog metadata (use catalog_tool for
+    # script name). The tool is guaranteed installed here, so this is always an
+    # update unless the catalog defines an explicit install_action.
+    local install_cmd="install_tool.sh $catalog_tool update"
     if [ -n "$install_action" ]; then
       install_cmd="install_tool.sh $catalog_tool $install_action"
-    elif [ -n "$installed" ]; then
-      install_cmd="install_tool.sh $catalog_tool update"
     fi
 
     # Execute the install with version-specific environment variables
@@ -391,8 +400,6 @@ process_tool() {
     rm -f "/tmp/.cli-audit/${catalog_tool}.already-current"
     if [ "$auto_update_success" = "0" ]; then
       SUMMARY_FAILED=$((SUMMARY_FAILED + 1))
-    elif [ -z "$installed" ]; then
-      SUMMARY_INSTALLED=$((SUMMARY_INSTALLED + 1))
     else
       SUMMARY_UPDATED=$((SUMMARY_UPDATED + 1))
     fi
