@@ -111,8 +111,9 @@ when relevant**:
 
 - If any tool has duplicate installs:
   `N tool(s) have duplicate installs → make reconcile-all`
-- Always in the upgrade summary footer:
-  `Upgrade the package managers themselves → make upgrade-managed`
+- `Upgrade the package managers themselves → make upgrade-managed`: shown in the
+  audit summary when outdated tools exist, and always in the interactive
+  upgrade (guide) summary footer.
 
 Hints are informational, never block, and are suppressed when nothing applies
 (no duplicates → no reconcile hint).

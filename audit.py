@@ -1371,11 +1371,26 @@ def cmd_reconcile(args: argparse.Namespace) -> int:
                 mode="explicit", tool_names=all_tools, reconcile_mode="aggressive",
                 force=force, verbose=args.verbose,
             )
+            # Report only tools that actually had duplicates — the explicit
+            # sweep visits every catalog entry, but --all is about conflicts.
+            conflicts = [r for r in result.results if len(r.installations) > 1]
             if JSON_MODE:
-                print(json.dumps(result.to_dict()))
+                print(json.dumps({
+                    "tools_checked": result.tools_checked,
+                    "conflicts_found": result.conflicts_found,
+                    "conflicts_resolved": result.conflicts_resolved,
+                    "results": [r.to_dict() for r in conflicts],
+                    "duration_seconds": result.duration_seconds,
+                }))
             else:
                 print(result.summary(), file=sys.stderr)
-            return 0 if result.conflicts_resolved == result.conflicts_found else 1
+            # Fail only on real removal errors — not on protected tools (blocked)
+            # or tools the user declined (aborted), which are expected outcomes.
+            failures = [
+                r for r in conflicts
+                if not r.success and r.action_taken not in ("blocked", "aborted", "none")
+            ]
+            return 1 if failures else 0
         # Plan-only sweep (parallel detection, no removal)
         result = bulk_reconcile(
             mode="explicit", tool_names=all_tools, reconcile_mode="parallel",
@@ -1389,7 +1404,7 @@ def cmd_reconcile(args: argparse.Namespace) -> int:
             for r in result.results if len(r.installations) > 1
         ]
         if JSON_MODE:
-            print(json.dumps({"conflicts": plans, "total": len(plans)}))
+            print(json.dumps({"results": plans, "total": len(plans)}))
         else:
             _print_reconcile_plans(plans)
         return 0
@@ -1495,6 +1510,12 @@ def main() -> int:
 
     # Setup logging
     setup_logging(verbose=args.verbose)
+
+    # Reconcile-only flags are meaningless (and silently ignored) without
+    # --reconcile — fail loudly so scripting mistakes surface.
+    if not args.reconcile and (args.all or args.apply or args.yes):
+        print("--all/--apply/--yes are only valid with --reconcile", file=sys.stderr)
+        return 2
 
     # Route to appropriate command
     if args.reconcile:

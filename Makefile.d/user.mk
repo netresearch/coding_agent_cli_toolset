@@ -224,6 +224,12 @@ reconcile-%: scripts-perms ## Reconcile tool installation (e.g., make reconcile-
 		echo "Error: No installer found for '$*'" >&2; exit 1; \
 	fi
 
+reconcile-all: scripts-perms ## Remove duplicate installs across ALL tools (confirm each; keeps preferred)
+	@$(PYTHON) audit.py --reconcile --all --apply
+
+reconcile-all-dry-run: scripts-perms ## Preview duplicate-install cleanup across ALL tools (removes nothing)
+	@$(PYTHON) audit.py --reconcile --all
+
 # ----------------------------------------------------------------------------
 # SYSTEM MANAGEMENT
 # ----------------------------------------------------------------------------

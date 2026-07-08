@@ -64,14 +64,34 @@ class TestResolveCandidates:
         assert "pip3" in cands
 
     def test_unknown_tool_returns_none(self):
-        from cli_audit.reconcile import _resolve_candidates, _candidate_cache
-        _candidate_cache.pop("not-a-real-tool-xyz", None)
+        from cli_audit.reconcile import _resolve_candidates, _catalog_cache
+        _catalog_cache.pop("not-a-real-tool-xyz", None)
         assert _resolve_candidates("not-a-real-tool-xyz") is None
 
     def test_result_is_cached(self):
-        from cli_audit.reconcile import _resolve_candidates, _candidate_cache
+        from cli_audit.reconcile import _resolve_candidates, _catalog_cache
         _resolve_candidates("pip")
-        assert "pip" in _candidate_cache
+        assert "pip" in _catalog_cache
+
+
+class TestSafeBinaryPath:
+    def test_accepts_normal_absolute_paths(self):
+        from cli_audit.reconcile import _is_safe_binary_path
+        assert _is_safe_binary_path("/usr/bin/rg")
+        assert _is_safe_binary_path("/home/u/.cargo/bin/fd")
+
+    def test_rejects_shell_metacharacters_and_relative(self):
+        from cli_audit.reconcile import _is_safe_binary_path
+        assert not _is_safe_binary_path("/opt/x; rm -rf /")
+        assert not _is_safe_binary_path("/opt/a$(id)")
+        assert not _is_safe_binary_path("rg")
+        assert not _is_safe_binary_path("")
+
+    def test_classify_via_queries_short_circuits_unsafe_path(self):
+        # An unsafe path must never reach a package-manager OS query; it falls
+        # back to path-based classification instead.
+        from cli_audit.reconcile import _classify_via_queries
+        assert isinstance(_classify_via_queries("/opt/x; rm -rf /", "demo", False), str)
 
 
 class TestCmdReconcilePlanJSON:
