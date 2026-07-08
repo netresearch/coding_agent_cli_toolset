@@ -287,8 +287,10 @@ def merge_for_display(
             "installed_path_selected": loc.installed_path,
             "classification_reason_selected": loc.classification_reason,
             "status": loc.status,
-            # Upstream info (from upstream cache)
-            "latest_upstream": up.latest_tag,
+            # Upstream info (from upstream cache). Display the normalized
+            # version, not latest_tag (which holds the raw tag, e.g. "v1.7.12",
+            # used for URL construction).
+            "latest_upstream": up.latest_version or up.latest_tag,
             "latest_version": up.latest_version,
             "latest_url": up.latest_url,
             "tool_url": up.tool_url,

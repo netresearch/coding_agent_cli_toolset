@@ -9,6 +9,7 @@ The catalog is the single source of truth for tool metadata.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 
@@ -131,6 +132,11 @@ def latest_target_url(tool: Tool, latest_tag: str, latest_num: str) -> str:
     Returns:
         Release URL string
     """
+    # The tag comes from untrusted upstream APIs and is embedded in URLs that
+    # are later rendered as OSC8 terminal hyperlinks. Strip control characters
+    # (incl. ESC 0x1b) so a malicious tag can't inject terminal escape sequences.
+    latest_tag = re.sub(r"[\x00-\x1f\x7f]", "", latest_tag) if latest_tag else latest_tag
+
     if tool.source_kind == "gh" and len(tool.source_args) >= 2:
         owner, repo = tool.source_args[0], tool.source_args[1]
         if latest_tag:

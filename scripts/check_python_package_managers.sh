@@ -13,6 +13,8 @@ NC='\033[0m' # No Color
 has_pip=false
 has_pipx=false
 has_uv=false
+has_poetry=false
+has_conda=false
 
 if command -v pip >/dev/null 2>&1 || command -v pip3 >/dev/null 2>&1; then
   has_pip=true
@@ -26,15 +28,25 @@ if command -v uv >/dev/null 2>&1; then
   has_uv=true
 fi
 
+if command -v poetry >/dev/null 2>&1; then
+  has_poetry=true
+fi
+
+if command -v conda >/dev/null 2>&1; then
+  has_conda=true
+fi
+
 # Count how many are installed
 count=0
 managers=()
 if $has_pip; then count=$((count + 1)); managers+=("pip"); fi
 if $has_pipx; then count=$((count + 1)); managers+=("pipx"); fi
 if $has_uv; then count=$((count + 1)); managers+=("uv"); fi
+if $has_poetry; then count=$((count + 1)); managers+=("poetry"); fi
+if $has_conda; then count=$((count + 1)); managers+=("conda"); fi
 
 # If only uv is installed, all good
-if $has_uv && ! $has_pip && ! $has_pipx; then
+if $has_uv && ! $has_pip && ! $has_pipx && ! $has_poetry && ! $has_conda; then
   echo -e "${GREEN}✓ Only uv is installed - optimal configuration!${NC}"
   exit 0
 fi
@@ -70,6 +82,18 @@ if [ "$count" -gt 1 ]; then
   if $has_pip; then
     echo -e "${YELLOW}Migrate pip packages to uv:${NC}"
     echo "  make reconcile-pip-to-uv"
+    echo ""
+  fi
+
+  if $has_poetry; then
+    echo -e "${YELLOW}poetry is a project-level dependency manager (not a global CLI tool).${NC}"
+    echo "  If it is installed globally but unused, remove it: make uninstall-poetry"
+    echo ""
+  fi
+
+  if $has_conda; then
+    echo -e "${YELLOW}conda manages its own Python environments separately from uv.${NC}"
+    echo "  Keep it only if you rely on conda envs; otherwise deactivate/remove it."
     echo ""
   fi
 
