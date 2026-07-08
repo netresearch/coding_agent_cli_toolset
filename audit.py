@@ -29,7 +29,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from cli_audit.tools import Tool, all_tools, filter_tools, tool_homepage_url, latest_target_url  # noqa: E402
 from cli_audit.detection import audit_tool_installation, detect_multi_versions  # noqa: E402
 from cli_audit.snapshot import load_snapshot, write_snapshot, render_from_snapshot, get_snapshot_path  # noqa: E402
-from cli_audit.render import render_table, print_summary, status_icon  # noqa: E402
+from cli_audit.render import render_table, print_summary, status_icon, osc8  # noqa: E402
 from cli_audit.pins import lookup_pin, should_skip as _pin_should_skip  # noqa: E402
 from cli_audit.collectors import get_github_rate_limit, get_github_rate_limit_help, get_gitlab_rate_limit, is_wsl, collect_endoflife  # noqa: E402
 from cli_audit import collectors  # noqa: E402
@@ -641,6 +641,11 @@ def cmd_update(args: argparse.Namespace) -> int:
                             marker_str = f" [{' '.join(markers)}]" if markers else ""
                             inst_fmt = f"{inst_color}{inst_display}{RESET}"
                             latest_fmt = f"{latest_color}{latest_display}{RESET}"
+                            # Hyperlink the latest version to its release/page URL
+                            # (osc8 self-disables when CLI_AUDIT_LINKS=0 or no URL)
+                            latest_link = result.get("latest_url", "")
+                            if latest_link and latest_display != "n/a":
+                                latest_fmt = osc8(latest_link, latest_fmt)
                             msg = f"# [{completed}/{total}] [{cat}] {tool.name} (installed: {inst_fmt} {op} latest: {latest_fmt}){marker_str}"
 
                             print(msg, file=sys.stderr, flush=True)

@@ -519,8 +519,9 @@ class TestMergeForDisplay:
         assert len(result) == 1
         tool = result[0]
         assert tool["tool"] == "ripgrep"
-        # Upstream data
-        assert tool["latest_upstream"] == "v15.1.0"
+        # Upstream data: latest_tag ("v15.1.0") is the raw tag used for URL
+        # construction; the displayed latest_upstream is the normalized version.
+        assert tool["latest_upstream"] == "15.1.0"
         assert tool["latest_version"] == "15.1.0"
         assert tool["tool_url"] == "https://github.com/BurntSushi/ripgrep"
         # Local data

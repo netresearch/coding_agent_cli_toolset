@@ -68,6 +68,22 @@ class ToolCatalogEntry:
         if self._raw_data and self._raw_data.get("skip_upstream"):
             return ("skip", ())
 
+        # Priority 0a: Explicit source declaration in the catalog. Lets a tool
+        # whose homepage/install_method don't auto-route (e.g. poetry, whose
+        # homepage is python-poetry.org and install_method is package_manager)
+        # still declare its upstream, e.g. {"source_kind": "pypi"}.
+        explicit_kind = self._raw_data.get("source_kind") if self._raw_data else None
+        if explicit_kind:
+            explicit_args = self._raw_data.get("source_args")
+            if explicit_args:
+                # A single string must not be split into characters by tuple().
+                if isinstance(explicit_args, str):
+                    return (explicit_kind, (explicit_args,))
+                return (explicit_kind, tuple(explicit_args))
+            if self.package_name:
+                return (explicit_kind, (self.package_name,))
+            return (explicit_kind, ())
+
         # Priority 0b: Skip version checking for pure package_manager tools
         # These are OS-managed and can't be manually upgraded
         if self.install_method == "package_manager" and not self.github_repo and not self.gitlab_project and not self.package_name:

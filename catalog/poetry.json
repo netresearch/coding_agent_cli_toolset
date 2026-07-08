@@ -6,6 +6,7 @@
   "homepage": "https://python-poetry.org/",
   "package_name": "poetry",
   "binary_name": "poetry",
+  "source_kind": "pypi",
   "packages": {
     "apt": "python3-poetry",
     "brew": "poetry",

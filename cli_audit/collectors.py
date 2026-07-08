@@ -155,22 +155,24 @@ def collect_github(owner: str, repo: str, offline_cache: dict[str, tuple[str, st
             last_segment = final_url.rsplit("/", 1)[-1]
 
             if last_segment and last_segment.lower() not in ("releases", "latest"):
-                tag = normalize_version_tag(last_segment)
-                version = extract_version_number(tag)
-                logger.debug(f"GitHub {owner}/{repo}: {tag} via redirect")
-                return tag, version
+                # Return the RAW tag (e.g. "v1.7.12") so the release URL points
+                # at the real tag; the version number is normalized separately.
+                raw_tag = last_segment
+                version = extract_version_number(raw_tag)
+                logger.debug(f"GitHub {owner}/{repo}: {raw_tag} via redirect")
+                return raw_tag, version
     except Exception as e:
         logger.debug(f"GitHub redirect failed for {owner}/{repo}: {e}")
 
     # Fallback to releases API
     try:
         data = json.loads(http_get(f"https://api.github.com/repos/{owner}/{repo}/releases/latest", timeout=3))
-        tag = normalize_version_tag(data.get("tag_name", ""))
+        raw_tag = data.get("tag_name", "") if isinstance(data, dict) else ""
 
-        if tag:
-            version = extract_version_number(tag)
-            logger.debug(f"GitHub {owner}/{repo}: {tag} via API")
-            return tag, version
+        if raw_tag:
+            version = extract_version_number(raw_tag)
+            logger.debug(f"GitHub {owner}/{repo}: {raw_tag} via API")
+            return raw_tag, version
     except Exception as e:
         logger.debug(f"GitHub API failed for {owner}/{repo}: {e}")
 
@@ -190,19 +192,20 @@ def collect_github(owner: str, repo: str, offline_cache: dict[str, tuple[str, st
             if tag and re.match(r"^v?\d+\.\d+(\.\d+)?$", tag):
                 ver = extract_version_number(tag)
                 if ver:
-                    # Parse version as tuple for comparison
+                    # Parse version as tuple for comparison; keep the RAW tag so
+                    # the release URL points at the real tag (e.g. "v3.14.0").
                     try:
                         nums = tuple(int(x) for x in ver.split("."))
-                        tup = (nums, tag, ver)
+                        tup = (nums, raw_tag, ver)
                         if best is None or tup[0] > best[0]:
                             best = tup
                     except (ValueError, AttributeError):
                         continue
 
         if best is not None:
-            _, tag, version = best
-            logger.debug(f"GitHub {owner}/{repo}: {tag} via Atom feed (filtered stable)")
-            return tag, version
+            _, raw_tag, version = best
+            logger.debug(f"GitHub {owner}/{repo}: {raw_tag} via Atom feed (filtered stable)")
+            return raw_tag, version
     except Exception as e:
         logger.debug(f"GitHub Atom feed failed for {owner}/{repo}: {e}")
 
@@ -235,12 +238,12 @@ def collect_gitlab(group: str, project: str, offline_cache: dict[str, tuple[str,
         url = f"https://gitlab.com/api/v4/projects/{project_path}/releases"
         data = json.loads(http_get(url))
 
-        if isinstance(data, list) and data:
-            tag = normalize_version_tag(data[0].get("tag_name", ""))
-            if tag:
-                version = extract_version_number(tag)
-                logger.debug(f"GitLab {group}/{project}: {tag}")
-                return tag, version
+        if isinstance(data, list) and data and isinstance(data[0], dict):
+            raw_tag = data[0].get("tag_name", "")
+            if raw_tag:
+                version = extract_version_number(raw_tag)
+                logger.debug(f"GitLab {group}/{project}: {raw_tag}")
+                return raw_tag, version
     except Exception as e:
         logger.debug(f"GitLab API failed for {group}/{project}: {e}")
 
