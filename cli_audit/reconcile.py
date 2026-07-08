@@ -527,6 +527,33 @@ def sort_by_preference(
     return sorted_installs
 
 
+_candidate_cache: dict[str, tuple[str, ...] | None] = {}
+_catalog_instance = None
+
+
+def _resolve_candidates(tool_name: str) -> tuple[str, ...] | None:
+    """Look up catalog candidates for a tool (cached).
+
+    Lets reconcile detect alternate-named duplicates (e.g. ``pip``/``pip3``,
+    ``fd``/``fdfind``) even when a caller (such as bulk_reconcile) does not pass
+    candidates. Returns None if the tool is unknown, so detection falls back to
+    the bare tool name.
+    """
+    global _catalog_instance
+    if tool_name in _candidate_cache:
+        return _candidate_cache[tool_name]
+    try:
+        if _catalog_instance is None:
+            from .catalog import ToolCatalog
+            _catalog_instance = ToolCatalog()
+        entry = _catalog_instance.get(tool_name)
+        cands = tuple(entry.to_tool().candidates) if entry else None
+    except Exception:
+        cands = None
+    _candidate_cache[tool_name] = cands
+    return cands
+
+
 def reconcile_tool(
     tool_name: str,
     mode: str = "parallel",
@@ -559,6 +586,11 @@ def reconcile_tool(
         config = load_config(verbose=verbose)
     if env is None:
         env = detect_environment(verbose=verbose)
+
+    # Resolve catalog candidates when a caller (e.g. bulk_reconcile) omits them,
+    # so alternate-named duplicates (pip/pip3, fd/fdfind) are still detected.
+    if candidates is None:
+        candidates = _resolve_candidates(tool_name)
 
     # Detect installations
     installations = detect_installations(tool_name, candidates, verbose)
