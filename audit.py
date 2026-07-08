@@ -1286,6 +1286,158 @@ def cmd_versions(args: argparse.Namespace) -> int:
     return 0
 
 
+def _shape_reconcile_plan(tool, installs, preferred, active, protected):
+    """Build a uniform plan dict for a tool's installations.
+
+    Each installation gets a ``preferred`` boolean (matched by path) so shell
+    consumers don't have to cross-reference the separate ``preferred`` entry.
+    """
+    pref_path = preferred.path if preferred else None
+    return {
+        "tool": tool,
+        "count": len(installs),
+        "protected": protected,
+        "preferred": preferred.to_dict() if preferred else None,
+        "active": active.to_dict() if active else None,
+        "installations": [
+            {**i.to_dict(), "preferred": bool(pref_path and i.path == pref_path)}
+            for i in installs
+        ],
+    }
+
+
+def _print_reconcile_plans(plans) -> None:
+    """Human-readable rendering of reconcile plans (non-JSON mode)."""
+    multi = [p for p in plans if p["count"] > 1]
+    if not multi:
+        print("No duplicate installations detected.", file=sys.stderr)
+        return
+    for p in multi:
+        note = " [protected]" if p["protected"] else ""
+        print(f"\n{p['tool']} — {p['count']} installations{note}:", file=sys.stderr)
+        for i in p["installations"]:
+            marks = []
+            if i.get("active"):
+                marks.append("→ active")
+            if i.get("preferred"):
+                marks.append("✓ keep")
+            suffix = ("  " + "  ".join(marks)) if marks else ""
+            ver = i.get("version") or "?"
+            print(f"   • {ver}  {i['method']}  {i['path']}{suffix}", file=sys.stderr)
+
+
+def cmd_reconcile(args: argparse.Namespace) -> int:
+    """Reconcile duplicate installations of a tool.
+
+    Without --apply this only reports the plan (which install is kept vs
+    removed, which is active on PATH). With --apply it removes the non-preferred
+    installations (aggressive mode), honoring the system-tool safelist.
+
+    Supports JSON output via CLI_AUDIT_JSON=1 for consumption by guide.sh.
+    """
+    from cli_audit.catalog import ToolCatalog
+    from cli_audit.reconcile import (
+        SYSTEM_TOOL_SAFELIST,
+        bulk_reconcile,
+        detect_installations,
+        reconcile_tool,
+    )
+
+    catalog = ToolCatalog()
+
+    def _candidates(tool):
+        try:
+            return list(catalog.get(tool).to_tool().candidates)
+        except Exception:
+            return None
+
+    def _plan(tool):
+        installs = detect_installations(tool, candidates=_candidates(tool), verbose=args.verbose)
+        preferred = installs[0] if installs else None
+        active = next((i for i in installs if i.active), None)
+        return _shape_reconcile_plan(tool, installs, preferred, active, tool in SYSTEM_TOOL_SAFELIST)
+
+    apply = getattr(args, "apply", False)
+    force = getattr(args, "yes", False)
+    do_all = getattr(args, "all", False)
+
+    # --- ALL mode ---
+    # bulk_reconcile's own "all"/"conflicts" modes only look at config.tools
+    # (a tiny user-config subset), so sweep the full catalog explicitly.
+    if do_all:
+        all_tools = list(catalog.all_tools())
+        if apply:
+            result = bulk_reconcile(
+                mode="explicit", tool_names=all_tools, reconcile_mode="aggressive",
+                force=force, verbose=args.verbose,
+            )
+            # Report only tools that actually had duplicates — the explicit
+            # sweep visits every catalog entry, but --all is about conflicts.
+            conflicts = [r for r in result.results if len(r.installations) > 1]
+            if JSON_MODE:
+                print(json.dumps({
+                    "tools_checked": result.tools_checked,
+                    "conflicts_found": result.conflicts_found,
+                    "conflicts_resolved": result.conflicts_resolved,
+                    "results": [r.to_dict() for r in conflicts],
+                    "duration_seconds": result.duration_seconds,
+                }))
+            else:
+                print(result.summary(), file=sys.stderr)
+            # Fail only on real removal errors — not on protected tools (blocked)
+            # or tools the user declined (aborted), which are expected outcomes.
+            failures = [
+                r for r in conflicts
+                if not r.success and r.action_taken not in ("blocked", "aborted", "none")
+            ]
+            return 1 if failures else 0
+        # Plan-only sweep (parallel detection, no removal)
+        result = bulk_reconcile(
+            mode="explicit", tool_names=all_tools, reconcile_mode="parallel",
+            verbose=args.verbose,
+        )
+        plans = [
+            _shape_reconcile_plan(
+                r.tool, list(r.installations), r.preferred, r.active,
+                r.tool in SYSTEM_TOOL_SAFELIST,
+            )
+            for r in result.results if len(r.installations) > 1
+        ]
+        if JSON_MODE:
+            print(json.dumps({"results": plans, "total": len(plans)}))
+        else:
+            _print_reconcile_plans(plans)
+        return 0
+
+    # --- Explicit tools ---
+    tools = args.tools
+    if not tools:
+        print("reconcile: specify one or more tools, or use --all", file=sys.stderr)
+        return 2
+
+    if apply:
+        results = []
+        for tool in tools:
+            results.append(reconcile_tool(
+                tool, mode="aggressive", candidates=_candidates(tool),
+                force=force, verbose=args.verbose,
+            ))
+        if JSON_MODE:
+            print(json.dumps({"results": [r.to_dict() for r in results]}))
+        else:
+            for r in results:
+                extra = f" ({r.error_message})" if r.error_message else ""
+                print(f"{r.tool}: {r.action_taken}{extra}", file=sys.stderr)
+        return 0 if all(r.success for r in results) else 1
+
+    plans = [_plan(t) for t in tools]
+    if JSON_MODE:
+        print(json.dumps({"results": plans}))
+    else:
+        _print_reconcile_plans(plans)
+    return 0
+
+
 def main() -> int:
     """Main entry point for audit system."""
     parser = argparse.ArgumentParser(
@@ -1324,6 +1476,26 @@ def main() -> int:
         help="Show multi-version runtime status (PHP, Python, Node.js, Ruby, Go)",
     )
     parser.add_argument(
+        "--reconcile",
+        action="store_true",
+        help="Report (or with --apply, remove) duplicate installations of a tool",
+    )
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="With --reconcile: operate on all tools that have duplicate installs",
+    )
+    parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="With --reconcile: actually remove non-preferred installs (default: plan only)",
+    )
+    parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="With --reconcile --apply: skip confirmation prompts (honors safelist)",
+    )
+    parser.add_argument(
         "--verbose", "-v",
         action="store_true",
         help="Verbose output",
@@ -1339,8 +1511,16 @@ def main() -> int:
     # Setup logging
     setup_logging(verbose=args.verbose)
 
+    # Reconcile-only flags are meaningless (and silently ignored) without
+    # --reconcile — fail loudly so scripting mistakes surface.
+    if not args.reconcile and (args.all or args.apply or args.yes):
+        print("--all/--apply/--yes are only valid with --reconcile", file=sys.stderr)
+        return 2
+
     # Route to appropriate command
-    if args.versions:
+    if args.reconcile:
+        return cmd_reconcile(args)
+    elif args.versions:
         return cmd_versions(args)
     elif args.update:
         # Explicit --update flag: full update of all tools

@@ -843,6 +843,25 @@ run_all_updates() {
   # Determine target scope
   local target_scope="${SCOPE:-$(determine_default_scope)}"
 
+  # Pin/lock override warning: this runs each package manager's own upgrade,
+  # which moves tools past the versions cli-audit pins (pins.json) and any
+  # project lockfiles. Skip the prompt in dry-run or when FORCE=1 (CI).
+  if [ "$DRY_RUN" != "1" ] && [ "${FORCE:-0}" != "1" ]; then
+    printf "[auto-update] ⚠️  This runs each package manager's own upgrade. It moves tools\n" >&2
+    printf "              PAST the versions pinned in cli-audit (pins.json) and any project\n" >&2
+    printf "              lockfiles — pins are NOT enforced here.\n" >&2
+    local ans=""
+    if [ -t 0 ]; then
+      read -r -p "[auto-update] Continue? [y/N] " ans || true
+    elif [ -r /dev/tty ]; then
+      read -r -p "[auto-update] Continue? [y/N] " ans </dev/tty || true
+    fi
+    if [ "$ans" != "y" ] && [ "$ans" != "Y" ]; then
+      log "Aborted (no changes made)."
+      return 0
+    fi
+  fi
+
   log "Starting auto-update for scope: $target_scope"
   echo ""
 

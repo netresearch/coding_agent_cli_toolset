@@ -11,7 +11,7 @@ from typing import Any
 import pytest
 
 from cli_audit import pins as pins_module
-from cli_audit.render import render_table
+from cli_audit.render import render_table, print_summary
 
 
 @pytest.fixture(autouse=True)
@@ -357,3 +357,24 @@ class TestAutoMarker:
 
 # (Env-var override of DEFAULT_PINS_PATH is covered by
 # ``tests/test_pins.py::TestDefaultPath::test_env_override``.)
+
+
+class TestSummaryHints:
+    """Discoverability hints in print_summary (Component 4)."""
+
+    def test_hints_shown_when_conflicts_and_outdated(self, capsys):
+        tools = [
+            {"tool": "a", "status": "CONFLICT", "installed": "1.0"},
+            {"tool": "b", "status": "OUTDATED", "installed": "1.0"},
+        ]
+        print_summary({"__meta__": {"count": 2}}, tools)
+        err = capsys.readouterr().err
+        assert "make reconcile-all" in err
+        assert "make upgrade-managed" in err
+
+    def test_no_hints_when_all_clean(self, capsys):
+        tools = [{"tool": "a", "status": "UP-TO-DATE", "installed": "1.0"}]
+        print_summary({"__meta__": {"count": 1}}, tools)
+        err = capsys.readouterr().err
+        assert "make reconcile-all" not in err
+        assert "make upgrade-managed" not in err

@@ -16,6 +16,13 @@ CLI="${PYTHON:-python3}"
 # Ignore pins: IGNORE_PINS=1 to show all tools regardless of pin status
 IGNORE_PINS="${IGNORE_PINS:-0}"
 
+# Duplicate-install count for the tool most recently passed to
+# check_multi_installs(); consumed by process_tool to offer inline cleanup.
+LAST_MULTI_COUNT=0
+# Space-separated tool names seen with duplicate installs this run (for the
+# summary hint); de-duplicated when counted.
+GUIDE_DUP_LIST=""
+
 # Summary counters
 SUMMARY_UPDATED=0
 SUMMARY_SKIPPED=0
@@ -33,6 +40,14 @@ print_summary() {
   printf "  Failed:    %d\n" "$SUMMARY_FAILED"
   echo
   echo "Re-run: make audit"
+  local dup_count=0
+  if [ -n "${GUIDE_DUP_LIST// /}" ]; then
+    dup_count="$(printf '%s\n' $GUIDE_DUP_LIST | sort -u | grep -c . || true)"
+  fi
+  if [ "$dup_count" -gt 0 ]; then
+    printf "  → %d tool(s) with duplicate installs: 'make reconcile-all'\n" "$dup_count"
+  fi
+  echo "  → upgrade the package managers themselves: 'make upgrade-managed'"
 }
 
 # Category filter: CATEGORY=python,go or --category=python
@@ -221,11 +236,61 @@ check_multi_installs() {
   local binary_name
   binary_name="$(catalog_get_property "$catalog_tool" binary_name)"
   binary_name="${binary_name:-$catalog_tool}"
-  local all_installs
-  all_installs="$(detect_all_installations "$catalog_tool" "$binary_name" 2>/dev/null || true)"
+  # Cheap shell pre-check: only pay for the richer reconcile query when there
+  # actually is more than one install (the common case is a single install).
+  # Check every catalog candidate binary (e.g. pip AND pip3, fd AND fdfind) so
+  # alternate-named duplicates aren't missed here.
+  local cand_list
+  cand_list="$(jq -r '.candidates[]? // empty' "$ROOT/catalog/$catalog_tool.json" 2>/dev/null)"
+  [ -z "$cand_list" ] && cand_list="$binary_name"
+  local all_installs=""
+  local cand found
+  while IFS= read -r cand; do
+    [ -z "$cand" ] && continue
+    found="$(detect_all_installations "$catalog_tool" "$cand" 2>/dev/null || true)"
+    [ -n "$found" ] && all_installs+="${all_installs:+$'\n'}$found"
+  done <<< "$cand_list"
+  all_installs="$(printf '%s\n' "$all_installs" | grep -v '^[[:space:]]*$' | sort -u || true)"
   local install_count
   install_count="$(echo "$all_installs" | grep -c . || true)"
-  if [ "$install_count" -gt 1 ]; then
+  LAST_MULTI_COUNT="$install_count"
+  [ "$install_count" -le 1 ] && return 0
+  GUIDE_DUP_LIST="$GUIDE_DUP_LIST $catalog_tool"
+
+  # Duplicates exist — render version + active + preferred markers from the
+  # reconcile plan (the single source of truth). Fall back to the basic listing
+  # if reconcile produces nothing.
+  local recon_json rendered
+  recon_json="$(cd "$ROOT" && CLI_AUDIT_JSON=1 "$CLI" audit.py --reconcile "$catalog_tool" 2>/dev/null || true)"
+  rendered="$(RECON_JSON="$recon_json" "$CLI" - <<'PY'
+import os, json
+try:
+    doc = json.loads(os.environ.get("RECON_JSON", "").strip())
+    plan = (doc.get("results") or [None])[0]
+    installs = plan.get("installations") or []
+except Exception:
+    raise SystemExit(0)
+if len(installs) < 2:
+    raise SystemExit(0)
+active_path = (plan.get("active") or {}).get("path")
+pref_path = (plan.get("preferred") or {}).get("path")
+lines = [f"    ⚠️  Multiple installations detected ({len(installs)}):"]
+for i in installs:
+    marks = []
+    if i.get("active"):
+        marks.append("→ active")
+    if i.get("preferred"):
+        marks.append("✓ keep")
+    suffix = ("  " + "  ".join(marks)) if marks else ""
+    lines.append(f"       • {i.get('version') or '?'}  {i.get('method')}  {i.get('path')}{suffix}")
+if active_path and pref_path and active_path != pref_path:
+    lines.append(f"       note: cleanup would change which {plan.get('tool')} runs (active → preferred).")
+print("\n".join(lines))
+PY
+)"
+  if [ -n "$rendered" ]; then
+    printf '%s\n' "$rendered"
+  else
     printf "    ⚠️  Multiple installations detected (%d):\n" "$install_count"
     echo "$all_installs" | while IFS=: read -r inst_method inst_path; do
       printf "       • %s: %s\n" "$inst_method" "$inst_path"
@@ -446,6 +511,9 @@ process_tool() {
       printf "      p = Pin to %s (don't ask for upgrades)\n" "$installed"
     fi
     printf "      r = Remove/uninstall this tool\n"
+    if [ "${LAST_MULTI_COUNT:-0}" -gt 1 ]; then
+      printf "      c = Clean up duplicates (keep preferred, remove the rest)\n"
+    fi
     if [ -n "$is_multi_version" ]; then
       printf "      P = Skip ALL outdated %s cycles\n" "$catalog_tool"
     fi
@@ -469,6 +537,9 @@ process_tool() {
       prompt_text="Upgrade? [Y/a/n/s/p/r/P] "
     else
       prompt_text="Upgrade? [Y/a/n/s/p/r] "
+    fi
+    if [ "${LAST_MULTI_COUNT:-0}" -gt 1 ]; then
+      prompt_text="${prompt_text%] }/c] "
     fi
   else
     if [ -n "$is_multi_version" ]; then
@@ -704,6 +775,32 @@ process_tool() {
         fi
       else
         printf "    Tool is not installed, nothing to remove\n"
+      fi
+      ;;
+    [Cc])
+      # Clean up duplicate installations: keep the preferred, remove the rest.
+      # The plan (keep/remove, active marker) was already shown by
+      # check_multi_installs above. Confirm the destructive step, then apply.
+      if [ "${LAST_MULTI_COUNT:-0}" -gt 1 ]; then
+        local ans_c=""
+        if [ -t 0 ]; then
+          read -r -p "    Remove the non-preferred duplicate(s)? [y/N] " ans_c || true
+        elif [ -r /dev/tty ]; then
+          read -r -p "    Remove the non-preferred duplicate(s)? [y/N] " ans_c </dev/tty || true
+        fi
+        if [ "$ans_c" = "y" ] || [ "$ans_c" = "Y" ]; then
+          if (cd "$ROOT" && "$CLI" audit.py --reconcile "$catalog_tool" --apply --yes); then
+            printf "    ✓ Duplicates removed (kept preferred install)\n"
+          else
+            printf "    ⚠️  Cleanup did not complete (tool may be on the protect list)\n"
+          fi
+          CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_MERGE=1 "$CLI" audit.py "$tool" >/dev/null 2>&1 || true
+          reload_audit_json
+        else
+          printf "    Skipped cleanup\n"
+        fi
+      else
+        printf "    No duplicate installations to clean up\n"
       fi
       ;;
     [P])

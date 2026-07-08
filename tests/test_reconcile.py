@@ -132,7 +132,7 @@ class TestDetectInstallations:
     """Tests for installation detection."""
 
     @skip_on_windows
-    @patch("cli_audit.reconcile.validate_installation")
+    @patch("cli_audit.detection.get_version_line")
     @patch("cli_audit.reconcile.shutil.which")
     @patch("os.path.exists")
     @patch("os.access")
@@ -143,7 +143,7 @@ class TestDetectInstallations:
         mock_access,
         mock_exists,
         mock_which,
-        mock_validate,
+        mock_version,
         monkeypatch,
     ):
         """Test detecting single installation."""
@@ -158,7 +158,8 @@ class TestDetectInstallations:
         mock_access.return_value = True
         mock_realpath.side_effect = lambda p: p
         mock_which.return_value = "/home/user/.cargo/bin/rg"
-        mock_validate.return_value = (True, "/home/user/.cargo/bin/rg", "14.1.0")
+        # get_version_line(path, tool, flag, cmd) -> version line for that path
+        mock_version.return_value = "14.1.0"
 
         # Clear cache
         clear_detection_cache()
@@ -172,7 +173,7 @@ class TestDetectInstallations:
         assert installations[0].active is True
 
     @skip_on_windows
-    @patch("cli_audit.reconcile.validate_installation")
+    @patch("cli_audit.detection.get_version_line")
     @patch("cli_audit.reconcile.shutil.which")
     @patch("os.path.exists")
     @patch("os.access")
@@ -183,7 +184,7 @@ class TestDetectInstallations:
         mock_access,
         mock_exists,
         mock_which,
-        mock_validate,
+        mock_version,
         monkeypatch,
     ):
         """Test detecting multiple installations."""
@@ -201,15 +202,11 @@ class TestDetectInstallations:
         mock_realpath.side_effect = lambda p: p
         mock_which.return_value = "/home/user/.cargo/bin/rg"
 
-        def validate_side_effect(tool, verbose=False):
-            # Return different versions for different paths
-            which_result = mock_which.return_value
-            if "cargo" in which_result:
-                return (True, "/home/user/.cargo/bin/rg", "14.1.0")
-            else:
-                return (True, "/usr/bin/rg", "13.0.0")
+        def version_side_effect(path, *args, **kwargs):
+            # Each install reports its OWN version, keyed on its real path.
+            return "14.1.0" if "cargo" in path else "13.0.0"
 
-        mock_validate.side_effect = validate_side_effect
+        mock_version.side_effect = version_side_effect
 
         # Clear cache
         clear_detection_cache()
@@ -218,6 +215,32 @@ class TestDetectInstallations:
         installations = detect_installations("ripgrep", ["rg"])
 
         assert len(installations) == 2
+        # Each install must report its OWN version (not the active binary's).
+        versions = {i.path: i.version for i in installations}
+        assert versions["/home/user/.cargo/bin/rg"] == "14.1.0"
+        assert versions["/usr/bin/rg"] == "13.0.0"
+
+    @skip_on_windows
+    @patch("cli_audit.detection.get_version_line")
+    @patch("cli_audit.reconcile.shutil.which")
+    @patch("os.path.exists")
+    @patch("os.access")
+    @patch("os.path.realpath")
+    def test_detect_version_probe_failure_marks_unknown(
+        self, mock_realpath, mock_access, mock_exists, mock_which, mock_version, monkeypatch
+    ):
+        """A version probe that raises leaves the install detected but 'unknown'."""
+        monkeypatch.setenv("PATH", "/home/user/.cargo/bin")
+        mock_exists.side_effect = lambda p: p == "/home/user/.cargo/bin/rg"
+        mock_access.return_value = True
+        mock_realpath.side_effect = lambda p: p
+        mock_which.return_value = "/home/user/.cargo/bin/rg"
+        mock_version.side_effect = Exception("probe failed")
+        clear_detection_cache()
+
+        installations = detect_installations("ripgrep", ["rg"])
+        assert len(installations) == 1
+        assert installations[0].version == "unknown"
 
     def test_detect_no_installations(self, monkeypatch):
         """Test detecting when tool not installed."""

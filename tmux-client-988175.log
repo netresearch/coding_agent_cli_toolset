@@ -1,0 +1,111 @@
+1783499626.080425 client started (988175): version 3.4, socket /tmp/tmux-1000/default, protocol 8
+1783499626.080475 on Linux 6.18.35.2-microsoft-standard-WSL2 #1 SMP PREEMPT_DYNAMIC Wed Jun 17 23:14:00 UTC 2026
+1783499626.080480 using libevent 2.1.12-stable poll
+1783499626.080482 using ncurses 6.4 20240113
+1783499626.080592 flags are 0x18010000
+1783499626.080747 socket is /tmp/tmux-1000/default
+1783499626.080768 trying connect
+1783499626.080827 connect failed: Connection refused
+1783499626.080839 lock file is /tmp/tmux-1000/default.lock
+1783499626.081743 flock succeeded
+1783499626.081754 got lock (6)
+1783499626.081765 trying connect
+1783499626.081782 connect failed: Connection refused
+1783499626.082647 add peer 0x58e4724b0830: 7 ((nil))
+1783499626.083291 sending message 100 to peer 0x58e4724b0830 (4 bytes)
+1783499626.083390 sending message 111 to peer 0x58e4724b0830 (8 bytes)
+1783499626.083400 sending message 101 to peer 0x58e4724b0830 (5 bytes)
+1783499626.083403 sending message 109 to peer 0x58e4724b0830 (4 bytes)
+1783499626.083405 sending message 102 to peer 0x58e4724b0830 (1 bytes)
+1783499626.083407 sending message 108 to peer 0x58e4724b0830 (37 bytes)
+1783499626.083410 sending message 104 to peer 0x58e4724b0830 (0 bytes)
+1783499626.083412 sending message 110 to peer 0x58e4724b0830 (0 bytes)
+1783499626.083415 sending message 107 to peer 0x58e4724b0830 (4 bytes)
+1783499626.083418 sending message 105 to peer 0x58e4724b0830 (35 bytes)
+1783499626.083420 sending message 105 to peer 0x58e4724b0830 (50 bytes)
+1783499626.083421 sending message 105 to peer 0x58e4724b0830 (37 bytes)
+1783499626.083423 sending message 105 to peer 0x58e4724b0830 (47 bytes)
+1783499626.083425 sending message 105 to peer 0x58e4724b0830 (14 bytes)
+1783499626.083427 sending message 105 to peer 0x58e4724b0830 (23 bytes)
+1783499626.083428 sending message 105 to peer 0x58e4724b0830 (27 bytes)
+1783499626.083430 sending message 105 to peer 0x58e4724b0830 (13 bytes)
+1783499626.083432 sending message 105 to peer 0x58e4724b0830 (63 bytes)
+1783499626.083433 sending message 105 to peer 0x58e4724b0830 (28 bytes)
+1783499626.083435 sending message 105 to peer 0x58e4724b0830 (27 bytes)
+1783499626.083437 sending message 105 to peer 0x58e4724b0830 (68 bytes)
+1783499626.083439 sending message 105 to peer 0x58e4724b0830 (39 bytes)
+1783499626.083441 sending message 105 to peer 0x58e4724b0830 (60 bytes)
+1783499626.083442 sending message 105 to peer 0x58e4724b0830 (31 bytes)
+1783499626.083444 sending message 105 to peer 0x58e4724b0830 (19 bytes)
+1783499626.083446 sending message 105 to peer 0x58e4724b0830 (17 bytes)
+1783499626.083447 sending message 105 to peer 0x58e4724b0830 (27 bytes)
+1783499626.083450 sending message 105 to peer 0x58e4724b0830 (481 bytes)
+1783499626.083452 sending message 105 to peer 0x58e4724b0830 (49 bytes)
+1783499626.083454 sending message 105 to peer 0x58e4724b0830 (56 bytes)
+1783499626.083456 sending message 105 to peer 0x58e4724b0830 (256 bytes)
+1783499626.083458 sending message 105 to peer 0x58e4724b0830 (11 bytes)
+1783499626.083460 sending message 105 to peer 0x58e4724b0830 (11 bytes)
+1783499626.083461 sending message 105 to peer 0x58e4724b0830 (31 bytes)
+1783499626.083463 sending message 105 to peer 0x58e4724b0830 (16 bytes)
+1783499626.083465 sending message 105 to peer 0x58e4724b0830 (24 bytes)
+1783499626.083467 sending message 105 to peer 0x58e4724b0830 (15 bytes)
+1783499626.083468 sending message 105 to peer 0x58e4724b0830 (50 bytes)
+1783499626.083470 sending message 105 to peer 0x58e4724b0830 (43 bytes)
+1783499626.083472 sending message 105 to peer 0x58e4724b0830 (56 bytes)
+1783499626.083473 sending message 105 to peer 0x58e4724b0830 (16 bytes)
+1783499626.083475 sending message 105 to peer 0x58e4724b0830 (48 bytes)
+1783499626.083476 sending message 105 to peer 0x58e4724b0830 (13 bytes)
+1783499626.083478 sending message 105 to peer 0x58e4724b0830 (34 bytes)
+1783499626.083480 sending message 105 to peer 0x58e4724b0830 (32 bytes)
+1783499626.083481 sending message 105 to peer 0x58e4724b0830 (12 bytes)
+1783499626.083484 sending message 105 to peer 0x58e4724b0830 (1817 bytes)
+1783499626.083520 sending message 105 to peer 0x58e4724b0830 (17 bytes)
+1783499626.083522 sending message 105 to peer 0x58e4724b0830 (49 bytes)
+1783499626.083524 sending message 105 to peer 0x58e4724b0830 (14 bytes)
+1783499626.083526 sending message 105 to peer 0x58e4724b0830 (23 bytes)
+1783499626.083528 sending message 105 to peer 0x58e4724b0830 (58 bytes)
+1783499626.083529 sending message 105 to peer 0x58e4724b0830 (37 bytes)
+1783499626.083531 sending message 105 to peer 0x58e4724b0830 (44 bytes)
+1783499626.083534 sending message 105 to peer 0x58e4724b0830 (8256 bytes)
+1783499626.083548 sending message 105 to peer 0x58e4724b0830 (50 bytes)
+1783499626.083552 sending message 105 to peer 0x58e4724b0830 (38 bytes)
+1783499626.083554 sending message 105 to peer 0x58e4724b0830 (38 bytes)
+1783499626.083556 sending message 105 to peer 0x58e4724b0830 (40 bytes)
+1783499626.083557 sending message 105 to peer 0x58e4724b0830 (41 bytes)
+1783499626.083559 sending message 105 to peer 0x58e4724b0830 (17 bytes)
+1783499626.083561 sending message 105 to peer 0x58e4724b0830 (16 bytes)
+1783499626.083562 sending message 105 to peer 0x58e4724b0830 (8 bytes)
+1783499626.083564 sending message 105 to peer 0x58e4724b0830 (18 bytes)
+1783499626.083566 sending message 105 to peer 0x58e4724b0830 (46 bytes)
+1783499626.083567 sending message 105 to peer 0x58e4724b0830 (38 bytes)
+1783499626.083569 sending message 105 to peer 0x58e4724b0830 (20 bytes)
+1783499626.083570 sending message 105 to peer 0x58e4724b0830 (10 bytes)
+1783499626.083572 sending message 105 to peer 0x58e4724b0830 (9 bytes)
+1783499626.083574 sending message 105 to peer 0x58e4724b0830 (27 bytes)
+1783499626.083575 sending message 105 to peer 0x58e4724b0830 (25 bytes)
+1783499626.083577 sending message 105 to peer 0x58e4724b0830 (55 bytes)
+1783499626.083579 sending message 105 to peer 0x58e4724b0830 (23 bytes)
+1783499626.083580 sending message 105 to peer 0x58e4724b0830 (11 bytes)
+1783499626.083582 sending message 105 to peer 0x58e4724b0830 (26 bytes)
+1783499626.083583 sending message 105 to peer 0x58e4724b0830 (24 bytes)
+1783499626.083585 sending message 105 to peer 0x58e4724b0830 (33 bytes)
+1783499626.083587 sending message 105 to peer 0x58e4724b0830 (23 bytes)
+1783499626.083588 sending message 105 to peer 0x58e4724b0830 (36 bytes)
+1783499626.083590 sending message 105 to peer 0x58e4724b0830 (53 bytes)
+1783499626.083591 sending message 105 to peer 0x58e4724b0830 (48 bytes)
+1783499626.083593 sending message 105 to peer 0x58e4724b0830 (38 bytes)
+1783499626.083595 sending message 105 to peer 0x58e4724b0830 (19 bytes)
+1783499626.083596 sending message 106 to peer 0x58e4724b0830 (0 bytes)
+1783499626.083695 sending message 200 to peer 0x58e4724b0830 (4 bytes)
+1783499626.083706 client loop enter
+1783499626.083818 client_signal: Child exited
+1783499626.150036 peer 0x58e4724b0830 message 303
+1783499626.150086 open write file 2 -
+1783499626.150182 sending message 305 to peer 0x58e4724b0830 (8 bytes)
+1783499626.150246 write check file 2
+1783499626.150669 peer 0x58e4724b0830 message 304
+1783499626.150676 write 37 to file 2
+1783499626.150681 peer 0x58e4724b0830 message 203
+1783499626.150684 file 2 37 bytes left
+1783499626.150759 write check file 2
+1783499626.150765 client loop exit

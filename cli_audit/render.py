@@ -332,3 +332,16 @@ def print_summary(snapshot: dict[str, Any], tools: list[dict[str, Any]]) -> None
         f"\nReadiness{offline_tag}: {', '.join(parts)}",
         file=sys.stderr,
     )
+
+    # Discoverability hints (only when relevant)
+    if conflicts > 0:
+        print(
+            f"  → {conflicts} tool(s) with duplicate installs: "
+            "'make reconcile-all' (keeps preferred, removes the rest)",
+            file=sys.stderr,
+        )
+    if outdated > 0:
+        print(
+            "  → upgrade the package managers themselves: 'make upgrade-managed'",
+            file=sys.stderr,
+        )

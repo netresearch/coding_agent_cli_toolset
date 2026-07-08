@@ -9,9 +9,11 @@ and aggressive (remove non-preferred) reconciliation modes.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import sys
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from functools import cmp_to_key
@@ -21,7 +23,6 @@ from typing import Sequence
 from .common import vlog
 from .config import Config
 from .environment import Environment
-from .installer import validate_installation
 from .upgrade import compare_versions
 
 
@@ -213,20 +214,26 @@ def detect_installations(
 
             seen_paths.add(real_path)
 
-            # Get version and validate
+            # Get THIS install's own version by running its actual binary path.
+            # validate_installation(tool_name) only ever runs the PATH-active
+            # binary, so it would report the same version for every duplicate.
+            # version_command is deliberately omitted (it runs the tool by name,
+            # i.e. the active binary) to force path-based detection.
             version = None
             valid = True
             try:
-                success, _, version_str = validate_installation(tool_name, verbose=verbose)
-                if success and version_str:
-                    version = version_str
+                from .detection import get_version_line
+                from .collectors import extract_version_number
+                meta = _catalog_meta(tool_name)
+                line = get_version_line(real_path, tool_name, meta.get("version_flag"), None)
+                if line:
+                    version = extract_version_number(line) or line.strip()
                 else:
                     valid = False
             except Exception:
                 valid = False
-                version = "unknown"
 
-            if version is None:
+            if not version:
                 version = "unknown"
 
             # Classify installation method
@@ -246,6 +253,10 @@ def detect_installations(
             ))
 
             vlog(f"  Found: {real_path} ({method}, {version})", verbose)
+
+    # Sort by preference (highest first) so installations[0] is the preferred
+    # install — callers and the guide's "keep" marker rely on this ordering.
+    installations = sort_by_preference(installations)
 
     # Cache results
     _detection_cache[cache_key] = (installations, time.time())
@@ -282,8 +293,28 @@ def classify_install_method(
     return _classify_via_path(path)
 
 
+# Any of these characters in a path means it is not a plain absolute binary
+# path and must never be forwarded to a package-manager OS command.
+_UNSAFE_PATH_CHARS = re.compile(r"[\s;&|`$(){}<>*?!\"'\\]")
+
+
+def _is_safe_binary_path(path: str) -> bool:
+    """Validate a resolved binary path before passing it to OS commands.
+
+    Detected paths are os.path.realpath() of executables on PATH, so they are
+    always absolute and free of shell metacharacters — but validate explicitly
+    so untrusted-looking data never reaches a package-manager query.
+    """
+    return bool(path) and path.startswith("/") and not _UNSAFE_PATH_CHARS.search(path)
+
+
 def _classify_via_queries(path: str, tool_name: str, verbose: bool) -> str:
     """Classify via package manager queries."""
+    # Validate the path before any package-manager OS command: it must be a
+    # plain absolute path with no shell metacharacters.
+    if not _is_safe_binary_path(path):
+        return _classify_via_path(path)
+
     # dpkg (Debian/Ubuntu)
     if shutil.which('dpkg'):
         try:
@@ -527,6 +558,56 @@ def sort_by_preference(
     return sorted_installs
 
 
+_catalog_cache: dict[str, dict] = {}
+_catalog_instance = None
+_catalog_lock = threading.Lock()
+
+
+def _catalog_meta(tool_name: str) -> dict:
+    """Return cached catalog metadata for a tool: candidates + version command.
+
+    Thread-safe (bulk_reconcile detects tools in a ThreadPool). Returns an empty
+    dict for unknown tools so callers fall back to sane defaults.
+    """
+    global _catalog_instance
+    with _catalog_lock:
+        if tool_name in _catalog_cache:
+            return _catalog_cache[tool_name]
+        meta: dict = {}
+        try:
+            inst = _catalog_instance
+            if inst is None:
+                from .catalog import ToolCatalog
+                inst = ToolCatalog()
+                # Only cache a catalog that actually loaded, so a transiently
+                # empty/unavailable filesystem doesn't poison later calls.
+                if inst.all_tools():
+                    _catalog_instance = inst
+            entry = inst.get(tool_name)
+            if entry:
+                meta["candidates"] = tuple(entry.to_tool().candidates)
+                raw = getattr(entry, "_raw_data", None) or {}
+                meta["version_flag"] = raw.get("version_flag")
+                meta["version_command"] = raw.get("version_command")
+        except Exception:
+            meta = {}
+        # Only cache successful lookups — an empty result may be transient.
+        if meta:
+            _catalog_cache[tool_name] = meta
+        return meta
+
+
+def _resolve_candidates(tool_name: str) -> tuple[str, ...] | None:
+    """Look up catalog candidates for a tool (cached).
+
+    Lets reconcile detect alternate-named duplicates (e.g. ``pip``/``pip3``,
+    ``fd``/``fdfind``) even when a caller (such as bulk_reconcile) does not pass
+    candidates. Returns None if the tool is unknown, so detection falls back to
+    the bare tool name.
+    """
+    return _catalog_meta(tool_name).get("candidates")
+
+
 def reconcile_tool(
     tool_name: str,
     mode: str = "parallel",
@@ -559,6 +640,11 @@ def reconcile_tool(
         config = load_config(verbose=verbose)
     if env is None:
         env = detect_environment(verbose=verbose)
+
+    # Resolve catalog candidates when a caller (e.g. bulk_reconcile) omits them,
+    # so alternate-named duplicates (pip/pip3, fd/fdfind) are still detected.
+    if candidates is None:
+        candidates = _resolve_candidates(tool_name)
 
     # Detect installations
     installations = detect_installations(tool_name, candidates, verbose)
