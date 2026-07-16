@@ -18,11 +18,15 @@ RECONCILE_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ensure_nvm_loaded
 
 # Remove an installation via a specific method
-# Args: tool_name, method, binary_name
+# Args: tool_name, method, binary_name, [binary_path]
+# binary_path: the detected installation's path. With multiple installations,
+# command -v resolves to whichever shadows the others in PATH — pass the
+# detected path so the right installation is removed.
 remove_installation() {
   local tool="$1"
   local method="$2"
   local binary="${3:-$tool}"
+  local known_path="${4:-}"
 
   echo "[$tool] Removing installation via $method..." >&2
 
@@ -30,7 +34,7 @@ remove_installation() {
     apt)
       # Find package name
       local binary_path
-      binary_path="$(command -v "$binary" 2>/dev/null || echo "")"
+      binary_path="${known_path:-$(command -v "$binary" 2>/dev/null || echo "")}"
       if [ -z "$binary_path" ]; then
         echo "[$tool] Binary not found, nothing to remove" >&2
         return 0
@@ -66,9 +70,15 @@ remove_installation() {
       fi
       ;;
     nvm)
-      # nvm-managed binaries: these are node versions, not directly removable via nvm here
-      # Skip removal — nvm versions are managed by install_node.sh
+      # nvm method is reserved for the node runtime itself (node/npm/npx/corepack);
+      # npm packages inside an nvm node dir classify as npm and are removed above.
       echo "[$tool] Skipping nvm-managed binary (use install_node.sh to manage)" >&2
+      ;;
+    uv)
+      if command -v uv >/dev/null 2>&1; then
+        echo "[$tool] Uninstalling uv tool: $tool" >&2
+        uv tool uninstall "$tool" 2>/dev/null || true
+      fi
       ;;
     gem)
       if command -v gem >/dev/null 2>&1; then
@@ -97,7 +107,7 @@ remove_installation() {
       ;;
     github_release_binary|manual)
       local binary_path
-      binary_path="$(command -v "$binary" 2>/dev/null || echo "")"
+      binary_path="${known_path:-$(command -v "$binary" 2>/dev/null || echo "")}"
       if [ -n "$binary_path" ] && [ -f "$binary_path" ]; then
         local bin_dir
         bin_dir="$(dirname "$binary_path")"

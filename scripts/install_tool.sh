@@ -90,7 +90,9 @@ if [ "$ACTION" = "uninstall" ]; then
       echo "[$TOOL] Skipping system binary: $path (managed by OS)" >&2
       continue
     fi
-    remove_installation "$TOOL" "$base_method" "$binary_name"
+    # || true: one failed removal (e.g. an unsupported method) must not abort
+    # the remaining removals under set -e; leftovers surface in the verify below
+    remove_installation "$TOOL" "$base_method" "$binary_name" "$path" || true
   done
 
   # Verify removal (ignore system entries in the check)
