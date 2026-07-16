@@ -125,7 +125,7 @@ class TestConfirmRemovalSerialized:
 
         inst = Installation(
             tool="faketool", version="1.0", method="uv",
-            path="/tmp/faketool", active=False, valid=True,
+            path="/opt/faketool", active=False, valid=True,
         )
 
         def worker():
