@@ -5,6 +5,9 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$DIR/lib/common.sh"
 
 ACTION="${1:-reconcile}"
+# Remember whether the caller pinned a version — uninstall treats an explicit
+# RUBY_VERSION as "remove only this cycle" (like NODE_VERSION/UV_PYTHON_SPEC)
+RUBY_VERSION_EXPLICIT="${RUBY_VERSION:+1}"
 # Target Ruby version (default: latest stable)
 RUBY_VERSION="${RUBY_VERSION:-3.3.6}"
 
@@ -79,8 +82,10 @@ install_ruby() {
   fi
 
   # Check version before install
-  local before="$(get_specific_ruby_version "$RUBY_VERSION")"
-  local version_cycle="$(get_version_cycle "$RUBY_VERSION")"
+  local before
+  before="$(get_specific_ruby_version "$RUBY_VERSION")"
+  local version_cycle
+  version_cycle="$(get_version_cycle "$RUBY_VERSION")"
   local display_name="ruby"
   [ -n "$version_cycle" ] && display_name="ruby@${version_cycle}"
 
@@ -99,7 +104,8 @@ install_ruby() {
   fi
 
   # Only set global if no global version is set yet
-  local current_global="$(rbenv global 2>/dev/null || true)"
+  local current_global
+  current_global="$(rbenv global 2>/dev/null || true)"
   if [ -z "$current_global" ] || [ "$current_global" = "system" ]; then
     rbenv global "$RUBY_VERSION" || true
   fi
@@ -113,7 +119,8 @@ install_ruby() {
   rbenv rehash || true
 
   # Report version for this specific install
-  local after="$(get_specific_ruby_version "$RUBY_VERSION")"
+  local after
+  after="$(get_specific_ruby_version "$RUBY_VERSION")"
   local path="$HOME/.rbenv/versions/$RUBY_VERSION/bin/ruby"
   printf "[%s] before: %s\n" "$display_name" "${before:-<none>}"
   printf "[%s] after:  %s\n" "$display_name" "${after:-<none>}"
@@ -133,7 +140,42 @@ update_ruby() {
 }
 
 uninstall_ruby() {
-  # Remove rbenv-managed Ruby
+  if [ -n "$RUBY_VERSION_EXPLICIT" ]; then
+    # Multi-version: only remove the requested cycle, keep rbenv and other versions
+    if ! have rbenv && [ -x "$HOME/.rbenv/bin/rbenv" ]; then
+      export PATH="$HOME/.rbenv/bin:$PATH"
+    fi
+    if ! have rbenv; then
+      echo "[ruby] rbenv not found; nothing to remove for cycle $RUBY_VERSION" >&2
+      return 0
+    fi
+
+    local cycle cycle_re resolved
+    cycle="$(get_version_cycle "$RUBY_VERSION")"
+    cycle_re="^${cycle//./\\.}(\\.|$)"
+    resolved="$(rbenv versions --bare 2>/dev/null | grep -E "$cycle_re" || true)"
+    if [ -z "$resolved" ]; then
+      echo "[ruby] Ruby $RUBY_VERSION not found in rbenv" >&2
+      return 0
+    fi
+
+    local current_global other_ver v
+    current_global="$(rbenv global 2>/dev/null || true)"
+    for v in $resolved; do
+      if [ "$v" = "$current_global" ]; then
+        other_ver="$(rbenv versions --bare 2>/dev/null | grep -vE "$cycle_re" | tail -1 || true)"
+        if [ -n "$other_ver" ]; then
+          echo "[ruby] Warning: ruby $v is the current global, switching to $other_ver first" >&2
+          rbenv global "$other_ver" || true
+        fi
+      fi
+      rbenv uninstall -f "$v" || true
+      echo "[ruby] Removed ruby $v (cycle $cycle)" >&2
+    done
+    return 0
+  fi
+
+  # Full uninstall: remove rbenv-managed Ruby entirely
   if [ -d "$HOME/.rbenv" ]; then
     rm -rf "$HOME/.rbenv"
   fi
