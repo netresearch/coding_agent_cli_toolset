@@ -12,6 +12,8 @@ DRY_RUN="${DRY_RUN:-0}"
 VERBOSE="${VERBOSE:-0}"
 SKIP_SYSTEM="${SKIP_SYSTEM:-0}"
 SCOPE="${SCOPE:-}"  # Can be: system, user, project, all, or auto-detect if empty
+SLOW_SECS="${SLOW_SECS:-10}"    # announce the actual command after this many seconds
+TAIL_LINES="${TAIL_LINES:-5}"   # rolling output lines shown for slow commands (tty only)
 
 log() {
   printf "[auto-update] %s\n" "$*" >&2
@@ -23,20 +25,81 @@ vlog() {
   fi
 }
 
+# Erase the rolling tail region (count lines) from the terminal.
+_clear_tail() {
+  local count="$1"
+  [ "$count" -gt 0 ] || return 0
+  printf '\033[%dA' "$count" >&2
+  for _ in $(seq 1 "$count"); do
+    printf '\033[2K\n' >&2
+  done
+  printf '\033[%dA' "$count" >&2
+}
+
+# Redraw the last TAIL_LINES lines of file $1, replacing $2 previously drawn
+# lines. Echoes the new drawn-line count.
+_draw_tail() {
+  local out="$1" drawn="$2"
+  local width
+  width="$(tput cols 2>/dev/null || echo "${COLUMNS:-120}")"
+  _clear_tail "$drawn"
+  local lines
+  lines="$(tail -n "$TAIL_LINES" "$out" 2>/dev/null | cut -c1-$((width - 6)) || true)"
+  if [ -z "$lines" ]; then
+    echo 0
+    return 0
+  fi
+  printf '%s\n' "$lines" | sed 's/^/    │ /' >&2
+  printf '%s\n' "$lines" | wc -l
+}
+
+# Run a package-manager command: stdin detached (a hidden interactive prompt
+# must fail fast, not hang on the terminal — a swallowed composer prompt once
+# blocked upgrade-managed for hours), the real command line announced after
+# SLOW_SECS, a rolling TAIL_LINES-line output tail on ttys, and the last
+# output lines surfaced when the command fails. Failures stay non-fatal.
 run_cmd() {
   local desc="$1"
   shift
   if [ "$DRY_RUN" = "1" ]; then
     log "DRY-RUN: $desc"
     log "  Command: $*"
-  else
-    log "$desc"
-    if [ "$VERBOSE" = "1" ]; then
-      "$@"
-    else
-      "$@" >/dev/null 2>&1 || true
-    fi
+    return 0
   fi
+
+  log "$desc"
+  if [ "$VERBOSE" = "1" ]; then
+    "$@" </dev/null || true
+    return 0
+  fi
+
+  local out
+  out="$(mktemp)"
+  "$@" </dev/null >"$out" 2>&1 &
+  local pid=$!
+
+  local elapsed=0 drawn=0
+  while kill -0 "$pid" 2>/dev/null; do
+    sleep 1
+    elapsed=$((elapsed + 1))
+    if [ "$elapsed" -eq "$SLOW_SECS" ]; then
+      log "  ↳ still running (${elapsed}s): $*"
+    fi
+    if [ "$elapsed" -ge "$SLOW_SECS" ] && [ -t 2 ]; then
+      drawn="$(_draw_tail "$out" "$drawn")"
+    fi
+  done
+
+  local rc=0
+  wait "$pid" || rc=$?
+  _clear_tail "$drawn" 2>/dev/null || true
+
+  if [ "$rc" -ne 0 ]; then
+    log "  ✗ $desc failed (exit $rc); last output:"
+    tail -n 20 "$out" | sed 's/^/    /' >&2
+  fi
+  rm -f "$out"
+  return 0
 }
 
 # ============================================================================
@@ -415,8 +478,8 @@ update_composer() {
   if ! detect_composer; then return; fi
   log "Composer: Updating"
 
-  run_cmd "Composer: Self-update" composer self-update
-  run_cmd "Composer: Update global packages" composer global update
+  run_cmd "Composer: Self-update" composer self-update --no-interaction
+  run_cmd "Composer: Update global packages" composer global update --no-interaction
 
   log "Composer: Complete"
 }
@@ -543,7 +606,8 @@ get_manager_stats() {
     go)
       location="$(command -v go 2>/dev/null || echo "N/A")"
       version="$(go version 2>/dev/null | awk '{print $3}' | sed 's/go//' || echo "unknown")"
-      local gobin="$(go env GOBIN 2>/dev/null || echo "$(go env GOPATH 2>/dev/null)/bin")"
+      local gobin
+      gobin="$(go env GOBIN 2>/dev/null || echo "$(go env GOPATH 2>/dev/null)/bin")"
       pkg_count="$([ -d "$gobin" ] && ls -1 "$gobin" 2>/dev/null | wc -l | tr -d '[:space:]' || echo "0")"
       ;;
     gup)
@@ -926,7 +990,7 @@ run_all_updates() {
 
     # Composer
     if [ -f "./composer.json" ] && command -v composer >/dev/null 2>&1 && confirm_project_update "composer" "./composer.json"; then
-      run_cmd "Composer: Update project dependencies" composer update
+      run_cmd "Composer: Update project dependencies" composer update --no-interaction
     fi
   fi
 
