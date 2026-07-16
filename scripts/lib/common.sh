@@ -115,7 +115,8 @@ npm_global_bin_dir() {
   return 0
 }
 
-# Resolve a global CLI binary path: prefer PATH, fall back to npm's global bin.
+# Resolve a global CLI binary path: prefer PATH, fall back to npm's global
+# bin, then GOPATH/bin (go install lands there even when it is off PATH).
 resolve_global_bin() {
   local bin="$1" p
   p="$(command -v "$bin" 2>/dev/null || true)"
@@ -123,6 +124,10 @@ resolve_global_bin() {
     local gdir
     gdir="$(npm_global_bin_dir)"
     [[ -n "$gdir" ]] && [[ -x "$gdir/$bin" ]] && p="$gdir/$bin"
+  fi
+  if [[ -z "$p" ]]; then
+    local go_bin="${GOPATH:-$HOME/go}/bin/$bin"
+    [[ -x "$go_bin" ]] && p="$go_bin"
   fi
   printf '%s' "$p"
 }
