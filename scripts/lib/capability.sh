@@ -49,7 +49,12 @@ detect_install_method() {
       return 0
       ;;
     "$HOME/.nvm/"*)
-      echo "nvm"
+      # Only the node runtime itself is nvm-managed; anything else inside an
+      # nvm node dir is an npm global package (removable via npm uninstall -g)
+      case "$tool" in
+        node|npm|npx|corepack) echo "nvm" ;;
+        *) echo "npm" ;;
+      esac
       return 0
       ;;
     "/usr/local/bin/"*)
@@ -186,7 +191,12 @@ classify_install_path() {
       # Extract node version for context
       local node_version="${path#$HOME/.nvm/versions/node/}"
       node_version="${node_version%%/*}"
-      echo "nvm($node_version)"
+      # Only the node runtime itself is nvm-managed; anything else inside an
+      # nvm node dir is an npm global package (removable via npm uninstall -g)
+      case "$tool" in
+        node|npm|npx|corepack) echo "nvm($node_version)" ;;
+        *) echo "npm($node_version)" ;;
+      esac
       ;;
     "$HOME/.local/pipx/venvs/"*)
       local pkg="${path#$HOME/.local/pipx/venvs/}"
@@ -418,7 +428,7 @@ list_available_methods() {
 can_install_via_method() {
   local tool="$1"
   local method="$2"
-  local config="${3:-{}}"
+  # $3 (catalog_config JSON) is accepted for future method-specific checks
 
   # First check if method is available
   if ! is_method_available "$method"; then
