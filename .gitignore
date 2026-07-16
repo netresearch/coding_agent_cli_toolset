@@ -46,6 +46,10 @@ vendor/
 claudedocs/
 .serena/
 .beads/
+.agents/
+
+# tmux verbose-mode debug logs (tmux -v writes them into the cwd)
+tmux-*.log
 
 # Type checking cache
 .mypy_cache/
