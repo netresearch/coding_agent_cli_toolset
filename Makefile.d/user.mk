@@ -88,8 +88,10 @@ reset-pins: scripts-perms ## Remove all version pins from all tools
 
 guide: upgrade ## Alias for upgrade (deprecated)
 
-upgrade-%: scripts-perms ## Upgrade tool (e.g., make upgrade-python)
-	@if [ -f "./scripts/install_$*.sh" ]; then \
+upgrade-%: scripts-perms ## Upgrade tool or cycle (e.g., make upgrade-python, upgrade-node@24)
+	@spec="$*"; if [ "$${spec#*@}" != "$$spec" ]; then \
+		./scripts/cycle_action.sh "$$spec" update; \
+	elif [ -f "./scripts/install_$*.sh" ]; then \
 		./scripts/install_$*.sh update; \
 	elif [ -f "./catalog/$*.json" ]; then \
 		./scripts/install_tool.sh "$*" update; \
@@ -188,7 +190,9 @@ install-uv: scripts-perms ## Install uv package manager
 
 # Generic fallback: install any cataloged tool (e.g., make install-jq)
 install-%: scripts-perms
-	@if [ -f "./scripts/install_$*.sh" ]; then \
+	@spec="$*"; if [ "$${spec#*@}" != "$$spec" ]; then \
+		./scripts/cycle_action.sh "$$spec" install; \
+	elif [ -f "./scripts/install_$*.sh" ]; then \
 		./scripts/install_$*.sh; \
 	elif [ -f "./catalog/$*.json" ]; then \
 		./scripts/install_tool.sh "$*" install; \
@@ -200,8 +204,10 @@ install-%: scripts-perms
 # UNINSTALL / RECONCILE
 # ----------------------------------------------------------------------------
 
-uninstall-%: scripts-perms ## Uninstall tool (e.g., make uninstall-python)
-	@if [ -f "./scripts/install_$*.sh" ]; then \
+uninstall-%: scripts-perms ## Uninstall tool or cycle (e.g., make uninstall-python, uninstall-node@24)
+	@spec="$*"; if [ "$${spec#*@}" != "$$spec" ]; then \
+		./scripts/cycle_action.sh "$$spec" uninstall; \
+	elif [ -f "./scripts/install_$*.sh" ]; then \
 		./scripts/install_$*.sh uninstall; \
 	elif [ -f "./catalog/$*.json" ]; then \
 		./scripts/install_tool.sh "$*" uninstall; \

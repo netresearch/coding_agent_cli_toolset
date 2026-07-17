@@ -94,6 +94,8 @@ This repo **is** a CLI tool manager, so the word "upgrade" is overloaded:
 | `make upgrade-<tool>` | Upgrade any tool (e.g., `make upgrade-ripgrep`) |
 | `make uninstall-<tool>` | Uninstall any tool (e.g., `make uninstall-jq`) |
 | `make reconcile-<tool>` | Reconcile install method (e.g., `make reconcile-node`) |
+| `make uninstall-<tool>@<cycle>` | Remove one runtime version cycle (e.g., `make uninstall-node@24`, `uninstall-ruby@3.3`) |
+| `make install-<tool>@<cycle>` / `upgrade-<tool>@<cycle>` | Install/upgrade a specific cycle (node, ruby, go, python) |
 | `make upgrade` | Interactive upgrade guide |
 | `make cleanup` | Interactive tool removal |
 | `make upgrade-managed` | Upgrade all package managers |
