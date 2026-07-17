@@ -6,7 +6,6 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 have() { command -v "$1" >/dev/null 2>&1; }
 
-TOOL="go"
 ACTION="${1:-install}"
 
 # Support version-specific installation via GO_VERSION env var
@@ -22,16 +21,33 @@ else
   DISPLAY_NAME="go"
 fi
 
-# Get current version of the specific binary
+# GOBIN (default GOPATH/bin) — where `go install` puts version wrappers.
+# May be off PATH, so never rely on `have` alone for these binaries.
+go_bin_dir() {
+  have go || return 0
+  local dir
+  dir="$(go env GOBIN 2>/dev/null || true)"
+  [ -z "$dir" ] && dir="$(go env GOPATH 2>/dev/null || true)/bin"
+  echo "$dir"
+}
+
+# Get current version of the specific binary (PATH first, then GOBIN)
 get_go_version() {
   local bin="$1"
   if have "$bin"; then
     "$bin" version 2>/dev/null | head -1 || true
+    return 0
+  fi
+  local gobin
+  gobin="$(go_bin_dir)"
+  if [ -n "$gobin" ] && [ -x "$gobin/$bin" ]; then
+    "$gobin/$bin" version 2>/dev/null | head -1 || true
   fi
 }
 
 install_go() {
-  local before="$(get_go_version "$BINARY")"
+  local before
+  before="$(get_go_version "$BINARY")"
 
   # Version-specific Go installation (e.g., go1.24 alongside go1.25)
   if [ -n "$TARGET_CYCLE" ]; then
@@ -65,17 +81,34 @@ install_go() {
 
     echo "Installing ${FULL_BINARY} via go install golang.org/dl/${FULL_BINARY}@latest..."
     if go install "golang.org/dl/${FULL_BINARY}@latest"; then
-      # The go1.XX.YY command needs to download its SDK on first run
-      if have "$FULL_BINARY"; then
+      # go install lands in GOBIN, which may be off PATH — resolve explicitly
+      local gobin full_bin
+      gobin="$(go_bin_dir)"
+      full_bin="$gobin/$FULL_BINARY"
+      if [ -x "$full_bin" ]; then
+        # The go1.XX.YY command needs to download its SDK on first run
         echo "Downloading Go ${FULL_VERSION} SDK..."
-        "$FULL_BINARY" download || true
+        "$full_bin" download || true
 
         # Update symlink from go1.24 -> go1.24.12
-        GOBIN="$(go env GOPATH)/bin"
-        if [ -x "$GOBIN/$FULL_BINARY" ]; then
-          ln -sf "$FULL_BINARY" "$GOBIN/$BINARY" 2>/dev/null || true
-          echo "Updated symlink: $BINARY -> $FULL_BINARY"
+        ln -sf "$FULL_BINARY" "$gobin/$BINARY" 2>/dev/null || true
+        echo "Updated symlink: $BINARY -> $FULL_BINARY"
+
+        # Remove superseded wrappers (and SDKs) of the same cycle so
+        # repeated updates don't accumulate go1.26.0, go1.26.2, ...
+        if [[ "$TARGET_CYCLE" =~ ^[0-9]+\.[0-9]+$ ]]; then
+          local stale stale_name
+          for stale in "$gobin/go${TARGET_CYCLE}".*; do
+            [ -e "$stale" ] || continue
+            stale_name="$(basename "$stale")"
+            [ "$stale_name" = "$FULL_BINARY" ] && continue
+            rm -f "$stale"
+            rm -rf "$HOME/sdk/$stale_name" 2>/dev/null || true
+            echo "Removed superseded wrapper: $stale_name"
+          done
         fi
+      else
+        echo "Error: ${FULL_BINARY} not found in $gobin after go install" >&2
       fi
     else
       echo "Failed to install ${FULL_BINARY}" >&2
@@ -140,8 +173,11 @@ install_go() {
     rm -rf "$TMP" 2>/dev/null || true
   fi
 
-  local after="$(get_go_version "$BINARY")"
-  local path="$(command -v "$BINARY" 2>/dev/null || true)"
+  local after
+
+  after="$(get_go_version "$BINARY")"
+  local path
+  path="$(command -v "$BINARY" 2>/dev/null || true)"
   printf "[%s] before: %s\n" "$DISPLAY_NAME" "${before:-<none>}"
   printf "[%s] after:  %s\n"  "$DISPLAY_NAME" "${after:-<none>}"
   if [ -n "$path" ]; then printf "[%s] path:   %s\n" "$DISPLAY_NAME" "$path"; fi
