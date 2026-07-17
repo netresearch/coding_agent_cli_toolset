@@ -412,6 +412,28 @@ update_rust() {
 
 ## House rules
 
+**Hard-won invariants** (each caused a shipped bug; keep them intact):
+
+- **Never verify an install via PATH lookup.** `go install`, `uv tool install`
+  etc. land in manager-owned dirs (`$(go env GOBIN)`, `~/.local/bin`) that may
+  be off PATH — resolve the manager's bin dir explicitly, or a successful
+  install reports "binary not found" and repeated runs orphan artifacts
+  (PRs #107, #111). With multiple installs, `command -v` also resolves to
+  whichever copy shadows the others — pass the *detected* path into removal
+  code, never re-resolve (PR #106).
+- **Environments are not installations.** Virtualenv/conda bins must be
+  excluded by every detection layer. Both `scripts/lib/capability.sh`
+  (`detect_all_installations`) and `cli_audit/reconcile.py`
+  (`_is_virtualenv_bin`) enforce this — keep them in sync; a gap in one
+  caused removal of the wrong installation (PR #110).
+- **Quiet command wrappers must detach stdin** (`</dev/null`) and surface
+  failures with their last output lines. Suppressed output plus attached
+  stdin turns any hidden interactive prompt into an invisible, indefinite
+  hang (PR #108, composer).
+- **The shellcheck pre-commit hook lints the whole changed file** — touching
+  a script means clearing its pre-existing warnings too (SC2155
+  declare/assign splits are the recurring case).
+
 **Installation preferences** (Phase 2 planning):
 - User-level preferred: `~/.local/bin` (workstations)
 - System-level for servers: `/usr/local/bin`
