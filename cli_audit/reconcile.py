@@ -153,6 +153,30 @@ Reconciliation Summary:
 """
 
 
+# Environment-name patterns for env managers without a pyvenv.cfg (conda etc.).
+# Mirrors the venv skip list in scripts/lib/capability.sh:detect_all_installations.
+_ENV_DIR_PATTERNS = (
+    "/venv/bin", "/.venv/bin", "/env/bin",
+    "/venvs/", "/.venvs/", "/virtualenvs/", "/.virtualenvs/",
+    "/envs/", "/conda/", "/miniconda", "/anaconda",
+)
+
+
+def _is_virtualenv_bin(bin_dir: str) -> bool:
+    """True if bin_dir is a virtualenv/conda environment's bin directory.
+
+    Environments are not installations: their binaries vanish with the env,
+    and classifying them by method (e.g. `uv` because the tool also appears
+    in `uv tool list`) makes removal delete a DIFFERENT installation.
+    """
+    # Definitive signal: PEP 405 venvs carry pyvenv.cfg next to bin/
+    if os.path.isfile(os.path.join(os.path.dirname(bin_dir), "pyvenv.cfg")):
+        return True
+    # Name-based fallback for conda/virtualenvwrapper layouts
+    normalized = bin_dir.rstrip("/") + "/"
+    return any(pat in normalized for pat in _ENV_DIR_PATTERNS)
+
+
 def detect_installations(
     tool_name: str,
     candidates: Sequence[str] | None = None,
@@ -193,6 +217,10 @@ def detect_installations(
 
     # Search each PATH directory
     for path_dir in path_dirs:
+        # Virtualenv/conda bins are environments, not installations
+        if _is_virtualenv_bin(path_dir):
+            vlog(f"  Skipping environment dir: {path_dir}", verbose)
+            continue
         for candidate in candidates:
             full_path = os.path.join(path_dir, candidate)
 
@@ -210,6 +238,11 @@ def detect_installations(
             # Resolve symlinks to get real path
             real_path = os.path.realpath(full_path)
             if real_path in seen_paths:
+                continue
+
+            # A symlink can point into an environment as well
+            if _is_virtualenv_bin(os.path.dirname(real_path)):
+                vlog(f"  Skipping environment binary: {real_path}", verbose)
                 continue
 
             seen_paths.add(real_path)
@@ -854,19 +887,25 @@ def _check_path_ordering(
     return tuple(issues)
 
 
+# bulk_reconcile prompts from ThreadPool workers: without serialization all
+# prompts print at once and the answers race for stdin.
+_prompt_lock = threading.Lock()
+
+
 def _confirm_removal(tool_name: str, to_remove: list[Installation]) -> bool:
-    """Prompt user to confirm removal."""
+    """Prompt user to confirm removal. Serialized across worker threads."""
     if not sys.stdin.isatty():
         # Non-interactive mode
         return False
 
-    print(f"\n⚠️  WARNING: About to remove {len(to_remove)} installation(s) of {tool_name}")
-    for inst in to_remove:
-        print(f"  - {inst.version} ({inst.method}, {inst.path})")
+    with _prompt_lock:
+        print(f"\n⚠️  WARNING: About to remove {len(to_remove)} installation(s) of {tool_name}")
+        for inst in to_remove:
+            print(f"  - {inst.version} ({inst.method}, {inst.path})")
 
-    print("\nProceed with removal? [y/N]: ", end="")
-    response = input().strip().lower()
-    return response in ('y', 'yes')
+        print("\nProceed with removal? [y/N]: ", end="")
+        response = input().strip().lower()
+        return response in ('y', 'yes')
 
 
 def _uninstall_installation(installation: Installation, verbose: bool) -> tuple[bool, str | None]:
