@@ -99,6 +99,19 @@ jobs:
           pip-audit
         continue-on-error: true
 
+  shell-tests:
+    name: Shell Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Run shell test suites
+        run: |
+          bash tests/test_guide_multi_install.sh
+          bash tests/test_reconcile_dryrun.sh
+
   build:
     name: Build Distribution
     runs-on: ubuntu-latest
