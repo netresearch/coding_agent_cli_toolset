@@ -11,34 +11,27 @@ permissions:
   contents: read
 
 jobs:
+  # Lint + type-check via the org-standard reusable, so the pinned
+  # checkout/setup-python versions are maintained centrally in
+  # netresearch/.github instead of inline here.
   lint:
     name: Lint and Type Check
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: '3.14'
-          cache: 'pip'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
-
-      - name: Run flake8
-        run: |
-          flake8 cli_audit tests --count --select=E9,F63,F7,F82 --show-source --statistics
-          flake8 cli_audit tests --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-
-      - name: Run mypy
-        run: |
-          mypy cli_audit --ignore-missing-imports
-        continue-on-error: true
+    uses: netresearch/.github/.github/workflows/python-ci.yml@main
+    permissions:
+      contents: read
+    with:
+      python-versions: '["3.14"]'
+      cache: "pip"
+      cache-dependency-path: "requirements-dev.txt"
+      install-cmd: "python -m pip install --upgrade pip && pip install -r requirements-dev.txt"
+      run-lint: true
+      lint-cmd: >-
+        flake8 cli_audit tests --count --select=E9,F63,F7,F82 --show-source --statistics &&
+        flake8 cli_audit tests --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+      run-type-check: true
+      # mypy stays non-blocking (was continue-on-error: true).
+      type-check-cmd: "mypy cli_audit --ignore-missing-imports || true"
+      run-tests: false
 
   # Unit + integration tests with coverage and Codecov upload, via the
   # org-standard reusable. Replaces the inline copy whose per-repo
@@ -69,35 +62,9 @@ jobs:
     secrets:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
-  security:
-    name: Security Scan
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: '3.14'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install bandit pip-audit
-
-      - name: Run bandit
-        run: |
-          bandit -r cli_audit -f json -o bandit-report.json || true
-          bandit -r cli_audit
-        continue-on-error: true
-
-      - name: Run pip-audit
-        run: |
-          pip-audit --desc --fix --dry-run || true
-          pip-audit
-        continue-on-error: true
+  # NOTE: bandit + pip-audit run in security.yml via the shared
+  # python-audit.yml reusable (push/PR/schedule); the previously inline
+  # "Security Scan" job here duplicated that and was removed.
 
   shell-tests:
     name: Shell Tests
