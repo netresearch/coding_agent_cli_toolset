@@ -79,87 +79,48 @@ jobs:
           bash tests/test_guide_multi_install.sh
           bash tests/test_reconcile_dryrun.sh
 
+  # Build/dist via the shared python-build.yml reusable (build + twine
+  # check + dist artifact), so the pinned actions are maintained centrally.
   build:
     name: Build Distribution
-    runs-on: ubuntu-latest
     needs: [lint, test]
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: '3.14'
-
-      - name: Install build tools
-        run: |
-          python -m pip install --upgrade pip
-          pip install build twine
-
-      - name: Build package
-        run: |
-          python -m build
-
-      - name: Check package
-        run: |
-          twine check dist/*
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: distributions
-          path: dist/
+    uses: netresearch/.github/.github/workflows/python-build.yml@main
+    permissions:
+      contents: read
+    with:
+      python-version: "3.14"
+      cache-dependency-path: "requirements-dev.txt"
+      artifact-name: distributions
+      artifact-path: dist/
 
   docs:
     name: Documentation Check
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: '3.14'
-
-      - name: Check README
-        run: |
-          python -m pip install --upgrade pip
-          pip install markdown
-          python -c "import markdown; markdown.markdown(open('README.md').read())"
-
-      - name: Validate YAML configs
-        run: |
-          pip install pyyaml
-          python -c "import yaml; yaml.safe_load(open('.cli-audit.yml').read())" || echo "No config file"
+    uses: netresearch/.github/.github/workflows/python-ci.yml@main
+    permissions:
+      contents: read
+    with:
+      python-versions: '["3.14"]'
+      install-cmd: "python -m pip install --upgrade pip markdown pyyaml"
+      run-lint: false
+      run-type-check: false
+      run-tests: true
+      test-cmd: >-
+        python -c "import markdown; markdown.markdown(open('README.md').read())" &&
+        { python -c "import yaml; yaml.safe_load(open('.cli-audit.yml').read())" || echo "No config file"; }
 
   integration-e2e:
     name: End-to-End Integration
-    runs-on: ubuntu-latest
     needs: [test]
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: '3.14'
-
-      - name: Install package
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e .
-
-      - name: Test CLI execution
-        run: |
-          python audit.py --help
-          CLI_AUDIT_JSON=1 python audit.py --only python-core | jq '.'
-
-      - name: Test programmatic API
-        run: |
-          python -c "from cli_audit import Config, Environment, load_config; c = Config(); print('API works')"
+    uses: netresearch/.github/.github/workflows/python-ci.yml@main
+    permissions:
+      contents: read
+    with:
+      python-versions: '["3.14"]'
+      install-cmd: "python -m pip install --upgrade pip && pip install -e ."
+      run-lint: false
+      run-type-check: false
+      run-tests: true
+      test-cmd: >-
+        python audit.py --help &&
+        CLI_AUDIT_JSON=1 python audit.py --only python-core | jq '.' &&
+        python -c "from cli_audit import Config, Environment, load_config; c = Config(); print('API works')"
