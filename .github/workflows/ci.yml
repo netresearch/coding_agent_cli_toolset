@@ -23,7 +23,7 @@ jobs:
   # merges; flip to @main afterwards.
   app-ci:
     name: App CI
-    uses: netresearch/.github/.github/workflows/python-app-ci.yml@feat/python-gold-standard
+    uses: netresearch/.github/.github/workflows/python-app-ci.yml@main
     permissions:
       actions: read
       contents: read
