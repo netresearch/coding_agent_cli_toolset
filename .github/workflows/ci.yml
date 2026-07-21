@@ -11,18 +11,29 @@ permissions:
   contents: read
 
 jobs:
-  # Lint + type-check via the org-standard reusable, so the pinned
-  # checkout/setup-python versions are maintained centrally in
-  # netresearch/.github instead of inline here.
-  lint:
-    name: Lint and Type Check
-    uses: netresearch/.github/.github/workflows/python-ci.yml@main
+  # Gold-standard meta-reusable pilot. python-app-ci composes lint /
+  # type-check / tests (python-ci), the distribution build (python-build),
+  # the security audit (python-audit: pip-audit + bandit + SBOM), plus
+  # gitleaks secret scanning and dependency review — one call site that
+  # replaces the former lint / test / build jobs here AND the audit job in
+  # security.yml. CodeQL stays OFF here: the repo uses CodeQL default setup
+  # (actions + python), and enabling the advanced workflow would conflict.
+  #
+  # Pinned to @feat/python-gold-standard until netresearch/.github#252
+  # merges; flip to @main afterwards.
+  app-ci:
+    name: App CI
+    uses: netresearch/.github/.github/workflows/python-app-ci.yml@feat/python-gold-standard
     permissions:
+      actions: read
       contents: read
+      security-events: write
+      pull-requests: write
+      id-token: write
     with:
+      package-manager: pip
       python-versions: '["3.14"]'
-      cache: "pip"
-      cache-dependency-path: "requirements-dev.txt"
+      os-versions: '["ubuntu-latest", "macos-latest", "windows-latest"]'
       install-cmd: "python -m pip install --upgrade pip && pip install -r requirements-dev.txt"
       run-lint: true
       lint-cmd: >-
@@ -31,40 +42,22 @@ jobs:
       run-type-check: true
       # mypy stays non-blocking (was continue-on-error: true).
       type-check-cmd: "mypy cli_audit --ignore-missing-imports || true"
-      run-tests: false
-
-  # Unit + integration tests with coverage and Codecov upload, via the
-  # org-standard reusable. Replaces the inline copy whose per-repo
-  # codecov-action reference Renovate kept bumping (#88). Coverage is
-  # uploaded once (ubuntu / 3.14) instead of from every matrix cell.
-  test:
-    name: Test Suite
-    uses: netresearch/.github/.github/workflows/python-ci.yml@main
-    permissions:
-      contents: read
-    with:
-      os-versions: '["ubuntu-latest", "macos-latest", "windows-latest"]'
-      python-versions: '["3.14"]'
-      cache: "pip"
-      cache-dependency-path: "requirements-dev.txt"
-      install-cmd: "python -m pip install --upgrade pip && pip install -r requirements-dev.txt"
-      run-lint: false
-      run-type-check: false
       run-tests: true
       test-cmd: >-
         pytest tests/ --ignore=tests/integration -v --cov=cli_audit
         --cov-report=xml --cov-report=term &&
         pytest tests/integration -v --cov=cli_audit --cov-append
         --cov-report=xml --cov-report=term
-      upload-coverage-codecov: true
-      coverage-os: "ubuntu-latest"
-      coverage-python-version: "3.14"
+      coverage-upload: true
+      enable-build: true
+      build-cmd: "python -m build"
+      check-cmd: "twine check dist/*"
+      run-bandit: true
+      enable-gitleaks: true
+      enable-codeql: false
     secrets:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-
-  # NOTE: bandit + pip-audit run in security.yml via the shared
-  # python-audit.yml reusable (push/PR/schedule); the previously inline
-  # "Security Scan" job here duplicated that and was removed.
+      GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
 
   shell-tests:
     name: Shell Tests
@@ -78,20 +71,6 @@ jobs:
         run: |
           bash tests/test_guide_multi_install.sh
           bash tests/test_reconcile_dryrun.sh
-
-  # Build/dist via the shared python-build.yml reusable (build + twine
-  # check + dist artifact), so the pinned actions are maintained centrally.
-  build:
-    name: Build Distribution
-    needs: [lint, test]
-    uses: netresearch/.github/.github/workflows/python-build.yml@main
-    permissions:
-      contents: read
-    with:
-      python-version: "3.14"
-      cache-dependency-path: "requirements-dev.txt"
-      artifact-name: distributions
-      artifact-path: dist/
 
   docs:
     name: Documentation Check
@@ -110,7 +89,7 @@ jobs:
 
   integration-e2e:
     name: End-to-End Integration
-    needs: [test]
+    needs: [app-ci]
     uses: netresearch/.github/.github/workflows/python-ci.yml@main
     permissions:
       contents: read
