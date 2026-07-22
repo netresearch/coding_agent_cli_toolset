@@ -7,8 +7,7 @@ on:
     branches: [main, develop]
   workflow_dispatch:
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   # Gold-standard meta-reusable pilot. python-app-ci composes lint /
@@ -59,18 +58,25 @@ jobs:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
       GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
 
+  # The bash suites are driven through python-ci's test step (it runs the
+  # command with `bash -c` from the repo root), so no step-level action is
+  # needed here. test_reconcile_dryrun.sh invokes `python3 audit.py`, which
+  # needs the runtime deps declared in pyproject (packaging, PyYAML) — hence
+  # the editable install and Python 3.14 (pyproject requires-python >=3.14).
   shell-tests:
     name: Shell Tests
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Run shell test suites
-        run: |
-          bash tests/test_guide_multi_install.sh
-          bash tests/test_reconcile_dryrun.sh
+    uses: netresearch/.github/.github/workflows/python-ci.yml@main
+    permissions:
+      contents: read
+    with:
+      python-versions: '["3.14"]'
+      install-cmd: "python -m pip install --upgrade pip && pip install -e ."
+      run-lint: false
+      run-type-check: false
+      run-tests: true
+      test-cmd: >-
+        bash tests/test_guide_multi_install.sh &&
+        bash tests/test_reconcile_dryrun.sh
 
   docs:
     name: Documentation Check
