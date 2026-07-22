@@ -12,5 +12,8 @@
     "display_name": "rbenv",
     "install_action": "install",
     "order": 30
+  },
+  "bash_completion": {
+    "source_path": "completions/rbenv.bash"
   }
 }

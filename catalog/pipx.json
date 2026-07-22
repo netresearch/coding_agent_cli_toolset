@@ -11,5 +11,8 @@
     "brew": "pipx",
     "dnf": "pipx",
     "pacman": "python-pipx"
+  },
+  "bash_completion": {
+    "command": "register-python-argcomplete pipx"
   }
 }

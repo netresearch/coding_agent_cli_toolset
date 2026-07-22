@@ -19,5 +19,8 @@
     "install_action": "install",
     "order": 265
   },
-  "notes": "Standalone CLI for Symfony development. Includes local web server, security checker, and cloud deployment."
+  "notes": "Standalone CLI for Symfony development. Includes local web server, security checker, and cloud deployment.",
+  "bash_completion": {
+    "command": "symfony completion bash"
+  }
 }

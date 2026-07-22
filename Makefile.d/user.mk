@@ -237,6 +237,16 @@ reconcile-all-dry-run: scripts-perms ## Preview duplicate-install cleanup across
 	@$(PYTHON) audit.py --reconcile --all
 
 # ----------------------------------------------------------------------------
+# BASH COMPLETION
+# ----------------------------------------------------------------------------
+
+completions: scripts-perms ## Install bash completions for all installed tools that declare them
+	@./scripts/install_completion.sh --all
+
+completion-%: scripts-perms ## Install bash completion for one tool (e.g., make completion-gh)
+	@./scripts/install_completion.sh "$*" install
+
+# ----------------------------------------------------------------------------
 # SYSTEM MANAGEMENT
 # ----------------------------------------------------------------------------
 

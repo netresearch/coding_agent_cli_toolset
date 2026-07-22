@@ -12,5 +12,8 @@
     "x86_64": "x86_64",
     "armv7l": "arm"
   },
-  "notes": "Only x86_64 builds available; arm builds use different target triple"
+  "notes": "Only x86_64 builds available; arm builds use different target triple",
+  "bash_completion": {
+    "command": "git-absorb --gen-completions bash"
+  }
 }

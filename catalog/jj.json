@@ -33,5 +33,8 @@
   "tags": [
     "git",
     "vcs"
-  ]
+  ],
+  "bash_completion": {
+    "command": "jj util completion bash"
+  }
 }

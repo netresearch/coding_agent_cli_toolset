@@ -6,7 +6,9 @@
   "homepage": "https://pnpm.io/",
   "package_name": "pnpm",
   "binary_name": "pnpm",
-  "requires": ["node"],
+  "requires": [
+    "node"
+  ],
   "available_methods": [
     {
       "method": "npm",
@@ -30,5 +32,8 @@
       }
     }
   ],
-  "notes": "Can be installed via npm (npm install -g pnpm), apt, or brew"
+  "notes": "Can be installed via npm (npm install -g pnpm), apt, or brew",
+  "bash_completion": {
+    "command": "pnpm completion bash"
+  }
 }

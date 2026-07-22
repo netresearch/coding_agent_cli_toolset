@@ -28,5 +28,8 @@
       "package.json"
     ]
   },
-  "notes": "Managed via nvm (Node Version Manager). Supports multiple concurrent LTS versions."
+  "notes": "Managed via nvm (Node Version Manager). Supports multiple concurrent LTS versions.",
+  "bash_completion": {
+    "command": "node --completion-bash"
+  }
 }

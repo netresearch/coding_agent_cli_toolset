@@ -11,5 +11,8 @@
   "arch_map": {
     "x86_64": "x86_64",
     "aarch64": "arm64"
+  },
+  "bash_completion": {
+    "command": "vhs completion bash"
   }
 }

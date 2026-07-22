@@ -11,5 +11,8 @@
     "display_name": "Docker CLI",
     "install_action": "install",
     "order": 200
+  },
+  "bash_completion": {
+    "command": "docker completion bash"
   }
 }

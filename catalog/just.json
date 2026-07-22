@@ -15,5 +15,8 @@
   "tags": [
     "core"
   ],
-  "auto_update": true
+  "auto_update": true,
+  "bash_completion": {
+    "command": "JUST_COMPLETE=bash just"
+  }
 }

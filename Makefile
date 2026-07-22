@@ -18,6 +18,7 @@ export
 	install-aws install-kubectl install-terraform install-ansible install-docker \
 	install-brew install-rust install-uv install-% upgrade-% uninstall-% reconcile-% \
 	reconcile-all reconcile-all-dry-run \
+	completions completion-% \
 	build build-dist build-wheel check-dist publish-test publish-prod \
 	clean clean-build clean-test clean-pyc clean-all \
 	scripts-perms audit-auto detect-managers upgrade-managed upgrade-dry-run \

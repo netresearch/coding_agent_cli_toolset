@@ -7,11 +7,16 @@
   "github_repo": "composer/composer",
   "binary_name": "composer",
   "script": "install_composer.sh",
-  "requires": ["php"],
+  "requires": [
+    "php"
+  ],
   "guide": {
     "display_name": "Composer",
     "install_action": "install",
     "order": 260
   },
-  "notes": "Installed from latest stable phar (https://getcomposer.org/download/latest-stable/composer.phar). Requires PHP."
+  "notes": "Installed from latest stable phar (https://getcomposer.org/download/latest-stable/composer.phar). Requires PHP.",
+  "bash_completion": {
+    "command": "composer completion bash"
+  }
 }
