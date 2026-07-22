@@ -118,6 +118,30 @@ uv run python -m pytest -m unit
 - Test functions: `test_<behavior>`
 - Use descriptive names: `test_config_invalid_timeout_too_low`
 
+**Tests that shell out MUST be skipped on Windows.** CI runs the suite on
+`ubuntu-latest`, `macos-latest` **and `windows-latest`**, while everything under
+`scripts/` is POSIX Bash. Any test that invokes `bash`, sources a `scripts/lib/*.sh`
+helper, or executes an installer fails on the Windows leg. Use the established
+module-level marker (13 test files already do):
+
+```python
+import sys
+import pytest
+
+skip_on_windows = pytest.mark.skipif(
+    sys.platform == "win32", reason="Shell script tests require POSIX shell"
+)
+
+@skip_on_windows
+class TestSomethingThatRunsBash:
+    ...
+```
+
+Apply it to the shell-invoking class only — pure-Python assertions (catalog JSON
+structure, parsing, schema invariants) stay platform-independent and must keep
+running everywhere. Forgetting this is not caught locally: the suite is green on
+Linux and only the Windows CI leg turns red.
+
 **Test structure (Arrange-Act-Assert):**
 ```python
 def test_tool_config_defaults():
