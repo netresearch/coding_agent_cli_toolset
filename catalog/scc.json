@@ -40,5 +40,8 @@
   "tags": [
     "code-counter",
     "statistics"
-  ]
+  ],
+  "bash_completion": {
+    "command": "scc completion bash"
+  }
 }

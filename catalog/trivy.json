@@ -11,5 +11,8 @@
     "x86_64": "64bit",
     "aarch64": "ARM64",
     "armv7l": "ARM"
+  },
+  "bash_completion": {
+    "command": "trivy completion bash"
   }
 }

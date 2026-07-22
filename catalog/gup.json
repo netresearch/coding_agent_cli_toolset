@@ -46,5 +46,8 @@
     "package-manager",
     "updater"
   ],
-  "auto_update": true
+  "auto_update": true,
+  "bash_completion": {
+    "command": "gup completion bash"
+  }
 }

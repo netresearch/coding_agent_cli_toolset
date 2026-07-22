@@ -6,7 +6,13 @@
   "homepage": "https://pip.pypa.io/",
   "package_name": "pip",
   "binary_name": "pip",
-  "candidates": ["pip", "pip3"],
+  "candidates": [
+    "pip",
+    "pip3"
+  ],
   "script": "install_pip.sh",
-  "notes": "pip is bundled with Python 3. Use python3 -m pip if pip command is not available."
+  "notes": "pip is bundled with Python 3. Use python3 -m pip if pip command is not available.",
+  "bash_completion": {
+    "command": "pip completion --bash"
+  }
 }

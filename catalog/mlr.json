@@ -17,5 +17,8 @@
     "csv",
     "json",
     "text-utils"
-  ]
+  ],
+  "bash_completion": {
+    "command": "mlr completion bash"
+  }
 }

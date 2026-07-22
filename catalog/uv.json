@@ -12,5 +12,8 @@
     "install_action": "reconcile",
     "order": 20
   },
-  "auto_update": true
+  "auto_update": true,
+  "bash_completion": {
+    "command": "uv generate-shell-completion bash"
+  }
 }

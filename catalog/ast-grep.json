@@ -12,5 +12,8 @@
     "aarch64": "aarch64",
     "armv7l": "armv7"
   },
-  "auto_update": true
+  "auto_update": true,
+  "bash_completion": {
+    "command": "ast-grep completions bash"
+  }
 }

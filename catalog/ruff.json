@@ -5,5 +5,8 @@
   "description": "An extremely fast Python linter and code formatter, written in Rust",
   "homepage": "https://github.com/astral-sh/ruff",
   "package_name": "ruff",
-  "auto_update": true
+  "auto_update": true,
+  "bash_completion": {
+    "command": "ruff generate-shell-completion bash"
+  }
 }

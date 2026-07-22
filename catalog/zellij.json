@@ -27,5 +27,8 @@
         "crate": "zellij"
       }
     }
-  ]
+  ],
+  "bash_completion": {
+    "command": "zellij setup --generate-completion bash"
+  }
 }

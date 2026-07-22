@@ -20,5 +20,8 @@
     "display_name": "kubectl",
     "install_action": "install",
     "order": 203
+  },
+  "bash_completion": {
+    "command": "kubectl completion bash"
   }
 }
