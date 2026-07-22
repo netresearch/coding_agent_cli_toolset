@@ -46,10 +46,18 @@ remove_bashrc_block() {
   grep -qF "$BEGIN_MARK" "$BASHRC" 2>/dev/null || return 0
   local tmp
   tmp="$(mktemp)"
+  # Hardened: if the begin marker has no matching end marker (tampering / a
+  # write interrupted mid-block), restore the region intact rather than
+  # deleting everything that follows the begin marker.
   awk -v b="$BEGIN_MARK" -v e="$END_MARK" '
-    $0 == b {skip=1}
-    skip && $0 == e {skip=0; next}
-    !skip {print}
+    !skip && $0 == b { skip=1; buf=$0 ORS; next }
+    skip {
+      buf = buf $0 ORS
+      if ($0 == e) { skip=0; buf="" }
+      next
+    }
+    { print }
+    END { if (skip) printf "%s", buf }
   ' "$BASHRC" >"$tmp"
   cat "$tmp" >"$BASHRC"
   rm -f "$tmp"

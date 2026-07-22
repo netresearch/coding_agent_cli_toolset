@@ -92,3 +92,14 @@ class TestBleshInstaller:
         assert "export FOO=bar" in proc.stdout
         assert "alias ll='ls -la'" in proc.stdout
         assert "cli-audit: ble.sh" not in proc.stdout
+
+    def test_bashrc_removal_preserves_content_when_end_marker_missing(self, tmp_path):
+        # A begin marker without its matching end marker (tampering / interrupted
+        # write) must NOT cause removal to delete everything that follows it.
+        bashrc = tmp_path / ".bashrc"
+        bashrc.write_text("keepA\n" "# >>> cli-audit: ble.sh >>>\n" "orphan\n" "keepB\n")
+        proc = self._run_sourced(tmp_path, 'remove_bashrc_block; cat "$HOME/.bashrc"')
+        assert proc.returncode == 0, proc.stderr
+        # Unbalanced block is left intact; trailing user content survives.
+        assert "keepA" in proc.stdout
+        assert "keepB" in proc.stdout
