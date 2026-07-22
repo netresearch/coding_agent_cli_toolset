@@ -8,10 +8,15 @@ no real tool execution: completion "commands" are plain `printf` snippets.
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
+
+import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 LIB = PROJECT_ROOT / "scripts" / "lib" / "completion.sh"
+
+skip_on_windows = pytest.mark.skipif(sys.platform == "win32", reason="Shell script tests require POSIX shell")
 
 
 def _write_catalog(catalog_dir: Path, name: str, entry: dict) -> None:
@@ -38,6 +43,7 @@ def _completions_path(xdg: Path, name: str) -> Path:
     return xdg / "bash-completion" / "completions" / name
 
 
+@skip_on_windows
 class TestInstallCompletion:
     def test_command_shape_installs_named_by_binary(self, tmp_path):
         catalog = tmp_path / "catalog"
@@ -130,6 +136,7 @@ class TestInstallCompletion:
         assert "rc=1" in proc.stdout
 
 
+@skip_on_windows
 class TestRemoveCompletion:
     def test_remove_deletes_installed_file(self, tmp_path):
         catalog = tmp_path / "catalog"
@@ -197,6 +204,7 @@ class TestRealCatalogSchema:
 WRAPPER = PROJECT_ROOT / "scripts" / "install_completion.sh"
 
 
+@skip_on_windows
 class TestWrapperCli:
     def _run_wrapper(self, catalog, xdg, home, *args):
         env = {
