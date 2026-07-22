@@ -1,0 +1,13 @@
+{
+  "name": "blesh",
+  "category": "general",
+  "install_method": "dedicated_script",
+  "script": "install_blesh.sh",
+  "description": "Bash Line Editor — full-featured line editor for interactive Bash (syntax highlighting, autosuggestions, completion UI)",
+  "homepage": "https://github.com/akinomyoga/ble.sh",
+  "github_repo": "akinomyoga/ble.sh",
+  "binary_name": "ble.sh",
+  "version_command": "bash \"$HOME/.local/share/blesh/ble.sh\" --version 2>/dev/null",
+  "notes": "Not a PATH binary — sourced from ~/.local/share/blesh/ble.sh via .bashrc. Built from source (git clone --recursive + make install PREFIX=~/.local). Requires git, make, gawk.",
+  "tags": []
+}
