@@ -9,11 +9,16 @@ real network install.
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
+
+import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CATALOG = PROJECT_ROOT / "catalog" / "blesh.json"
 SCRIPT = PROJECT_ROOT / "scripts" / "install_blesh.sh"
+
+skip_on_windows = pytest.mark.skipif(sys.platform == "win32", reason="Shell script tests require POSIX shell")
 
 
 class TestBleshCatalog:
@@ -40,6 +45,7 @@ class TestBleshCatalog:
         assert "source" in data.get("notes", "").lower()
 
 
+@skip_on_windows
 class TestBleshInstaller:
     def test_script_exists_and_executable(self):
         assert SCRIPT.exists(), "install_blesh.sh should exist"
