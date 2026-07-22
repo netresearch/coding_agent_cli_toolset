@@ -45,6 +45,21 @@ _completion_name() {
   printf '%s' "$tool"
 }
 
+# _completion_run CMD -> run a generator command, bounded by `timeout` when the
+# platform provides one (GNU coreutils; absent from a stock macOS, where
+# gtimeout may exist via Homebrew). Falls back to a plain run rather than
+# failing, so completion generation still works without coreutils.
+_completion_run() {
+  local cmd="$1"
+  if command -v timeout >/dev/null 2>&1; then
+    timeout 30 bash -c "$cmd"
+  elif command -v gtimeout >/dev/null 2>&1; then
+    gtimeout 30 bash -c "$cmd"
+  else
+    bash -c "$cmd"
+  fi
+}
+
 # _completion_looks_valid FILE -> 0 if the file looks like a bash completion
 # script. Requires a real completion signature — the `complete` builtin WITH a
 # flag (-F/-o/-C/-W/…), a `compgen` call, or a `COMPREPLY` assignment. A bare
@@ -120,10 +135,13 @@ install_completion() {
   if [ -n "$cmd" ] && [ "$cmd" != "null" ]; then
     # Generate to stdout. stderr is discarded so tool noise never lands in the
     # completion file; validation below rejects anything that isn't completion.
-    # stdin MUST be detached and the run bounded: a generator that falls through
-    # to reading stdin (or blocks) would otherwise hang the whole install
-    # indefinitely, since stdin is inherited from make/the user's terminal.
-    timeout 30 bash -c "$cmd" >"$tmp" 2>/dev/null </dev/null || true
+    # stdin MUST be detached: a generator that falls through to reading stdin
+    # would otherwise hang the whole install indefinitely, since stdin is
+    # inherited from make/the user's terminal. </dev/null is portable and does
+    # the real work; the timeout is extra insurance for a generator that blocks
+    # on something else, and is only used where available (macOS ships no
+    # GNU `timeout` — hard-coding it made every generator fail there).
+    _completion_run "$cmd" >"$tmp" 2>/dev/null </dev/null || true
   elif [ -n "$src" ] && [ "$src" != "null" ]; then
     local clone_path base full
     clone_path="$(jq -r '.clone_path // ""' "$catalog" 2>/dev/null)"
