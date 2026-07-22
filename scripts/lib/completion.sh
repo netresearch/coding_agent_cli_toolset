@@ -25,12 +25,15 @@ completion_catalog_dir() {
   printf '%s' "${CLI_AUDIT_CATALOG_DIR:-$_COMPLETION_LIB_DIR/../../catalog}"
 }
 
-# _completion_catalog_file TOOL -> path to catalog JSON (echoes nothing if absent)
+# _completion_catalog_file TOOL -> path to catalog JSON (echoes nothing if absent).
+# Always returns 0: callers capture it in an assignment, and a non-zero status
+# there would abort a `set -e` caller before their own "no catalog" guard runs.
 _completion_catalog_file() {
   local tool="$1"
   local f
   f="$(completion_catalog_dir)/${tool}.json"
-  [ -f "$f" ] && printf '%s' "$f"
+  [ -f "$f" ] || return 0
+  printf '%s' "$f"
 }
 
 # _completion_name TOOL -> the command name the completion file must be named
@@ -76,8 +79,13 @@ ensure_bash_completion_framework() {
   # 2) Ensure interactive shells load it (guarded; no-op if already loaded by
   #    /etc/bash.bashrc). The block sources the framework only when its
   #    initializer function is not yet defined.
+  # The interactive guard is essential: the distro bash_completion script has no
+  # guard of its own and enables `extglob`/`progcomp` at top level. Without
+  # `$- == *i*` a non-interactive shell that sources ~/.bashrc (e.g. `ssh host
+  # somescript`) would silently get extended globbing, changing how patterns
+  # like !(…) / @(…) parse. Also skipped in POSIX mode, as distro rc files do.
   local content
-  content='if ! declare -F _init_completion >/dev/null 2>&1; then
+  content='if [[ $- == *i* ]] && ! shopt -oq posix && ! declare -F _init_completion >/dev/null 2>&1; then
   for _f in /usr/share/bash-completion/bash_completion /etc/bash_completion; do
     [ -r "$_f" ] && { . "$_f"; break; }
   done
@@ -112,7 +120,10 @@ install_completion() {
   if [ -n "$cmd" ] && [ "$cmd" != "null" ]; then
     # Generate to stdout. stderr is discarded so tool noise never lands in the
     # completion file; validation below rejects anything that isn't completion.
-    bash -c "$cmd" >"$tmp" 2>/dev/null || true
+    # stdin MUST be detached and the run bounded: a generator that falls through
+    # to reading stdin (or blocks) would otherwise hang the whole install
+    # indefinitely, since stdin is inherited from make/the user's terminal.
+    timeout 30 bash -c "$cmd" >"$tmp" 2>/dev/null </dev/null || true
   elif [ -n "$src" ] && [ "$src" != "null" ]; then
     local clone_path base full
     clone_path="$(jq -r '.clone_path // ""' "$catalog" 2>/dev/null)"
@@ -141,8 +152,18 @@ install_completion() {
   local name dir
   name="$(_completion_name "$tool" "$catalog")"
   dir="$(completion_dir)"
-  mkdir -p "$dir"
-  mv "$tmp" "$dir/$name"
+  # Both steps must be checked: the trailing echo would otherwise mask a failure
+  # behind a 0 return, reporting "installed" with nothing written.
+  if ! mkdir -p "$dir" 2>/dev/null; then
+    echo "[completion] $tool: cannot create $dir" >&2
+    rm -f "$tmp"
+    return 1
+  fi
+  if ! mv "$tmp" "$dir/$name" 2>/dev/null; then
+    echo "[completion] $tool: failed to install into $dir" >&2
+    rm -f "$tmp"
+    return 1
+  fi
   echo "[completion] $tool: installed completion ($name)" >&2
 }
 

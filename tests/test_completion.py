@@ -168,6 +168,149 @@ class TestRemoveCompletion:
         assert "rc=0" in proc.stdout
 
 
+@skip_on_windows
+class TestRobustness:
+    """Regressions for defects found in adversarial review of #121."""
+
+    def test_unknown_tool_via_wrapper_under_set_e_exits_zero(self, tmp_path):
+        # _completion_catalog_file used to return 1 for a missing catalog, which
+        # aborted the `set -euo pipefail` wrapper before its own no-op guard.
+        catalog = tmp_path / "catalog"
+        catalog.mkdir()
+        env = {
+            **os.environ,
+            "CLI_AUDIT_CATALOG_DIR": str(catalog),
+            "XDG_DATA_HOME": str(tmp_path / "xdg"),
+            "HOME": str(tmp_path),
+        }
+        proc = subprocess.run(
+            ["bash", str(WRAPPER), "ghost", "install"],
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        assert proc.returncode == 0, f"stdout={proc.stdout} stderr={proc.stderr}"
+
+    def test_unwritable_target_reports_failure_and_leaks_no_tempfile(self, tmp_path):
+        # mkdir/mv were unchecked, so a failed install still echoed "installed"
+        # and returned 0, leaving the temp file behind.
+        catalog = tmp_path / "catalog"
+        _write_catalog(
+            catalog,
+            "g",
+            {"name": "g", "binary_name": "g", "bash_completion": {"command": "printf 'complete -F _g g\\n'"}},
+        )
+        blocked = tmp_path / "blocked"
+        blocked.mkdir()
+        blocked.chmod(0o500)
+        tmpdir = tmp_path / "tmp"
+        tmpdir.mkdir()
+        env = {
+            **os.environ,
+            "CLI_AUDIT_CATALOG_DIR": str(catalog),
+            "XDG_DATA_HOME": str(blocked / "sub"),
+            "HOME": str(tmp_path),
+            "TMPDIR": str(tmpdir),
+        }
+        proc = subprocess.run(
+            ["bash", "-c", f'source "{LIB}"\ninstall_completion g; echo rc=$?'],
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        blocked.chmod(0o700)
+        assert "rc=1" in proc.stdout
+        assert "installed completion" not in proc.stderr
+        assert list(tmpdir.iterdir()) == [], "temp file leaked"
+
+    def test_generator_reading_stdin_does_not_hang(self, tmp_path):
+        # stdin is now detached and the run bounded; `cat` used to block forever.
+        catalog = tmp_path / "catalog"
+        _write_catalog(
+            catalog,
+            "h",
+            {"name": "h", "binary_name": "h", "bash_completion": {"command": "cat"}},
+        )
+        env = {
+            **os.environ,
+            "CLI_AUDIT_CATALOG_DIR": str(catalog),
+            "XDG_DATA_HOME": str(tmp_path / "xdg"),
+            "HOME": str(tmp_path),
+        }
+        proc = subprocess.run(
+            ["bash", "-c", f'source "{LIB}"\ninstall_completion h'],
+            capture_output=True,
+            text=True,
+            env=env,
+            stdin=subprocess.PIPE,
+            timeout=30,
+        )
+        assert proc.returncode == 1
+
+    def test_framework_block_is_guarded_for_non_interactive_shells(self, tmp_path):
+        # The distro bash_completion enables extglob/progcomp at top level and
+        # has no guard of its own; sourcing it non-interactively changes glob
+        # semantics for scripts (e.g. `ssh host somescript`).
+        env = {**os.environ, "HOME": str(tmp_path)}
+        subprocess.run(
+            ["bash", "-c", f'source "{LIB}"\nensure_bash_completion_framework'],
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        bashrc = tmp_path / ".bashrc"
+        if not bashrc.exists():
+            pytest.skip("framework not available in this environment")
+        assert "$- == *i*" in bashrc.read_text()
+        proc = subprocess.run(
+            ["bash", "-c", 'source "$HOME/.bashrc" 2>/dev/null; shopt extglob'],
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        assert "off" in proc.stdout, "non-interactive shell got extglob enabled"
+
+
+@skip_on_windows
+class TestBashrcLib:
+    """Direct coverage for the shared managed-block primitives."""
+
+    BASHRC_LIB = PROJECT_ROOT / "scripts" / "lib" / "bashrc.sh"
+
+    def _run(self, home, snippet):
+        return subprocess.run(
+            ["bash", "-c", f'source "{self.BASHRC_LIB}"\n{snippet}'],
+            capture_output=True,
+            text=True,
+            env={**os.environ, "HOME": str(home)},
+        )
+
+    def test_ensure_is_idempotent(self, tmp_path):
+        rc = tmp_path / "rc"
+        proc = self._run(
+            tmp_path,
+            f'bashrc_ensure_block "{rc}" demo "X"; bashrc_ensure_block "{rc}" demo "X"; '
+            f'grep -c ">>> cli-audit: demo >>>" "{rc}"',
+        )
+        assert proc.stdout.strip().splitlines()[-1] == "1"
+
+    def test_remove_preserves_surrounding_content(self, tmp_path):
+        rc = tmp_path / "rc"
+        rc.write_text("before\nafter\n")
+        proc = self._run(
+            tmp_path,
+            f'bashrc_ensure_block "{rc}" demo "X"; bashrc_remove_block "{rc}" demo; cat "{rc}"',
+        )
+        assert "before" in proc.stdout and "after" in proc.stdout
+        assert "cli-audit" not in proc.stdout
+
+    def test_remove_restores_unbalanced_block_intact(self, tmp_path):
+        rc = tmp_path / "rc"
+        rc.write_text("keepA\n# >>> cli-audit: demo >>>\norphan\nkeepB\n")
+        proc = self._run(tmp_path, f'bashrc_remove_block "{rc}" demo; cat "{rc}"')
+        assert "keepA" in proc.stdout and "keepB" in proc.stdout
+
+
 class TestRealCatalogSchema:
     """Invariants over the shipped catalog's bash_completion declarations."""
 

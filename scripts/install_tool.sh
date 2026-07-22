@@ -159,7 +159,9 @@ rc=0
 "$INSTALLER_SCRIPT" "$TOOL" "$@" || rc=$?
 if [ "$rc" -eq 0 ]; then
   case "$ACTION" in
-    install|update|reconcile) post_install_completion "$TOOL" ;;
+    # || true: completion is best-effort and must never turn a successful
+    # install into a non-zero exit (this call is not otherwise set -e exempt).
+    install|update|reconcile) post_install_completion "$TOOL" || true ;;
   esac
 fi
 exit "$rc"
