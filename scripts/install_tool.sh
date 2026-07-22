@@ -7,6 +7,9 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source reconciliation libraries
 . "$DIR/lib/reconcile.sh"
+# Source bash-completion lifecycle helpers (install_completion / remove_completion /
+# post_install_completion). All completion operations are best-effort.
+. "$DIR/lib/completion.sh"
 
 TOOL="${1:-}"
 ACTION="${2:-install}"
@@ -48,6 +51,9 @@ fi
 
 # Handle uninstall universally - remove ALL installations found
 if [ "$ACTION" = "uninstall" ]; then
+  # Remove any installed bash completion for this tool (best-effort).
+  remove_completion "$TOOL" || true
+
   # For dedicated_script tools, delegate to their own uninstall handler first
   if [ "$INSTALL_METHOD" = "dedicated_script" ]; then
     script_name="$(jq -r '.script // ""' "$CATALOG_FILE" 2>/dev/null || true)"
@@ -117,7 +123,9 @@ if [ "$INSTALL_METHOD" = "auto" ]; then
     install|update|reconcile)
       # Pass the actual action to reconcile_tool
       reconcile_tool "$CATALOG_FILE" "$ACTION"
-      exit $?
+      rc=$?
+      [ "$rc" -eq 0 ] && post_install_completion "$TOOL"
+      exit "$rc"
       ;;
     status)
       reconcile_tool "$CATALOG_FILE" "status"
@@ -144,6 +152,14 @@ if [ ! -x "$INSTALLER_SCRIPT" ]; then
   exit 1
 fi
 
-# Execute installer with all remaining arguments
+# Execute installer with all remaining arguments.
+# (Not exec'd, so we can install bash completion after a successful install.)
 shift  # Remove TOOL from $@
-exec "$INSTALLER_SCRIPT" "$TOOL" "$@"
+rc=0
+"$INSTALLER_SCRIPT" "$TOOL" "$@" || rc=$?
+if [ "$rc" -eq 0 ]; then
+  case "$ACTION" in
+    install|update|reconcile) post_install_completion "$TOOL" ;;
+  esac
+fi
+exit "$rc"

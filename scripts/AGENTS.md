@@ -49,7 +49,10 @@
 - `test_smoke.sh`: Smoke test for audit output
 - `auto_update_scope_prototype.sh`: Prototype for scope detection
 
-**Shared utilities:** `scripts/lib/` directory (10 modules):
+**Bash completion:**
+- `install_completion.sh`: Install/remove a tool's bash completion; `--all` backfills every declared tool
+
+**Shared utilities:** `scripts/lib/` directory (12 modules):
 - `lib/common.sh` — Logging and output formatting
 - `lib/config.sh` — Read user config from `~/.config/cli-audit/config.yml`
 - `lib/pins.sh` — Read/write version pins from `~/.config/cli-audit/pins.json`
@@ -57,6 +60,31 @@
 - `lib/capability.sh`, `lib/dependency.sh` — Capability and dependency checks
 - `lib/install_strategy.sh`, `lib/reconcile.sh` — Installation strategies
 - `lib/path_check.sh`, `lib/policy.sh`, `lib/scope_detection.sh` — Path and policy utilities
+- `lib/completion.sh` — Bash-completion install/remove + framework bootstrap
+- `lib/bashrc.sh` — Idempotent managed-block insert/remove in shell rc files
+
+### Bash completion (catalog-driven)
+
+A catalog entry may declare an optional `bash_completion` object with **exactly one** of:
+
+```jsonc
+"bash_completion": { "command": "gh completion bash" }        // generate to stdout
+"bash_completion": { "source_path": "shell/completion.bash" } // copy from clone_path
+```
+
+Completion files are written to `${XDG_DATA_HOME:-~/.local/share}/bash-completion/completions/`
+and named after the tool's **`binary_name`** (the command being completed), so the
+bash-completion framework lazy-loads them. Consequences to respect:
+
+- **Never declare `bash_completion` on two entries sharing a `binary_name`** — the second
+  would overwrite the first (e.g. the `compose` entry has `binary_name: docker`, so
+  completion belongs on `docker` only).
+- Generated output is validated (`complete -…` / `compgen ` / `COMPREPLY`) before being
+  written; tools that echo help text for an unknown `completion` argument are rejected.
+- All completion work is **best-effort** — it never fails the surrounding install/uninstall.
+
+`install_tool.sh` installs completion after a successful install/update/reconcile and removes
+it on uninstall. Use `make completions` to backfill tools installed before this existed.
 
 ## Setup & environment
 

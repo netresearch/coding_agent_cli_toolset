@@ -104,6 +104,8 @@ This repo **is** a CLI tool manager, so the word "upgrade" is overloaded:
 | `make reset-pins` | Remove all version pins |
 | `make upgrade-all` | Full system upgrade (data + managers + tools) |
 | `./scripts/set_auto_update.sh <tool>` | Enable auto-update for a tool |
+| `make completions` | Install bash completions for all installed tools that declare one |
+| `make completion-<tool>` | Install bash completion for one tool (e.g. `make completion-gh`) |
 | `uv run python audit.py --versions` | Show multi-version runtime status |
 | `uv run python audit.py --versions php` | Show specific runtime versions |
 
