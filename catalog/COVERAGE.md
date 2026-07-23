@@ -2,7 +2,7 @@
 
 This file documents which tools have catalog entries and which use dedicated install scripts.
 
-## Tools with Catalog Entries (56)
+## Tools with Catalog Entries (57)
 
 These tools use the catalog-based installation system with generic installers:
 
@@ -11,7 +11,7 @@ These tools use the catalog-based installation system with generic installers:
 - git-branchless, git-lfs, gitleaks, glab, golangci-lint, httpie, isort, just
 - kubectl, ninja, npm, opengrep, parallel, pip, pipx, pnpm, poetry, pre-commit
 - prettier, rga, ripgrep, ruff, sd, semgrep, shellcheck, shfmt, sponge, terraform
-- tfsec, trivy, watchexec, xsv, yarn, yq
+- tfsec, trivy, vault, watchexec, xsv, yarn, yq
 
 ## Tools with Dedicated Install Scripts
 
@@ -49,16 +49,16 @@ Most now in catalog, one dedicated script:
 - **github_release_binary**: 32 tools
 - **uv_tool**: 8 tools (Python CLI tools)
 - **package_manager**: 10 tools (pip, pipx, poetry, npm, pnpm, yarn, gem, composer, sponge, entr)
-- **hashicorp_zip**: 1 tool (terraform)
+- **hashicorp_zip**: 2 tools (terraform, vault)
 - **aws_installer**: 1 tool (aws)
 - **npm_global**: 1 tool (prettier)
 - **script**: 1 tool (parallel)
 - **dedicated_script**: 10 tools (runtimes: go, rust, python, node; special: uv, docker, git, ctags, gam)
 - **system_package**: 2 tools (cscope, rename variants)
 
-## Total: 71 tools tracked
+## Total: 72 tools tracked
 
-- **56 tools** have catalog entries
+- **57 tools** have catalog entries
 - **10 tools** use dedicated scripts (runtimes + special cases)
 - **5 tools** are system packages only
 
@@ -101,7 +101,7 @@ direnv, dust, entr, eslint, flake8, gam, gem, gemini, gh-aw-firewall, git,
 git-branchless, git-filter-repo, go, google-workspace-cli, gosec, httpie,
 hyperfine, isort, jq, ninja, opengrep, php, pre-commit, prename, prettier,
 python, qsv, rename.ul, ruby, ruby-build, sd, semgrep, shellcheck, shfmt,
-sponge, templ, terraform, tfsec, tmux, tokei, tree, wslu, xsv, yarn
+sponge, templ, terraform, tfsec, tmux, tokei, tree, vault, wslu, xsv, yarn
 
 (`git` and `docker` already ship completions via the distro `bash-completion`
 package; `docker` is still declared so the generated script matches the
