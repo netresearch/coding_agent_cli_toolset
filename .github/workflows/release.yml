@@ -6,121 +6,44 @@ on:
       - 'v*.*.*'
   workflow_dispatch:
 
-permissions:
-  contents: write
+permissions: {}
 
+# Thin caller: build, dist check, GitHub Release and PyPI upload all live in
+# the shared reusable, so every pinned action version is maintained centrally
+# in netresearch/.github. This workflow has zero step-level `uses:`.
+#
+# PyPI publishing is OFF, and that records a fact rather than making a policy
+# choice: the token-based publish jobs this replaces could never have run.
+# The repo has no Actions secrets at all, so PYPI_API_TOKEN and
+# TEST_PYPI_API_TOKEN resolved to empty; there are no tags, no releases, and
+# cli-audit is not registered on PyPI.
+#
+# Turning publishing on needs two things that cannot be done from a workflow
+# file:
+#   1. a PyPI Trusted Publisher configured for
+#      netresearch/coding_agent_cli_toolset, pointing at this workflow and at
+#      the environment named by the reusable's `pypi-environment` input,
+#   2. that GitHub Environment (only `copilot` exists today).
+# Then set publish-pypi: true. No token is required — the reusable uploads
+# via OIDC Trusted Publishing.
 jobs:
-  build:
-    name: Build Distribution
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: '3.14'
-
-      - name: Install build tools
-        run: |
-          python -m pip install --upgrade pip
-          pip install build twine
-
-      - name: Build package
-        run: |
-          python -m build
-
-      - name: Check package
-        run: |
-          twine check dist/*
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: distributions
-          path: dist/
-
   release:
-    name: Create GitHub Release
-    runs-on: ubuntu-latest
-    needs: [build]
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Download artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: distributions
-          path: dist/
-
-      - name: Extract version
-        id: version
-        run: |
-          echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-
-      - name: Generate changelog
-        id: changelog
-        run: |
-          # Extract changes for this version from CHANGELOG if it exists
-          if [ -f CHANGELOG.md ]; then
-            echo "CHANGES<<EOF" >> $GITHUB_OUTPUT
-            sed -n "/^## \[${VERSION}\]/,/^## \[/p" CHANGELOG.md | sed '$d' >> $GITHUB_OUTPUT || echo "See CHANGELOG.md for details" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-          else
-            echo "CHANGES=Release ${VERSION}" >> $GITHUB_OUTPUT
-          fi
-        env:
-          VERSION: ${{ steps.version.outputs.VERSION }}
-
-      - name: Create Release
-        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
-        with:
-          files: dist/*
-          body: ${{ steps.changelog.outputs.CHANGES }}
-          draft: false
-          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  publish-pypi:
-    name: Publish to PyPI
-    runs-on: ubuntu-latest
-    needs: [build, release]
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: distributions
-          path: dist/
-
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247 # v1.14.1
-        with:
-          password: ${{ secrets.PYPI_API_TOKEN }}
-          skip-existing: true
-
-  publish-test-pypi:
-    name: Publish to Test PyPI
-    runs-on: ubuntu-latest
-    needs: [build]
-    if: github.event_name == 'workflow_dispatch'
-
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: distributions
-          path: dist/
-
-      - name: Publish to Test PyPI
-        uses: pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247 # v1.14.1
-        with:
-          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
-          repository-url: https://test.pypi.org/legacy/
-          skip-existing: true
+    uses: netresearch/.github/.github/workflows/python-release.yml@main
+    permissions:
+      contents: write
+      id-token: write
+    with:
+      python-version: '3.14'
+      package-manager: pip
+      install-cmd: python -m pip install --upgrade pip build twine
+      build-cmd: python -m build
+      check-cmd: python -m twine check dist/*
+      # Attach the sdist and wheel to the Release, as the previous
+      # softprops/action-gh-release step did via `files: dist/*`.
+      release-files: dist/*
+      # Reproduces the previous prerelease expression and also covers the
+      # PEP 440 spellings it missed. The project is on 2.0.0-alpha.6, so
+      # prerelease tags are the normal case here, not the exception.
+      prerelease: auto
+      publish-pypi: false
+      publish-testpypi: false
