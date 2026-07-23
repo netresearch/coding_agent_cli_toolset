@@ -1,0 +1,19 @@
+{
+  "name": "vault",
+  "category": "devops",
+  "install_method": "hashicorp_zip",
+  "description": "Secrets management tool",
+  "homepage": "https://www.vaultproject.io/",
+  "github_repo": "hashicorp/vault",
+  "product_name": "vault",
+  "binary_name": "vault",
+  "arch_map": {
+    "x86_64": "amd64",
+    "aarch64": "arm64"
+  },
+  "guide": {
+    "display_name": "Vault",
+    "install_action": "install",
+    "order": 205
+  }
+}
