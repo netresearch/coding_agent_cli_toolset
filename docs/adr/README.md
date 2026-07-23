@@ -104,6 +104,8 @@ ADRs are **immutable** once accepted. To change a decision:
 | [006](ADR-006-configuration-file-format.md) | Configuration File Format | Accepted | 2025-10-09 | configuration, yaml |
 | [007](ADR-007-generic-tool-installation-architecture.md) | Generic Tool Installation Architecture | Accepted | 2026-02-25 | installation, catalog, generic-installer |
 | [008](ADR-008-makefile-pattern-target-fallback.md) | Makefile Pattern Target Fallback Chain | Accepted | 2026-02-25 | makefile, installation, pattern-targets |
+| [009](ADR-009-first-class-multi-install.md) | First-Class Support for Multiple Installations | Proposed | 2026-04-21 | detection, audit, upgrade, pinning, reconciliation |
+| [010](ADR-010-reconcile-engine-single-source-of-truth.md) | Reconcile Engine as Single Source of Truth | Accepted | 2026-07-23 | reconciliation, cli, safety, makefile |
 
 ---
 
@@ -125,13 +127,17 @@ ADRs are **immutable** once accepted. To change a decision:
 - ADR-005: Environment Detection Logic
 - ADR-006: Configuration File Format
 
+**Multi-Install and Reconciliation:**
+- ADR-009: First-Class Support for Multiple Installations
+- ADR-010: Reconcile Engine as Single Source of Truth
+
 ### By Tag
 
 **installation:** ADR-001, ADR-002, ADR-003, ADR-007, ADR-008
 **environment-detection:** ADR-001, ADR-005
 **versioning:** ADR-004
 **configuration:** ADR-006
-**reconciliation:** ADR-003
+**reconciliation:** ADR-003, ADR-009, ADR-010
 **package-managers:** ADR-002
 **catalog:** ADR-007
 **makefile:** ADR-008
