@@ -1260,3 +1260,57 @@ class TestUpdateLocalPreservesLatest:
         assert entry["installed_version"] not in ("", "0.0.1"), "installed must be refreshed"
         # directional status: real git (e.g. 2.x) < 999.0.0 -> OUTDATED
         assert entry["status"] == "OUTDATED"
+
+
+@skip_on_windows
+class TestUpdateBaselineMerges:
+    """A tool-scoped `--update-baseline <tool>` must MERGE the collected entry
+    into the existing committed baseline, never replace the whole file with only
+    the requested tool (issue #125: `--update-baseline vault` dropped every other
+    entry). Failed collections must likewise leave the existing entry intact."""
+
+    def _seed_baseline(self, path):
+        path.write_text(json.dumps({
+            "__meta__": {"baseline_updated_at": "2026-01-01T00:00:00Z",
+                         "schema_version": 2, "source": "test"},
+            "versions": {
+                "keepme": {"latest_tag": "v1.0.0", "latest_version": "1.0.0",
+                           "latest_url": "", "tool_url": "", "upstream_method": "gh"},
+                "ripgrep": {"latest_tag": "v0.0.1", "latest_version": "0.0.1",
+                            "latest_url": "", "tool_url": "", "upstream_method": "gh"},
+            },
+        }))
+
+    def test_single_tool_update_preserves_other_entries(self, tmp_path, monkeypatch):
+        import argparse
+        import audit
+        baseline = tmp_path / "upstream_versions.json"
+        self._seed_baseline(baseline)
+        monkeypatch.setenv("CLI_AUDIT_UPSTREAM_FILE", str(baseline))
+
+        with patch.object(audit, "collect_latest_version", return_value=("v9.9.9", "9.9.9")), \
+                patch.object(audit, "get_github_rate_limit", return_value=None):
+            rc = audit.cmd_update_baseline(argparse.Namespace(tools=["ripgrep"]))
+
+        assert rc == 0
+        data = json.loads(baseline.read_text())
+        assert data["versions"]["ripgrep"]["latest_version"] == "9.9.9"
+        assert "keepme" in data["versions"], "unrelated entries must survive a tool-scoped run"
+        assert data["versions"]["keepme"]["latest_version"] == "1.0.0"
+
+    def test_failed_collection_keeps_existing_entry(self, tmp_path, monkeypatch):
+        import argparse
+        import audit
+        baseline = tmp_path / "upstream_versions.json"
+        self._seed_baseline(baseline)
+        monkeypatch.setenv("CLI_AUDIT_UPSTREAM_FILE", str(baseline))
+
+        with patch.object(audit, "collect_latest_version", side_effect=RuntimeError("network down")), \
+                patch.object(audit, "get_github_rate_limit", return_value=None):
+            rc = audit.cmd_update_baseline(argparse.Namespace(tools=["ripgrep"]))
+
+        assert rc == 0
+        data = json.loads(baseline.read_text())
+        # transient failure must not delete the committed entry
+        assert data["versions"]["ripgrep"]["latest_version"] == "0.0.1"
+        assert "keepme" in data["versions"]

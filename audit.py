@@ -36,7 +36,7 @@ from cli_audit import collectors  # noqa: E402
 from cli_audit.logging_config import setup_logging  # noqa: E402
 # Split file support (Phase 2.1)
 from cli_audit.upstream_cache import (  # noqa: E402
-    UpstreamVersion, UpstreamCache,
+    UpstreamVersion,
     load_upstream_cache, write_upstream_cache, get_upstream_cache_path,
     update_cached_upstream,
 )
@@ -1025,9 +1025,12 @@ def cmd_update_baseline(args: argparse.Namespace) -> int:
 
     print(f"# Collecting upstream versions for {total} tools...", file=sys.stderr)
 
-    # Collect upstream versions only
-    upstream_cache = UpstreamCache()
+    # Collect upstream versions only. Merge into the existing baseline so a
+    # tool-scoped run (or a transient collection failure) never drops the
+    # entries that were not collected this run (issue #125).
+    upstream_cache = load_upstream_cache()
     completed = 0
+    collected = 0
 
     with ThreadPoolExecutor(max_workers=min(MAX_WORKERS, total)) as executor:
         future_to_tool = {}
@@ -1048,6 +1051,7 @@ def cmd_update_baseline(args: argparse.Namespace) -> int:
                 )
                 upstream_cache.versions[tool.name] = version
                 completed += 1
+                collected += 1
 
                 display = latest_num or latest_tag or "n/a"
                 print(f"# [{completed}/{total}] {tool.name}: {display}", file=sys.stderr)
@@ -1059,7 +1063,7 @@ def cmd_update_baseline(args: argparse.Namespace) -> int:
     write_upstream_cache(upstream_cache)
     print("", file=sys.stderr)
     print(f"✓ Upstream baseline updated: {get_upstream_cache_path()}", file=sys.stderr)
-    print(f"✓ Collected {len(upstream_cache.versions)} versions", file=sys.stderr)
+    print(f"✓ Collected {collected}/{total} versions", file=sys.stderr)
 
     # Report rate limit
     rate_limit = get_github_rate_limit()
