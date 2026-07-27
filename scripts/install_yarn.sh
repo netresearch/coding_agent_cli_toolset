@@ -3,8 +3,9 @@ set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$DIR/lib/common.sh"
+. "$DIR/lib/install_strategy.sh"
 
-ACTION="${1:-update}"
+ACTION="${1:-install}"
 
 check_nvm_node() {
   # Check if Node.js is nvm-managed (resolve symlinks)
@@ -27,6 +28,7 @@ check_nvm_node() {
 }
 
 update_yarn() {
+  local allow_install="${1:-false}"
   ensure_nvm_loaded
 
   if ! command -v node >/dev/null 2>&1; then
@@ -44,13 +46,18 @@ update_yarn() {
     return 1
   fi
 
+  if ! command -v yarn >/dev/null 2>&1 && [ "$allow_install" != "true" ]; then
+    echo "[yarn] Yarn is not installed; skipping update" >&2
+    return 0
+  fi
+
   local before after path
   before="$(yarn --version 2>/dev/null || echo '<none>')"
 
   # Try corepack first (modern approach)
   if command -v corepack >/dev/null 2>&1; then
     echo "[yarn] Updating yarn via corepack..." >&2
-    corepack enable || true
+    corepack enable yarn || true
     corepack prepare yarn@stable --activate || true
   else
     # Fallback to npm global install
@@ -69,7 +76,7 @@ update_yarn() {
 install_yarn() {
   echo "[yarn] yarn should be installed via Node.js corepack/npm. Installing/updating Node.js first..."
   "$DIR/install_node.sh" install || true
-  update_yarn
+  update_yarn true
 }
 
 reconcile_yarn() {
@@ -89,13 +96,26 @@ reconcile_yarn() {
     apt_remove_if_present cmdtest yarnpkg || true
   fi
 
-  update_yarn
+  update_yarn true
 }
 
 uninstall_yarn() {
-  echo "[yarn] yarn is managed by Node.js/npm. To remove:" >&2
-  echo "[yarn]   npm uninstall -g yarn" >&2
-  echo "[yarn]   or: corepack disable" >&2
+  ensure_nvm_loaded
+
+  if command -v npm >/dev/null 2>&1; then
+    npm uninstall -g yarn >/dev/null 2>&1 || true
+  fi
+  if command -v corepack >/dev/null 2>&1; then
+    corepack disable yarn >/dev/null 2>&1 || true
+  fi
+
+  refresh_snapshot "yarn" || true
+
+  if command -v yarn >/dev/null 2>&1; then
+    echo "[yarn] Warning: Yarn is still available at $(command -v yarn)" >&2
+    return 1
+  fi
+  echo "[yarn] Successfully removed"
 }
 
 case "$ACTION" in

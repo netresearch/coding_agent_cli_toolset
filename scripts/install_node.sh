@@ -81,6 +81,14 @@ install_node() {
 }
 
 update_node() {
+  # Preserve deliberate uninstalls across the Node.js version switch. nvm
+  # installs a fresh prefix, so checking after the switch would lose whether
+  # these optional package managers existed beforehand.
+  local had_pnpm=0
+  local had_yarn=0
+  command -v pnpm >/dev/null 2>&1 && had_pnpm=1
+  command -v yarn >/dev/null 2>&1 && had_yarn=1
+
   ensure_nvm
   nvm install "$NODE_CHANNEL"
   # Re-source nvm to ensure the new version is active in this shell
@@ -98,12 +106,17 @@ update_node() {
       nvm alias default "$NODE_CHANNEL" || true
       nvm use default || true
     fi
-    # Ensure corepack shims are present
-    corepack enable 2>/dev/null || true
     npm install -g npm@latest || true
-    # Update pnpm and yarn via corepack; fall back to npm global if corepack unavailable
-    corepack prepare pnpm@latest --activate 2>/dev/null || npm install -g pnpm@latest || true
-    corepack prepare yarn@1 --activate 2>/dev/null || npm install -g yarn@latest || true
+    # Only restore/update package managers that were installed before the
+    # Node.js update. Explicit installs still enable both in install_node().
+    if [ "$had_pnpm" -eq 1 ]; then
+      corepack enable pnpm 2>/dev/null || true
+      corepack prepare pnpm@latest --activate 2>/dev/null || npm install -g pnpm@latest || true
+    fi
+    if [ "$had_yarn" -eq 1 ]; then
+      corepack enable yarn 2>/dev/null || true
+      corepack prepare yarn@1 --activate 2>/dev/null || npm install -g yarn@latest || true
+    fi
     npm update -g eslint prettier || true
   else
     echo "=> Node.js version $NODE_VERSION has been updated"
@@ -168,7 +181,8 @@ reconcile_node() {
     after="$(get_specific_node_version "$NODE_CHANNEL")"
     # Get path to the specific version's node binary
     local nvm_dir="${NVM_DIR:-$HOME/.nvm}"
-    local resolved_ver="$(nvm version "$NODE_CHANNEL" 2>/dev/null || true)"
+    local resolved_ver
+    resolved_ver="$(nvm version "$NODE_CHANNEL" 2>/dev/null || true)"
     if [ -n "$resolved_ver" ] && [ "$resolved_ver" != "N/A" ]; then
       path="$nvm_dir/versions/node/$resolved_ver/bin/node"
     fi
@@ -191,5 +205,3 @@ case "$ACTION" in
   reconcile) reconcile_node ;;
   *) echo "Usage: $0 {install|update|uninstall|reconcile}" ; exit 2 ;;
 esac
-
-
