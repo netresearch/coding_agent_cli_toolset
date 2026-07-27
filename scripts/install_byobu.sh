@@ -61,7 +61,8 @@ get_target_version() {
         tags_json="$(gh api "repos/$GITHUB_REPO/tags?per_page=100" 2>/dev/null || true)"
     fi
     if [ -z "$tags_json" ]; then
-        tags_json="$(curl -fsSL --retry 3 --retry-delay 1 --connect-timeout 10 \
+        tags_json="$(curl --proto '=https' --proto-redir '=https' -fsSL \
+            --retry 3 --retry-delay 1 --connect-timeout 10 \
             -H "Accept: application/vnd.github+json" \
             -H "User-Agent: cli-audit" \
             "https://api.github.com/repos/$GITHUB_REPO/tags?per_page=100")"
@@ -119,7 +120,8 @@ install_byobu() {
     url="https://github.com/$GITHUB_REPO/archive/refs/tags/${version}.tar.gz"
 
     echo "[$TOOL] Downloading $url..." >&2
-    if ! curl -fL --retry 3 --retry-delay 1 --connect-timeout 10 \
+    if ! curl --proto '=https' --proto-redir '=https' -fL \
+        --retry 3 --retry-delay 1 --connect-timeout 10 \
         "$url" -o "$archive"; then
         echo "[$TOOL] Error: Failed to download $url" >&2
         return 1

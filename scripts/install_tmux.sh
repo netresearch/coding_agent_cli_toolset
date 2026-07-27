@@ -42,7 +42,8 @@ get_target_version() {
     version="$(gh api "repos/$GITHUB_REPO/releases/latest" --jq '.tag_name' 2>/dev/null || true)"
   fi
   if [ -z "$version" ]; then
-    version="$(curl -fsSIL -H "User-Agent: cli-audit" -o /dev/null -w '%{url_effective}' \
+    version="$(curl --proto '=https' --proto-redir '=https' -fsSIL \
+      -H "User-Agent: cli-audit" -o /dev/null -w '%{url_effective}' \
       "https://github.com/$GITHUB_REPO/releases/latest" 2>/dev/null | awk -F/ '{print $NF}')"
   fi
   printf '%s' "$version"
@@ -86,7 +87,8 @@ install_tmux() {
   BUILD_LOG="$BUILD_TMPDIR/build.log"
 
   echo "[$TOOL] Downloading $url..." >&2
-  if ! curl -fL --retry 3 --retry-delay 1 --connect-timeout 10 \
+  if ! curl --proto '=https' --proto-redir '=https' -fL \
+    --retry 3 --retry-delay 1 --connect-timeout 10 \
     "$url" -o "$BUILD_TMPDIR/$tarball"; then
     echo "[$TOOL] Error: Failed to download $url" >&2
     return 1
