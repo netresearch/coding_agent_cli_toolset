@@ -7,6 +7,8 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source reconciliation libraries
 . "$DIR/lib/reconcile.sh"
+# Source snapshot refresh helper used after uninstall.
+. "$DIR/lib/install_strategy.sh"
 # Source bash-completion lifecycle helpers (install_completion / remove_completion /
 # post_install_completion). All completion operations are best-effort.
 . "$DIR/lib/completion.sh"
@@ -60,6 +62,7 @@ if [ "$ACTION" = "uninstall" ]; then
     if [ -n "$script_name" ] && [ -f "$DIR/$script_name" ]; then
       "$DIR/$script_name" uninstall || true
     fi
+    refresh_snapshot "$TOOL" || true
     # Dedicated scripts handle their own cleanup completely
     # Don't try to detect and remove additional installations
     # (especially important for multi-version tools like node, python, go)
@@ -75,6 +78,7 @@ if [ "$ACTION" = "uninstall" ]; then
 
   if [ "$install_count" -eq 0 ]; then
     echo "[$TOOL] Successfully removed"
+    refresh_snapshot "$TOOL" || true
     exit 0
   fi
 
@@ -113,6 +117,7 @@ if [ "$ACTION" = "uninstall" ]; then
       echo "  • $method: $path"
     done
   fi
+  refresh_snapshot "$TOOL" || true
   exit 0
 fi
 

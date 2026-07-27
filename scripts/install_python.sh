@@ -127,7 +127,10 @@ install_or_update_py_cli() {
       if [ "$cmd" = install ]; then
         uv tool install -q "$p" >/dev/null 2>&1 || true
       else
-        uv tool upgrade -q "$p" >/dev/null 2>&1 || uv tool install -q "$p" >/dev/null 2>&1 || true
+        # Upgrade only tools that are already installed. A failed upgrade
+        # commonly means that the tool was deliberately removed; installing it
+        # here would undo `make uninstall-<tool>`.
+        uv tool upgrade -q "$p" >/dev/null 2>&1 || true
       fi
     done
   else
@@ -139,7 +142,7 @@ install_or_update_py_cli() {
       if [ "$cmd" = install ]; then
         pipx install "$p" >/dev/null 2>&1 || true
       else
-        pipx upgrade "$p" >/dev/null 2>&1 || pipx install "$p" >/dev/null 2>&1 || true
+        pipx upgrade "$p" >/dev/null 2>&1 || true
       fi
     done
   fi
@@ -270,5 +273,3 @@ case "$ACTION" in
   reconcile) reconcile_py_tools ;;
   *) echo "Usage: $0 {install|update|uninstall|reconcile}" ; exit 2 ;;
 esac
-
-
