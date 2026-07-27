@@ -317,7 +317,8 @@ stage_2_managers() {
 	fi
 
 	# Language-specific package managers
-	if command -v pip3 >/dev/null 2>&1; then
+	if command -v python3 >/dev/null 2>&1 &&
+		python3 -m pip --version >/dev/null 2>&1; then
 		# Skip pip if uv is managing Python packages, suggest migration
 		if command -v uv >/dev/null 2>&1; then
 			# Check if there are user-installed pip packages to migrate
@@ -328,9 +329,6 @@ stage_2_managers() {
 			else
 				log_skip "pip (uv is managing Python packages)"
 			fi
-		# Check if pip module is actually available
-		elif ! python3 -m pip --version >/dev/null 2>&1; then
-			log_skip "pip (python3 has no pip module)"
 		elif [ "$DRY_RUN" = "1" ]; then
 			log_info "DRY-RUN: pip upgrade"
 		else
@@ -351,7 +349,7 @@ stage_2_managers() {
 			fi
 		fi
 	else
-		log_skip "pip (not installed)"
+		log_skip "pip (python3 module not installed)"
 	fi
 
 	if command -v uv >/dev/null 2>&1; then

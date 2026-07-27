@@ -166,6 +166,58 @@ stage_2_managers
     )
 
 
+def _run_python_module_pip_stage(tmp_path: Path) -> subprocess.CompletedProcess[str]:
+    project = tmp_path / "project"
+    project.mkdir()
+
+    bash_code = f"""
+set -euo pipefail
+GREEN=
+RESET=
+BLUE=
+YELLOW=
+DRY_RUN=0
+TOTAL_UPGRADED=0
+TOTAL_SKIPPED=0
+PROJECT_ROOT={str(project)!r}
+LOG_FILE={str(tmp_path / "upgrade.log")!r}
+log_stage() {{ :; }}
+log_info() {{ :; }}
+log_skip() {{ :; }}
+log_fail() {{ :; }}
+log_reconcile() {{ :; }}
+python3() {{
+    if [ "${{1:-}} ${{2:-}} ${{3:-}}" = "-m pip --version" ]; then
+        printf 'pip 24.0 from /fake/site-packages/pip (python 3.14)\\n'
+    elif [ "${{1:-}} ${{2:-}} ${{3:-}}" = "-m pip install" ]; then
+        return 0
+    else
+        return 1
+    fi
+}}
+command() {{
+    if [ "${{1:-}}" = "-v" ]; then
+        if [ "${{2:-}}" = "python3" ]; then
+            printf '/fake/python3\\n'
+            return 0
+        fi
+        return 1
+    fi
+    builtin command "$@"
+}}
+eval "$(sed -n '/^get_version()/,/^}}/p' {str(SCRIPT)!r})"
+eval "$(sed -n '/^log_success_with_versions()/,/^}}/p' {str(SCRIPT)!r})"
+eval "$(sed -n '/^log_success_with_info()/,/^}}/p' {str(SCRIPT)!r})"
+eval "$(sed -n '/^stage_2_managers()/,/^}}/p' {str(SCRIPT)!r})"
+stage_2_managers
+"""
+    return subprocess.run(
+        ["bash", "-c", bash_code],
+        capture_output=True,
+        text=True,
+    )
+
+
 def _run_python_runtime_stage(tmp_path: Path) -> subprocess.CompletedProcess[str]:
     project = tmp_path / "project"
     scripts = project / "scripts"
@@ -259,3 +311,9 @@ class TestUpgradeAllVersionReporting:
 
         assert result.returncode == 0, result.stderr
         assert "apt (system) (2.9.0 unchanged at /fake/apt-get)" in result.stdout
+
+    def test_pip_module_does_not_require_separate_pip3_launcher(self, tmp_path):
+        result = _run_python_module_pip_stage(tmp_path)
+
+        assert result.returncode == 0, result.stderr
+        assert "pip (python3 -m pip) (24.0 unchanged at /fake/python3)" in result.stdout
