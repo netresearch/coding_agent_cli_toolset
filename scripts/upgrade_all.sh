@@ -55,14 +55,29 @@ log_success() {
 	TOTAL_UPGRADED=$((TOTAL_UPGRADED + 1))
 }
 
+get_version() {
+	local version_cmd="$1"
+	local version
+	version="$(eval "$version_cmd" 2>/dev/null || true)"
+	printf '%s' "${version:-unknown}"
+}
+
 log_success_with_info() {
 	local name="$1"
-	local version_cmd="$2"
+	local binary="$2"
+	local version_cmd="$3"
+	local before_version="$4"
 	local location
-	location="$(command -v "$name" 2>/dev/null || echo "unknown")"
-	local version
-	version="$(eval "$version_cmd" 2>/dev/null || echo "unknown")"
-	echo "  ${GREEN}✓${RESET} $name ($version at $location)" | tee -a "$LOG_FILE"
+	location="$(command -v "$binary" 2>/dev/null || echo "unknown")"
+	local after_version
+	after_version="$(get_version "$version_cmd")"
+	local version_change
+	if [ "$before_version" = "$after_version" ]; then
+		version_change="$after_version unchanged"
+	else
+		version_change="$before_version → $after_version"
+	fi
+	echo "  ${GREEN}✓${RESET} $name ($version_change at $location)" | tee -a "$LOG_FILE"
 	TOTAL_UPGRADED=$((TOTAL_UPGRADED + 1))
 }
 
@@ -129,7 +144,8 @@ stage_1_refresh() {
 		log_info "DRY-RUN: make update"
 		log_skip "Version data refresh (dry-run)"
 	else
-		local start=$(date +%s)
+		local start
+		start="$(date +%s)"
 		log_info "Fetching latest versions (this may take a minute)..."
 
 		# Run make update with progress indication
@@ -149,7 +165,8 @@ stage_1_refresh() {
 		)
 
 		if [ $? -eq 0 ]; then
-			local end=$(date +%s)
+			local end
+			end="$(date +%s)"
 			local duration=$((end - start))
 			log_success "Fetched latest version data (${duration}s)"
 		else
@@ -201,7 +218,8 @@ stage_2_managers() {
 		# Skip pip if uv is managing Python packages, suggest migration
 		if command -v uv >/dev/null 2>&1; then
 			# Check if there are user-installed pip packages to migrate
-			local user_packages=$(python3 -m pip list --user --format=freeze 2>/dev/null | grep -v "^#" | wc -l)
+			local user_packages
+			user_packages="$(python3 -m pip list --user --format=freeze 2>/dev/null | grep -v "^#" | wc -l)"
 			if [ "$user_packages" -gt 0 ]; then
 				log_reconcile "pip ($user_packages user packages, run: make reconcile-pip-to-uv to migrate)"
 			else
@@ -213,6 +231,8 @@ stage_2_managers() {
 		elif [ "$DRY_RUN" = "1" ]; then
 			log_info "DRY-RUN: pip upgrade"
 		else
+			local before_version
+			before_version="$(get_version "python3 -m pip --version | awk '{print \$2}'")"
 			local upgrade_success=0
 			# Check if in virtualenv - skip --user flag if so
 			if [ -n "${VIRTUAL_ENV:-}" ]; then
@@ -222,7 +242,7 @@ stage_2_managers() {
 			fi
 
 			if [ "$upgrade_success" = "1" ]; then
-				log_success_with_info "pip" "python3 -m pip --version | awk '{print \$2}'"
+				log_success_with_info "pip" "pip3" "python3 -m pip --version | awk '{print \$2}'" "$before_version"
 			else
 				log_fail "pip (see $LOG_FILE for details)"
 			fi
@@ -235,8 +255,10 @@ stage_2_managers() {
 		if [ "$DRY_RUN" = "1" ]; then
 			log_info "DRY-RUN: uv self update"
 		else
+			local before_version
+			before_version="$(get_version "uv --version | awk '{print \$2}'")"
 			if uv self update >> "$LOG_FILE" 2>&1; then
-				log_success_with_info "uv" "uv --version | awk '{print \$2}'"
+				log_success_with_info "uv" "uv" "uv --version | awk '{print \$2}'" "$before_version"
 			else
 				log_fail "uv (see $LOG_FILE for details)"
 			fi
@@ -249,7 +271,8 @@ stage_2_managers() {
 		# Skip pipx if uv is managing Python tools, suggest migration
 		if command -v uv >/dev/null 2>&1; then
 			# Check if there are pipx tools to migrate
-			local pipx_tools=$(pipx list --short 2>/dev/null | wc -l)
+			local pipx_tools
+			pipx_tools="$(pipx list --short 2>/dev/null | wc -l)"
 			if [ "$pipx_tools" -gt 0 ]; then
 				log_reconcile "pipx ($pipx_tools tools installed, run: make reconcile-pipx-to-uv to migrate)"
 			else
@@ -258,6 +281,8 @@ stage_2_managers() {
 		elif [ "$DRY_RUN" = "1" ]; then
 			log_info "DRY-RUN: pip3 install --upgrade pipx"
 		else
+			local before_version
+			before_version="$(get_version "pipx --version")"
 			# Check if in virtualenv - skip --user flag if so
 			local upgrade_success=0
 			if [ -n "${VIRTUAL_ENV:-}" ]; then
@@ -267,7 +292,7 @@ stage_2_managers() {
 			fi
 
 			if [ "$upgrade_success" = "1" ]; then
-				log_success_with_info "pipx" "pipx --version"
+				log_success_with_info "pipx" "pipx" "pipx --version" "$before_version"
 			else
 				log_fail "pipx (see $LOG_FILE for details)"
 			fi
@@ -286,8 +311,10 @@ stage_2_managers() {
 			if [ "$DRY_RUN" = "1" ]; then
 				log_info "DRY-RUN: npm install -g npm@latest"
 			else
+				local before_version
+				before_version="$(get_version "npm --version")"
 				if npm install -g npm@latest >> "$LOG_FILE" 2>&1; then
-					log_success_with_info "npm" "npm --version"
+					log_success_with_info "npm" "npm" "npm --version" "$before_version"
 				else
 					log_fail "npm (see $LOG_FILE for details)"
 				fi
@@ -307,6 +334,8 @@ stage_2_managers() {
 			if [ "$DRY_RUN" = "1" ]; then
 				log_info "DRY-RUN: pnpm upgrade"
 			else
+				local before_version
+				before_version="$(get_version "pnpm --version")"
 				local upgrade_success=0
 				if command -v corepack >/dev/null 2>&1; then
 					corepack prepare pnpm@latest --activate >> "$LOG_FILE" 2>&1 && upgrade_success=1
@@ -315,7 +344,7 @@ stage_2_managers() {
 				fi
 
 				if [ "$upgrade_success" = "1" ]; then
-					log_success_with_info "pnpm" "pnpm --version"
+					log_success_with_info "pnpm" "pnpm" "pnpm --version" "$before_version"
 				else
 					log_fail "pnpm (see $LOG_FILE for details)"
 				fi
@@ -335,6 +364,8 @@ stage_2_managers() {
 			if [ "$DRY_RUN" = "1" ]; then
 				log_info "DRY-RUN: yarn upgrade"
 			else
+				local before_version
+				before_version="$(get_version "yarn --version")"
 				local upgrade_success=0
 				if command -v corepack >/dev/null 2>&1; then
 					corepack prepare yarn@stable --activate >> "$LOG_FILE" 2>&1 && upgrade_success=1
@@ -343,7 +374,7 @@ stage_2_managers() {
 				fi
 
 				if [ "$upgrade_success" = "1" ]; then
-					log_success_with_info "yarn" "yarn --version"
+					log_success_with_info "yarn" "yarn" "yarn --version" "$before_version"
 				else
 					log_fail "yarn (see $LOG_FILE for details)"
 				fi
@@ -357,8 +388,10 @@ stage_2_managers() {
 		if [ "$DRY_RUN" = "1" ]; then
 			log_info "DRY-RUN: rustup update"
 		else
+			local before_version
+			before_version="$(get_version "rustup --version | head -1 | awk '{print \$2}'")"
 			if rustup update >> "$LOG_FILE" 2>&1; then
-				log_success_with_info "rustup" "rustup --version | head -1 | awk '{print \$2}'"
+				log_success_with_info "rustup" "rustup" "rustup --version | head -1 | awk '{print \$2}'" "$before_version"
 			else
 				log_fail "rustup (see $LOG_FILE for details)"
 			fi
@@ -371,8 +404,10 @@ stage_2_managers() {
 		if [ "$DRY_RUN" = "1" ]; then
 			log_info "DRY-RUN: gem update --system"
 		else
+			local before_version
+			before_version="$(get_version "gem --version")"
 			if gem update --system >> "$LOG_FILE" 2>&1; then
-				log_success_with_info "gem" "gem --version"
+				log_success_with_info "gem" "gem" "gem --version" "$before_version"
 			else
 				log_fail "gem (see $LOG_FILE for details)"
 			fi
@@ -388,8 +423,10 @@ stage_2_managers() {
 		elif [ "$DRY_RUN" = "1" ]; then
 			log_info "DRY-RUN: composer self-update"
 		else
+			local before_version
+			before_version="$(get_version "composer --version | head -1 | awk '{print \$3}'")"
 			if composer self-update >> "$LOG_FILE" 2>&1; then
-				log_success_with_info "composer" "composer --version | head -1 | awk '{print \$3}'"
+				log_success_with_info "composer" "composer" "composer --version | head -1 | awk '{print \$3}'" "$before_version"
 			else
 				log_fail "composer (see $LOG_FILE for details)"
 			fi
@@ -402,6 +439,8 @@ stage_2_managers() {
 		if [ "$DRY_RUN" = "1" ]; then
 			log_info "DRY-RUN: poetry upgrade"
 		else
+			local before_version
+			before_version="$(get_version "poetry --version | awk '{print \$3}'")"
 			local upgrade_success=0
 			# Try poetry self update first (Poetry 1.2+)
 			if poetry self update --help >/dev/null 2>&1; then
@@ -418,7 +457,7 @@ stage_2_managers() {
 			fi
 
 			if [ "$upgrade_success" = "1" ]; then
-				log_success_with_info "poetry" "poetry --version | awk '{print \$3}'"
+				log_success_with_info "poetry" "poetry" "poetry --version | awk '{print \$3}'" "$before_version"
 			elif [ "$upgrade_success" = "0" ]; then
 				log_fail "poetry (see $LOG_FILE for details)"
 			fi
@@ -441,9 +480,11 @@ stage_3_runtimes() {
 		if [ "$DRY_RUN" = "1" ]; then
 			log_info "DRY-RUN: ./scripts/install_python.sh update"
 		else
+			local before_version
+			before_version="$(get_version "python3 --version | awk '{print \$2}'")"
 			if ./scripts/install_python.sh update >> "$LOG_FILE" 2>&1; then
 				if command -v python3 >/dev/null 2>&1; then
-					log_success_with_info "Python" "python3 --version | awk '{print \$2}'"
+					log_success_with_info "Python" "python3" "python3 --version | awk '{print \$2}'" "$before_version"
 				else
 					log_success "Python runtime"
 				fi
@@ -460,9 +501,11 @@ stage_3_runtimes() {
 		if [ "$DRY_RUN" = "1" ]; then
 			log_info "DRY-RUN: ./scripts/install_node.sh update"
 		else
+			local before_version
+			before_version="$(get_version "node --version | sed 's/^v//'")"
 			if ./scripts/install_node.sh update >> "$LOG_FILE" 2>&1; then
 				if command -v node >/dev/null 2>&1; then
-					log_success_with_info "Node.js" "node --version | sed 's/^v//'"
+					log_success_with_info "Node.js" "node" "node --version | sed 's/^v//'" "$before_version"
 				else
 					log_success "Node.js runtime"
 				fi
@@ -479,9 +522,11 @@ stage_3_runtimes() {
 		if [ "$DRY_RUN" = "1" ]; then
 			log_info "DRY-RUN: ./scripts/install_go.sh update"
 		else
+			local before_version
+			before_version="$(get_version "go version | awk '{print \$3}' | sed 's/^go//'")"
 			if ./scripts/install_go.sh update >> "$LOG_FILE" 2>&1; then
 				if command -v go >/dev/null 2>&1; then
-					log_success_with_info "Go" "go version | awk '{print \$3}' | sed 's/^go//'"
+					log_success_with_info "Go" "go" "go version | awk '{print \$3}' | sed 's/^go//'" "$before_version"
 				else
 					log_success "Go runtime"
 				fi
@@ -498,9 +543,11 @@ stage_3_runtimes() {
 		if [ "$DRY_RUN" = "1" ]; then
 			log_info "DRY-RUN: ./scripts/install_ruby.sh update"
 		else
+			local before_version
+			before_version="$(get_version "ruby --version | awk '{print \$2}'")"
 			if ./scripts/install_ruby.sh update >> "$LOG_FILE" 2>&1; then
 				if command -v ruby >/dev/null 2>&1; then
-					log_success_with_info "Ruby" "ruby --version | awk '{print \$2}'"
+					log_success_with_info "Ruby" "ruby" "ruby --version | awk '{print \$2}'" "$before_version"
 				else
 					log_success "Ruby runtime"
 				fi
@@ -517,9 +564,11 @@ stage_3_runtimes() {
 		if [ "$DRY_RUN" = "1" ]; then
 			log_info "DRY-RUN: ./scripts/install_rust.sh update"
 		else
+			local before_version
+			before_version="$(get_version "rustc --version | awk '{print \$2}'")"
 			if ./scripts/install_rust.sh update >> "$LOG_FILE" 2>&1; then
 				if command -v rustc >/dev/null 2>&1; then
-					log_success_with_info "Rust" "rustc --version | awk '{print \$2}'"
+					log_success_with_info "Rust" "rustc" "rustc --version | awk '{print \$2}'" "$before_version"
 				else
 					log_success "Rust runtime"
 				fi
@@ -548,13 +597,16 @@ stage_4_user_packages() {
 			# Filter out binary lines (starting with dash) and keep only tool names
 			tools="$(uv tool list 2>/dev/null | grep -v '^-' | awk 'NF > 0 {print $1}' || true)"
 			if [ -n "$tools" ]; then
-				local count=$(echo "$tools" | wc -l)
+				local count
+				count="$(echo "$tools" | wc -l)"
 				log_info "Found $count uv tools to upgrade"
 				while IFS= read -r tool; do
 					[ -z "$tool" ] && continue
+					local before_version
+					before_version="$(get_version "$tool --version 2>/dev/null | head -1 | awk '{print \$NF}' || echo 'installed'")"
 					if uv tool upgrade "$tool" >> "$LOG_FILE" 2>&1; then
 						if command -v "$tool" >/dev/null 2>&1; then
-							log_success_with_info "$tool" "$tool --version 2>/dev/null | head -1 | awk '{print \$NF}' || echo 'installed'"
+							log_success_with_info "$tool" "$tool" "$tool --version 2>/dev/null | head -1 | awk '{print \$NF}' || echo 'installed'" "$before_version"
 						else
 							log_success "uv tool: $tool"
 						fi
@@ -576,7 +628,8 @@ stage_4_user_packages() {
 	if command -v pipx >/dev/null 2>&1; then
 		# Skip pipx packages if uv is managing Python tools
 		if command -v uv >/dev/null 2>&1; then
-			local pipx_tools=$(pipx list --short 2>/dev/null | wc -l)
+			local pipx_tools
+			pipx_tools="$(pipx list --short 2>/dev/null | wc -l)"
 			if [ "$pipx_tools" -gt 0 ]; then
 				log_reconcile "pipx packages ($pipx_tools tools, run: make reconcile-pipx-to-uv to migrate)"
 			else
@@ -585,13 +638,15 @@ stage_4_user_packages() {
 		elif [ "$DRY_RUN" = "1" ]; then
 			log_info "DRY-RUN: pipx upgrade-all"
 		else
-			local temp_log=$(mktemp)
+			local temp_log
+			temp_log="$(mktemp)"
 			if pipx upgrade-all >> "$LOG_FILE" 2>&1; then
 				log_success "pipx packages"
 			else
 				# Check if only failure was missing metadata (known issue)
 				if grep -q "missing internal pipx metadata" "$LOG_FILE" 2>/dev/null; then
-					local broken_pkg=$(grep -oP "Not upgrading \K\w+" "$LOG_FILE" 2>/dev/null | tail -1)
+					local broken_pkg
+					broken_pkg="$(grep -oP "Not upgrading \K\w+" "$LOG_FILE" 2>/dev/null | tail -1)"
 					log_reconcile "pipx packages (partial: $broken_pkg has missing metadata, run: pipx uninstall $broken_pkg && pipx install $broken_pkg)"
 				else
 					log_fail "pipx packages (see $LOG_FILE for details)"
@@ -719,7 +774,8 @@ main() {
 	stage_6_health_checks || true
 
 	# Summary
-	local end_time=$(date +%s)
+	local end_time
+	end_time="$(date +%s)"
 	local total_time=$((end_time - START_TIME))
 	local minutes=$((total_time / 60))
 	local seconds=$((total_time % 60))
