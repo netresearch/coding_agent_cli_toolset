@@ -1,6 +1,6 @@
 {
   "__meta__": {
-    "baseline_updated_at": "2025-12-21T12:41:48Z",
+    "baseline_updated_at": "2026-07-27T12:27:44Z",
     "schema_version": 2,
     "source": "github/pypi/npm/crates API"
   },
@@ -46,6 +46,20 @@
       "latest_version": "25.12.0",
       "tool_url": "https://pypi.org/project/black/",
       "upstream_method": "pypi"
+    },
+    "bwrap": {
+      "latest_tag": "v0.11.2",
+      "latest_url": "https://github.com/containers/bubblewrap/releases/tag/v0.11.2",
+      "latest_version": "0.11.2",
+      "tool_url": "https://github.com/containers/bubblewrap",
+      "upstream_method": "gh"
+    },
+    "byobu": {
+      "latest_tag": "7.15",
+      "latest_url": "https://github.com/dustinkirkland/byobu/releases/tag/7.15",
+      "latest_version": "7.15",
+      "tool_url": "https://github.com/dustinkirkland/byobu",
+      "upstream_method": "gh"
     },
     "claude": {
       "latest_tag": "2.0.76",
@@ -511,6 +525,13 @@
       "latest_version": "0.68.2",
       "tool_url": "https://github.com/aquasecurity/trivy",
       "upstream_method": "gh"
+    },
+    "trustmux": {
+      "latest_tag": "7.15",
+      "latest_url": "https://pypi.org/project/trustmux/",
+      "latest_version": "7.15",
+      "tool_url": "https://pypi.org/project/trustmux/",
+      "upstream_method": "pypi"
     },
     "uv": {
       "latest_tag": "0.9.18",

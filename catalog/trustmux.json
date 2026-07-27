@@ -1,0 +1,15 @@
+{
+  "name": "trustmux",
+  "category": "security",
+  "install_method": "uv_tool",
+  "description": "Secure mobile companion for remote tmux sessions over Tailscale",
+  "homepage": "https://trustmux.dev/",
+  "package_name": "trustmux",
+  "binary_name": "trustmux",
+  "source_kind": "pypi",
+  "version_command": "trustmuxd --version 2>/dev/null | head -1",
+  "requires": [
+    "tmux"
+  ],
+  "notes": "Installed from the newest stable PyPI release instead of the distribution package bundled with Byobu."
+}
