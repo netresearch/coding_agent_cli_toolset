@@ -1,0 +1,21 @@
+{
+  "name": "bwrap",
+  "category": "security",
+  "install_method": "package_manager",
+  "description": "Unprivileged sandboxing tool based on Linux namespaces",
+  "homepage": "https://github.com/containers/bubblewrap",
+  "github_repo": "containers/bubblewrap",
+  "binary_name": "bwrap",
+  "version_command": "bwrap --version 2>/dev/null | head -1",
+  "packages": {
+    "apt": "bubblewrap",
+    "dnf": "bubblewrap",
+    "pacman": "bubblewrap"
+  },
+  "tags": [
+    "sandbox",
+    "security",
+    "linux"
+  ],
+  "notes": "Linux-only sandbox runtime. The package is named bubblewrap; the executable is bwrap."
+}

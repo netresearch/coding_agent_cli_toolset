@@ -10,10 +10,10 @@ Covers:
 
 import json
 import os
-import pytest
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
+import pytest
 
 # Get the project root directory
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -217,8 +217,7 @@ class TestInstallComposerPHPCheck:
 
         # Should check for PHP
         assert "command -v php" in content, "Script should check for PHP"
-        assert "Error: PHP is required" in content or "PHP is required" in content, \
-            "Script should mention PHP requirement"
+        assert "Error: PHP is required" in content or "PHP is required" in content, "Script should mention PHP requirement"
 
 
 class TestGitHubRateLimitHelpers:
@@ -227,6 +226,7 @@ class TestGitHubRateLimitHelpers:
     def test_get_github_rate_limit_help_exists(self):
         """Test that get_github_rate_limit_help function exists."""
         from cli_audit.collectors import get_github_rate_limit_help
+
         assert callable(get_github_rate_limit_help)
 
     def test_get_github_rate_limit_help_content(self):
@@ -247,6 +247,7 @@ class TestGitHubRateLimitHelpers:
     def test_get_gh_cli_token_exists(self):
         """Test that get_gh_cli_token function exists."""
         from cli_audit.collectors import get_gh_cli_token
+
         assert callable(get_gh_cli_token)
 
     @patch("shutil.which")
@@ -308,8 +309,8 @@ class TestGitHubRateLimitDisplay:
     def test_audit_imports_help_function(self):
         """Test that audit.py imports get_github_rate_limit_help."""
         import audit
-        assert hasattr(audit, 'get_github_rate_limit_help') or \
-               'get_github_rate_limit_help' in dir(audit)
+
+        assert hasattr(audit, "get_github_rate_limit_help") or "get_github_rate_limit_help" in dir(audit)
 
 
 class TestCatalogIntegrity:
@@ -344,3 +345,72 @@ class TestCatalogIntegrity:
             with open(json_file) as f:
                 data = json.load(f)
             assert "install_method" in data, f"{json_file.name} should have 'install_method' field"
+
+
+class TestBubblewrapCatalog:
+    """Tests for the Bubblewrap catalog entry."""
+
+    def test_bwrap_catalog_uses_distribution_package_name(self):
+        catalog_path = PROJECT_ROOT / "catalog" / "bwrap.json"
+
+        with open(catalog_path) as f:
+            data = json.load(f)
+
+        assert data["name"] == "bwrap"
+        assert data["binary_name"] == "bwrap"
+        assert data["install_method"] == "package_manager"
+        assert data["packages"]["apt"] == "bubblewrap"
+        assert data["github_repo"] == "containers/bubblewrap"
+
+
+class TestByobuCatalog:
+    """Tests for the upstream Byobu catalog entry."""
+
+    def test_byobu_catalog_uses_dedicated_source_installer(self):
+        catalog_path = PROJECT_ROOT / "catalog" / "byobu.json"
+
+        with open(catalog_path) as f:
+            data = json.load(f)
+
+        assert data["name"] == "byobu"
+        assert data["install_method"] == "dedicated_script"
+        assert data["script"] == "install_byobu.sh"
+        assert data["github_repo"] == "dustinkirkland/byobu"
+        assert data["binary_name"] == "byobu"
+        assert data["requires"] == ["tmux"]
+        assert '"VERSION"' in data["version_command"]
+
+
+class TestByobuInstallScript:
+    """Tests for the dedicated upstream Byobu installer."""
+
+    def test_byobu_installer_is_executable_and_filters_stable_tags(self):
+        script_path = PROJECT_ROOT / "scripts" / "install_byobu.sh"
+
+        assert script_path.exists()
+        assert os.access(script_path, os.X_OK)
+
+        content = script_path.read_text()
+        assert "^[0-9]+([.][0-9]+)+$" in content
+        assert "archive/refs/tags/${version}.tar.gz" in content
+        assert './configure --prefix="$INSTALL_PREFIX"' in content
+        assert "$INSTALL_PREFIX/bin/byobu" in content
+        assert "uninstall)" in content
+
+
+class TestTrustmuxCatalog:
+    """Tests for the upstream Trustmux PyPI catalog entry."""
+
+    def test_trustmux_catalog_uses_uv_tool(self):
+        catalog_path = PROJECT_ROOT / "catalog" / "trustmux.json"
+
+        with open(catalog_path) as f:
+            data = json.load(f)
+
+        assert data["name"] == "trustmux"
+        assert data["install_method"] == "uv_tool"
+        assert data["package_name"] == "trustmux"
+        assert data["binary_name"] == "trustmux"
+        assert data["source_kind"] == "pypi"
+        assert data["requires"] == ["tmux"]
+        assert data["version_command"].startswith("trustmuxd --version")

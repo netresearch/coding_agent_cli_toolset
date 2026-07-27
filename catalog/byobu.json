@@ -1,0 +1,15 @@
+{
+  "name": "byobu",
+  "category": "general",
+  "install_method": "dedicated_script",
+  "description": "Text-based window manager and terminal multiplexer enhancement",
+  "homepage": "https://byobu.org/",
+  "github_repo": "dustinkirkland/byobu",
+  "binary_name": "byobu",
+  "script": "install_byobu.sh",
+  "version_command": "awk -F= '$1 == \"VERSION\" { print $2; exit }' \"$(command -v byobu)\"",
+  "requires": [
+    "tmux"
+  ],
+  "notes": "Built from the newest stable upstream source tag because distribution packages lag behind."
+}
