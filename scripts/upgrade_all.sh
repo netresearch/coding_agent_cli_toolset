@@ -67,18 +67,77 @@ log_success_with_info() {
 	local binary="$2"
 	local version_cmd="$3"
 	local before_version="$4"
-	local location
-	location="$(command -v "$binary" 2>/dev/null || echo "unknown")"
 	local after_version
 	after_version="$(get_version "$version_cmd")"
+	log_success_with_versions "$name" "$binary" "$before_version" "$after_version"
+}
+
+log_success_with_versions() {
+	local name="$1"
+	local binary="$2"
+	local before_version="$3"
+	local after_version="$4"
+	local location
+	location="$(command -v "$binary" 2>/dev/null || echo "unknown")"
 	local version_change
-	if [ "$before_version" = "$after_version" ]; then
+	if [ "$before_version" = "unknown" ] || [ "$after_version" = "unknown" ]; then
+		version_change="version unavailable: $before_version → $after_version"
+	elif [ "$before_version" = "$after_version" ]; then
 		version_change="$after_version unchanged"
 	else
 		version_change="$before_version → $after_version"
 	fi
 	echo "  ${GREEN}✓${RESET} $name ($version_change at $location)" | tee -a "$LOG_FILE"
 	TOTAL_UPGRADED=$((TOTAL_UPGRADED + 1))
+}
+
+get_uv_tool_version() {
+	local package="$1"
+	local version
+	version="$(uv tool list 2>/dev/null | awk -v package="$package" '
+		$1 == package {
+			version = $2
+			sub(/^v/, "", version)
+			print version
+			exit
+		}
+	')"
+	printf '%s' "${version:-unknown}"
+}
+
+get_uv_tool_binary() {
+	local package="$1"
+	uv tool list 2>/dev/null | awk -v package="$package" '
+		$1 == package { found = 1; next }
+		found && $1 == "-" { print $2; exit }
+		found { exit }
+	'
+}
+
+upgrade_uv_tools() {
+	local tools
+	tools="$(uv tool list 2>/dev/null | awk '$1 != "-" && NF >= 2 { print $1 }' || true)"
+	if [ -z "$tools" ]; then
+		log_skip "uv (no tools installed)"
+		return 0
+	fi
+
+	local count
+	count="$(printf '%s\n' "$tools" | wc -l)"
+	log_info "Found $count uv tools to upgrade"
+
+	local tool before_version after_version binary
+	while IFS= read -r tool; do
+		[ -z "$tool" ] && continue
+		before_version="$(get_uv_tool_version "$tool")"
+		binary="$(get_uv_tool_binary "$tool")"
+		if uv tool upgrade "$tool" >> "$LOG_FILE" 2>&1; then
+			after_version="$(get_uv_tool_version "$tool")"
+			log_success_with_versions "$tool" "${binary:-$tool}" "$before_version" "$after_version"
+		else
+			log_skip "uv tool: $tool (failed)"
+		fi
+	done <<< "$tools"
 }
 
 log_skip() {
@@ -189,26 +248,70 @@ stage_2_managers() {
 		if [ "$DRY_RUN" = "1" ]; then
 			log_info "DRY-RUN: apt-get update && apt-get upgrade"
 		else
-			run_cmd "apt (system)" sudo apt-get update >/dev/null 2>&1 && sudo apt-get upgrade -y >/dev/null 2>&1 || log_skip "apt (not available or failed)"
+			local before_version
+			before_version="$(get_version "apt-get --version | head -1 | awk '{print \$2}'")"
+			# The caller owns LOG_FILE; only apt-get itself needs sudo.
+			# shellcheck disable=SC2024
+			if {
+				sudo apt-get update &&
+					sudo apt-get upgrade -y
+			} >> "$LOG_FILE" 2>&1; then
+				log_success_with_info "apt (system)" "apt-get" "apt-get --version | head -1 | awk '{print \$2}'" "$before_version"
+			else
+				log_skip "apt (not available or failed)"
+			fi
 		fi
 	else
 		log_skip "apt (not installed)"
 	fi
 
 	if command -v brew >/dev/null 2>&1; then
-		run_cmd "brew" brew update >/dev/null 2>&1 && brew upgrade >/dev/null 2>&1 || log_skip "brew (failed)"
+		if [ "$DRY_RUN" = "1" ]; then
+			log_info "DRY-RUN: brew update && brew upgrade"
+		else
+			local before_version
+			before_version="$(get_version "brew --version | head -1 | awk '{print \$2}'")"
+			if brew update >> "$LOG_FILE" 2>&1 &&
+				brew upgrade >> "$LOG_FILE" 2>&1; then
+				log_success_with_info "brew" "brew" "brew --version | head -1 | awk '{print \$2}'" "$before_version"
+			else
+				log_skip "brew (failed)"
+			fi
+		fi
 	else
 		log_skip "brew (not installed)"
 	fi
 
 	if command -v snap >/dev/null 2>&1; then
-		run_cmd "snap" sudo snap refresh || log_skip "snap (failed)"
+		if [ "$DRY_RUN" = "1" ]; then
+			log_info "DRY-RUN: snap refresh"
+		else
+			local before_version
+			before_version="$(get_version "snap version | awk '/^snap / {print \$2}'")"
+			# The caller owns LOG_FILE; only snap itself needs sudo.
+			# shellcheck disable=SC2024
+			if sudo snap refresh >> "$LOG_FILE" 2>&1; then
+				log_success_with_info "snap" "snap" "snap version | awk '/^snap / {print \$2}'" "$before_version"
+			else
+				log_skip "snap (failed)"
+			fi
+		fi
 	else
 		log_skip "snap (not installed)"
 	fi
 
 	if command -v flatpak >/dev/null 2>&1; then
-		run_cmd "flatpak" flatpak update -y || log_skip "flatpak (failed)"
+		if [ "$DRY_RUN" = "1" ]; then
+			log_info "DRY-RUN: flatpak update -y"
+		else
+			local before_version
+			before_version="$(get_version "flatpak --version | awk '{print \$2}'")"
+			if flatpak update -y >> "$LOG_FILE" 2>&1; then
+				log_success_with_info "flatpak" "flatpak" "flatpak --version | awk '{print \$2}'" "$before_version"
+			else
+				log_skip "flatpak (failed)"
+			fi
+		fi
 	else
 		log_skip "flatpak (not installed)"
 	fi
@@ -242,7 +345,7 @@ stage_2_managers() {
 			fi
 
 			if [ "$upgrade_success" = "1" ]; then
-				log_success_with_info "pip" "pip3" "python3 -m pip --version | awk '{print \$2}'" "$before_version"
+				log_success_with_info "pip (python3 -m pip)" "python3" "python3 -m pip --version | awk '{print \$2}'" "$before_version"
 			else
 				log_fail "pip (see $LOG_FILE for details)"
 			fi
@@ -593,30 +696,7 @@ stage_4_user_packages() {
 	if command -v uv >/dev/null 2>&1; then
 		log_info "Upgrading uv tools..."
 		if [ "$DRY_RUN" = "0" ]; then
-			local tools
-			# Filter out binary lines (starting with dash) and keep only tool names
-			tools="$(uv tool list 2>/dev/null | grep -v '^-' | awk 'NF > 0 {print $1}' || true)"
-			if [ -n "$tools" ]; then
-				local count
-				count="$(echo "$tools" | wc -l)"
-				log_info "Found $count uv tools to upgrade"
-				while IFS= read -r tool; do
-					[ -z "$tool" ] && continue
-					local before_version
-					before_version="$(get_version "$tool --version 2>/dev/null | head -1 | awk '{print \$NF}' || echo 'installed'")"
-					if uv tool upgrade "$tool" >> "$LOG_FILE" 2>&1; then
-						if command -v "$tool" >/dev/null 2>&1; then
-							log_success_with_info "$tool" "$tool" "$tool --version 2>/dev/null | head -1 | awk '{print \$NF}' || echo 'installed'" "$before_version"
-						else
-							log_success "uv tool: $tool"
-						fi
-					else
-						log_skip "uv tool: $tool (failed)"
-					fi
-				done <<< "$tools"
-			else
-				log_skip "uv (no tools installed)"
-			fi
+			upgrade_uv_tools
 		else
 			log_info "DRY-RUN: uv tool upgrade <all-tools>"
 		fi
