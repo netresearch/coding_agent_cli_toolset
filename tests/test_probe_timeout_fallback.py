@@ -86,6 +86,14 @@ class TestGetVersionLine:
         monkeypatch.setattr(detection, "TIMEOUT_SECONDS", 1)
         assert detection.get_version_line(str(script), "quiettool") == ""
 
+    @skip_on_windows
+    def test_returns_none_on_timeout_with_version_command(self, monkeypatch):
+        """The shell version_command path must also signal a timeout as None."""
+        import cli_audit.detection as detection
+
+        monkeypatch.setattr(detection, "TIMEOUT_SECONDS", 0.1)
+        assert detection.get_version_line("", "slowtool", version_command="sleep 2") is None
+
 
 # ===========================================================================
 # 3. audit_tool_installation returns the timeout marker
@@ -113,6 +121,20 @@ class TestAuditToolInstallationTimeout:
         monkeypatch.setattr(detection, "find_paths", lambda cand, deep=False: [])
         result = detection.audit_tool_installation("ghosttool", ("ghosttool",))
         assert result == ("", "X", "", "")
+
+    def test_timeout_marker_for_standalone_version_command(self, monkeypatch):
+        """A timed-out standalone version_command probe must not read as not-installed."""
+        import cli_audit.detection as detection
+
+        monkeypatch.setattr(detection, "find_paths", lambda cand, deep=False: [])
+        monkeypatch.setattr(
+            detection,
+            "get_version_line",
+            lambda path, tool_name, version_flag=None, version_command=None: None,
+        )
+
+        result = detection.audit_tool_installation("slowtool", ("slowtool",), version_command="slow-pipeline")
+        assert result == ("", detection.VERSION_PROBE_TIMEOUT, "<version_command>", "version_command")
 
 
 # ===========================================================================
@@ -150,13 +172,14 @@ class TestTimeoutFallback:
         import audit
         from cli_audit.detection import VERSION_PROBE_TIMEOUT
 
-        version_num, version_line, path, method = audit._apply_probe_timeout_fallback(
+        version_num, version_line, path, method, from_cache = audit._apply_probe_timeout_fallback(
             "slowtool", "", VERSION_PROBE_TIMEOUT, "/fake/bin/slowtool", "manual"
         )
         assert version_num == "1.26.0"
         assert "1.26.0" in version_line
         assert path == "/fake/bin/slowtool"
         assert method == "manual"
+        assert from_cache is True
 
     def test_no_cached_version_reports_unknown(self, tmp_path, monkeypatch):
         import audit
@@ -166,15 +189,53 @@ class TestTimeoutFallback:
         state_file.write_text(json.dumps({"__meta__": {"schema_version": 2}, "tools": {}}))
         monkeypatch.setenv("CLI_AUDIT_LOCAL_FILE", str(state_file))
 
-        version_num, version_line, path, method = audit._apply_probe_timeout_fallback(
+        version_num, version_line, path, method, from_cache = audit._apply_probe_timeout_fallback(
             "slowtool", "", VERSION_PROBE_TIMEOUT, "/fake/bin/slowtool", "manual"
         )
         assert version_num == ""
         assert version_line == ""
         assert path == "/fake/bin/slowtool"
+        assert from_cache is False
 
     def test_passthrough_when_no_timeout(self, local_state_file):
         import audit
 
         result = audit._apply_probe_timeout_fallback("slowtool", "2.0.0", "slowtool 2.0.0", "/usr/bin/slowtool", "apt")
-        assert result == ("2.0.0", "slowtool 2.0.0", "/usr/bin/slowtool", "apt")
+        assert result == ("2.0.0", "slowtool 2.0.0", "/usr/bin/slowtool", "apt", False)
+
+    def test_fallback_is_surfaced_in_classification_reason(self, tmp_path, monkeypatch):
+        """The cached substitution must be visible in the audit record, not silent."""
+        import audit
+        from cli_audit.detection import VERSION_PROBE_TIMEOUT
+        from cli_audit.tools import filter_tools
+
+        tool = filter_tools(["ripgrep"])[0]
+        state_file = tmp_path / "local_state.json"
+        state_file.write_text(
+            json.dumps(
+                {
+                    "__meta__": {"schema_version": 2},
+                    "tools": {
+                        tool.name: {
+                            "installed_version": "15.1.0",
+                            "installed_path": "/home/user/.cargo/bin/rg",
+                            "installed_method": "cargo",
+                            "status": "UP-TO-DATE",
+                            "classification_reason": "Detected via path analysis: cargo",
+                            "category": "general",
+                            "hint": "",
+                        }
+                    },
+                }
+            )
+        )
+        monkeypatch.setenv("CLI_AUDIT_LOCAL_FILE", str(state_file))
+        monkeypatch.setattr(
+            audit,
+            "audit_tool_installation",
+            lambda *a, **k: ("", VERSION_PROBE_TIMEOUT, "/fake/bin/rg", "cargo"),
+        )
+
+        inst = audit._detect_local_only(tool)
+        assert inst.installed_version == "15.1.0"
+        assert "probe timed out" in inst.classification_reason

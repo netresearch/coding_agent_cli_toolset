@@ -271,24 +271,29 @@ def _apply_probe_timeout_fallback(
     version_line: str,
     path: str,
     install_method: str,
-) -> tuple[str, str, str, str]:
+) -> tuple[str, str, str, str, bool]:
     """Fall back to the last known local_state version when the probe timed out.
 
     A timeout means the binary exists but answered too slowly (slow binaries
     like opengrep need ~2.5s and can exceed the probe timeout under parallel
     collection load) — reporting it as not installed would be wrong.
+
+    Returns:
+        Tuple of (version_num, version_line, path, install_method, from_cache).
+        from_cache is True only when the cached version was substituted; callers
+        must surface that in classification_reason so the fallback is not silent.
     """
     if version_line != VERSION_PROBE_TIMEOUT:
-        return version_num, version_line, path, install_method
+        return version_num, version_line, path, install_method, False
 
     prev = load_local_state().tools.get(tool_name)
     if prev and prev.installed_version:
         version = prev.installed_version
         line = f"{tool_name} {version} (cached; version probe timed out)"
-        return version, line, path or prev.installed_path, install_method or prev.installed_method
+        return version, line, path or prev.installed_path, install_method or prev.installed_method, True
 
     # No cached version to fall back to: keep prior "no version" behavior.
-    return "", "", path, install_method
+    return "", "", path, install_method, False
 
 
 def audit_tool(tool: Tool, offline_cache: dict[str, tuple[str, str]] | None = None) -> dict[str, str]:
@@ -317,7 +322,7 @@ def audit_tool(tool: Tool, offline_cache: dict[str, tuple[str, str]] | None = No
     version_num, version_line, path, install_method = audit_tool_installation(
         tool.name, tool.candidates, deep=deep_scan, version_flag=version_flag, version_command=version_command
     )
-    version_num, version_line, path, install_method = _apply_probe_timeout_fallback(
+    version_num, version_line, path, install_method, from_cache = _apply_probe_timeout_fallback(
         tool.name, version_num, version_line, path, install_method
     )
 
@@ -346,7 +351,9 @@ def audit_tool(tool: Tool, offline_cache: dict[str, tuple[str, str]] | None = No
     latest_url = latest_target_url(tool, latest_tag, latest_num)
 
     # Generate classification reason
-    if install_method:
+    if from_cache:
+        classification_reason = "Cached version (probe timed out); last known method: " + (install_method or "unknown")
+    elif install_method:
         classification_reason = f"Detected via path analysis: {install_method}"
     else:
         classification_reason = "No installation detected"
@@ -1172,13 +1179,15 @@ def _detect_local_only(tool: Tool) -> LocalInstallation:
     version_num, version_line, path, install_method = audit_tool_installation(
         tool.name, tool.candidates, deep=deep_scan, version_flag=version_flag, version_command=version_command
     )
-    version_num, version_line, path, install_method = _apply_probe_timeout_fallback(
+    version_num, version_line, path, install_method, from_cache = _apply_probe_timeout_fallback(
         tool.name, version_num, version_line, path, install_method
     )
 
     installed = version_num if version_num else (version_line if version_line != "X" else "")
 
-    if install_method:
+    if from_cache:
+        classification_reason = "Cached version (probe timed out); last known method: " + (install_method or "unknown")
+    elif install_method:
         classification_reason = f"Detected via path analysis: {install_method}"
     else:
         classification_reason = "No installation detected"

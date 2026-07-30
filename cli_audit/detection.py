@@ -351,13 +351,17 @@ def audit_tool_installation(
         if line:
             num = extract_version_number(line)
             tuples.append((num, line, "<version_command>"))
+        elif line is None:
+            timed_out_paths.append("<version_command>")
 
     if not tuples:
-        # Binary exists but every version probe timed out: signal the timeout
-        # so callers can fall back to the last known version instead of
-        # misreporting the tool as not installed.
+        # A probe ran but timed out: signal the timeout so callers can fall
+        # back to the last known version instead of misreporting the tool
+        # as not installed.
         if timed_out_paths:
             path = timed_out_paths[0]
+            if path == "<version_command>":
+                return ("", VERSION_PROBE_TIMEOUT, path, "version_command")
             return ("", VERSION_PROBE_TIMEOUT, path, detect_install_method(path, tool_name))
         return ("", "X", "", "")
 
