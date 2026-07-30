@@ -6,22 +6,23 @@ Target coverage: 85%+
 
 import json
 import os
-import pytest
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from cli_audit.local_state import (
+    DEFAULT_LOCAL_STATE_FILE,
     LocalInstallation,
     LocalState,
+    build_legacy_snapshot,
+    get_local_installation,
     get_local_state_path,
     load_local_state,
-    write_local_state,
-    get_local_installation,
-    update_local_installation,
-    migrate_from_snapshot,
     merge_for_display,
-    build_legacy_snapshot,
-    DEFAULT_LOCAL_STATE_FILE,
+    migrate_from_snapshot,
+    update_local_installation,
+    write_local_state,
 )
 from cli_audit.upstream_cache import UpstreamCache, UpstreamVersion
 
@@ -286,9 +287,7 @@ class TestWriteLocalState:
     def test_write_local_state_basic(self, tmp_path):
         """Test writing state file."""
         path = tmp_path / "local_state.json"
-        state = LocalState(
-            tools={"fd": LocalInstallation(installed_version="10.0.0")}
-        )
+        state = LocalState(tools={"fd": LocalInstallation(installed_version="10.0.0")})
         write_local_state(state, path)
 
         assert path.exists()
@@ -300,9 +299,7 @@ class TestWriteLocalState:
     def test_write_local_state_updates_metadata(self, tmp_path):
         """Test that write updates metadata fields."""
         path = tmp_path / "local_state.json"
-        state = LocalState(
-            tools={"tool": LocalInstallation(installed_version="1.0.0")}
-        )
+        state = LocalState(tools={"tool": LocalInstallation(installed_version="1.0.0")})
 
         write_local_state(state, path)
 
@@ -379,9 +376,7 @@ class TestStateHelpers:
 
     def test_update_local_installation_overwrite(self):
         """Test overwriting existing tool in state."""
-        state = LocalState(
-            tools={"tool": LocalInstallation(installed_version="1.0.0")}
-        )
+        state = LocalState(tools={"tool": LocalInstallation(installed_version="1.0.0")})
         new_install = LocalInstallation(installed_version="2.0.0")
         update_local_installation("tool", new_install, state)
 
@@ -468,9 +463,7 @@ class TestMergeForDisplay:
 
     def test_merge_for_display_upstream_only(self):
         """Test merging with only upstream data."""
-        upstream = UpstreamCache(
-            versions={"fd": UpstreamVersion(latest_version="10.0.0")}
-        )
+        upstream = UpstreamCache(versions={"fd": UpstreamVersion(latest_version="10.0.0")})
         local = LocalState()
         result = merge_for_display(upstream, local)
 
@@ -482,9 +475,7 @@ class TestMergeForDisplay:
     def test_merge_for_display_local_only(self):
         """Test merging with only local data."""
         upstream = UpstreamCache()
-        local = LocalState(
-            tools={"bat": LocalInstallation(installed_version="0.25.0")}
-        )
+        local = LocalState(tools={"bat": LocalInstallation(installed_version="0.25.0")})
         result = merge_for_display(upstream, local)
 
         assert len(result) == 1
@@ -529,6 +520,44 @@ class TestMergeForDisplay:
         assert tool["installed_method"] == "cargo"
         assert tool["status"] == "OUTDATED"
         assert tool["category"] == "rust-core"
+
+    def test_merge_recomputes_stale_up_to_date_status(self):
+        """A stored UP-TO-DATE must not survive a moved upstream baseline.
+
+        Regression (bwrap): local_state.json stored UP-TO-DATE for 0.9.0,
+        the committed baseline later moved to 0.11.2, and the merged row
+        rendered installed 0.9.0 / latest 0.11.2 / status UP-TO-DATE — so
+        guide.sh printed "target: 0.11.2 (same); up-to-date; skipping.".
+        """
+        upstream = UpstreamCache(versions={"bwrap": UpstreamVersion(latest_version="0.11.2")})
+        local = LocalState(tools={"bwrap": LocalInstallation(installed_version="0.9.0", status="UP-TO-DATE")})
+        result = merge_for_display(upstream, local)
+
+        assert result[0]["status"] == "OUTDATED"
+
+    def test_merge_recomputes_installed_ahead_as_up_to_date(self):
+        """Installed ahead of a stale baseline renders UP-TO-DATE (directional)."""
+        upstream = UpstreamCache(versions={"atuin": UpstreamVersion(latest_version="18.10.0")})
+        local = LocalState(tools={"atuin": LocalInstallation(installed_version="18.17.1", status="OUTDATED")})
+        result = merge_for_display(upstream, local)
+
+        assert result[0]["status"] == "UP-TO-DATE"
+
+    def test_merge_keeps_stored_status_without_upstream_version(self):
+        """No upstream latest → the stored status is the best information."""
+        upstream = UpstreamCache()
+        local = LocalState(tools={"bat": LocalInstallation(installed_version="0.25.0", status="UP-TO-DATE")})
+        result = merge_for_display(upstream, local)
+
+        assert result[0]["status"] == "UP-TO-DATE"
+
+    def test_merge_keeps_conflict_status(self):
+        """CONFLICT is not a version verdict and must pass through."""
+        upstream = UpstreamCache(versions={"node": UpstreamVersion(latest_version="24.0.0")})
+        local = LocalState(tools={"node": LocalInstallation(installed_version="22.0.0", status="CONFLICT")})
+        result = merge_for_display(upstream, local)
+
+        assert result[0]["status"] == "CONFLICT"
 
     def test_merge_for_display_sorted(self):
         """Test that merged tools are sorted alphabetically."""
