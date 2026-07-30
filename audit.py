@@ -1474,6 +1474,15 @@ def cmd_reconcile(args: argparse.Namespace) -> int:
                     )
                 )
             else:
+                # Per-tool outcomes must be visible without --verbose: a user
+                # who confirmed a removal needs to see why it failed.
+                for r in conflicts:
+                    if r.action_taken == "aborted":
+                        print(f"  {r.tool}: skipped (declined)", file=sys.stderr)
+                    elif r.action_taken == "blocked":
+                        print(f"  {r.tool}: skipped (protected system tool)", file=sys.stderr)
+                    elif not r.success and r.error_message:
+                        print(f"  ✗ {r.tool}: {r.error_message}", file=sys.stderr)
                 print(result.summary(), file=sys.stderr)
             # Fail only on real removal errors — not on protected tools (blocked)
             # or tools the user declined (aborted), which are expected outcomes.

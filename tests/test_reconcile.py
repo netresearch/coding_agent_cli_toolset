@@ -8,35 +8,32 @@ import os
 import sys
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch, mock_open
+from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 
-# Skip marker for Windows (Unix-style paths and PATH separator differences)
-skip_on_windows = pytest.mark.skipif(
-    sys.platform == "win32",
-    reason="Uses Unix-style paths and PATH separator (:)"
-)
-
-from cli_audit.reconcile import (
-    Installation,
-    ReconciliationResult,
-    BulkReconciliationResult,
-    detect_installations,
-    classify_install_method,
-    _classify_via_path,
-    clear_detection_cache,
-    sort_by_preference,
-    reconcile_tool,
-    bulk_reconcile,
-    verify_path_ordering,
-    _check_path_ordering,
-    _confirm_removal,
-    _uninstall_installation,
-    SYSTEM_TOOL_SAFELIST,
-)
 from cli_audit.config import Config, Preferences
 from cli_audit.environment import Environment
+from cli_audit.reconcile import (
+    SYSTEM_TOOL_SAFELIST,
+    BulkReconciliationResult,
+    Installation,
+    ReconciliationResult,
+    _check_path_ordering,
+    _classify_via_path,
+    _confirm_removal,
+    _uninstall_installation,
+    bulk_reconcile,
+    classify_install_method,
+    clear_detection_cache,
+    detect_installations,
+    reconcile_tool,
+    sort_by_preference,
+    verify_path_ordering,
+)
+
+# Skip marker for Windows (Unix-style paths and PATH separator differences)
+skip_on_windows = pytest.mark.skipif(sys.platform == "win32", reason="Uses Unix-style paths and PATH separator (:)")
 
 
 class TestInstallationDataclass:
@@ -104,10 +101,29 @@ class TestClassifyInstallMethod:
         assert method == "nvm"
 
     def test_classify_via_path_brew(self):
-        """Test brew classification via path."""
+        """Test brew classification via path when brew is installed."""
         path = "/usr/local/bin/ripgrep"
-        method = _classify_via_path(path)
+        with patch("cli_audit.reconcile.shutil.which", return_value="/home/linuxbrew/.linuxbrew/bin/brew"):
+            method = _classify_via_path(path)
         assert method == "brew"
+
+    def test_classify_via_path_usr_local_without_brew_is_manual(self):
+        """Without brew installed, /usr/local/bin binaries are manual installs.
+
+        Regression: manually-installed binaries in /usr/local/bin were labeled
+        'brew', so removal ran `brew uninstall` and failed with FileNotFoundError.
+        """
+        path = "/usr/local/bin/yq"
+        with patch("cli_audit.reconcile.shutil.which", return_value=None):
+            method = _classify_via_path(path)
+        assert method == "manual"
+
+    def test_classify_via_path_opt_homebrew_without_brew_is_manual(self):
+        """Without brew installed, /opt/homebrew paths are manual too."""
+        path = "/opt/homebrew/bin/yq"
+        with patch("cli_audit.reconcile.shutil.which", return_value=None):
+            method = _classify_via_path(path)
+        assert method == "manual"
 
     def test_classify_via_path_apt(self):
         """Test apt classification via path."""
@@ -544,9 +560,7 @@ class TestBulkReconcile:
                 # Single installation
                 return ReconciliationResult(
                     tool="fd",
-                    installations=(
-                        Installation("fd", "9.0.0", "cargo", "/home/user/.cargo/bin/fd", True),
-                    ),
+                    installations=(Installation("fd", "9.0.0", "cargo", "/home/user/.cargo/bin/fd", True),),
                     preferred=Installation("fd", "9.0.0", "cargo", "/home/user/.cargo/bin/fd", True),
                     active=Installation("fd", "9.0.0", "cargo", "/home/user/.cargo/bin/fd", True),
                     path_issues=(),
@@ -555,10 +569,12 @@ class TestBulkReconcile:
 
         mock_reconcile.side_effect = reconcile_side_effect
 
-        config = Config(tools={
-            "ripgrep": {},
-            "fd": {},
-        })
+        config = Config(
+            tools={
+                "ripgrep": {},
+                "fd": {},
+            }
+        )
         env = Environment(mode="workstation", confidence=1.0)
 
         result = bulk_reconcile(
@@ -765,7 +781,7 @@ class TestUninstallInstallation:
         assert success is True
         assert error is None
         mock_run.assert_called_once()
-        assert mock_run.call_args[0][0] == ['cargo', 'uninstall', 'ripgrep']
+        assert mock_run.call_args[0][0] == ["cargo", "uninstall", "ripgrep"]
 
     @patch("cli_audit.reconcile.subprocess.run")
     def test_uninstall_pipx(self, mock_run):
@@ -784,7 +800,7 @@ class TestUninstallInstallation:
 
         assert success is True
         mock_run.assert_called_once()
-        assert mock_run.call_args[0][0] == ['pipx', 'uninstall', 'black']
+        assert mock_run.call_args[0][0] == ["pipx", "uninstall", "black"]
 
     @patch("cli_audit.reconcile.subprocess.run")
     def test_uninstall_uv(self, mock_run):
@@ -803,7 +819,7 @@ class TestUninstallInstallation:
 
         assert success is True
         mock_run.assert_called_once()
-        assert mock_run.call_args[0][0] == ['uv', 'tool', 'uninstall', 'ruff']
+        assert mock_run.call_args[0][0] == ["uv", "tool", "uninstall", "ruff"]
 
     def test_uninstall_system_package(self):
         """Test system package requires sudo."""
@@ -836,6 +852,23 @@ class TestUninstallInstallation:
 
         assert success is True
         mock_remove.assert_called_once_with("/home/user/bin/tool")
+
+    @patch("os.remove", side_effect=PermissionError(13, "Permission denied"))
+    @patch("os.path.exists", return_value=True)
+    def test_uninstall_manual_permission_denied_suggests_sudo(self, mock_exists, mock_remove):
+        """Root-owned manual binaries surface actionable sudo guidance."""
+        inst = Installation(
+            tool="yq",
+            version="4.48.1",
+            method="manual",
+            path="/usr/local/bin/yq",
+            active=False,
+        )
+
+        success, error = _uninstall_installation(inst, False)
+
+        assert success is False
+        assert "sudo rm /usr/local/bin/yq" in error
 
 
 class TestSystemToolSafelist:

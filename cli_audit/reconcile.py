@@ -25,7 +25,6 @@ from .config import Config
 from .environment import Environment
 from .upgrade import compare_versions
 
-
 # Installation detection cache with TTL
 _detection_cache: dict[str, tuple[list[Installation], float]] = {}
 CACHE_TTL = 3600  # 1 hour
@@ -33,9 +32,33 @@ CACHE_TTL = 3600  # 1 hour
 
 # Critical system tools that should never be removed
 SYSTEM_TOOL_SAFELIST = {
-    'python', 'python3', 'bash', 'sh', 'sudo', 'rm', 'cp', 'mv', 'ls', 'cat',
-    'chmod', 'chown', 'grep', 'sed', 'awk', 'tar', 'gzip', 'gunzip', 'find',
-    'xargs', 'ps', 'kill', 'systemctl', 'apt', 'dnf', 'yum', 'pacman',
+    "python",
+    "python3",
+    "bash",
+    "sh",
+    "sudo",
+    "rm",
+    "cp",
+    "mv",
+    "ls",
+    "cat",
+    "chmod",
+    "chown",
+    "grep",
+    "sed",
+    "awk",
+    "tar",
+    "gzip",
+    "gunzip",
+    "find",
+    "xargs",
+    "ps",
+    "kill",
+    "systemctl",
+    "apt",
+    "dnf",
+    "yum",
+    "pacman",
 }
 
 
@@ -53,6 +76,7 @@ class Installation:
         valid: Whether the installation can be executed successfully
         preference_score: Tuple for sorting (tier, version, -path_index)
     """
+
     tool: str
     version: str
     method: str
@@ -89,6 +113,7 @@ class ReconciliationResult:
         success: Whether reconciliation succeeded
         error_message: Error message if failed
     """
+
     tool: str
     installations: tuple[Installation, ...]
     preferred: Installation | None
@@ -126,6 +151,7 @@ class BulkReconciliationResult:
         results: Individual reconciliation results
         duration_seconds: Total execution time
     """
+
     tools_checked: int
     conflicts_found: int
     conflicts_resolved: int
@@ -156,9 +182,17 @@ Reconciliation Summary:
 # Environment-name patterns for env managers without a pyvenv.cfg (conda etc.).
 # Mirrors the venv skip list in scripts/lib/capability.sh:detect_all_installations.
 _ENV_DIR_PATTERNS = (
-    "/venv/bin", "/.venv/bin", "/env/bin",
-    "/venvs/", "/.venvs/", "/virtualenvs/", "/.virtualenvs/",
-    "/envs/", "/conda/", "/miniconda", "/anaconda",
+    "/venv/bin",
+    "/.venv/bin",
+    "/env/bin",
+    "/venvs/",
+    "/.venvs/",
+    "/virtualenvs/",
+    "/.virtualenvs/",
+    "/envs/",
+    "/conda/",
+    "/miniconda",
+    "/anaconda",
 )
 
 
@@ -212,7 +246,7 @@ def detect_installations(
     seen_paths = set()
 
     # Get PATH directories
-    path_env = os.environ.get('PATH', '')
+    path_env = os.environ.get("PATH", "")
     path_dirs = [d for d in path_env.split(os.pathsep) if d]
 
     # Search each PATH directory
@@ -255,8 +289,9 @@ def detect_installations(
             version = None
             valid = True
             try:
-                from .detection import get_version_line
                 from .collectors import extract_version_number
+                from .detection import get_version_line
+
                 meta = _catalog_meta(tool_name)
                 line = get_version_line(real_path, tool_name, meta.get("version_flag"), None)
                 if line:
@@ -276,14 +311,16 @@ def detect_installations(
             active_path = shutil.which(candidate)
             is_active = (os.path.realpath(active_path) == real_path) if active_path else False
 
-            installations.append(Installation(
-                tool=tool_name,
-                version=version,
-                method=method,
-                path=real_path,
-                active=is_active,
-                valid=valid,
-            ))
+            installations.append(
+                Installation(
+                    tool=tool_name,
+                    version=version,
+                    method=method,
+                    path=real_path,
+                    active=is_active,
+                    valid=valid,
+                )
+            )
 
             vlog(f"  Found: {real_path} ({method}, {version})", verbose)
 
@@ -349,10 +386,10 @@ def _classify_via_queries(path: str, tool_name: str, verbose: bool) -> str:
         return _classify_via_path(path)
 
     # dpkg (Debian/Ubuntu)
-    if shutil.which('dpkg'):
+    if shutil.which("dpkg"):
         try:
             result = subprocess.run(
-                ['dpkg', '-S', path],
+                ["dpkg", "-S", path],
                 capture_output=True,
                 text=True,
                 timeout=2,
@@ -360,15 +397,15 @@ def _classify_via_queries(path: str, tool_name: str, verbose: bool) -> str:
             )
             if result.returncode == 0:
                 vlog("  Classified as apt via dpkg query", verbose)
-                return 'apt'
+                return "apt"
         except Exception:
             pass
 
     # rpm (Fedora/RHEL)
-    if shutil.which('rpm'):
+    if shutil.which("rpm"):
         try:
             result = subprocess.run(
-                ['rpm', '-qf', path],
+                ["rpm", "-qf", path],
                 capture_output=True,
                 text=True,
                 timeout=2,
@@ -376,15 +413,15 @@ def _classify_via_queries(path: str, tool_name: str, verbose: bool) -> str:
             )
             if result.returncode == 0:
                 vlog("  Classified as dnf/rpm via rpm query", verbose)
-                return 'dnf'
+                return "dnf"
         except Exception:
             pass
 
     # brew
-    if shutil.which('brew'):
+    if shutil.which("brew"):
         try:
             result = subprocess.run(
-                ['brew', 'list'],
+                ["brew", "list"],
                 capture_output=True,
                 text=True,
                 timeout=5,
@@ -393,7 +430,7 @@ def _classify_via_queries(path: str, tool_name: str, verbose: bool) -> str:
             if result.returncode == 0 and tool_name in result.stdout:
                 # Verify this tool is from brew
                 formula_result = subprocess.run(
-                    ['brew', 'list', tool_name],
+                    ["brew", "list", tool_name],
                     capture_output=True,
                     text=True,
                     timeout=2,
@@ -401,15 +438,15 @@ def _classify_via_queries(path: str, tool_name: str, verbose: bool) -> str:
                 )
                 if formula_result.returncode == 0 and path in formula_result.stdout:
                     vlog("  Classified as brew via brew list", verbose)
-                    return 'brew'
+                    return "brew"
         except Exception:
             pass
 
     # cargo
-    if shutil.which('cargo'):
+    if shutil.which("cargo"):
         try:
             result = subprocess.run(
-                ['cargo', 'install', '--list'],
+                ["cargo", "install", "--list"],
                 capture_output=True,
                 text=True,
                 timeout=5,
@@ -417,15 +454,15 @@ def _classify_via_queries(path: str, tool_name: str, verbose: bool) -> str:
             )
             if result.returncode == 0 and tool_name in result.stdout:
                 vlog("  Classified as cargo via cargo install --list", verbose)
-                return 'cargo'
+                return "cargo"
         except Exception:
             pass
 
     # pipx
-    if shutil.which('pipx'):
+    if shutil.which("pipx"):
         try:
             result = subprocess.run(
-                ['pipx', 'list'],
+                ["pipx", "list"],
                 capture_output=True,
                 text=True,
                 timeout=5,
@@ -433,15 +470,15 @@ def _classify_via_queries(path: str, tool_name: str, verbose: bool) -> str:
             )
             if result.returncode == 0 and tool_name in result.stdout:
                 vlog("  Classified as pipx via pipx list", verbose)
-                return 'pipx'
+                return "pipx"
         except Exception:
             pass
 
     # uv tool
-    if shutil.which('uv'):
+    if shutil.which("uv"):
         try:
             result = subprocess.run(
-                ['uv', 'tool', 'list'],
+                ["uv", "tool", "list"],
                 capture_output=True,
                 text=True,
                 timeout=5,
@@ -449,7 +486,7 @@ def _classify_via_queries(path: str, tool_name: str, verbose: bool) -> str:
             )
             if result.returncode == 0 and tool_name in result.stdout:
                 vlog("  Classified as uv via uv tool list", verbose)
-                return 'uv'
+                return "uv"
         except Exception:
             pass
 
@@ -459,34 +496,36 @@ def _classify_via_queries(path: str, tool_name: str, verbose: bool) -> str:
 def _classify_via_path(path: str) -> str:
     """Classify via path-based heuristics."""
     # User-level installations
-    if '/.cargo/bin' in path:
-        return 'cargo'
-    elif '/.local/bin' in path:
+    if "/.cargo/bin" in path:
+        return "cargo"
+    elif "/.local/bin" in path:
         # Could be pip --user, pipx, or uv
         # Default to pipx as most common
-        return 'pipx'
-    elif '/.uv/bin' in path or '/uv-python' in path:
-        return 'uv'
-    elif '/.nvm/' in path:
-        return 'nvm'
-    elif '/.pyenv/' in path:
-        return 'pyenv'
-    elif '/.rbenv/' in path:
-        return 'rbenv'
+        return "pipx"
+    elif "/.uv/bin" in path or "/uv-python" in path:
+        return "uv"
+    elif "/.nvm/" in path:
+        return "nvm"
+    elif "/.pyenv/" in path:
+        return "pyenv"
+    elif "/.rbenv/" in path:
+        return "rbenv"
 
     # System-level installations (check specific patterns before generic ones)
-    elif '/snap/bin' in path:
-        return 'snap'
-    elif '/opt/homebrew' in path:
-        return 'brew'
-    elif '/usr/local/bin' in path or '/usr/local/sbin' in path:
-        return 'brew'
-    elif '/usr/bin' in path or '/usr/sbin' in path:
-        return 'apt'  # Generic system PM
-    elif '/bin' in path or '/sbin' in path:
-        return 'system'
+    elif "/snap/bin" in path:
+        return "snap"
+    elif "/opt/homebrew" in path:
+        # Without brew installed these are manual installs (curl'd binaries);
+        # labeling them 'brew' makes removal run a nonexistent `brew uninstall`.
+        return "brew" if shutil.which("brew") else "manual"
+    elif "/usr/local/bin" in path or "/usr/local/sbin" in path:
+        return "brew" if shutil.which("brew") else "manual"
+    elif "/usr/bin" in path or "/usr/sbin" in path:
+        return "apt"  # Generic system PM
+    elif "/bin" in path or "/sbin" in path:
+        return "system"
 
-    return 'unknown'
+    return "unknown"
 
 
 def clear_detection_cache():
@@ -521,26 +560,27 @@ def sort_by_preference(
     Returns:
         Sorted list (highest preference first)
     """
+
     def get_preference_tier(installation: Installation) -> int:
         """Get preference tier (lower number = higher preference)."""
         method = installation.method
 
         # Tier 1: User-level vendor tools (highest priority)
-        if method in ('uv', 'pipx', 'rustup', 'nvm', 'pyenv', 'rbenv'):
+        if method in ("uv", "pipx", "rustup", "nvm", "pyenv", "rbenv"):
             return 1
 
         # Tier 2: User-level generic
-        if method in ('cargo', 'pip', 'npm'):
+        if method in ("cargo", "pip", "npm"):
             return 2
-        if '/.cargo/' in installation.path or '/.local/' in installation.path:
+        if "/.cargo/" in installation.path or "/.local/" in installation.path:
             return 2
 
         # Tier 3: Homebrew
-        if method == 'brew':
+        if method == "brew":
             return 3
 
         # Tier 4: System package managers (lowest priority)
-        if method in ('apt', 'dnf', 'yum', 'pacman', 'zypper', 'snap', 'system'):
+        if method in ("apt", "dnf", "yum", "pacman", "zypper", "snap", "system"):
             return 4
 
         # Unknown: treat as Tier 5
@@ -548,7 +588,7 @@ def sort_by_preference(
 
     # Score each installation
     scored = []
-    path_dirs = os.environ.get('PATH', '').split(os.pathsep)
+    path_dirs = os.environ.get("PATH", "").split(os.pathsep)
 
     for installation in installations:
         tier = get_preference_tier(installation)
@@ -611,6 +651,7 @@ def _catalog_meta(tool_name: str) -> dict:
             inst = _catalog_instance
             if inst is None:
                 from .catalog import ToolCatalog
+
                 inst = ToolCatalog()
                 # Only cache a catalog that actually loaded, so a transiently
                 # empty/unavailable filesystem doesn't poison later calls.
@@ -717,15 +758,9 @@ def reconcile_tool(
 
     # Execute reconciliation based on mode
     if mode == "aggressive":
-        return _reconcile_aggressive(
-            tool_name, sorted_installs, preferred, active,
-            path_issues, force, verbose
-        )
+        return _reconcile_aggressive(tool_name, sorted_installs, preferred, active, path_issues, force, verbose)
     else:  # parallel (default)
-        return _reconcile_parallel(
-            tool_name, sorted_installs, preferred, active,
-            path_issues, verbose
-        )
+        return _reconcile_parallel(tool_name, sorted_installs, preferred, active, path_issues, verbose)
 
 
 def _reconcile_parallel(
@@ -905,7 +940,7 @@ def _confirm_removal(tool_name: str, to_remove: list[Installation]) -> bool:
 
         print("\nProceed with removal? [y/N]: ", end="")
         response = input().strip().lower()
-        return response in ('y', 'yes')
+        return response in ("y", "yes")
 
 
 def _uninstall_installation(installation: Installation, verbose: bool) -> tuple[bool, str | None]:
@@ -922,10 +957,10 @@ def _uninstall_installation(installation: Installation, verbose: bool) -> tuple[
     vlog(f"  Uninstalling {tool} via {method}...", verbose)
 
     # Cargo
-    if method == 'cargo':
+    if method == "cargo":
         try:
             result = subprocess.run(
-                ['cargo', 'uninstall', tool],
+                ["cargo", "uninstall", tool],
                 capture_output=True,
                 text=True,
                 timeout=30,
@@ -939,10 +974,10 @@ def _uninstall_installation(installation: Installation, verbose: bool) -> tuple[
             return (False, str(e))
 
     # Pipx
-    elif method == 'pipx':
+    elif method == "pipx":
         try:
             result = subprocess.run(
-                ['pipx', 'uninstall', tool],
+                ["pipx", "uninstall", tool],
                 capture_output=True,
                 text=True,
                 timeout=30,
@@ -956,10 +991,10 @@ def _uninstall_installation(installation: Installation, verbose: bool) -> tuple[
             return (False, str(e))
 
     # UV
-    elif method == 'uv':
+    elif method == "uv":
         try:
             result = subprocess.run(
-                ['uv', 'tool', 'uninstall', tool],
+                ["uv", "tool", "uninstall", tool],
                 capture_output=True,
                 text=True,
                 timeout=30,
@@ -973,10 +1008,10 @@ def _uninstall_installation(installation: Installation, verbose: bool) -> tuple[
             return (False, str(e))
 
     # Brew
-    elif method == 'brew':
+    elif method == "brew":
         try:
             result = subprocess.run(
-                ['brew', 'uninstall', tool],
+                ["brew", "uninstall", tool],
                 capture_output=True,
                 text=True,
                 timeout=30,
@@ -990,11 +1025,11 @@ def _uninstall_installation(installation: Installation, verbose: bool) -> tuple[
             return (False, str(e))
 
     # System package managers (require sudo - don't auto-execute)
-    elif method in ('apt', 'dnf', 'pacman', 'system'):
+    elif method in ("apt", "dnf", "pacman", "system"):
         return (False, f"System package removal requires manual sudo: sudo {method} remove {tool}")
 
     # Manual removal (for GitHub releases, etc.)
-    elif method == 'unknown' or method == 'manual':
+    elif method == "unknown" or method == "manual":
         try:
             if os.path.exists(path):
                 os.remove(path)
@@ -1002,7 +1037,7 @@ def _uninstall_installation(installation: Installation, verbose: bool) -> tuple[
             else:
                 return (False, "Binary not found")
         except PermissionError:
-            return (False, f"Permission denied: {path}")
+            return (False, f"Permission denied — remove manually: sudo rm {path}")
         except Exception as e:
             return (False, str(e))
 
@@ -1037,6 +1072,7 @@ def bulk_reconcile(
         BulkReconciliationResult with outcomes
     """
     import time
+
     from .config import load_config
     from .environment import detect_environment
 
@@ -1113,26 +1149,25 @@ def bulk_reconcile(
 
             except Exception as e:
                 vlog(f"✗ {tool}: Error - {e}", verbose)
-                results.append(ReconciliationResult(
-                    tool=tool,
-                    installations=(),
-                    preferred=None,
-                    active=None,
-                    path_issues=(),
-                    action_taken="error",
-                    success=False,
-                    error_message=str(e),
-                ))
+                results.append(
+                    ReconciliationResult(
+                        tool=tool,
+                        installations=(),
+                        preferred=None,
+                        active=None,
+                        path_issues=(),
+                        action_taken="error",
+                        success=False,
+                        error_message=str(e),
+                    )
+                )
 
     duration = time.time() - start_time
 
     # Calculate statistics
     tools_checked = len(results)
     conflicts_found = sum(1 for r in results if len(r.installations) > 1)
-    conflicts_resolved = sum(
-        1 for r in results
-        if len(r.installations) > 1 and r.success and r.action_taken != "none"
-    )
+    conflicts_resolved = sum(1 for r in results if len(r.installations) > 1 and r.success and r.action_taken != "none")
 
     return BulkReconciliationResult(
         tools_checked=tools_checked,
@@ -1158,18 +1193,18 @@ def verify_path_ordering(config: Config | None = None, verbose: bool = False) ->
 
     # User bin directories (should come first)
     user_bins = [
-        os.path.expanduser('~/.local/bin'),
-        os.path.expanduser('~/.cargo/bin'),
-        os.path.expanduser('~/.uv/bin'),
-        os.path.expanduser('~/.pyenv/bin'),
-        os.path.expanduser('~/.rbenv/bin'),
+        os.path.expanduser("~/.local/bin"),
+        os.path.expanduser("~/.cargo/bin"),
+        os.path.expanduser("~/.uv/bin"),
+        os.path.expanduser("~/.pyenv/bin"),
+        os.path.expanduser("~/.rbenv/bin"),
     ]
 
     # System bin directories (should come later)
-    system_bins = ['/usr/local/bin', '/usr/bin', '/bin', '/usr/sbin', '/sbin']
+    system_bins = ["/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"]
 
     # Get PATH
-    path_dirs = os.environ.get('PATH', '').split(os.pathsep)
+    path_dirs = os.environ.get("PATH", "").split(os.pathsep)
 
     # Check each user bin that exists
     for user_bin in user_bins:
@@ -1180,7 +1215,7 @@ def verify_path_ordering(config: Config | None = None, verbose: bool = False) ->
             issues.append(
                 f"Missing from PATH: {user_bin}\n"
                 f"  Fix: Add to ~/.bashrc or ~/.zshrc:\n"
-                f"    export PATH=\"{user_bin}:$PATH\""
+                f'    export PATH="{user_bin}:$PATH"'
             )
             continue
 
@@ -1199,7 +1234,7 @@ def verify_path_ordering(config: Config | None = None, verbose: bool = False) ->
                     f"PATH ordering issue: {sys_bin} appears before {user_bin}\n"
                     f"  Current PATH index: {sys_bin}={sys_idx}, {user_bin}={user_idx}\n"
                     f"  Fix: Add to ~/.bashrc or ~/.zshrc:\n"
-                    f"    export PATH=\"{user_bin}:$PATH\""
+                    f'    export PATH="{user_bin}:$PATH"'
                 )
 
     if verbose:
