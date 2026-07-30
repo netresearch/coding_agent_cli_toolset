@@ -34,6 +34,10 @@ VERSION_FLAG_SETS = (
 # fall back to the last known version instead of reporting "not installed".
 VERSION_PROBE_TIMEOUT = "<probe-timeout>"
 
+# Pseudo-path recorded when a version was detected via a standalone
+# catalog version_command instead of a binary on disk.
+VERSION_COMMAND_PATH = "<version_command>"
+
 
 def find_paths(command_name: str, deep: bool = False) -> list[str]:
     """Find all paths for a command.
@@ -350,9 +354,9 @@ def audit_tool_installation(
         line = get_version_line("", tool_name, version_flag, version_command)
         if line:
             num = extract_version_number(line)
-            tuples.append((num, line, "<version_command>"))
+            tuples.append((num, line, VERSION_COMMAND_PATH))
         elif line is None:
-            timed_out_paths.append("<version_command>")
+            timed_out_paths.append(VERSION_COMMAND_PATH)
 
     if not tuples:
         # A probe ran but timed out: signal the timeout so callers can fall
@@ -360,7 +364,7 @@ def audit_tool_installation(
         # as not installed.
         if timed_out_paths:
             path = timed_out_paths[0]
-            if path == "<version_command>":
+            if path == VERSION_COMMAND_PATH:
                 return ("", VERSION_PROBE_TIMEOUT, path, "version_command")
             return ("", VERSION_PROBE_TIMEOUT, path, detect_install_method(path, tool_name))
         return ("", "X", "", "")
@@ -372,7 +376,7 @@ def audit_tool_installation(
     version_num, version_line, path = chosen
 
     # Handle version_command detection (no physical path)
-    if path == "<version_command>":
+    if path == VERSION_COMMAND_PATH:
         install_method = "version_command"
     else:
         install_method = detect_install_method(path, tool_name)
