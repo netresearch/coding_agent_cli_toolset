@@ -889,7 +889,25 @@ def _reconcile_aggressive(
             vlog(f"  ✗ Error: {e}", verbose)
 
     # Determine success
-    success = len(removed) == len(to_remove)
+    # Verify the kept installation still works: a survivor can be a wrapper
+    # script depending on files the removed package owned (byobu's launcher
+    # sources /usr/lib/byobu), in which case the removal silently broke it.
+    if removed:
+        try:
+            from .detection import get_version_line
+
+            meta = _catalog_meta(tool_name)
+            probe = get_version_line(preferred.path, tool_name, meta.get("version_flag"), None)
+        except Exception:
+            probe = None
+        if not probe:
+            errors.append(
+                f"kept installation {preferred.path} no longer works after removal — "
+                f"reinstall the removed package (e.g. sudo {removed[0].method} install {tool_name}) "
+                f"or remove the broken survivor"
+            )
+
+    success = len(removed) == len(to_remove) and not errors
     error_msg = "; ".join(errors) if errors else None
     # Failures that only need a manual sudo command are the designed outcome
     # (this tool never runs sudo itself), not errors — callers exit 0 on them.

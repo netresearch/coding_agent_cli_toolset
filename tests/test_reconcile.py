@@ -440,10 +440,11 @@ class TestReconcileTool:
         assert result.preferred.method == "cargo"
         assert result.action_taken in ("none", "path_guidance")
 
+    @patch("cli_audit.detection.get_version_line", return_value="ripgrep 14.1.0")
     @patch("cli_audit.reconcile._uninstall_installation")
     @patch("cli_audit.reconcile._confirm_removal")
     @patch("cli_audit.reconcile.detect_installations")
-    def test_reconcile_aggressive_mode(self, mock_detect, mock_confirm, mock_uninstall):
+    def test_reconcile_aggressive_mode(self, mock_detect, mock_confirm, mock_uninstall, mock_probe):
         """Test aggressive reconciliation mode."""
         installations = [
             Installation(
@@ -769,6 +770,46 @@ class TestConfirmRemoval:
 
         result = _confirm_removal("tool", installations)
         assert result is False
+
+
+class TestSurvivorValidation:
+    """After a removal, the kept installation must still work."""
+
+    @patch("cli_audit.detection.get_version_line", return_value=None)
+    @patch("cli_audit.reconcile._uninstall_installation", return_value=(True, None))
+    @patch("cli_audit.reconcile.detect_installations")
+    def test_broken_survivor_after_removal_is_reported(self, mock_detect, mock_uninstall, mock_probe):
+        """A kept wrapper script can depend on files of the removed package.
+
+        Regression: reconcile removed apt byobu and kept a stray copy of
+        byobu's launcher script in ~/.local/bin, which sources
+        /usr/lib/byobu/include/common — the survivor was silently broken.
+        """
+        mock_detect.return_value = [
+            Installation("byobu", "6.11", "manual", "/home/u/.local/bin/byobu", True),
+            Installation("byobu", "6.11", "apt", "/usr/bin/byobu", False),
+        ]
+
+        result = reconcile_tool("byobu", mode="aggressive", force=True)
+
+        assert result.success is False
+        assert "no longer works" in result.error_message
+        assert "byobu" in result.error_message
+
+    @patch("cli_audit.detection.get_version_line", return_value="byobu version 6.14")
+    @patch("cli_audit.reconcile._uninstall_installation", return_value=(True, None))
+    @patch("cli_audit.reconcile.detect_installations")
+    def test_working_survivor_keeps_success(self, mock_detect, mock_uninstall, mock_probe):
+        """A functional survivor leaves the removal a plain success."""
+        mock_detect.return_value = [
+            Installation("byobu", "6.14", "manual", "/home/u/.local/bin/byobu", True),
+            Installation("byobu", "6.11", "apt", "/usr/bin/byobu", False),
+        ]
+
+        result = reconcile_tool("byobu", mode="aggressive", force=True)
+
+        assert result.success is True
+        assert result.action_taken == "removed"
 
 
 class TestManualRequiredClassification:
