@@ -83,9 +83,7 @@ class LocalState:
                 "count": self.count,
                 "partial_failures": self.partial_failures,
             },
-            "tools": {
-                name: tool.to_dict() for name, tool in self.tools.items()
-            },
+            "tools": {name: tool.to_dict() for name, tool in self.tools.items()},
         }
 
     @classmethod
@@ -94,10 +92,7 @@ class LocalState:
         meta = data.get("__meta__", {})
         tools_raw = data.get("tools", {})
 
-        tools = {
-            name: LocalInstallation.from_dict(tool_data)
-            for name, tool_data in tools_raw.items()
-        }
+        tools = {name: LocalInstallation.from_dict(tool_data) for name, tool_data in tools_raw.items()}
 
         return cls(
             tools=tools,
@@ -163,19 +158,11 @@ def write_local_state(
         path = get_local_state_path()
 
     # Update metadata
-    state.collected_at = (
-        datetime.datetime.now(datetime.timezone.utc)
-        .replace(microsecond=0)
-        .isoformat()
-        .replace("+00:00", "Z")
-    )
+    state.collected_at = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     state.hostname = socket.gethostname()
     state.offline = offline
     state.count = len(state.tools)
-    state.partial_failures = sum(
-        1 for t in state.tools.values()
-        if t.status == "UNKNOWN" and not t.installed_version
-    )
+    state.partial_failures = sum(1 for t in state.tools.values() if t.status == "UNKNOWN" and not t.installed_version)
 
     # Atomic write: write to temp file then rename
     try:
@@ -251,6 +238,28 @@ def migrate_from_snapshot(snapshot: dict[str, Any]) -> LocalState:
     return state
 
 
+def _display_status(loc: LocalInstallation, up: UpstreamVersion) -> str:
+    """Recompute display status from the current pair of inputs.
+
+    local_state.json stores the status computed at collect time; serving it
+    verbatim after the committed upstream baseline moved pairs a fresh latest
+    with a stale verdict (bwrap: installed 0.9.0 rendered UP-TO-DATE next to
+    latest 0.11.2). A stored status is only valid for the inputs it was
+    computed from, so recompute whenever both sides are present. Directional
+    like compute_status: installed >= latest is UP-TO-DATE. CONFLICT is not a
+    version verdict and passes through unchanged.
+    """
+    from .upgrade import compare_versions
+
+    if loc.status == "CONFLICT":
+        return loc.status
+    installed = (loc.installed_version or "").lstrip("v")
+    latest = (up.latest_version or "").lstrip("v")
+    if not installed or not latest:
+        return loc.status
+    return "OUTDATED" if compare_versions(installed, latest) < 0 else "UP-TO-DATE"
+
+
 def merge_for_display(
     upstream: UpstreamCache,
     local: LocalState,
@@ -286,7 +295,7 @@ def merge_for_display(
             "installed_method": loc.installed_method,
             "installed_path_selected": loc.installed_path,
             "classification_reason_selected": loc.classification_reason,
-            "status": loc.status,
+            "status": _display_status(loc, up),
             # Upstream info (from upstream cache). Display the normalized
             # version, not latest_tag (which holds the raw tag, e.g. "v1.7.12",
             # used for URL construction).
