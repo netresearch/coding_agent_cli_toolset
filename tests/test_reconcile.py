@@ -440,10 +440,11 @@ class TestReconcileTool:
         assert result.preferred.method == "cargo"
         assert result.action_taken in ("none", "path_guidance")
 
+    @patch("cli_audit.detection.get_version_line", return_value="ripgrep 14.1.0")
     @patch("cli_audit.reconcile._uninstall_installation")
     @patch("cli_audit.reconcile._confirm_removal")
     @patch("cli_audit.reconcile.detect_installations")
-    def test_reconcile_aggressive_mode(self, mock_detect, mock_confirm, mock_uninstall):
+    def test_reconcile_aggressive_mode(self, mock_detect, mock_confirm, mock_uninstall, mock_probe):
         """Test aggressive reconciliation mode."""
         installations = [
             Installation(
@@ -769,6 +770,171 @@ class TestConfirmRemoval:
 
         result = _confirm_removal("tool", installations)
         assert result is False
+
+
+class TestSurvivorValidation:
+    """After a removal, the kept installation must still work."""
+
+    @patch("cli_audit.detection.get_version_line", return_value=None)
+    @patch("cli_audit.reconcile._uninstall_installation", return_value=(True, None))
+    @patch("cli_audit.reconcile.detect_installations")
+    def test_broken_survivor_after_removal_is_reported(self, mock_detect, mock_uninstall, mock_probe):
+        """A kept wrapper script can depend on files of the removed package.
+
+        Regression: reconcile removed apt byobu and kept a stray copy of
+        byobu's launcher script in ~/.local/bin, which sources
+        /usr/lib/byobu/include/common — the survivor was silently broken.
+        """
+        mock_detect.return_value = [
+            Installation("byobu", "6.11", "manual", "/home/u/.local/bin/byobu", True),
+            Installation("byobu", "6.11", "apt", "/usr/bin/byobu", False),
+        ]
+
+        result = reconcile_tool("byobu", mode="aggressive", force=True)
+
+        assert result.success is False
+        assert "no longer works" in result.error_message
+        assert "byobu" in result.error_message
+
+    @patch("cli_audit.detection.get_version_line", return_value="byobu version 6.14")
+    @patch("cli_audit.reconcile._uninstall_installation", return_value=(True, None))
+    @patch("cli_audit.reconcile.detect_installations")
+    def test_working_survivor_keeps_success(self, mock_detect, mock_uninstall, mock_probe):
+        """A functional survivor leaves the removal a plain success."""
+        mock_detect.return_value = [
+            Installation("byobu", "6.14", "manual", "/home/u/.local/bin/byobu", True),
+            Installation("byobu", "6.11", "apt", "/usr/bin/byobu", False),
+        ]
+
+        result = reconcile_tool("byobu", mode="aggressive", force=True)
+
+        assert result.success is True
+        assert result.action_taken == "removed"
+
+
+class TestManualRequiredClassification:
+    """Failures that only need a manual sudo command are not errors."""
+
+    @patch("cli_audit.reconcile._uninstall_installation")
+    @patch("cli_audit.reconcile.detect_installations")
+    def test_all_manual_failures_mark_manual_required(self, mock_detect, mock_uninstall):
+        """A removal blocked only on sudo is 'manual_required', not a failure.
+
+        Regression: `make reconcile-all` ended with `Error 1` even when the
+        run worked as designed and printed the manual sudo commands.
+        """
+        mock_detect.return_value = [
+            Installation("jq", "1.8.1", "pipx", "/home/u/.local/bin/jq", True),
+            Installation("jq", "1.6", "apt", "/usr/bin/jq", False),
+        ]
+        mock_uninstall.return_value = (False, "System package removal requires manual sudo: sudo apt remove jq")
+
+        result = reconcile_tool("jq", mode="aggressive", force=True)
+
+        assert result.action_taken == "manual_required"
+        assert result.success is False
+
+    @patch("cli_audit.reconcile._uninstall_installation")
+    @patch("cli_audit.reconcile.detect_installations")
+    def test_mixed_failures_stay_removed(self, mock_detect, mock_uninstall):
+        """A genuine error among the failures keeps the result a real failure."""
+        mock_detect.return_value = [
+            Installation("demo", "2.0.0", "pipx", "/home/u/.local/bin/demo", True),
+            Installation("demo", "1.0.0", "apt", "/usr/bin/demo", False),
+            Installation("demo", "1.5.0", "cargo", "/home/u/.cargo/bin/demo", False),
+        ]
+        mock_uninstall.side_effect = [
+            (False, "System package removal requires manual sudo: sudo apt remove demo"),
+            (False, "error: package ID specification `demo` did not match any packages"),
+        ]
+
+        result = reconcile_tool("demo", mode="aggressive", force=True)
+
+        assert result.action_taken == "removed"
+        assert result.success is False
+
+
+class TestConfirmRemovalBulkAnswers:
+    """'a' (all), 'q' (quit) and Ctrl-C handling for bulk prompt runs."""
+
+    def setup_method(self):
+        from cli_audit.reconcile import _reset_bulk_prompt_state
+
+        _reset_bulk_prompt_state()
+
+    def teardown_method(self):
+        from cli_audit.reconcile import _reset_bulk_prompt_state
+
+        _reset_bulk_prompt_state()
+
+    @patch("builtins.input", return_value="a")
+    @patch("sys.stdin.isatty", return_value=True)
+    def test_all_answers_yes_to_all_remaining(self, mock_isatty, mock_input):
+        """'a' confirms this prompt and every later one without re-prompting."""
+        installations = [Installation("tool", "1.0.0", "cargo", "/path", False)]
+
+        assert _confirm_removal("tool", installations) is True
+        assert _confirm_removal("other", installations) is True
+        mock_input.assert_called_once()
+
+    @patch("builtins.input", return_value="q")
+    @patch("sys.stdin.isatty", return_value=True)
+    def test_quit_declines_all_remaining(self, mock_isatty, mock_input):
+        """'q' declines this prompt and every later one without re-prompting."""
+        installations = [Installation("tool", "1.0.0", "cargo", "/path", False)]
+
+        assert _confirm_removal("tool", installations) is False
+        assert _confirm_removal("other", installations) is False
+        mock_input.assert_called_once()
+
+    @patch("builtins.input", side_effect=KeyboardInterrupt)
+    @patch("sys.stdin.isatty", return_value=True)
+    def test_ctrl_c_acts_as_quit(self, mock_isatty, mock_input):
+        """Ctrl-C at a prompt declines and stops all later prompts — no traceback.
+
+        Regression: KeyboardInterrupt killed the main thread while worker
+        threads kept prompting, then Python's atexit hung joining a thread
+        blocked in input().
+        """
+        installations = [Installation("tool", "1.0.0", "cargo", "/path", False)]
+
+        assert _confirm_removal("tool", installations) is False
+        assert _confirm_removal("other", installations) is False
+        mock_input.assert_called_once()
+
+
+class TestBulkAggressivePrompting:
+    """Bulk aggressive mode must prompt from the main thread only."""
+
+    @patch("cli_audit.reconcile._uninstall_installation", return_value=(True, None))
+    @patch("cli_audit.reconcile._confirm_removal")
+    @patch("cli_audit.reconcile.detect_installations")
+    def test_prompts_run_in_main_thread(self, mock_detect, mock_confirm, mock_uninstall):
+        """Prompting from ThreadPool workers deadlocks atexit on Ctrl-C."""
+        import threading
+
+        mock_detect.side_effect = lambda tool, *a, **k: [
+            Installation(tool, "2.0.0", "cargo", f"/home/user/.cargo/bin/{tool}", True),
+            Installation(tool, "1.0.0", "apt", f"/usr/bin/{tool}", False),
+        ]
+        prompt_threads = []
+
+        def record_prompt(tool, to_remove):
+            prompt_threads.append(threading.current_thread().name)
+            return False
+
+        mock_confirm.side_effect = record_prompt
+
+        bulk_reconcile(
+            mode="explicit",
+            tool_names=["toola", "toolb"],
+            reconcile_mode="aggressive",
+            config=Config(),
+            env=Environment(mode="workstation", confidence=1.0),
+        )
+
+        assert len(prompt_threads) == 2
+        assert set(prompt_threads) == {"MainThread"}
 
 
 class TestUninstallInstallation:
