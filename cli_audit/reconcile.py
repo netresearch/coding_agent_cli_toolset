@@ -170,11 +170,13 @@ class BulkReconciliationResult:
 
     def summary(self) -> str:
         """Human-readable summary."""
+        manual = sum(1 for r in self.results if r.action_taken == "manual_required")
+        manual_line = f"\n  Manual action required: {manual}" if manual else ""
         return f"""
 Reconciliation Summary:
   Checked: {self.tools_checked} tools
   Conflicts found: {self.conflicts_found}
-  Conflicts resolved: {self.conflicts_resolved}
+  Conflicts resolved: {self.conflicts_resolved}{manual_line}
   Duration: {self.duration_seconds:.1f}s
 """
 
@@ -889,6 +891,9 @@ def _reconcile_aggressive(
     # Determine success
     success = len(removed) == len(to_remove)
     error_msg = "; ".join(errors) if errors else None
+    # Failures that only need a manual sudo command are the designed outcome
+    # (this tool never runs sudo itself), not errors — callers exit 0 on them.
+    action = "manual_required" if errors and all(_is_manual_removal_error(e) for e in errors) else "removed"
 
     return ReconciliationResult(
         tool=tool_name,
@@ -896,7 +901,7 @@ def _reconcile_aggressive(
         preferred=preferred,
         active=active,
         path_issues=path_issues,
-        action_taken="removed",
+        action_taken=action,
         removed_installations=tuple(removed),
         success=success,
         error_message=error_msg,
@@ -971,6 +976,20 @@ def _confirm_removal(tool_name: str, to_remove: list[Installation]) -> bool:
             _bulk_prompt_state["quit"] = True
             return False
         return response in ("y", "yes")
+
+
+# Failure messages that only require a manual sudo command — an expected
+# limitation (this tool never runs sudo itself), not an error.
+_MANUAL_REMOVAL_MARKERS = (
+    "System package removal requires manual sudo:",
+    "Permission denied — remove manually:",
+    "Unmanaged system binary — remove manually:",
+)
+
+
+def _is_manual_removal_error(message: str | None) -> bool:
+    """True if a removal failure only needs the user to run a sudo command."""
+    return bool(message) and any(marker in message for marker in _MANUAL_REMOVAL_MARKERS)
 
 
 def _cargo_package_for(binary: str, tool: str) -> str:

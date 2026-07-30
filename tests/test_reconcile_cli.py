@@ -207,9 +207,9 @@ class TestCmdReconcileApplyJSON:
                 preferred=kept,
                 active=kept,
                 path_issues=(),
-                action_taken="removed",
+                action_taken="manual_required",
                 success=False,
-                error_message="removal failed",
+                error_message="removal needs sudo",
             )
 
         bulk = BulkReconciliationResult(
@@ -231,13 +231,16 @@ class TestCmdReconcileApplyJSON:
             err = io.StringIO()
             with redirect_stderr(err):
                 rc = audit.cmd_reconcile(_ns(all=True, apply=True, yes=True))
-        assert rc == 1
+        # Needing manual sudo is the designed outcome, not an error: exit 0
+        # so `make reconcile-all` does not end in a confusing "Error 1".
+        assert rc == 0
         output = err.getvalue()
         assert "sudo apt remove jq ripgrep" in output
         assert "sudo rm -f /usr/local/bin/fx /usr/local/bin/jq" in output
         # aggregated once, not per tool
         assert output.count("sudo apt remove") == 1
         assert output.count("sudo rm -f") == 1
+        assert "Manual action required: 3" in output
 
     def test_apply_protected_returns_nonzero(self):
         kept = _inst("/usr/bin/demo", active=True)

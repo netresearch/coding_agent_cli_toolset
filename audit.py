@@ -1481,6 +1481,8 @@ def cmd_reconcile(args: argparse.Namespace) -> int:
                         print(f"  {r.tool}: skipped (declined)", file=sys.stderr)
                     elif r.action_taken == "blocked":
                         print(f"  {r.tool}: skipped (protected system tool)", file=sys.stderr)
+                    elif r.action_taken == "manual_required":
+                        print(f"  ⚠ {r.tool}: {r.error_message}", file=sys.stderr)
                     elif not r.success and r.error_message:
                         print(f"  ✗ {r.tool}: {r.error_message}", file=sys.stderr)
                 # Aggregate confirmed-but-failed removals into one copy-paste
@@ -1488,7 +1490,7 @@ def cmd_reconcile(args: argparse.Namespace) -> int:
                 pm_tools: dict[str, set[str]] = {}
                 rm_paths: set[str] = set()
                 for r in conflicts:
-                    if r.action_taken != "removed" or r.success:
+                    if r.action_taken not in ("removed", "manual_required") or r.success:
                         continue
                     for inst in r.installations:
                         if inst == r.preferred or inst in r.removed_installations:
@@ -1504,9 +1506,14 @@ def cmd_reconcile(args: argparse.Namespace) -> int:
                     if rm_paths:
                         print(f"  sudo rm -f {' '.join(sorted(rm_paths))}", file=sys.stderr)
                 print(result.summary(), file=sys.stderr)
-            # Fail only on real removal errors — not on protected tools (blocked)
-            # or tools the user declined (aborted), which are expected outcomes.
-            failures = [r for r in conflicts if not r.success and r.action_taken not in ("blocked", "aborted", "none")]
+            # Fail only on real removal errors — not on protected tools (blocked),
+            # tools the user declined (aborted), or removals that just need a
+            # manual sudo command (manual_required), which are expected outcomes.
+            failures = [
+                r
+                for r in conflicts
+                if not r.success and r.action_taken not in ("blocked", "aborted", "none", "manual_required")
+            ]
             return 1 if failures else 0
         # Plan-only sweep (parallel detection, no removal)
         result = bulk_reconcile(
@@ -1556,7 +1563,7 @@ def cmd_reconcile(args: argparse.Namespace) -> int:
             for r in results:
                 extra = f" ({r.error_message})" if r.error_message else ""
                 print(f"{r.tool}: {r.action_taken}{extra}", file=sys.stderr)
-        return 0 if all(r.success for r in results) else 1
+        return 0 if all(r.success or r.action_taken == "manual_required" for r in results) else 1
 
     plans = [_plan(t) for t in tools]
     if JSON_MODE:

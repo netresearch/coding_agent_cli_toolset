@@ -771,6 +771,48 @@ class TestConfirmRemoval:
         assert result is False
 
 
+class TestManualRequiredClassification:
+    """Failures that only need a manual sudo command are not errors."""
+
+    @patch("cli_audit.reconcile._uninstall_installation")
+    @patch("cli_audit.reconcile.detect_installations")
+    def test_all_manual_failures_mark_manual_required(self, mock_detect, mock_uninstall):
+        """A removal blocked only on sudo is 'manual_required', not a failure.
+
+        Regression: `make reconcile-all` ended with `Error 1` even when the
+        run worked as designed and printed the manual sudo commands.
+        """
+        mock_detect.return_value = [
+            Installation("jq", "1.8.1", "pipx", "/home/u/.local/bin/jq", True),
+            Installation("jq", "1.6", "apt", "/usr/bin/jq", False),
+        ]
+        mock_uninstall.return_value = (False, "System package removal requires manual sudo: sudo apt remove jq")
+
+        result = reconcile_tool("jq", mode="aggressive", force=True)
+
+        assert result.action_taken == "manual_required"
+        assert result.success is False
+
+    @patch("cli_audit.reconcile._uninstall_installation")
+    @patch("cli_audit.reconcile.detect_installations")
+    def test_mixed_failures_stay_removed(self, mock_detect, mock_uninstall):
+        """A genuine error among the failures keeps the result a real failure."""
+        mock_detect.return_value = [
+            Installation("demo", "2.0.0", "pipx", "/home/u/.local/bin/demo", True),
+            Installation("demo", "1.0.0", "apt", "/usr/bin/demo", False),
+            Installation("demo", "1.5.0", "cargo", "/home/u/.cargo/bin/demo", False),
+        ]
+        mock_uninstall.side_effect = [
+            (False, "System package removal requires manual sudo: sudo apt remove demo"),
+            (False, "error: package ID specification `demo` did not match any packages"),
+        ]
+
+        result = reconcile_tool("demo", mode="aggressive", force=True)
+
+        assert result.action_taken == "removed"
+        assert result.success is False
+
+
 class TestConfirmRemovalBulkAnswers:
     """'a' (all), 'q' (quit) and Ctrl-C handling for bulk prompt runs."""
 
