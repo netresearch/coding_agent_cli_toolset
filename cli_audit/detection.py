@@ -19,7 +19,7 @@ CARGO_BIN = os.path.join(HOME, ".cargo", "bin")
 
 VERSION_RE = re.compile(r"(\d+(?:\.\d+)+)")
 DATE_VERSION_RE = re.compile(r"\b(\d{8})\b")
-ANSI_ESCAPE_RE = re.compile(r'\x1b\[[0-9;]*m|\033\[[0-9;]*m')
+ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*m|\033\[[0-9;]*m")
 
 VERSION_FLAG_SETS = (
     ("-v",),
@@ -27,6 +27,16 @@ VERSION_FLAG_SETS = (
     ("-V",),
     ("version",),
 )
+
+# Marker returned by audit_tool_installation when the binary exists on disk
+# but every version probe timed out (slow binaries like opengrep need ~2.5s
+# and can exceed TIMEOUT_SECONDS under parallel collection load). Callers
+# fall back to the last known version instead of reporting "not installed".
+VERSION_PROBE_TIMEOUT = "<probe-timeout>"
+
+# Pseudo-path recorded when a version was detected via a standalone
+# catalog version_command instead of a binary on disk.
+VERSION_COMMAND_PATH = "<version_command>"
 
 
 def find_paths(command_name: str, deep: bool = False) -> list[str]:
@@ -76,7 +86,7 @@ def find_paths(command_name: str, deep: bool = False) -> list[str]:
     return paths
 
 
-def run_with_timeout(args: Sequence[str], timeout: float | None = None, capture_stderr: bool = True) -> str:
+def run_with_timeout(args: Sequence[str], timeout: float | None = None, capture_stderr: bool = True) -> str | None:
     """Run command with timeout and return output with version info.
 
     Args:
@@ -85,7 +95,8 @@ def run_with_timeout(args: Sequence[str], timeout: float | None = None, capture_
         capture_stderr: If True, merge stderr into stdout
 
     Returns:
-        Line containing version, or first line if no version found
+        Line containing version, or first line if no version found.
+        None if the command timed out (distinct from "" for other failures).
     """
     try:
         proc = subprocess.run(
@@ -107,7 +118,7 @@ def run_with_timeout(args: Sequence[str], timeout: float | None = None, capture_
             return ""
 
         # Strip ANSI escape sequences from all lines
-        cleaned_lines = [ANSI_ESCAPE_RE.sub('', line.strip()) for line in lines]
+        cleaned_lines = [ANSI_ESCAPE_RE.sub("", line.strip()) for line in lines]
 
         # Search for line containing version number (prefer this over first line)
         for line in cleaned_lines:
@@ -120,6 +131,8 @@ def run_with_timeout(args: Sequence[str], timeout: float | None = None, capture_
                 return line
 
         return ""
+    except subprocess.TimeoutExpired:
+        return None
     except Exception:
         return ""
 
@@ -146,7 +159,9 @@ def extract_version_number(s: str) -> str:
     return m2.group(1) if m2 else ""
 
 
-def get_version_line(path: str, tool_name: str, version_flag: str | None = None, version_command: str | None = None) -> str:
+def get_version_line(
+    path: str, tool_name: str, version_flag: str | None = None, version_command: str | None = None
+) -> str | None:
     """Get version string for installed tool.
 
     Args:
@@ -156,8 +171,12 @@ def get_version_line(path: str, tool_name: str, version_flag: str | None = None,
         version_command: Custom shell command from catalog (ignores path)
 
     Returns:
-        Version line string or empty string
+        Version line string, or empty string if no probe produced output.
+        None if at least one probe timed out and none produced a version.
     """
+    timed_out = False
+    line: str | None
+
     # Priority 1: If catalog specifies custom shell command, run it directly.
     # version_command comes from trusted catalog JSON (committed in-repo), never
     # from user input — e.g. `uv python list --only-installed | grep … | sed …`.
@@ -178,6 +197,8 @@ def get_version_line(path: str, tool_name: str, version_flag: str | None = None,
             line = (proc.stdout or "").strip()
             if line:
                 return line
+        except subprocess.TimeoutExpired:
+            timed_out = True
         except Exception:
             pass
 
@@ -186,6 +207,8 @@ def get_version_line(path: str, tool_name: str, version_flag: str | None = None,
         line = run_with_timeout([path, version_flag])
         if line:
             return line
+        if line is None:
+            timed_out = True
 
     # Priority 3: Special cases (only truly complex cases that can't be handled by catalog)
     if tool_name == "sponge":
@@ -195,17 +218,15 @@ def get_version_line(path: str, tool_name: str, version_flag: str | None = None,
     # Generic version flags
     for flags in VERSION_FLAG_SETS:
         line = run_with_timeout([path, *flags])
+        if line is None:
+            timed_out = True
+            continue
         if not line:
             continue
 
         # Skip error messages
         lcline = line.lower()
-        if (
-            lcline.startswith("error:")
-            or lcline.startswith("usage")
-            or "unknown option" in lcline
-            or "try --help" in lcline
-        ):
+        if lcline.startswith("error:") or lcline.startswith("usage") or "unknown option" in lcline or "try --help" in lcline:
             continue
 
         # Return if contains version
@@ -221,6 +242,7 @@ def get_version_line(path: str, tool_name: str, version_flag: str | None = None,
             if os.path.isfile(pkg_json):
                 try:
                     import json
+
                     with open(pkg_json) as f:
                         data = json.load(f)
                         version = data.get("version", "")
@@ -230,7 +252,7 @@ def get_version_line(path: str, tool_name: str, version_flag: str | None = None,
                     pass
         return "installed"
 
-    return ""
+    return None if timed_out else ""
 
 
 def detect_install_method(path: str, tool_name: str) -> str:
@@ -316,6 +338,7 @@ def audit_tool_installation(
         Tuple of (version_num, version_line, path, install_method)
     """
     tuples: list[tuple[str, str, str]] = []
+    timed_out_paths: list[str] = []
 
     for cand in candidates:
         for path in find_paths(cand, deep=deep):
@@ -323,15 +346,27 @@ def audit_tool_installation(
             if line:
                 num = extract_version_number(line)
                 tuples.append((num, line, path))
+            elif line is None:
+                timed_out_paths.append(path)
 
     # If no paths found but version_command exists, try standalone version detection
     if not tuples and version_command:
         line = get_version_line("", tool_name, version_flag, version_command)
         if line:
             num = extract_version_number(line)
-            tuples.append((num, line, "<version_command>"))
+            tuples.append((num, line, VERSION_COMMAND_PATH))
+        elif line is None:
+            timed_out_paths.append(VERSION_COMMAND_PATH)
 
     if not tuples:
+        # A probe ran but timed out: signal the timeout so callers can fall
+        # back to the last known version instead of misreporting the tool
+        # as not installed.
+        if timed_out_paths:
+            path = timed_out_paths[0]
+            if path == VERSION_COMMAND_PATH:
+                return ("", VERSION_PROBE_TIMEOUT, path, "version_command")
+            return ("", VERSION_PROBE_TIMEOUT, path, detect_install_method(path, tool_name))
         return ("", "X", "", "")
 
     chosen = choose_highest(tuples)
@@ -341,7 +376,7 @@ def audit_tool_installation(
     version_num, version_line, path = chosen
 
     # Handle version_command detection (no physical path)
-    if path == "<version_command>":
+    if path == VERSION_COMMAND_PATH:
         install_method = "version_command"
     else:
         install_method = detect_install_method(path, tool_name)
@@ -379,7 +414,7 @@ def scan_version_manager_dir(
         # Get version string (strip prefix if present)
         version = version_dir
         if version_prefix and version.startswith(version_prefix):
-            version = version[len(version_prefix):]
+            version = version[len(version_prefix) :]
 
         # Find the binary
         if binary_name:
@@ -438,9 +473,7 @@ def detect_multi_versions(
         binary_subpath = multi_version_config.get("binary_subpath", "bin")
         binary_name = multi_version_config.get("binary_name", tool_name)
 
-        installed_versions = scan_version_manager_dir(
-            version_manager_dir, version_prefix, binary_subpath, binary_name
-        )
+        installed_versions = scan_version_manager_dir(version_manager_dir, version_prefix, binary_subpath, binary_name)
 
         # Create a lookup map: major.minor -> (full_version, path)
         installed_map: dict[str, tuple[str, str]] = {}
@@ -493,7 +526,7 @@ def detect_multi_versions(
             default_go = shutil.which("go")
             if default_go:
                 version_line = get_version_line(default_go, "go", version_flag="version")
-                default_version = extract_version_number(version_line)
+                default_version = extract_version_number(version_line or "")
                 if default_version:
                     parts = default_version.split(".")
                     if len(parts) >= 2:
@@ -529,7 +562,7 @@ def detect_multi_versions(
                 if found_path:
                     # Get version info
                     version_line = get_version_line(found_path, tool_name)
-                    installed_version = extract_version_number(version_line)
+                    installed_version = extract_version_number(version_line or "")
                     break
 
             # Go fallback: if no version-specific binary found, check if default

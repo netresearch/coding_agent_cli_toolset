@@ -25,25 +25,38 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 # Add current directory to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# Import modules
-from cli_audit.tools import Tool, all_tools, filter_tools, tool_homepage_url, latest_target_url  # noqa: E402
-from cli_audit.detection import audit_tool_installation, detect_multi_versions  # noqa: E402
-from cli_audit.snapshot import load_snapshot, write_snapshot, render_from_snapshot, get_snapshot_path  # noqa: E402
-from cli_audit.render import render_table, print_summary, status_icon, osc8  # noqa: E402
-from cli_audit.pins import lookup_pin, should_skip as _pin_should_skip  # noqa: E402
-from cli_audit.collectors import get_github_rate_limit, get_github_rate_limit_help, get_gitlab_rate_limit, is_wsl, collect_endoflife  # noqa: E402
 from cli_audit import collectors  # noqa: E402
+from cli_audit.collectors import (  # noqa: E402
+    collect_endoflife,
+    get_github_rate_limit,
+    get_github_rate_limit_help,
+    get_gitlab_rate_limit,
+    is_wsl,
+)
+from cli_audit.detection import VERSION_PROBE_TIMEOUT, audit_tool_installation, detect_multi_versions  # noqa: E402
+from cli_audit.local_state import (  # noqa: E402
+    LocalInstallation,
+    LocalState,
+    build_legacy_snapshot,
+    get_local_state_path,
+    load_local_state,
+    write_local_state,
+)
 from cli_audit.logging_config import setup_logging  # noqa: E402
+from cli_audit.pins import lookup_pin  # noqa: E402
+from cli_audit.pins import should_skip as _pin_should_skip  # noqa: E402
+from cli_audit.render import osc8, print_summary, render_table, status_icon  # noqa: E402
+from cli_audit.snapshot import get_snapshot_path, load_snapshot, render_from_snapshot, write_snapshot  # noqa: E402
+
+# Import modules
+from cli_audit.tools import Tool, all_tools, filter_tools, latest_target_url, tool_homepage_url  # noqa: E402
+
 # Split file support (Phase 2.1)
 from cli_audit.upstream_cache import (  # noqa: E402
     UpstreamVersion,
-    load_upstream_cache, write_upstream_cache, get_upstream_cache_path,
-    update_cached_upstream,
-)
-from cli_audit.local_state import (  # noqa: E402
-    LocalInstallation, LocalState,
-    load_local_state, write_local_state, get_local_state_path,
-    update_local_installation, merge_for_display, build_legacy_snapshot,
+    get_upstream_cache_path,
+    load_upstream_cache,
+    write_upstream_cache,
 )
 
 # Strip control characters from externally-sourced strings (e.g. GitHub tags)
@@ -87,23 +100,23 @@ def normalize_version(version: str) -> str:
         return version
 
     # Remove 'v' prefix
-    version = version.lstrip('v')
+    version = version.lstrip("v")
 
     # Split into parts and remove trailing zeros from each part
-    parts = version.split('.')
+    parts = version.split(".")
     normalized_parts = []
 
     for i, part in enumerate(parts):
         # For numeric parts, strip trailing zeros but keep at least one digit
         if part.isdigit():
             # Keep at least one zero if the part is all zeros
-            normalized = part.lstrip('0') or '0'
+            normalized = part.lstrip("0") or "0"
             normalized_parts.append(normalized)
         else:
             # Non-numeric parts (e.g., "rc1", "beta") - keep as is
             normalized_parts.append(part)
 
-    return '.'.join(normalized_parts)
+    return ".".join(normalized_parts)
 
 
 def compute_status(installed: str, latest: str) -> str:
@@ -120,6 +133,7 @@ def compute_status(installed: str, latest: str) -> str:
     if not latest:
         return "UNKNOWN"
     from cli_audit.upgrade import compare_versions
+
     if compare_versions(normalize_version(installed), normalize_version(latest)) < 0:
         return "OUTDATED"
     return "UP-TO-DATE"
@@ -224,29 +238,62 @@ def audit_multi_version_tool(
         # canned "check your package manager" line adds no value).
         hint = catalog_data.get("hint", "")
 
-        results.append({
-            "tool": versioned_name,
-            "category": catalog_data.get("category", tool_name),
-            "installed": installed or "",
-            "installed_method": method,
-            "installed_version": installed or "",
-            "installed_path_selected": path,
-            "classification_reason_selected": classification_reason,
-            "latest_upstream": latest,
-            "latest_version": latest,
-            "upstream_method": "endoflife",
-            "status": status,
-            "tool_url": catalog_data.get("homepage", ""),
-            "latest_url": f"https://endoflife.date/{product}",
-            "hint": hint,
-            # Extra fields for multi-version
-            "is_multi_version": True,
-            "base_tool": tool_name,
-            "version_cycle": cycle,
-            "lifecycle_status": status_lifecycle,  # active, security, eol
-        })
+        results.append(
+            {
+                "tool": versioned_name,
+                "category": catalog_data.get("category", tool_name),
+                "installed": installed or "",
+                "installed_method": method,
+                "installed_version": installed or "",
+                "installed_path_selected": path,
+                "classification_reason_selected": classification_reason,
+                "latest_upstream": latest,
+                "latest_version": latest,
+                "upstream_method": "endoflife",
+                "status": status,
+                "tool_url": catalog_data.get("homepage", ""),
+                "latest_url": f"https://endoflife.date/{product}",
+                "hint": hint,
+                # Extra fields for multi-version
+                "is_multi_version": True,
+                "base_tool": tool_name,
+                "version_cycle": cycle,
+                "lifecycle_status": status_lifecycle,  # active, security, eol
+            }
+        )
 
     return results
+
+
+def _apply_probe_timeout_fallback(
+    tool_name: str,
+    version_num: str,
+    version_line: str,
+    path: str,
+    install_method: str,
+) -> tuple[str, str, str, str, bool]:
+    """Fall back to the last known local_state version when the probe timed out.
+
+    A timeout means the binary exists but answered too slowly (slow binaries
+    like opengrep need ~2.5s and can exceed the probe timeout under parallel
+    collection load) — reporting it as not installed would be wrong.
+
+    Returns:
+        Tuple of (version_num, version_line, path, install_method, from_cache).
+        from_cache is True only when the cached version was substituted; callers
+        must surface that in classification_reason so the fallback is not silent.
+    """
+    if version_line != VERSION_PROBE_TIMEOUT:
+        return version_num, version_line, path, install_method, False
+
+    prev = load_local_state().tools.get(tool_name)
+    if prev and prev.installed_version:
+        version = prev.installed_version
+        line = f"{tool_name} {version} (cached; version probe timed out)"
+        return version, line, path or prev.installed_path, install_method or prev.installed_method, True
+
+    # No cached version to fall back to: keep prior "no version" behavior.
+    return "", "", path, install_method, False
 
 
 def audit_tool(tool: Tool, offline_cache: dict[str, tuple[str, str]] | None = None) -> dict[str, str]:
@@ -261,6 +308,7 @@ def audit_tool(tool: Tool, offline_cache: dict[str, tuple[str, str]] | None = No
     """
     # Load catalog metadata for version detection
     from cli_audit.catalog import ToolCatalog
+
     catalog = ToolCatalog()
     version_flag = None
     version_command = None
@@ -273,6 +321,9 @@ def audit_tool(tool: Tool, offline_cache: dict[str, tuple[str, str]] | None = No
     deep_scan = tool.name in {"node", "python", "semgrep", "pre-commit", "bandit", "black", "flake8", "isort"}
     version_num, version_line, path, install_method = audit_tool_installation(
         tool.name, tool.candidates, deep=deep_scan, version_flag=version_flag, version_command=version_command
+    )
+    version_num, version_line, path, install_method, from_cache = _apply_probe_timeout_fallback(
+        tool.name, version_num, version_line, path, install_method
     )
 
     installed = version_num if version_num else (version_line if version_line != "X" else "")
@@ -300,7 +351,9 @@ def audit_tool(tool: Tool, offline_cache: dict[str, tuple[str, str]] | None = No
     latest_url = latest_target_url(tool, latest_tag, latest_num)
 
     # Generate classification reason
-    if install_method:
+    if from_cache:
+        classification_reason = "Cached version (probe timed out); last known method: " + (install_method or "unknown")
+    elif install_method:
         classification_reason = f"Detected via path analysis: {install_method}"
     else:
         classification_reason = "No installation detected"
@@ -340,6 +393,7 @@ def cmd_audit(args: argparse.Namespace) -> int:
 
         # Separate multi-version tools from regular tools
         from cli_audit.catalog import ToolCatalog
+
         catalog = ToolCatalog()
         regular_tools = []
         mv_tools = {}  # tool_name -> (catalog_data, mv_config)
@@ -416,7 +470,7 @@ def cmd_audit(args: argparse.Namespace) -> int:
             enriched["state_icon"] = status_icon(status, installed)
 
             # Add is_up_to_date boolean field
-            enriched["is_up_to_date"] = (status == "UP-TO-DATE")  # type: ignore[assignment]
+            enriched["is_up_to_date"] = status == "UP-TO-DATE"  # type: ignore[assignment]
 
             # Add path and classification fields (for backward compatibility with old snapshots)
             if "installed_path_selected" not in enriched:
@@ -447,6 +501,7 @@ def cmd_audit(args: argparse.Namespace) -> int:
     if created_at and created_at != "cached":
         try:
             from datetime import datetime
+
             created_dt = datetime.fromisoformat(created_at)
             now = datetime.now(created_dt.tzinfo)
             age_seconds = (now - created_dt).total_seconds()
@@ -474,6 +529,7 @@ def cmd_audit(args: argparse.Namespace) -> int:
 
     # Suggest package manager upgrades
     from cli_audit.catalog import suggest_package_manager_upgrades
+
     suggest_package_manager_upgrades()
 
     return 0
@@ -540,9 +596,17 @@ def cmd_update(args: argparse.Namespace) -> int:
                 gl_auth_info = " (via GITLAB_TOKEN)"
 
         if gl_remaining < gl_limit * 0.2:
-            print(f"⚠️  GitLab rate limit ({gl_host}): {gl_remaining}/{gl_limit} remaining{gl_auth_info}", file=sys.stderr, flush=True)
+            print(
+                f"⚠️  GitLab rate limit ({gl_host}): {gl_remaining}/{gl_limit} remaining{gl_auth_info}",
+                file=sys.stderr,
+                flush=True,
+            )
         else:
-            print(f"✓ GitLab rate limit ({gl_host}): {gl_remaining}/{gl_limit} remaining{gl_auth_info}", file=sys.stderr, flush=True)
+            print(
+                f"✓ GitLab rate limit ({gl_host}): {gl_remaining}/{gl_limit} remaining{gl_auth_info}",
+                file=sys.stderr,
+                flush=True,
+            )
 
     print(f"# Collecting fresh data for {total} tools...", file=sys.stderr)
     est_time = int((total / MAX_WORKERS) * 3 * 1.5)
@@ -551,6 +615,7 @@ def cmd_update(args: argparse.Namespace) -> int:
 
     # Identify multi-version tools
     from cli_audit.catalog import ToolCatalog
+
     catalog = ToolCatalog()
     multi_version_tools = {}  # tool_name -> (catalog_data, mv_config)
     regular_tools = []
@@ -565,7 +630,8 @@ def cmd_update(args: argparse.Namespace) -> int:
         regular_tools.append(tool)
 
     # Group regular tools by category for organized output
-    from cli_audit.render import CATEGORY_ORDER, CATEGORY_ICON, CATEGORY_DESC
+    from cli_audit.render import CATEGORY_DESC, CATEGORY_ICON, CATEGORY_ORDER
+
     categorized: dict[str, list] = {}
     for tool in regular_tools:
         cat = tool.category or "general"
@@ -646,7 +712,10 @@ def cmd_update(args: argparse.Namespace) -> int:
                             latest_link = result.get("latest_url", "")
                             if latest_link and latest_display != "n/a":
                                 latest_fmt = osc8(latest_link, latest_fmt)
-                            msg = f"# [{completed}/{total}] [{cat}] {tool.name} (installed: {inst_fmt} {op} latest: {latest_fmt}){marker_str}"
+                            msg = (
+                                f"# [{completed}/{total}] [{cat}] {tool.name} "
+                                f"(installed: {inst_fmt} {op} latest: {latest_fmt}){marker_str}"
+                            )
 
                             print(msg, file=sys.stderr, flush=True)
 
@@ -655,22 +724,24 @@ def cmd_update(args: argparse.Namespace) -> int:
                             print(f"# [{completed}/{total}] {tool.name} (failed: {e})", file=sys.stderr, flush=True)
 
                             # Add failure entry
-                            results.append({
-                                "tool": tool.name,
-                                "category": tool.category,
-                                "installed": "",
-                                "installed_method": "",
-                                "installed_version": "",
-                                "installed_path_selected": "",
-                                "classification_reason_selected": "Detection failed",
-                                "latest_upstream": "",
-                                "latest_version": "",
-                                "upstream_method": tool.source_kind,
-                                "status": "UNKNOWN",
-                                "tool_url": tool_homepage_url(tool),
-                                "latest_url": "",
-                                "hint": "",
-                            })
+                            results.append(
+                                {
+                                    "tool": tool.name,
+                                    "category": tool.category,
+                                    "installed": "",
+                                    "installed_method": "",
+                                    "installed_version": "",
+                                    "installed_path_selected": "",
+                                    "classification_reason_selected": "Detection failed",
+                                    "latest_upstream": "",
+                                    "latest_version": "",
+                                    "upstream_method": tool.source_kind,
+                                    "status": "UNKNOWN",
+                                    "tool_url": tool_homepage_url(tool),
+                                    "latest_url": "",
+                                    "hint": "",
+                                }
+                            )
                 except KeyboardInterrupt:
                     executor.shutdown(wait=False, cancel_futures=True)
                     raise
@@ -682,7 +753,7 @@ def cmd_update(args: argparse.Namespace) -> int:
             if cat in status_counts:
                 status_counts[cat][r.get("status")] += 1
 
-        print(f"\n# Summary by category:", file=sys.stderr)
+        print("\n# Summary by category:", file=sys.stderr)
         for category in sorted_cats:
             icon = CATEGORY_ICON.get(category, "📦")
             desc = CATEGORY_DESC.get(category, category)
@@ -743,6 +814,7 @@ def cmd_update(args: argparse.Namespace) -> int:
         sys.stderr.flush()
         # Exit immediately to avoid shutdown deadlocks
         import os
+
         os._exit(130)
 
     # Write snapshot
@@ -779,6 +851,7 @@ def cmd_update(args: argparse.Namespace) -> int:
 
         # Suggest package manager upgrades
         from cli_audit.catalog import suggest_package_manager_upgrades
+
         suggest_package_manager_upgrades()
 
         # Reset terminal state (reset colors + ensure echo mode)
@@ -838,9 +911,7 @@ def cmd_update_local(args: argparse.Namespace) -> int:
                 # Determine status using cached upstream
                 cached = upstream_cache.versions.get(tool.name)
                 if cached and installation.installed_version:
-                    installation.status = compute_status(
-                        installation.installed_version, cached.latest_version
-                    )
+                    installation.status = compute_status(installation.installed_version, cached.latest_version)
                 elif not installation.installed_version:
                     installation.status = STATUS_NOT_INSTALLED
                 else:
@@ -848,7 +919,10 @@ def cmd_update_local(args: argparse.Namespace) -> int:
 
                 local_state.tools[tool.name] = installation
                 completed += 1
-                print(f"# [{completed}/{total}] {tool.name}: {installation.installed_version or 'not installed'}", file=sys.stderr)
+                print(
+                    f"# [{completed}/{total}] {tool.name}: {installation.installed_version or 'not installed'}",
+                    file=sys.stderr,
+                )
             except Exception as e:
                 completed += 1
                 print(f"# [{completed}/{total}] {tool.name}: failed ({e})", file=sys.stderr)
@@ -888,6 +962,7 @@ def cmd_update_local(args: argparse.Namespace) -> int:
         # installs as "version unchanged" in the guide.
         try:
             from cli_audit.catalog import ToolCatalog
+
             _catalog = ToolCatalog()
         except Exception:
             _catalog = None
@@ -905,15 +980,17 @@ def cmd_update_local(args: argparse.Namespace) -> int:
                 supported: list[dict] = []
                 for t in existing_tools:
                     if t.get("base_tool") == tool.name and t.get("version_cycle"):
-                        supported.append({
-                            "cycle": t["version_cycle"],
-                            "latest": t.get("latest_upstream", ""),
-                            "status": t.get("lifecycle_status", "unknown"),
-                            "eol": None,
-                            "support": None,
-                            "release_date": None,
-                            "lts": False,
-                        })
+                        supported.append(
+                            {
+                                "cycle": t["version_cycle"],
+                                "latest": t.get("latest_upstream", ""),
+                                "status": t.get("lifecycle_status", "unknown"),
+                                "eol": None,
+                                "support": None,
+                                "release_date": None,
+                                "lts": False,
+                            }
+                        )
                 if not supported:
                     continue
                 detected = detect_multi_versions(tool.name, mv_config, supported)
@@ -932,25 +1009,26 @@ def cmd_update_local(args: argparse.Namespace) -> int:
                     method = info.get("install_method")
                     versioned = f"{tool.name}@{cycle}"
                     entry = dict(tools_by_name.get(versioned, {}))
-                    entry.update({
-                        "tool": versioned,
-                        "category": catalog_data.get("category", tool.name),
-                        "installed": installed_v or "",
-                        "installed_method": method,
-                        "installed_version": installed_v or "",
-                        "installed_path_selected": info.get("path"),
-                        "classification_reason_selected": (
-                            f"Detected via path analysis: {method}" if method
-                            else "No installation detected"
-                        ),
-                        "latest_upstream": latest_v,
-                        "latest_version": latest_v,
-                        "status": status_v,
-                        "is_multi_version": True,
-                        "base_tool": tool.name,
-                        "version_cycle": cycle,
-                        "lifecycle_status": info.get("status", "unknown"),
-                    })
+                    entry.update(
+                        {
+                            "tool": versioned,
+                            "category": catalog_data.get("category", tool.name),
+                            "installed": installed_v or "",
+                            "installed_method": method,
+                            "installed_version": installed_v or "",
+                            "installed_path_selected": info.get("path"),
+                            "classification_reason_selected": (
+                                f"Detected via path analysis: {method}" if method else "No installation detected"
+                            ),
+                            "latest_upstream": latest_v,
+                            "latest_version": latest_v,
+                            "status": status_v,
+                            "is_multi_version": True,
+                            "base_tool": tool.name,
+                            "version_cycle": cycle,
+                            "lifecycle_status": info.get("status", "unknown"),
+                        }
+                    )
                     # Hint stays empty for generic multi-version runtimes;
                     # the tool name + state already tell the user what to do.
                     entry["hint"] = ""
@@ -1088,6 +1166,7 @@ def cmd_update_baseline(args: argparse.Namespace) -> int:
 def _detect_local_only(tool: Tool) -> LocalInstallation:
     """Detect local installation without collecting upstream version."""
     from cli_audit.catalog import ToolCatalog
+
     catalog = ToolCatalog()
     version_flag = None
     version_command = None
@@ -1100,10 +1179,15 @@ def _detect_local_only(tool: Tool) -> LocalInstallation:
     version_num, version_line, path, install_method = audit_tool_installation(
         tool.name, tool.candidates, deep=deep_scan, version_flag=version_flag, version_command=version_command
     )
+    version_num, version_line, path, install_method, from_cache = _apply_probe_timeout_fallback(
+        tool.name, version_num, version_line, path, install_method
+    )
 
     installed = version_num if version_num else (version_line if version_line != "X" else "")
 
-    if install_method:
+    if from_cache:
+        classification_reason = "Cached version (probe timed out); last known method: " + (install_method or "unknown")
+    elif install_method:
         classification_reason = f"Detected via path analysis: {install_method}"
     else:
         classification_reason = "No installation detected"
@@ -1169,10 +1253,7 @@ def cmd_versions(args: argparse.Namespace) -> int:
     # Filter to specific tools if requested
     if args.tools:
         requested = set(args.tools)
-        multi_version_tools = [
-            (name, data, config) for name, data, config in multi_version_tools
-            if name in requested
-        ]
+        multi_version_tools = [(name, data, config) for name, data, config in multi_version_tools if name in requested]
 
     # Collect all runtime data
     runtimes_data = []
@@ -1208,17 +1289,19 @@ def cmd_versions(args: argparse.Namespace) -> int:
         for version_info in detected:
             installed = version_info.get("installed")
             latest = version_info.get("latest_upstream", "")
-            runtime_info["versions"].append({
-                "cycle": version_info.get("cycle", ""),
-                "latest_upstream": latest,
-                "installed": installed,
-                "is_installed": bool(installed),
-                "is_up_to_date": installed == latest if installed else False,
-                "needs_upgrade": bool(installed and installed != latest),
-                "path": version_info.get("path", ""),
-                "install_method": version_info.get("install_method", ""),
-                "status": version_info.get("status", "unknown"),
-            })
+            runtime_info["versions"].append(
+                {
+                    "cycle": version_info.get("cycle", ""),
+                    "latest_upstream": latest,
+                    "installed": installed,
+                    "is_installed": bool(installed),
+                    "is_up_to_date": installed == latest if installed else False,
+                    "needs_upgrade": bool(installed and installed != latest),
+                    "path": version_info.get("path", ""),
+                    "install_method": version_info.get("install_method", ""),
+                    "status": version_info.get("status", "unknown"),
+                }
+            )
 
         runtimes_data.append(runtime_info)
 
@@ -1303,10 +1386,7 @@ def _shape_reconcile_plan(tool, installs, preferred, active, protected):
         "protected": protected,
         "preferred": preferred.to_dict() if preferred else None,
         "active": active.to_dict() if active else None,
-        "installations": [
-            {**i.to_dict(), "preferred": bool(pref_path and i.path == pref_path)}
-            for i in installs
-        ],
+        "installations": [{**i.to_dict(), "preferred": bool(pref_path and i.path == pref_path)} for i in installs],
     }
 
 
@@ -1372,40 +1452,50 @@ def cmd_reconcile(args: argparse.Namespace) -> int:
         all_tools = list(catalog.all_tools())
         if apply:
             result = bulk_reconcile(
-                mode="explicit", tool_names=all_tools, reconcile_mode="aggressive",
-                force=force, verbose=args.verbose,
+                mode="explicit",
+                tool_names=all_tools,
+                reconcile_mode="aggressive",
+                force=force,
+                verbose=args.verbose,
             )
             # Report only tools that actually had duplicates — the explicit
             # sweep visits every catalog entry, but --all is about conflicts.
             conflicts = [r for r in result.results if len(r.installations) > 1]
             if JSON_MODE:
-                print(json.dumps({
-                    "tools_checked": result.tools_checked,
-                    "conflicts_found": result.conflicts_found,
-                    "conflicts_resolved": result.conflicts_resolved,
-                    "results": [r.to_dict() for r in conflicts],
-                    "duration_seconds": result.duration_seconds,
-                }))
+                print(
+                    json.dumps(
+                        {
+                            "tools_checked": result.tools_checked,
+                            "conflicts_found": result.conflicts_found,
+                            "conflicts_resolved": result.conflicts_resolved,
+                            "results": [r.to_dict() for r in conflicts],
+                            "duration_seconds": result.duration_seconds,
+                        }
+                    )
+                )
             else:
                 print(result.summary(), file=sys.stderr)
             # Fail only on real removal errors — not on protected tools (blocked)
             # or tools the user declined (aborted), which are expected outcomes.
-            failures = [
-                r for r in conflicts
-                if not r.success and r.action_taken not in ("blocked", "aborted", "none")
-            ]
+            failures = [r for r in conflicts if not r.success and r.action_taken not in ("blocked", "aborted", "none")]
             return 1 if failures else 0
         # Plan-only sweep (parallel detection, no removal)
         result = bulk_reconcile(
-            mode="explicit", tool_names=all_tools, reconcile_mode="parallel",
+            mode="explicit",
+            tool_names=all_tools,
+            reconcile_mode="parallel",
             verbose=args.verbose,
         )
         plans = [
             _shape_reconcile_plan(
-                r.tool, list(r.installations), r.preferred, r.active,
+                r.tool,
+                list(r.installations),
+                r.preferred,
+                r.active,
                 r.tool in SYSTEM_TOOL_SAFELIST,
             )
-            for r in result.results if len(r.installations) > 1
+            for r in result.results
+            if len(r.installations) > 1
         ]
         if JSON_MODE:
             print(json.dumps({"results": plans, "total": len(plans)}))
@@ -1422,10 +1512,15 @@ def cmd_reconcile(args: argparse.Namespace) -> int:
     if apply:
         results = []
         for tool in tools:
-            results.append(reconcile_tool(
-                tool, mode="aggressive", candidates=_candidates(tool),
-                force=force, verbose=args.verbose,
-            ))
+            results.append(
+                reconcile_tool(
+                    tool,
+                    mode="aggressive",
+                    candidates=_candidates(tool),
+                    force=force,
+                    verbose=args.verbose,
+                )
+            )
         if JSON_MODE:
             print(json.dumps({"results": [r.to_dict() for r in results]}))
         else:
@@ -1500,7 +1595,8 @@ def main() -> int:
         help="With --reconcile --apply: skip confirmation prompts (honors safelist)",
     )
     parser.add_argument(
-        "--verbose", "-v",
+        "--verbose",
+        "-v",
         action="store_true",
         help="Verbose output",
     )
@@ -1529,10 +1625,10 @@ def main() -> int:
     elif args.update:
         # Explicit --update flag: full update of all tools
         return cmd_update(args)
-    elif getattr(args, 'update_local', False) or UPDATE_LOCAL_ONLY:
+    elif getattr(args, "update_local", False) or UPDATE_LOCAL_ONLY:
         # Update only local state (fast, no network)
         return cmd_update_local(args)
-    elif getattr(args, 'update_baseline', False) or UPDATE_BASELINE_ONLY:
+    elif getattr(args, "update_baseline", False) or UPDATE_BASELINE_ONLY:
         # Update only upstream baseline cache
         return cmd_update_baseline(args)
     elif args.install:
