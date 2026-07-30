@@ -33,7 +33,7 @@ from cli_audit.collectors import (  # noqa: E402
     get_gitlab_rate_limit,
     is_wsl,
 )
-from cli_audit.detection import audit_tool_installation, detect_multi_versions  # noqa: E402
+from cli_audit.detection import VERSION_PROBE_TIMEOUT, audit_tool_installation, detect_multi_versions  # noqa: E402
 from cli_audit.local_state import (  # noqa: E402
     LocalInstallation,
     LocalState,
@@ -265,6 +265,32 @@ def audit_multi_version_tool(
     return results
 
 
+def _apply_probe_timeout_fallback(
+    tool_name: str,
+    version_num: str,
+    version_line: str,
+    path: str,
+    install_method: str,
+) -> tuple[str, str, str, str]:
+    """Fall back to the last known local_state version when the probe timed out.
+
+    A timeout means the binary exists but answered too slowly (slow binaries
+    like opengrep need ~2.5s and can exceed the probe timeout under parallel
+    collection load) — reporting it as not installed would be wrong.
+    """
+    if version_line != VERSION_PROBE_TIMEOUT:
+        return version_num, version_line, path, install_method
+
+    prev = load_local_state().tools.get(tool_name)
+    if prev and prev.installed_version:
+        version = prev.installed_version
+        line = f"{tool_name} {version} (cached; version probe timed out)"
+        return version, line, path or prev.installed_path, install_method or prev.installed_method
+
+    # No cached version to fall back to: keep prior "no version" behavior.
+    return "", "", path, install_method
+
+
 def audit_tool(tool: Tool, offline_cache: dict[str, tuple[str, str]] | None = None) -> dict[str, str]:
     """Audit a single tool.
 
@@ -290,6 +316,9 @@ def audit_tool(tool: Tool, offline_cache: dict[str, tuple[str, str]] | None = No
     deep_scan = tool.name in {"node", "python", "semgrep", "pre-commit", "bandit", "black", "flake8", "isort"}
     version_num, version_line, path, install_method = audit_tool_installation(
         tool.name, tool.candidates, deep=deep_scan, version_flag=version_flag, version_command=version_command
+    )
+    version_num, version_line, path, install_method = _apply_probe_timeout_fallback(
+        tool.name, version_num, version_line, path, install_method
     )
 
     installed = version_num if version_num else (version_line if version_line != "X" else "")
@@ -1142,6 +1171,9 @@ def _detect_local_only(tool: Tool) -> LocalInstallation:
     deep_scan = tool.name in {"node", "python", "semgrep", "pre-commit", "bandit", "black", "flake8", "isort"}
     version_num, version_line, path, install_method = audit_tool_installation(
         tool.name, tool.candidates, deep=deep_scan, version_flag=version_flag, version_command=version_command
+    )
+    version_num, version_line, path, install_method = _apply_probe_timeout_fallback(
+        tool.name, version_num, version_line, path, install_method
     )
 
     installed = version_num if version_num else (version_line if version_line != "X" else "")
