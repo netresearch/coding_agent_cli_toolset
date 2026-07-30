@@ -510,6 +510,10 @@ def _classify_via_path(path: str) -> str:
         return "pyenv"
     elif "/.rbenv/" in path:
         return "rbenv"
+    elif "/go/bin" in path:
+        # GOPATH bin (`go install` target); must precede the generic '/bin'
+        # fallback or user-owned binaries get labeled 'system'.
+        return "go"
 
     # System-level installations (check specific patterns before generic ones)
     elif "/snap/bin" in path:
@@ -570,7 +574,7 @@ def sort_by_preference(
             return 1
 
         # Tier 2: User-level generic
-        if method in ("cargo", "pip", "npm"):
+        if method in ("cargo", "pip", "npm", "go"):
             return 2
         if "/.cargo/" in installation.path or "/.local/" in installation.path:
             return 2
@@ -943,6 +947,34 @@ def _confirm_removal(tool_name: str, to_remove: list[Installation]) -> bool:
         return response in ("y", "yes")
 
 
+def _cargo_package_for(binary: str, tool: str) -> str:
+    """Map an installed binary to its owning cargo package.
+
+    `cargo uninstall` needs the crate name, which can differ from the binary
+    (git-delta installs `delta`, watchexec-cli installs `watchexec`). Parses
+    `cargo install --list`; falls back to the tool name.
+    """
+    try:
+        result = subprocess.run(
+            ["cargo", "install", "--list"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        if result.returncode != 0:
+            return tool
+        package = None
+        for line in result.stdout.splitlines():
+            if line and not line[0].isspace():
+                package = line.split()[0]
+            elif package and line.strip() in (binary, tool):
+                return package
+    except Exception:
+        pass
+    return tool
+
+
 def _uninstall_installation(installation: Installation, verbose: bool) -> tuple[bool, str | None]:
     """
     Uninstall a single installation.
@@ -960,7 +992,7 @@ def _uninstall_installation(installation: Installation, verbose: bool) -> tuple[
     if method == "cargo":
         try:
             result = subprocess.run(
-                ["cargo", "uninstall", tool],
+                ["cargo", "uninstall", _cargo_package_for(os.path.basename(path), tool)],
                 capture_output=True,
                 text=True,
                 timeout=30,
@@ -1025,11 +1057,15 @@ def _uninstall_installation(installation: Installation, verbose: bool) -> tuple[
             return (False, str(e))
 
     # System package managers (require sudo - don't auto-execute)
-    elif method in ("apt", "dnf", "pacman", "system"):
+    elif method in ("apt", "dnf", "pacman"):
         return (False, f"System package removal requires manual sudo: sudo {method} remove {tool}")
 
-    # Manual removal (for GitHub releases, etc.)
-    elif method == "unknown" or method == "manual":
+    # Unmanaged system-location binary — no package manager to invoke
+    elif method == "system":
+        return (False, f"Unmanaged system binary — remove manually: sudo rm {path}")
+
+    # Manual removal (GitHub releases, `go install` binaries, etc.)
+    elif method in ("unknown", "manual", "go"):
         try:
             if os.path.exists(path):
                 os.remove(path)

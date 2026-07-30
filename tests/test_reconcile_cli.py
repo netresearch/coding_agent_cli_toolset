@@ -192,6 +192,53 @@ class TestCmdReconcileApplyJSON:
         assert "npm" in output
         assert "declined" in output
 
+    def test_all_apply_aggregates_manual_commands(self):
+        """Failed removals end with ONE apt command and ONE rm command to copy-paste.
+
+        A run over dozens of tools otherwise prints dozens of individual sudo
+        hints; the summary must aggregate them per remedy.
+        """
+
+        def _failed(tool, *installs):
+            kept = Installation(tool, "1.0.0", "pipx", f"/home/u/.local/bin/{tool}", True)
+            return ReconciliationResult(
+                tool=tool,
+                installations=(kept, *installs),
+                preferred=kept,
+                active=kept,
+                path_issues=(),
+                action_taken="removed",
+                success=False,
+                error_message="removal failed",
+            )
+
+        bulk = BulkReconciliationResult(
+            tools_checked=3,
+            conflicts_found=3,
+            conflicts_resolved=0,
+            results=(
+                _failed("ripgrep", Installation("ripgrep", "13.0.0", "apt", "/usr/bin/rg", False)),
+                _failed("fx", Installation("fx", "24.0.0", "manual", "/usr/local/bin/fx", False)),
+                _failed(
+                    "jq",
+                    Installation("jq", "1.6", "apt", "/usr/bin/jq", False),
+                    Installation("jq", "1.8.1", "manual", "/usr/local/bin/jq", False),
+                ),
+            ),
+            duration_seconds=0.1,
+        )
+        with patch("cli_audit.reconcile.bulk_reconcile", return_value=bulk):
+            err = io.StringIO()
+            with redirect_stderr(err):
+                rc = audit.cmd_reconcile(_ns(all=True, apply=True, yes=True))
+        assert rc == 1
+        output = err.getvalue()
+        assert "sudo apt remove jq ripgrep" in output
+        assert "sudo rm -f /usr/local/bin/fx /usr/local/bin/jq" in output
+        # aggregated once, not per tool
+        assert output.count("sudo apt remove") == 1
+        assert output.count("sudo rm -f") == 1
+
     def test_apply_protected_returns_nonzero(self):
         kept = _inst("/usr/bin/demo", active=True)
         result = ReconciliationResult(

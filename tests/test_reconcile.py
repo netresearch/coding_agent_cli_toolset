@@ -125,6 +125,17 @@ class TestClassifyInstallMethod:
             method = _classify_via_path(path)
         assert method == "manual"
 
+    def test_classify_via_path_gopath_bin_is_go(self):
+        """GOPATH bin binaries are go installs, not 'system'.
+
+        Regression: /home/<user>/go/bin matched the generic '/bin' fallback and
+        was labeled 'system', producing nonsense `sudo system remove <tool>`
+        guidance for user-owned `go install` binaries.
+        """
+        path = "/home/user/go/bin/golangci-lint"
+        method = _classify_via_path(path)
+        assert method == "go"
+
     def test_classify_via_path_apt(self):
         """Test apt classification via path."""
         path = "/usr/bin/ripgrep"
@@ -766,7 +777,14 @@ class TestUninstallInstallation:
     @patch("cli_audit.reconcile.subprocess.run")
     def test_uninstall_cargo(self, mock_run):
         """Test cargo uninstall."""
-        mock_run.return_value = MagicMock(returncode=0)
+        listing = "ripgrep v14.1.0:\n    rg\n"
+
+        def side_effect(cmd, **kwargs):
+            if cmd == ["cargo", "install", "--list"]:
+                return MagicMock(returncode=0, stdout=listing)
+            return MagicMock(returncode=0)
+
+        mock_run.side_effect = side_effect
 
         inst = Installation(
             tool="ripgrep",
@@ -780,8 +798,36 @@ class TestUninstallInstallation:
 
         assert success is True
         assert error is None
-        mock_run.assert_called_once()
         assert mock_run.call_args[0][0] == ["cargo", "uninstall", "ripgrep"]
+
+    @patch("cli_audit.reconcile.subprocess.run")
+    def test_uninstall_cargo_maps_binary_to_package(self, mock_run):
+        """Cargo uninstall uses the owning package, not the binary name.
+
+        Regression: `cargo uninstall delta` fails with "package ID specification
+        `delta` did not match any packages" — the crate is `git-delta`.
+        """
+        listing = "git-delta v0.18.2:\n    delta\nwatchexec-cli v2.3.2:\n    watchexec\n"
+
+        def side_effect(cmd, **kwargs):
+            if cmd == ["cargo", "install", "--list"]:
+                return MagicMock(returncode=0, stdout=listing)
+            return MagicMock(returncode=0)
+
+        mock_run.side_effect = side_effect
+
+        inst = Installation(
+            tool="delta",
+            version="0.18.2",
+            method="cargo",
+            path="/home/user/.cargo/bin/delta",
+            active=False,
+        )
+
+        success, error = _uninstall_installation(inst, False)
+
+        assert success is True
+        assert mock_run.call_args[0][0] == ["cargo", "uninstall", "git-delta"]
 
     @patch("cli_audit.reconcile.subprocess.run")
     def test_uninstall_pipx(self, mock_run):
@@ -852,6 +898,39 @@ class TestUninstallInstallation:
 
         assert success is True
         mock_remove.assert_called_once_with("/home/user/bin/tool")
+
+    def test_uninstall_system_binary_suggests_rm(self):
+        """'system' has no package manager to invoke — suggest sudo rm, not `sudo system remove`."""
+        inst = Installation(
+            tool="mytool",
+            version="1.0.0",
+            method="system",
+            path="/bin/mytool",
+            active=False,
+        )
+
+        success, error = _uninstall_installation(inst, False)
+
+        assert success is False
+        assert "sudo rm /bin/mytool" in error
+        assert "sudo system remove" not in error
+
+    @patch("os.remove")
+    @patch("os.path.exists", return_value=True)
+    def test_uninstall_go_removes_binary(self, mock_exists, mock_remove):
+        """go-installed binaries are removed by deleting the file (no sudo)."""
+        inst = Installation(
+            tool="shfmt",
+            version="3.12.0",
+            method="go",
+            path="/home/user/go/bin/shfmt",
+            active=False,
+        )
+
+        success, error = _uninstall_installation(inst, False)
+
+        assert success is True
+        mock_remove.assert_called_once_with("/home/user/go/bin/shfmt")
 
     @patch("os.remove", side_effect=PermissionError(13, "Permission denied"))
     @patch("os.path.exists", return_value=True)
