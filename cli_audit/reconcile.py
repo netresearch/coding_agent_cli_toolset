@@ -15,7 +15,7 @@ import subprocess
 import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import cmp_to_key
 from itertools import groupby
 from typing import Sequence
@@ -926,24 +926,50 @@ def _check_path_ordering(
     return tuple(issues)
 
 
-# bulk_reconcile prompts from ThreadPool workers: without serialization all
-# prompts print at once and the answers race for stdin.
+# Serializes prompt output; prompts themselves run on the main thread only
+# (a worker blocked in input() hangs Python's atexit thread-join on Ctrl-C).
 _prompt_lock = threading.Lock()
+
+# Sticky answers for a bulk prompt run: 'a' confirms all remaining prompts,
+# 'q' (or Ctrl-C / EOF) declines all remaining ones.
+_bulk_prompt_state = {"all": False, "quit": False}
+
+
+def _reset_bulk_prompt_state() -> None:
+    """Reset the sticky all/quit prompt answers (start of each bulk run)."""
+    _bulk_prompt_state["all"] = False
+    _bulk_prompt_state["quit"] = False
 
 
 def _confirm_removal(tool_name: str, to_remove: list[Installation]) -> bool:
-    """Prompt user to confirm removal. Serialized across worker threads."""
+    """Prompt user to confirm removal. Supports y/n/a(ll)/q(uit); Ctrl-C = quit."""
     if not sys.stdin.isatty():
         # Non-interactive mode
         return False
 
     with _prompt_lock:
+        if _bulk_prompt_state["quit"]:
+            return False
+        if _bulk_prompt_state["all"]:
+            return True
+
         print(f"\n⚠️  WARNING: About to remove {len(to_remove)} installation(s) of {tool_name}")
         for inst in to_remove:
             print(f"  - {inst.version} ({inst.method}, {inst.path})")
 
-        print("\nProceed with removal? [y/N]: ", end="")
-        response = input().strip().lower()
+        print("\nProceed with removal? [y/N/a=all/q=quit]: ", end="")
+        try:
+            response = input().strip().lower()
+        except KeyboardInterrupt, EOFError:
+            print()
+            _bulk_prompt_state["quit"] = True
+            return False
+        if response in ("a", "all"):
+            _bulk_prompt_state["all"] = True
+            return True
+        if response in ("q", "quit"):
+            _bulk_prompt_state["quit"] = True
+            return False
         return response in ("y", "yes")
 
 
@@ -1149,14 +1175,18 @@ def bulk_reconcile(
 
     vlog(f"Checking {len(tools_to_check)} tools for conflicts...", verbose)
 
+    _reset_bulk_prompt_state()
     results = []
 
+    # Phase 1 — parallel DETECTION only. Workers must never prompt: input()
+    # in a worker survives Ctrl-C in the main thread and then deadlocks
+    # Python's atexit thread-join.
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_tool = {
             executor.submit(
                 reconcile_tool,
                 tool,
-                reconcile_mode,
+                "parallel",
                 None,
                 config,
                 env,
@@ -1166,37 +1196,58 @@ def bulk_reconcile(
             for tool in tools_to_check
         }
 
-        for future in as_completed(future_to_tool):
-            tool = future_to_tool[future]
-            try:
-                result = future.result()
-
-                # Filter by mode
-                if mode == "conflicts":
-                    # Only include tools with multiple installations
-                    if len(result.installations) > 1:
-                        results.append(result)
-                else:
+        try:
+            for future in as_completed(future_to_tool):
+                tool = future_to_tool[future]
+                try:
+                    result = future.result()
                     results.append(result)
-
-                if verbose:
-                    status = "✓" if result.success else "✗"
-                    vlog(f"{status} {tool}: {len(result.installations)} installation(s)", verbose)
-
-            except Exception as e:
-                vlog(f"✗ {tool}: Error - {e}", verbose)
-                results.append(
-                    ReconciliationResult(
-                        tool=tool,
-                        installations=(),
-                        preferred=None,
-                        active=None,
-                        path_issues=(),
-                        action_taken="error",
-                        success=False,
-                        error_message=str(e),
+                    if verbose:
+                        status = "✓" if result.success else "✗"
+                        vlog(f"{status} {tool}: {len(result.installations)} installation(s)", verbose)
+                except Exception as e:
+                    vlog(f"✗ {tool}: Error - {e}", verbose)
+                    results.append(
+                        ReconciliationResult(
+                            tool=tool,
+                            installations=(),
+                            preferred=None,
+                            active=None,
+                            path_issues=(),
+                            action_taken="error",
+                            success=False,
+                            error_message=str(e),
+                        )
                     )
+        except KeyboardInterrupt:
+            # Abort: skip everything not yet detected; workers finish their
+            # bounded probes (no stdin involved), so shutdown cannot hang.
+            _bulk_prompt_state["quit"] = True
+            for f in future_to_tool:
+                f.cancel()
+
+    # Phase 2 — aggressive resolution on the MAIN thread (prompts + removal).
+    if reconcile_mode == "aggressive":
+        finalized = []
+        for r in results:
+            if len(r.installations) <= 1 or r.preferred is None:
+                finalized.append(r)
+                continue
+            if _bulk_prompt_state["quit"]:
+                finalized.append(replace(r, action_taken="aborted", success=False, error_message="Skipped (quit)"))
+                continue
+            try:
+                finalized.append(
+                    _reconcile_aggressive(r.tool, list(r.installations), r.preferred, r.active, r.path_issues, force, verbose)
                 )
+            except KeyboardInterrupt:
+                _bulk_prompt_state["quit"] = True
+                finalized.append(replace(r, action_taken="aborted", success=False, error_message="Skipped (quit)"))
+        results = finalized
+
+    # Filter by mode
+    if mode == "conflicts":
+        results = [r for r in results if len(r.installations) > 1]
 
     duration = time.time() - start_time
 

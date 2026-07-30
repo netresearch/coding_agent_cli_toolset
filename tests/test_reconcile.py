@@ -771,6 +771,89 @@ class TestConfirmRemoval:
         assert result is False
 
 
+class TestConfirmRemovalBulkAnswers:
+    """'a' (all), 'q' (quit) and Ctrl-C handling for bulk prompt runs."""
+
+    def setup_method(self):
+        from cli_audit.reconcile import _reset_bulk_prompt_state
+
+        _reset_bulk_prompt_state()
+
+    def teardown_method(self):
+        from cli_audit.reconcile import _reset_bulk_prompt_state
+
+        _reset_bulk_prompt_state()
+
+    @patch("builtins.input", return_value="a")
+    @patch("sys.stdin.isatty", return_value=True)
+    def test_all_answers_yes_to_all_remaining(self, mock_isatty, mock_input):
+        """'a' confirms this prompt and every later one without re-prompting."""
+        installations = [Installation("tool", "1.0.0", "cargo", "/path", False)]
+
+        assert _confirm_removal("tool", installations) is True
+        assert _confirm_removal("other", installations) is True
+        mock_input.assert_called_once()
+
+    @patch("builtins.input", return_value="q")
+    @patch("sys.stdin.isatty", return_value=True)
+    def test_quit_declines_all_remaining(self, mock_isatty, mock_input):
+        """'q' declines this prompt and every later one without re-prompting."""
+        installations = [Installation("tool", "1.0.0", "cargo", "/path", False)]
+
+        assert _confirm_removal("tool", installations) is False
+        assert _confirm_removal("other", installations) is False
+        mock_input.assert_called_once()
+
+    @patch("builtins.input", side_effect=KeyboardInterrupt)
+    @patch("sys.stdin.isatty", return_value=True)
+    def test_ctrl_c_acts_as_quit(self, mock_isatty, mock_input):
+        """Ctrl-C at a prompt declines and stops all later prompts — no traceback.
+
+        Regression: KeyboardInterrupt killed the main thread while worker
+        threads kept prompting, then Python's atexit hung joining a thread
+        blocked in input().
+        """
+        installations = [Installation("tool", "1.0.0", "cargo", "/path", False)]
+
+        assert _confirm_removal("tool", installations) is False
+        assert _confirm_removal("other", installations) is False
+        mock_input.assert_called_once()
+
+
+class TestBulkAggressivePrompting:
+    """Bulk aggressive mode must prompt from the main thread only."""
+
+    @patch("cli_audit.reconcile._uninstall_installation", return_value=(True, None))
+    @patch("cli_audit.reconcile._confirm_removal")
+    @patch("cli_audit.reconcile.detect_installations")
+    def test_prompts_run_in_main_thread(self, mock_detect, mock_confirm, mock_uninstall):
+        """Prompting from ThreadPool workers deadlocks atexit on Ctrl-C."""
+        import threading
+
+        mock_detect.side_effect = lambda tool, *a, **k: [
+            Installation(tool, "2.0.0", "cargo", f"/home/user/.cargo/bin/{tool}", True),
+            Installation(tool, "1.0.0", "apt", f"/usr/bin/{tool}", False),
+        ]
+        prompt_threads = []
+
+        def record_prompt(tool, to_remove):
+            prompt_threads.append(threading.current_thread().name)
+            return False
+
+        mock_confirm.side_effect = record_prompt
+
+        bulk_reconcile(
+            mode="explicit",
+            tool_names=["toola", "toolb"],
+            reconcile_mode="aggressive",
+            config=Config(),
+            env=Environment(mode="workstation", confidence=1.0),
+        )
+
+        assert len(prompt_threads) == 2
+        assert set(prompt_threads) == {"MainThread"}
+
+
 class TestUninstallInstallation:
     """Tests for uninstallation."""
 
