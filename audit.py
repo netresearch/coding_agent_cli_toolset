@@ -1483,6 +1483,26 @@ def cmd_reconcile(args: argparse.Namespace) -> int:
                         print(f"  {r.tool}: skipped (protected system tool)", file=sys.stderr)
                     elif not r.success and r.error_message:
                         print(f"  ✗ {r.tool}: {r.error_message}", file=sys.stderr)
+                # Aggregate confirmed-but-failed removals into one copy-paste
+                # command per remedy instead of dozens of per-tool sudo hints.
+                pm_tools: dict[str, set[str]] = {}
+                rm_paths: set[str] = set()
+                for r in conflicts:
+                    if r.action_taken != "removed" or r.success:
+                        continue
+                    for inst in r.installations:
+                        if inst == r.preferred or inst in r.removed_installations:
+                            continue
+                        if inst.method in ("apt", "dnf", "pacman"):
+                            pm_tools.setdefault(inst.method, set()).add(inst.tool)
+                        elif inst.method in ("manual", "unknown", "go"):
+                            rm_paths.add(inst.path)
+                if pm_tools or rm_paths:
+                    print("\nTo finish the confirmed removals manually, run:", file=sys.stderr)
+                    for pm in sorted(pm_tools):
+                        print(f"  sudo {pm} remove {' '.join(sorted(pm_tools[pm]))}", file=sys.stderr)
+                    if rm_paths:
+                        print(f"  sudo rm -f {' '.join(sorted(rm_paths))}", file=sys.stderr)
                 print(result.summary(), file=sys.stderr)
             # Fail only on real removal errors — not on protected tools (blocked)
             # or tools the user declined (aborted), which are expected outcomes.
