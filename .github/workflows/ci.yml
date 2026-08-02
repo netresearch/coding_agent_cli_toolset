@@ -56,7 +56,6 @@ jobs:
       enable-codeql: false
     secrets:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-      GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
 
   # The bash suites are driven through python-ci's test step (it runs the
   # command with `bash -c` from the repo root), so no step-level action is
