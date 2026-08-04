@@ -13,6 +13,10 @@
 - Ask before: heavy deps, full rewrites, breaking changes
 - Never commit secrets, PII, or credentials
 
+## Editing these instructions
+
+`AGENTS.md` is canonical; `CLAUDE.md` is a symlink to it (root and scoped dirs alike). Edit the resolved `AGENTS.md` target — editing `CLAUDE.md` fails the Edit-tool symlink guard.
+
 ## Setup
 
 **This project uses [uv](https://docs.astral.sh/uv/) for package management.** Always use `uv run` to execute Python commands.
@@ -108,6 +112,11 @@ This repo **is** a CLI tool manager, so the word "upgrade" is overloaded:
 | `make completion-<tool>` | Install bash completion for one tool (e.g. `make completion-gh`) |
 | `uv run python audit.py --versions` | Show multi-version runtime status |
 | `uv run python audit.py --versions php` | Show specific runtime versions |
+
+## External API gotchas
+
+- **crates.io requires a User-Agent** (`curl -fsSL -A "cli-audit" https://crates.io/api/v1/crates/<name>`) — without it the response is non-JSON and parsing throws. The package-version MCP tools do not cover crates/cargo; manual curl is the fallback.
+- **Default to jq optional chaining** over external API JSON (`.arr[]?`, `.field?`): iterating a null/absent array with `.arr[]` aborts the whole pipeline (`Cannot iterate over null`), killing loops on one empty response. Safe even when the field is usually present.
 
 ## Data files
 
