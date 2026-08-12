@@ -1,0 +1,28 @@
+{
+  "name": "herdr",
+  "category": "ai",
+  "install_method": "github_release_binary",
+  "description": "Terminal multiplexer for coding agents - runs Claude Code, Codex and others in panes with live idle/working/blocked status",
+  "homepage": "https://herdr.dev",
+  "github_repo": "herdrdev/herdr",
+  "binary_name": "herdr",
+  "download_url_template": "https://github.com/herdrdev/herdr/releases/download/{version}/herdr-linux-{arch}",
+  "arch_map": {
+    "x86_64": "x86_64",
+    "aarch64": "aarch64"
+  },
+  "guide": {
+    "display_name": "Herdr",
+    "install_action": "install",
+    "order": 403
+  },
+  "bash_completion": {
+    "command": "herdr completion bash"
+  },
+  "notes": "Direct binary download, not an archive; no armv7l release. Upstream also offers 'curl -fsSL https://herdr.dev/install.sh | sh', brew, mise and nix. Ships its own self-updater ('herdr update', 'herdr channel'); this entry installs from GitHub releases instead so the version is tracked like every other cataloged tool.",
+  "tags": [
+    "ai",
+    "terminal",
+    "multiplexer"
+  ]
+}
