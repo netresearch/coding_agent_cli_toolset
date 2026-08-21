@@ -54,7 +54,8 @@ get_install_dir() {
     CURRENT)
       # Keep tool where it is currently installed
       if [ -n "$tool_name" ]; then
-        local current_path="$(command -v "$tool_name" 2>/dev/null || true)"
+        local current_path
+        current_path="$(command -v "$tool_name" 2>/dev/null || true)"
         if [ -n "$current_path" ]; then
           bin_dir="$(dirname "$current_path")"
         else
@@ -83,6 +84,7 @@ get_install_dir() {
 # Get install command based on target directory
 # Usage: get_install_cmd BIN_DIR
 # Sets: INSTALL and RM variables
+# shellcheck disable=SC2034  # INSTALL and RM are globals consumed by the calling installer
 get_install_cmd() {
   local bin_dir="$1"
 
@@ -100,6 +102,33 @@ get_install_cmd() {
   fi
 }
 
+# Fetch a GitHub REST API path and print the JSON body.
+# Tries `gh api` first (authenticated, higher rate limit) and falls back to an
+# unauthenticated curl call. `gh` prints the HTTP error body (e.g. a 401 for a
+# stale GITHUB_TOKEN exported from .env) to stdout and exits non-zero, so its
+# output is only trusted when it succeeded.
+# Usage: github_api_get "repos/OWNER/REPO/tags?per_page=100"
+# Returns: 0 with JSON on stdout, 1 when neither source answered
+github_api_get() {
+  local api_path="${1:?api path required}"
+  local body=""
+
+  if command -v gh >/dev/null 2>&1; then
+    if body="$(gh api "$api_path" 2>/dev/null)"; then
+      printf '%s' "$body"
+      return 0
+    fi
+    echo "# gh api $api_path failed; falling back to unauthenticated GitHub API" >&2
+  fi
+
+  body="$(curl --proto '=https' --proto-redir '=https' -fsSL \
+    --retry 3 --retry-delay 1 --connect-timeout 10 \
+    -H "Accept: application/vnd.github+json" \
+    -H "User-Agent: cli-audit" \
+    "https://api.github.com/$api_path")" || return 1
+  printf '%s' "$body"
+}
+
 # Refresh snapshot for a specific tool after installation
 # Usage: refresh_snapshot TOOL_NAME
 # Updates local_state.json and tools_snapshot.json with latest version of installed tool
@@ -112,7 +141,8 @@ refresh_snapshot() {
   fi
 
   # Path to project root (scripts/lib -> scripts -> root)
-  local project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+  local project_root
+  project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
   local audit_script="$project_root/audit.py"
 
   if [ ! -f "$audit_script" ]; then
