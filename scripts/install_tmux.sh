@@ -38,9 +38,7 @@ get_installed_version() {
 
 get_target_version() {
   local version=""
-  if command -v gh >/dev/null 2>&1; then
-    version="$(gh api "repos/$GITHUB_REPO/releases/latest" --jq '.tag_name' 2>/dev/null || true)"
-  fi
+  version="$(github_api_get "repos/$GITHUB_REPO/releases/latest" | jq -r '.tag_name // empty')" || version=""
   if [ -z "$version" ]; then
     version="$(curl --proto '=https' --proto-redir '=https' -fsSIL \
       -H "User-Agent: cli-audit" -o /dev/null -w '%{url_effective}' \
@@ -162,18 +160,20 @@ install_tmux() {
   return 0
 }
 
-# Main
-case "${1:-install}" in
-  install|update)
-    install_tmux "${2:-}"
-    ;;
-  uninstall)
-    echo "[$TOOL] Removing $INSTALL_PREFIX/bin/tmux" >&2
-    rm -f "$INSTALL_PREFIX/bin/tmux"
-    hash -r 2>/dev/null || true
-    ;;
-  *)
-    echo "Usage: $0 [install|update|uninstall] [version]" >&2
-    exit 1
-    ;;
-esac
+# Only dispatch when executed directly; allow sourcing for tests.
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+  case "${1:-install}" in
+    install|update)
+      install_tmux "${2:-}"
+      ;;
+    uninstall)
+      echo "[$TOOL] Removing $INSTALL_PREFIX/bin/tmux" >&2
+      rm -f "$INSTALL_PREFIX/bin/tmux"
+      hash -r 2>/dev/null || true
+      ;;
+    *)
+      echo "Usage: $0 [install|update|uninstall] [version]" >&2
+      exit 1
+      ;;
+  esac
+fi

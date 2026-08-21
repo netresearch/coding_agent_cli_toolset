@@ -21,7 +21,7 @@ install_tree() {
 
   if [ -z "$version" ]; then
     echo "[$TOOL] Fetching latest tag..." >&2
-    version="$(gh api repos/$GITHUB_REPO/tags --jq '.[0].name' 2>/dev/null || true)"
+    version="$(github_api_get "repos/$GITHUB_REPO/tags" | jq -r '.[0].name // empty')" || version=""
   fi
 
   if [ -z "$version" ]; then
@@ -29,10 +29,12 @@ install_tree() {
     return 1
   fi
 
-  local before="$(get_installed_version)"
+  local before
+  before="$(get_installed_version)"
 
   local url="https://github.com/$GITHUB_REPO/archive/refs/tags/${version}.tar.gz"
-  local tmpdir="$(mktemp -d)"
+  local tmpdir
+  tmpdir="$(mktemp -d)"
 
   echo "[$TOOL] Downloading $url..." >&2
   if ! curl -sL "$url" -o "$tmpdir/tree.tar.gz"; then
@@ -64,7 +66,8 @@ install_tree() {
 
   hash -r 2>/dev/null || true
 
-  local after="$(get_installed_version)"
+  local after
+  after="$(get_installed_version)"
   printf "[%s] before: %s\n" "$TOOL" "${before:-<none>}"
   printf "[%s] after:  %s\n" "$TOOL" "${after:-<none>}"
   printf "[%s] path:   %s\n" "$TOOL" "$(command -v tree 2>/dev/null || echo "$INSTALL_DIR/tree")"
@@ -75,18 +78,20 @@ install_tree() {
   return 0
 }
 
-# Main
-case "${1:-install}" in
-  install|update)
-    install_tree "${2:-}"
-    ;;
-  uninstall)
-    echo "[$TOOL] Removing $INSTALL_DIR/tree" >&2
-    rm -f "$INSTALL_DIR/tree"
-    hash -r 2>/dev/null || true
-    ;;
-  *)
-    echo "Usage: $0 [install|update|uninstall] [version]" >&2
-    exit 1
-    ;;
-esac
+# Only dispatch when executed directly; allow sourcing for tests.
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+  case "${1:-install}" in
+    install|update)
+      install_tree "${2:-}"
+      ;;
+    uninstall)
+      echo "[$TOOL] Removing $INSTALL_DIR/tree" >&2
+      rm -f "$INSTALL_DIR/tree"
+      hash -r 2>/dev/null || true
+      ;;
+    *)
+      echo "Usage: $0 [install|update|uninstall] [version]" >&2
+      exit 1
+      ;;
+  esac
+fi

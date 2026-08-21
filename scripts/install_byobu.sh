@@ -57,19 +57,10 @@ get_target_version() {
     local tags_json=""
     local version=""
 
-    if command -v gh >/dev/null 2>&1; then
-        tags_json="$(gh api "repos/$GITHUB_REPO/tags?per_page=100" 2>/dev/null || true)"
-    fi
-    if [ -z "$tags_json" ]; then
-        tags_json="$(curl --proto '=https' --proto-redir '=https' -fsSL \
-            --retry 3 --retry-delay 1 --connect-timeout 10 \
-            -H "Accept: application/vnd.github+json" \
-            -H "User-Agent: cli-audit" \
-            "https://api.github.com/repos/$GITHUB_REPO/tags?per_page=100")"
-    fi
+    tags_json="$(github_api_get "repos/$GITHUB_REPO/tags?per_page=100")" || tags_json=""
 
     version="$(printf '%s' "$tags_json" |
-        jq -r '.[].name' |
+        jq -r 'if type == "array" then .[].name else empty end' |
         grep -E '^[0-9]+([.][0-9]+)+$' |
         sort -V |
         tail -1)"
@@ -179,17 +170,20 @@ install_byobu() {
     refresh_snapshot "$TOOL"
 }
 
-case "${1:-install}" in
-    install|update)
-        install_byobu "${2:-}"
-        ;;
-    uninstall)
-        echo "[$TOOL] Removing user-local installation" >&2
-        remove_manifest_files
-        hash -r 2>/dev/null || true
-        ;;
-    *)
-        echo "Usage: $0 [install|update|uninstall] [version]" >&2
-        exit 1
-        ;;
-esac
+# Only dispatch when executed directly; allow sourcing for tests.
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+    case "${1:-install}" in
+        install|update)
+            install_byobu "${2:-}"
+            ;;
+        uninstall)
+            echo "[$TOOL] Removing user-local installation" >&2
+            remove_manifest_files
+            hash -r 2>/dev/null || true
+            ;;
+        *)
+            echo "Usage: $0 [install|update|uninstall] [version]" >&2
+            exit 1
+            ;;
+    esac
+fi
