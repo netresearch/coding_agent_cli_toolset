@@ -419,7 +419,7 @@ pip install -r requirements-dev.txt
 - build, twine
 
 **Security:**
-- safety
+- pip-audit
 
 **Documentation:**
 - markdown, PyYAML
@@ -441,7 +441,7 @@ mypy cli_audit
 
 # Security scan
 bandit -r cli_audit
-safety check
+pip-audit
 
 # Run tests
 pytest --cov=cli_audit --cov-report=term --cov-report=html
@@ -482,7 +482,7 @@ pytest -n auto
 
 3. **Security Scan**
    - bandit (code security)
-   - safety (dependency security)
+   - pip-audit (dependency security)
 
 4. **Build Distribution**
    - Build wheel and sdist

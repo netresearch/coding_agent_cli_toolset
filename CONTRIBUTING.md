@@ -81,7 +81,7 @@ isort cli_audit tests
 Run security checks:
 ```bash
 bandit -r cli_audit
-safety check
+pip-audit
 ```
 
 ### All Quality Checks at Once
@@ -101,7 +101,7 @@ pytest --cov=cli_audit
 
 # Security
 bandit -r cli_audit
-safety check
+pip-audit
 ```
 
 ## Continuous Integration
@@ -116,7 +116,7 @@ Runs on every push and pull request to `main` and `develop` branches:
 
 - **Lint and Type Check**: Runs flake8 and mypy
 - **Test Suite**: Runs pytest on multiple OS (Ubuntu, macOS, Windows) and Python versions (3.9-3.12)
-- **Security Scan**: Runs bandit and safety checks
+- **Security Scan**: Runs bandit and pip-audit
 - **Build**: Builds distribution packages
 - **Documentation**: Validates README and config files
 - **Integration E2E**: Tests CLI execution and programmatic API

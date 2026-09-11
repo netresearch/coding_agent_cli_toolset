@@ -697,7 +697,7 @@ pytest --cov=cli_audit --cov-fail-under=80
 
 # Security checks
 bandit -r cli_audit
-safety check
+pip-audit
 ```
 
 ### Pre-commit Hook
