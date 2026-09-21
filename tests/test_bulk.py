@@ -222,7 +222,7 @@ class TestBulkInstallResult:
 class TestGetMissingTools:
     """Tests for get_missing_tools function."""
 
-    @patch("cli_audit.bulk.shutil.which")
+    @patch("cli_audit.bulk._which")
     def test_get_missing_tools_all_missing(self, mock_which):
         """Test when all tools are missing."""
         mock_which.return_value = None
@@ -233,7 +233,7 @@ class TestGetMissingTools:
         assert missing == tools
         assert mock_which.call_count == 3
 
-    @patch("cli_audit.bulk.shutil.which")
+    @patch("cli_audit.bulk._which")
     def test_get_missing_tools_all_installed(self, mock_which):
         """Test when all tools are installed."""
         mock_which.return_value = "/usr/bin/tool"
@@ -244,11 +244,11 @@ class TestGetMissingTools:
         assert missing == []
         assert mock_which.call_count == 3
 
-    @patch("cli_audit.bulk.shutil.which")
+    @patch("cli_audit.bulk._which")
     def test_get_missing_tools_mixed(self, mock_which):
         """Test when some tools are installed."""
 
-        def which_side_effect(tool, path=None):
+        def which_side_effect(tool):
             if tool in ("ripgrep", "mypy"):
                 return "/usr/bin/" + tool
             return None

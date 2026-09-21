@@ -8,7 +8,6 @@ dependency resolution, and atomic rollback capability.
 from __future__ import annotations
 
 import os
-import shutil
 import subprocess
 import tempfile
 import threading
@@ -21,7 +20,7 @@ from typing import Callable, Sequence
 
 from .common import vlog
 from .config import Config
-from .detection import _installation_path
+from .detection import _which
 from .environment import Environment
 from .installer import InstallResult, install_tool
 from .package_managers import select_package_manager
@@ -169,7 +168,7 @@ def get_missing_tools(tool_names: Sequence[str], verbose: bool = False) -> list[
     missing = []
     for tool_name in tool_names:
         # Same lookup as the audit: a copy inside an activated venv is no installation
-        binary_path = shutil.which(tool_name, path=_installation_path())
+        binary_path = _which(tool_name)
         if not binary_path:
             missing.append(tool_name)
             vlog(f"Tool not found: {tool_name}", verbose)

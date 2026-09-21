@@ -9,14 +9,13 @@ from __future__ import annotations
 
 import hashlib
 import random
-import shutil
 import subprocess
 import time
 from dataclasses import dataclass
 
 from .common import vlog
 from .config import Config
-from .detection import _installation_path
+from .detection import _which
 from .environment import Environment
 from .install_plan import InstallStep, generate_install_plan
 from .package_managers import select_package_manager
@@ -383,7 +382,7 @@ def validate_installation(
     """
     # Check if binary exists in PATH. Same lookup as the audit: a copy inside
     # an activated venv would shadow the tool that was just installed.
-    binary_path = shutil.which(tool_name, path=_installation_path())
+    binary_path = _which(tool_name)
     if not binary_path:
         vlog(f"Binary not found in PATH: {tool_name}", verbose)
         return (False, None, None)

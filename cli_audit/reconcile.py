@@ -24,9 +24,9 @@ from .common import vlog
 from .config import Config
 from .detection import (
     _env_dir,
-    _installation_path,
     _is_environment_bin,
     _is_tool_dependency_binary,
+    _which,
     tool_manager_of,
 )
 from .environment import Environment
@@ -290,7 +290,7 @@ def detect_installations(
 
             # Check if this is the active installation
             # The active copy is resolved the same way the audit resolves it
-            active_path = shutil.which(candidate, path=_installation_path())
+            active_path = _which(candidate)
             is_active = (os.path.realpath(active_path) == real_path) if active_path else False
 
             installations.append(

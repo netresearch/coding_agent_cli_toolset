@@ -346,3 +346,36 @@ def test_symlinked_default_tool_root_is_recognised(tmp_path, monkeypatch):
     (tmp_path / "share" / "uv" / "tools").symlink_to(tmp_path / "data" / "uvtools")
 
     assert tool_manager_of(str(tmp_path / "data" / "uvtools" / "black" / "bin")) == "uv"
+
+
+def test_dependency_copy_answers_no_lookup(tmp_path, monkeypatch):
+    # A tool venv bin dir first on PATH (uv tool run): its dependency copies
+    # must not answer for the audit, the bulk check, the install validation,
+    # the version_command, or reconcile
+    tool_bin = _make_tool_venv(tmp_path / "share" / "uv" / "tools" / "fakehttpie2", "fakehttp2")
+    _make_bin(tool_bin, "fakedep", "2.19.0")
+    real_bin = tmp_path / "local" / "bin"
+    real = _make_bin(real_bin, "fakedep", "2.18.0")
+    monkeypatch.setenv("PATH", os.pathsep.join([str(tool_bin), str(real_bin), WHICH_DIR]))
+
+    from cli_audit.reconcile import clear_detection_cache, detect_installations
+
+    clear_detection_cache()
+    assert [(i.path, i.active) for i in detect_installations("fakedep", ["fakedep"])] == [(str(real), True)]
+    assert get_missing_tools(["fakedep"]) == []
+    assert validate_installation("fakedep")[1] == str(real)
+    version, _line, path, _method = audit_tool_installation("fakedep", ("fakedep",), version_command="fakedep --version")
+    assert (version, path) == ("2.18.0", str(real))
+
+
+def test_tool_venv_is_not_used_to_resolve_a_command(tmp_path, monkeypatch):
+    # A tool's own entry point is still found through its PATH dir, but a
+    # version_command runs outside every environment
+    from cli_audit.detection import _command_path, _installation_path
+
+    tool_bin = _make_tool_venv(tmp_path / "share" / "uv" / "tools" / "fakeonly", "fakeonly")
+    _make_bin(tool_bin, "fakeonly", "1.0.0")
+    monkeypatch.setenv("PATH", str(tool_bin))
+
+    assert _installation_path() == str(tool_bin)
+    assert _command_path() == ""

@@ -7,6 +7,7 @@ Phase 2.0: Detection and Auditing - Local Detection
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import shutil
@@ -150,7 +151,10 @@ def tool_entrypoints(bin_dir: str) -> set[str] | None:
         packages = [data.get("main_package") or {}]
         packages += [p for p in (data.get("injected_packages") or {}).values() if p.get("include_apps")]
         return {app for p in packages for app in (p.get("apps") or [])}
-    except OSError, ValueError, AttributeError, TypeError, KeyError:
+    except (OSError, ValueError, AttributeError, TypeError, KeyError) as exc:
+        # Unreadable record: every executable in that venv then counts as a
+        # dependency, so say which file and why
+        logging.getLogger(__name__).debug("unreadable tool record %s: %s", record, exc)
         return None
 
 
@@ -176,6 +180,17 @@ def _is_environment_bin(bin_dir: str) -> bool:
     reconcile. Tool roots are compared resolved, so bin_dir is resolved too.
     """
     return _is_virtualenv_bin(bin_dir) and not _is_tool_manager_env(os.path.realpath(bin_dir))
+
+
+def _command_path() -> str:
+    """PATH for running a tool by its name: no environment bin dirs at all.
+
+    Stricter than _installation_path, which keeps a manager's per-tool venv:
+    running a name there can hit a dependency's executable (pygmentize in
+    httpie's venv) instead of the installation.
+    """
+    dirs = [d for d in os.environ.get("PATH", os.defpath).split(os.pathsep) if d]
+    return os.pathsep.join(d for d in dirs if not _is_virtualenv_bin(d))
 
 
 def _installation_path() -> str:
@@ -346,9 +361,9 @@ def get_version_line(
     # from user input — e.g. `uv python list --only-installed | grep … | sed …`.
     # shell=True is required for the pipelines used in the catalog.
     if version_command:
-        # The command names the tool, not the path: resolve that name the way
-        # find_paths does, never to an activated environment's copy.
-        search_path = _installation_path()
+        # The command names the tool, not the path: resolve that name outside
+        # every environment, including a tool manager's per-tool venv.
+        search_path = _command_path()
         try:
             proc = subprocess.run(  # nosec B602
                 version_command,
