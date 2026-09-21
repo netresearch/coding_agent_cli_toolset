@@ -30,9 +30,10 @@ class TestSingleToolInstallation:
     """Integration tests for single tool installation."""
 
     @patch("cli_audit.installer.subprocess.run")
+    @patch("cli_audit.prerequisites.shutil.which", return_value="/usr/bin/python3")
     @patch("cli_audit.installer._which")
     @patch("cli_audit.package_managers.subprocess.run")
-    def test_install_python_tool_with_pipx(self, mock_pm_run, mock_which, mock_run):
+    def test_install_python_tool_with_pipx(self, mock_pm_run, mock_which, mock_prereq_which, mock_run):
         """Test installing a Python tool using pipx."""
         # Setup: pipx is available
         mock_pm_run.return_value = MagicMock(returncode=0)
@@ -69,9 +70,10 @@ class TestSingleToolInstallation:
         assert len(result.steps_completed) > 0
 
     @patch("cli_audit.installer.subprocess.run")
+    @patch("cli_audit.prerequisites.shutil.which", return_value="/usr/bin/python3")
     @patch("cli_audit.installer._which")
     @patch("cli_audit.package_managers.subprocess.run")
-    def test_install_rust_tool_with_cargo(self, mock_pm_run, mock_which, mock_run):
+    def test_install_rust_tool_with_cargo(self, mock_pm_run, mock_which, mock_prereq_which, mock_run):
         """Test installing a Rust tool using cargo."""
         # Setup: cargo is available
         mock_pm_run.return_value = MagicMock(returncode=0)
