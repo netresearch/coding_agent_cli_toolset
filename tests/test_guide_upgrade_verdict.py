@@ -275,11 +275,19 @@ def test_probe_path_skips_venv_dirs(tmp_path):
 # multiarch suffixes, and merged-/usr packages that still record /bin/x
 DPKG_DIVERTED = 'echo "diversion by other from: $2"; echo "diversion by other to: $2.other"; echo "bubblewrap, other: $2"'
 DPKG_MULTIARCH = 'echo "bubblewrap:amd64: $2"'
+# A comma inside the path must not become a second "owner" before the colon split
+DPKG_COMMA_PATH = 'echo "other: /opt/x, bubblewrap"'
 DPKG_BIN_ONLY = 'case "$2" in /bin/bwrap) echo "bubblewrap: /bin/bwrap" ;; *) echo "no path found" >&2; exit 1 ;; esac'
 
 
 @pytest.mark.parametrize(
-    "dpkg_stub", [DPKG_DIVERTED, DPKG_MULTIARCH, DPKG_BIN_ONLY], ids=["diverted", "multiarch", "bin-only"]
+    "dpkg_stub",
+    [DPKG_DIVERTED, DPKG_MULTIARCH, DPKG_BIN_ONLY],
+    ids=["diverted", "multiarch", "bin-only"],
 )
 def test_owner_is_found_in_real_dpkg_output_shapes(tmp_path, dpkg_stub):
     assert _run_package_manager(tmp_path, install_rc=0, candidate="0.9.0-1ubuntu0.3", dpkg_stub=dpkg_stub)
+
+
+def test_comma_in_the_path_is_not_an_owner(tmp_path):
+    assert not _run_package_manager(tmp_path, install_rc=0, candidate="0.9.0-1ubuntu0.3", dpkg_stub=DPKG_COMMA_PATH)

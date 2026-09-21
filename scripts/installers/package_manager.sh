@@ -143,9 +143,11 @@ if ! $installed && have apt-get; then
       bin_real="$(readlink -f "$bin_path" 2>/dev/null || true)"
       owned=false
       if [ -n "$bin_path" ]; then
-        # Resolved path first (alternatives: ctags -> ctags-universal), then
-        # the PATH entry and /bin/<name>: on merged-/usr systems some packages
-        # still record /bin/x while readlink gives /usr/bin/x
+        # Owners of the first of these paths that dpkg knows at all (a known
+        # path with a foreign owner does not fall through to the next one):
+        # the resolved path (alternatives: ctags -> ctags-universal), the PATH
+        # entry, then /bin/<name> (merged /usr: some packages still record
+        # /bin/x while readlink gives /usr/bin/x)
         for owner in $(dpkg_owners "$bin_real" "$bin_path" "/bin/${bin_real##*/}"); do
           if [[ " $pkg " == *" $owner "* ]]; then
             owned=true
