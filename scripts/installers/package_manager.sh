@@ -116,9 +116,18 @@ if ! $installed && have apt-get; then
       # means something else (e.g. another copy earlier on PATH)
       first_pkg="${pkg%% *}"
       pkg_installed="$(dpkg-query -W -f='${Version}' "$first_pkg" 2>/dev/null || true)"
-      pkg_candidate="$(apt-cache policy "$first_pkg" 2>/dev/null | awk '/Candidate:/ { print $2; exit }' || true)"
+      # apt-cache translates "Candidate:" (German: "Installationskandidat:")
+      pkg_candidate="$(LC_ALL=C apt-cache policy "$first_pkg" 2>/dev/null | awk '/Candidate:/ { print $2; exit }' || true)"
       if [ -n "$pkg_installed" ] && [ "$pkg_installed" = "$pkg_candidate" ]; then
         pm_ok=true
+      fi
+      # The detected binary must be this package's: upstream part of the
+      # package version (no epoch, no revision) starts with the detected one
+      pkg_upstream="${pkg_installed#*:}"
+      pkg_upstream="${pkg_upstream%%-*}"
+      after_num="$(get_version "$VERSIONED_BINARY" | grep -oE '[0-9]+(\.[0-9]+)+' | head -1 || true)"
+      if [ -z "$after_num" ] || [[ "$pkg_upstream" != "$after_num"* ]]; then
+        pm_ok=false
       fi
     fi
     installed=true
@@ -168,8 +177,9 @@ if $pm_ok && [ -n "$before" ] && [ -n "$after" ] && [ "$before" = "$after" ]; th
   printf "[%s] Note: Package manager has no newer version available\n" "$DISPLAY_NAME" >&2
   # Signal held-back status to callers (guide.sh), so the run is not counted
   # as an upgrade
-  mkdir -p /tmp/.cli-audit
-  echo "$after" > "/tmp/.cli-audit/${TOOL}.held-back"
+  marker_dir="${CLI_AUDIT_MARKER_DIR:-/tmp/.cli-audit}"
+  mkdir -p "$marker_dir"
+  echo "$after" > "$marker_dir/${TOOL}.held-back"
 fi
 
 # Refresh snapshot after successful installation

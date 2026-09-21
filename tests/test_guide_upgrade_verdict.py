@@ -42,9 +42,9 @@ def _run(
     clear_first: bool = False,
 ) -> tuple[str, str]:
     """Run upgrade_verdict + report_upgrade_verdict; return (stdout, counters)."""
-    marker_dir = Path("/tmp/.cli-audit")
-    marker_dir.mkdir(exist_ok=True)
-    tool = f"verdicttest{os.getpid()}"
+    marker_dir = tmp_path / "markers"
+    marker_dir.mkdir()
+    tool = "verdicttest"
     if marker:
         (marker_dir / f"{tool}.{marker}").write_text(latest)
     root = tmp_path / "root"
@@ -56,6 +56,7 @@ def _run(
         [
             "set -euo pipefail",
             f'ROOT="{root}"',
+            f'MARKER_DIR="{marker_dir}"',
             "SUMMARY_UPDATED=0 SUMMARY_SKIPPED=0 SUMMARY_FAILED=0",
             f'json_field() {{ echo "{audited}"; }}',
             f'probe_installed_version() {{ echo "{probed}"; }}',
@@ -141,25 +142,31 @@ def test_every_upgrade_branch_uses_the_verdict():
 SCRIPTS = PROJECT_ROOT / "scripts"
 
 
-def _run_package_manager(tmp_path: Path, *, install_rc: int, candidate: str) -> bool:
+def _run_package_manager(tmp_path: Path, *, install_rc: int, candidate: str, detected: str = "0.9.0", lang: str = "C") -> bool:
     """Run package_manager.sh bwrap against stub apt tools; return whether held-back was marked."""
+    if not shutil.which("jq"):
+        pytest.skip("jq not installed")
     fake = tmp_path / "fakebin"
     fake.mkdir()
     stubs = {
         "sudo": 'exec "$@"',
         "apt-get": f'[ "$1" = install ] && exit {install_rc}; exit 0',
         "dpkg-query": "echo 0.9.0-1ubuntu0.3",
-        "apt-cache": f'echo "  Installed: 0.9.0-1ubuntu0.3"; echo "  Candidate: {candidate}"',
-        "bwrap": "echo 'bubblewrap 0.9.0'",
+        # apt-cache translates its labels unless LC_ALL=C
+        "apt-cache": (
+            'label="Candidate:"; [ "${LC_ALL:-}" != C ] && [ "${LANG:-C}" != C ] && label="Installationskandidat:"\n'
+            f'echo "  Installed: 0.9.0-1ubuntu0.3"; echo "  $label {candidate}"'
+        ),
+        "bwrap": f"echo 'bubblewrap {detected}'",
         "python3": "exit 0",  # refresh_snapshot must not touch the real snapshot
     }
     for name, body in stubs.items():
         (fake / name).write_text(f"#!/bin/bash\n{body}\n")
         (fake / name).chmod(0o755)
     (fake / "jq").symlink_to(shutil.which("jq"))
-    marker = Path("/tmp/.cli-audit/bwrap.held-back")
-    marker.unlink(missing_ok=True)
-    env = {**os.environ, "PATH": f"{fake}:/usr/bin:/bin"}
+    marker = tmp_path / "markers" / "bwrap.held-back"
+    env = {**os.environ, "PATH": f"{fake}:/usr/bin:/bin", "CLI_AUDIT_MARKER_DIR": str(tmp_path / "markers"), "LANG": lang}
+    env.pop("LC_ALL", None)
     subprocess.run(
         ["bash", str(SCRIPTS / "installers" / "package_manager.sh"), "bwrap"],
         env=env,
@@ -167,9 +174,7 @@ def _run_package_manager(tmp_path: Path, *, install_rc: int, candidate: str) -> 
         text=True,
         check=True,
     )
-    marked = marker.exists()
-    marker.unlink(missing_ok=True)
-    return marked
+    return marker.exists()
 
 
 def test_package_manager_marks_held_back_when_candidate_is_installed(tmp_path):
@@ -209,4 +214,33 @@ def test_never_and_cycle_pins_apply():
 
 
 def test_guide_loop_uses_pin_applies_for_both_pin_kinds():
-    assert GUIDE.read_text().count("if pin_applies ") == 2
+    assert GUIDE.read_text().count('&& pin_applies "$') == 2
+
+
+def test_held_back_detection_is_locale_independent(tmp_path):
+    assert _run_package_manager(tmp_path, install_rc=0, candidate="0.9.0-1ubuntu0.3", lang="de_DE.UTF-8")
+
+
+def test_shadowed_package_is_not_held_back(tmp_path):
+    # apt installed its newest 0.9.0, but a /usr/local copy 0.8.0 answers on PATH
+    assert not _run_package_manager(tmp_path, install_rc=0, candidate="0.9.0-1ubuntu0.3", detected="0.8.0")
+
+
+def test_unknown_upstream_is_not_a_failure(tmp_path):
+    out, counters = _run(tmp_path, script_ok="1", installed="2.0.0", latest="", audited="2.0.0")
+    assert counters == "COUNTERS updated=0 skipped=1 failed=0"
+    assert "No upstream version known" in out
+
+
+def test_probe_path_skips_venv_dirs(tmp_path):
+    venv = tmp_path / "env-with-any-name"  # recognised by pyvenv.cfg alone
+    (venv / "bin").mkdir(parents=True)
+    (venv / "pyvenv.cfg").write_text("home = /usr/bin\n")
+    named = tmp_path / "proj" / "venv" / "bin"
+    named.mkdir(parents=True)
+    keep = tmp_path / ".local" / "bin"
+    keep.mkdir(parents=True)
+    path = ":".join([str(venv / "bin") + "/", str(named), str(keep)])
+    script = "\n".join(["set -euo pipefail", _function("installation_path"), f'PATH="{path}"', "installation_path"])
+    out = subprocess.run(["/bin/bash", "-c", script], capture_output=True, text=True, check=True).stdout
+    assert out == str(keep)

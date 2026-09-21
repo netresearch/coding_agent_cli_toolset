@@ -24,6 +24,9 @@ LAST_MULTI_COUNT=0
 # summary hint); de-duplicated when counted.
 GUIDE_DUP_LIST=""
 
+# Installers leave <tool>.already-current / <tool>.held-back here
+MARKER_DIR="${CLI_AUDIT_MARKER_DIR:-/tmp/.cli-audit}"
+
 # Summary counters
 SUMMARY_UPDATED=0
 SUMMARY_SKIPPED=0
@@ -186,6 +189,26 @@ osc8() {
   [ -n "$url" ] && printf '\e]8;;%s\e\\%s\e]8;;\e\\' "$url" "$text" || printf '%s' "$text"
 }
 
+# PATH without virtualenv/conda bin dirs; mirrors
+# cli_audit.detection._installation_path
+installation_path() {
+  local dir parent out=""
+  local -a dirs=()
+  IFS=: read -ra dirs <<<"$PATH"
+  for dir in "${dirs[@]}"; do
+    [ -n "$dir" ] || continue
+    # PEP 405 venvs carry pyvenv.cfg next to bin/ (no dirname: PATH may lack it)
+    parent="${dir%/}"
+    parent="${parent%/*}"
+    [ -f "$parent/pyvenv.cfg" ] && continue
+    case "${dir%/}/" in
+      */venv/bin/ | */.venv/bin/ | */env/bin/ | */venvs/* | */.venvs/* | */virtualenvs/* | */.virtualenvs/* | */envs/* | */conda/* | */miniconda* | */anaconda*) continue ;;
+    esac
+    out="${out:+$out:}$dir"
+  done
+  printf '%s' "$out"
+}
+
 # Probe the installed version directly from the binary — bypasses the
 # snapshot round-trip. Used as a fallback in upgrade-success checks so a
 # stale snapshot (e.g. after a transient endoflife failure) doesn't mask a
@@ -211,7 +234,8 @@ probe_installed_version() {
     [ -x "$binary" ] || return 1
     bin_path="$binary"
   else
-    bin_path="$(command -v "$binary" 2>/dev/null)" || return 1
+    # Same lookup as the audit: an activated venv's copy is no installation
+    bin_path="$(PATH="$(installation_path)" command -v "$binary" 2>/dev/null)" || return 1
   fi
 
   # Try --version first, then -v, capture both stdout and stderr. Extract
@@ -237,20 +261,21 @@ pin_applies() {
 # run (make upgrade-<tool>, an interrupted guide, another cycle of the same
 # tool) cannot decide this run's verdict.
 clear_upgrade_markers() {
-  rm -f "/tmp/.cli-audit/${1}.already-current" "/tmp/.cli-audit/${1}.held-back"
+  rm -f "$MARKER_DIR/${1}.already-current" "$MARKER_DIR/${1}.held-back"
 }
 
 # Classify the outcome of an install/upgrade run. Call after the re-audit.
 # An install script that exits 0 has not necessarily changed anything: a
 # shadowed binary, an unchanged package or a stale version string all exit 0.
 # Args: script_ok catalog_tool tool installed latest [version_cycle]
-# Echoes: updated | failed | unchanged | already-current | held-back
+# Echoes: updated | failed | unchanged | unverified | already-current | held-back
+#   unverified:      version unchanged, but no upstream version to compare with
 #   already-current: installer found the binary identical to the target release
 #   held-back:       package manager has no newer version than the installed one
 upgrade_verdict() {
   local script_ok="$1" catalog_tool="$2" tool="$3" installed="$4" latest="$5"
   local version_cycle="${6:-}" marker="" new_installed="" probed=""
-  local marker_dir="/tmp/.cli-audit"
+  local marker_dir="$MARKER_DIR"
   [ -f "$marker_dir/${catalog_tool}.already-current" ] && marker="already-current"
   [ -f "$marker_dir/${catalog_tool}.held-back" ] && marker="held-back"
   rm -f "$marker_dir/${catalog_tool}.already-current" "$marker_dir/${catalog_tool}.held-back"
@@ -275,7 +300,9 @@ upgrade_verdict() {
     echo "updated"
   elif [ -n "$marker" ]; then
     echo "$marker"
-  elif [ -n "$new_installed" ] && [ -n "$latest" ] && { [[ "$latest" == "$new_installed".* ]] || [[ "$new_installed" == "$latest".* ]]; }; then
+  elif [ -z "$latest" ]; then
+    echo "unverified"
+  elif [ -n "$new_installed" ] && { [[ "$latest" == "$new_installed".* ]] || [[ "$new_installed" == "$latest".* ]]; }; then
     # Short version form (3.13 vs 3.13.11): detection truncates, upgrade worked.
     # The dot boundary keeps 1.1 from matching 1.12.0.
     echo "updated"
@@ -305,6 +332,10 @@ report_upgrade_verdict() {
       # the guide hides every pinned tool, which would also hide the next
       # real release.
       printf "    ✓ Binary already matches release %s (its version string is stale)\n" "$latest"
+      SUMMARY_SKIPPED=$((SUMMARY_SKIPPED + 1))
+      ;;
+    unverified)
+      printf "    ⚠️  No upstream version known; cannot tell whether %s changed\n" "${installed:-the install}"
       SUMMARY_SKIPPED=$((SUMMARY_SKIPPED + 1))
       ;;
     held-back)
@@ -885,7 +916,8 @@ prompt_pin_version() {
   local tool="$1"
   local current_version="$2"
 
-  [ -z "$current_version" ] && current_version="<current>"
+  # Nothing installed: there is no version to pin
+  [ -z "$current_version" ] && return 0
 
   printf "    Pin to version %s to stop upgrade prompts? [y/N] " "$current_version"
 
@@ -1101,7 +1133,7 @@ while read -r line; do
           continue
         fi
         # Skip while the cycle pin still applies
-        if pin_applies "$multi_pin" "$(json_field "$tool_name" latest_upstream)" \
+        if [ -n "$multi_pin" ] && pin_applies "$multi_pin" "$(json_field "$tool_name" latest_upstream)" \
           "$(json_field "$tool_name" installed)" "$version_cycle"; then
           continue
         fi
@@ -1112,7 +1144,7 @@ while read -r line; do
         fi
 
         # Skip while the pin still applies (don't prompt for that release)
-        if pin_applies "$pinned_version" "$(json_field "$tool_name" latest_upstream)" \
+        if [ -n "$pinned_version" ] && pin_applies "$pinned_version" "$(json_field "$tool_name" latest_upstream)" \
           "$(json_field "$tool_name" installed)"; then
           continue
         fi
