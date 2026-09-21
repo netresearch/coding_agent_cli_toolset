@@ -76,7 +76,7 @@ def test_tool_only_in_venv_is_not_installed(tmp_path, monkeypatch):
     assert find_paths("fakeonlyvenv", deep=True) == []
 
 
-def test_version_command_runs_the_detected_binary(tmp_path, monkeypatch):
+def test_version_command_skips_the_venv_copy(tmp_path, monkeypatch):
     # Catalog version_command names the tool ("black --version"); it must not
     # resolve to the activated venv's copy either
     venv_bin = _make_venv(tmp_path / ".venv")
@@ -121,3 +121,36 @@ def test_install_validation_checks_the_installed_copy(tmp_path, monkeypatch):
 
     assert (ok, path) == (True, str(real))
     assert "26.5.1" in (version or "")
+
+
+def test_trailing_slash_venv_bin_is_skipped(tmp_path, monkeypatch):
+    # export PATH=~/proj-env/bin/:$PATH
+    venv_bin = _make_venv(tmp_path / "proj-env")
+    _make_bin(venv_bin, "faketool4", "1.0.0")
+    other_bin = tmp_path / "other" / "bin"
+    real = _make_bin(other_bin, "faketool4", "2.0.0")
+    monkeypatch.setenv("PATH", os.pathsep.join([str(venv_bin) + "/", str(other_bin)]))
+
+    assert find_paths("faketool4") == [str(real)]
+
+
+def test_reconcile_keeps_uv_tool_installation(tmp_path, monkeypatch):
+    # ~/.local/bin/black -> ~/.local/share/uv/tools/black/bin/black; the tool
+    # dir carries a pyvenv.cfg but the tool is installed, not an environment
+    from cli_audit.reconcile import clear_detection_cache, detect_installations
+
+    tool_env = tmp_path / "share" / "uv" / "tools" / "fakeuvtool"
+    real = _make_bin(_make_venv(tool_env), "fakeuvtool", "26.5.1")
+    local_bin = tmp_path / "local" / "bin"
+    local_bin.mkdir(parents=True)
+    (local_bin / "fakeuvtool").symlink_to(real)
+    # an activated venv with its own copy sits in front
+    venv_bin = _make_venv(tmp_path / ".venv")
+    _make_bin(venv_bin, "fakeuvtool", "25.11.0")
+    monkeypatch.setenv("PATH", os.pathsep.join([str(venv_bin), str(local_bin)]))
+    clear_detection_cache()
+
+    installs = detect_installations("fakeuvtool", ["fakeuvtool"])
+
+    assert [i.path for i in installs] == [str(real)]
+    assert installs[0].active

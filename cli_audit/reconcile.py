@@ -22,7 +22,7 @@ from typing import Sequence
 
 from .common import vlog
 from .config import Config
-from .detection import _is_virtualenv_bin
+from .detection import _installation_path, _is_tool_manager_env, _is_virtualenv_bin
 from .environment import Environment
 from .upgrade import compare_versions
 
@@ -246,7 +246,8 @@ def detect_installations(
                 continue
 
             # A symlink can point into an environment as well
-            if _is_virtualenv_bin(os.path.dirname(real_path)):
+            real_dir = os.path.dirname(real_path)
+            if _is_virtualenv_bin(real_dir) and not _is_tool_manager_env(real_dir):
                 vlog(f"  Skipping environment binary: {real_path}", verbose)
                 continue
 
@@ -279,7 +280,8 @@ def detect_installations(
             method = classify_install_method(real_path, tool_name, verbose)
 
             # Check if this is the active installation
-            active_path = shutil.which(candidate)
+            # The active copy is resolved the same way the audit resolves it
+            active_path = shutil.which(candidate, path=_installation_path())
             is_active = (os.path.realpath(active_path) == real_path) if active_path else False
 
             installations.append(

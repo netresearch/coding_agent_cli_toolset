@@ -62,12 +62,26 @@ def _is_virtualenv_bin(bin_dir: str) -> bool:
     and classifying them by method (e.g. `uv` because the tool also appears
     in `uv tool list`) makes removal delete a DIFFERENT installation.
     """
+    # "/x/env/bin/" must behave like "/x/env/bin" (dirname would stay in bin/)
+    bin_dir = os.path.normpath(bin_dir)
     # Definitive signal: PEP 405 venvs carry pyvenv.cfg next to bin/
     if os.path.isfile(os.path.join(os.path.dirname(bin_dir), "pyvenv.cfg")):
         return True
     # Name-based fallback for conda/virtualenvwrapper layouts
     normalized = bin_dir.rstrip("/") + "/"
     return any(pat in normalized for pat in _ENV_DIR_PATTERNS)
+
+
+# Tool managers install each tool into a venv of its own; a binary linked
+# from there (~/.local/bin/black -> ~/.local/share/uv/tools/black/bin/black)
+# is an installation, not an environment.
+_TOOL_ENV_ROOTS = ("/uv/tools/", "/pipx/venvs/")
+
+
+def _is_tool_manager_env(bin_dir: str) -> bool:
+    """True if bin_dir belongs to a uv-tool or pipx per-tool venv."""
+    normalized = os.path.normpath(bin_dir) + "/"
+    return any(root in normalized for root in _TOOL_ENV_ROOTS)
 
 
 def _installation_path() -> str:
