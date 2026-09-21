@@ -82,3 +82,12 @@ def test_version_command_runs_the_detected_binary(tmp_path, monkeypatch):
     )
 
     assert (version, path) == ("26.5.1", str(real))
+
+
+def test_bin_pattern_needs_a_directory_boundary(tmp_path, monkeypatch):
+    # "/venv/bin" must not match /opt/venv/bin-extra: that is no environment
+    extra_bin = tmp_path / "opt" / "venv" / "bin-extra"
+    real = _make_bin(extra_bin, "faketool3", "3.0.0")
+    monkeypatch.setenv("PATH", str(extra_bin))
+
+    assert find_paths("faketool3") == [str(real)]

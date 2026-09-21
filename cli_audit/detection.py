@@ -41,9 +41,9 @@ VERSION_COMMAND_PATH = "<version_command>"
 # Environment-name patterns for env managers without a pyvenv.cfg (conda etc.).
 # Mirrors the venv skip list in scripts/lib/capability.sh:detect_all_installations.
 _ENV_DIR_PATTERNS = (
-    "/venv/bin",
-    "/.venv/bin",
-    "/env/bin",
+    "/venv/bin/",
+    "/.venv/bin/",
+    "/env/bin/",
     "/venvs/",
     "/.venvs/",
     "/virtualenvs/",
