@@ -122,6 +122,28 @@ class TestGhErrorBodyFallback:
         assert proc.returncode == 0, proc.stderr
         assert proc.stdout.strip() == "7.19"
 
+    def test_byobu_explicit_version_falls_back_to_trustmux_tag(self, fake_bin, tmp_path):
+        # "install 7.20" when upstream only tagged trustmux-v7.20: the plain tag 404s
+        for cmd in ("make", "autoreconf", "automake", "autoconf"):
+            _write_stub(fake_bin, cmd, "exit 0\n")
+        _write_stub(
+            fake_bin,
+            "curl",
+            """for arg in "$@"; do
+  case "$arg" in
+    */refs/tags/trustmux-v7.20.tar.gz) echo "archive" > "${@: -1}"; exit 0 ;;
+  esac
+done
+exit 22
+""",
+        )
+        proc = _run_sourced("install_byobu.sh", "install_byobu 7.20", fake_bin, tmp_path)
+        assert proc.returncode == 1
+        # Reached the extract step with the prefixed tag; the stub archive is not a tarball
+        assert "Invalid source archive: https://github.com/dustinkirkland/byobu/archive/refs/tags/trustmux-v7.20.tar.gz" in (
+            proc.stderr
+        )
+
     def test_tmux_falls_back_to_release_redirect_when_gh_fails(self, fake_bin, tmp_path):
         proc = _run_sourced("install_tmux.sh", "get_target_version", fake_bin, tmp_path)
         assert proc.returncode == 0, proc.stderr

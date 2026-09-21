@@ -89,6 +89,8 @@ remove_manifest_files() {
 install_byobu() {
     local version="${1:-}"
     local tag="$version"
+    local candidate=""
+    local -a tags=()
     local before=""
     local after=""
     local archive=""
@@ -102,7 +104,12 @@ install_byobu() {
     if [ -z "$version" ]; then
         echo "[$TOOL] Fetching latest stable tag..." >&2
         tag="$(get_target_tag)"
-        version="${tag#trustmux-v}"
+    fi
+    version="${tag#trustmux-v}"
+    # An explicit plain version may exist only as trustmux-v<version>
+    tags=("$tag")
+    if [ "$tag" = "$version" ]; then
+        tags+=("trustmux-v$version")
     fi
     if ! grep -Eq '^[0-9]+([.][0-9]+)+$' <<<"$version"; then
         echo "[$TOOL] Error: Invalid stable version: ${version:-<none>}" >&2
@@ -114,13 +121,18 @@ install_byobu() {
     BUILD_LOG="$BUILD_TMPDIR/build.log"
     archive="$BUILD_TMPDIR/byobu-$version.tar.gz"
     stage_dir="$BUILD_TMPDIR/stage"
-    url="https://github.com/$GITHUB_REPO/archive/refs/tags/${tag}.tar.gz"
-
-    echo "[$TOOL] Downloading $url..." >&2
-    if ! curl --proto '=https' --proto-redir '=https' -fL \
-        --retry 3 --retry-delay 1 --connect-timeout 10 \
-        "$url" -o "$archive"; then
-        echo "[$TOOL] Error: Failed to download $url" >&2
+    url=""
+    for candidate in "${tags[@]}"; do
+        echo "[$TOOL] Downloading tag $candidate..." >&2
+        if curl --proto '=https' --proto-redir '=https' -fsSL \
+            --retry 3 --retry-delay 1 --connect-timeout 10 \
+            "https://github.com/$GITHUB_REPO/archive/refs/tags/${candidate}.tar.gz" -o "$archive"; then
+            url="https://github.com/$GITHUB_REPO/archive/refs/tags/${candidate}.tar.gz"
+            break
+        fi
+    done
+    if [ -z "$url" ]; then
+        echo "[$TOOL] Error: Failed to download tag(s): ${tags[*]}" >&2
         return 1
     fi
     if ! tar -xzf "$archive" -C "$BUILD_TMPDIR"; then
