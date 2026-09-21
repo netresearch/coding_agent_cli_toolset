@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -30,7 +31,15 @@ def _function(name: str) -> str:
 
 
 def _run(
-    tmp_path: Path, *, script_ok: str, installed: str, latest: str, audited: str, probed: str = "", marker: str = ""
+    tmp_path: Path,
+    *,
+    script_ok: str,
+    installed: str,
+    latest: str,
+    audited: str,
+    probed: str = "",
+    marker: str = "",
+    clear_first: bool = False,
 ) -> tuple[str, str]:
     """Run upgrade_verdict + report_upgrade_verdict; return (stdout, counters)."""
     marker_dir = Path("/tmp/.cli-audit")
@@ -45,12 +54,15 @@ def _run(
     (root / "scripts" / "pin_version.sh").chmod(0o755)
     script = "\n".join(
         [
+            "set -euo pipefail",
             f'ROOT="{root}"',
             "SUMMARY_UPDATED=0 SUMMARY_SKIPPED=0 SUMMARY_FAILED=0",
             f'json_field() {{ echo "{audited}"; }}',
             f'probe_installed_version() {{ echo "{probed}"; }}',
             _function("upgrade_verdict"),
             _function("report_upgrade_verdict"),
+            _function("clear_upgrade_markers"),
+            f'clear_upgrade_markers "{tool}"' if clear_first else ":",
             f'report_upgrade_verdict "$(upgrade_verdict "{script_ok}" "{tool}" "{tool}" "{installed}" "{latest}")" '
             f'"{tool}" "{installed}" "{latest}"',
             'echo "COUNTERS updated=$SUMMARY_UPDATED skipped=$SUMMARY_SKIPPED failed=$SUMMARY_FAILED"',
@@ -92,10 +104,24 @@ def test_held_back_package_is_skipped(tmp_path):
     assert "no newer version than 0.9.0" in out
 
 
-def test_already_current_binary_is_skipped_and_pinned(tmp_path):
+def test_already_current_binary_is_skipped_without_a_pin(tmp_path):
+    # A pin would hide the tool from every later run, the next real release included
     out, counters = _run(tmp_path, script_ok="1", installed="1.0.0", latest="1.1.0", audited="1.0.0", marker="already-current")
     assert counters == "COUNTERS updated=0 skipped=1 failed=0"
-    assert (tmp_path / "pins.log").read_text().split()[-1] == "1.1.0"
+    assert not (tmp_path / "pins.log").exists()
+
+
+def test_marker_from_an_earlier_run_is_cleared_before_install(tmp_path):
+    out, counters = _run(
+        tmp_path, script_ok="1", installed="0.9.0", latest="0.12.0", audited="0.9.0", marker="held-back", clear_first=True
+    )
+    assert counters == "COUNTERS updated=0 skipped=0 failed=1"
+
+
+def test_short_version_needs_a_dot_boundary(tmp_path):
+    # 1.1 is not a short form of 1.12.0
+    _out, counters = _run(tmp_path, script_ok="1", installed="1.1", latest="1.12.0", audited="1.1")
+    assert counters == "COUNTERS updated=0 skipped=0 failed=1"
 
 
 def test_short_version_form_counts_as_update(tmp_path):
@@ -107,4 +133,54 @@ def test_every_upgrade_branch_uses_the_verdict():
     # auto-update, [Yy] and [Aa] must all judge the outcome the same way
     source = GUIDE.read_text()
     assert source.count('$(upgrade_verdict "') == 3
+    assert source.count('  clear_upgrade_markers "$catalog_tool"') == 3
+    assert "pin_version.sh" not in _function("report_upgrade_verdict")
     assert "SUMMARY_UPDATED=$((SUMMARY_UPDATED + 1))" not in source.replace(_function("report_upgrade_verdict"), "")
+
+
+SCRIPTS = PROJECT_ROOT / "scripts"
+
+
+def _run_package_manager(tmp_path: Path, *, install_rc: int, candidate: str) -> bool:
+    """Run package_manager.sh bwrap against stub apt tools; return whether held-back was marked."""
+    fake = tmp_path / "fakebin"
+    fake.mkdir()
+    stubs = {
+        "sudo": 'exec "$@"',
+        "apt-get": f'[ "$1" = install ] && exit {install_rc}; exit 0',
+        "dpkg-query": "echo 0.9.0-1ubuntu0.3",
+        "apt-cache": f'echo "  Installed: 0.9.0-1ubuntu0.3"; echo "  Candidate: {candidate}"',
+        "bwrap": "echo 'bubblewrap 0.9.0'",
+        "python3": "exit 0",  # refresh_snapshot must not touch the real snapshot
+    }
+    for name, body in stubs.items():
+        (fake / name).write_text(f"#!/bin/bash\n{body}\n")
+        (fake / name).chmod(0o755)
+    (fake / "jq").symlink_to(shutil.which("jq"))
+    marker = Path("/tmp/.cli-audit/bwrap.held-back")
+    marker.unlink(missing_ok=True)
+    env = {**os.environ, "PATH": f"{fake}:/usr/bin:/bin"}
+    subprocess.run(
+        ["bash", str(SCRIPTS / "installers" / "package_manager.sh"), "bwrap"],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    marked = marker.exists()
+    marker.unlink(missing_ok=True)
+    return marked
+
+
+def test_package_manager_marks_held_back_when_candidate_is_installed(tmp_path):
+    assert _run_package_manager(tmp_path, install_rc=0, candidate="0.9.0-1ubuntu0.3")
+
+
+def test_failed_install_is_not_held_back(tmp_path):
+    # dpkg lock, refused sudo, no network: the version is unchanged for another reason
+    assert not _run_package_manager(tmp_path, install_rc=100, candidate="0.9.0-1ubuntu0.3")
+
+
+def test_newer_candidate_is_not_held_back(tmp_path):
+    # apt has a newer package, yet the detected version did not move: something shadows it
+    assert not _run_package_manager(tmp_path, install_rc=0, candidate="0.12.0-1")

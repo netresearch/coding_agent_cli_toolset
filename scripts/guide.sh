@@ -220,6 +220,13 @@ probe_installed_version() {
   printf '%s\n' "$ver" | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -n1
 }
 
+# Remove installer markers before an install, so a marker left by an earlier
+# run (make upgrade-<tool>, an interrupted guide, another cycle of the same
+# tool) cannot decide this run's verdict.
+clear_upgrade_markers() {
+  rm -f "/tmp/.cli-audit/${1}.already-current" "/tmp/.cli-audit/${1}.held-back"
+}
+
 # Classify the outcome of an install/upgrade run. Call after the re-audit.
 # An install script that exits 0 has not necessarily changed anything: a
 # shadowed binary, an unchanged package or a stale version string all exit 0.
@@ -255,8 +262,9 @@ upgrade_verdict() {
     echo "updated"
   elif [ -n "$marker" ]; then
     echo "$marker"
-  elif [ -n "$new_installed" ] && { [[ "$latest" == "$new_installed"* ]] || [[ "$new_installed" == "$latest"* ]]; }; then
-    # Short version form (3.13 vs 3.13.11): detection truncates, upgrade worked
+  elif [ -n "$new_installed" ] && [ -n "$latest" ] && { [[ "$latest" == "$new_installed".* ]] || [[ "$new_installed" == "$latest".* ]]; }; then
+    # Short version form (3.13 vs 3.13.11): detection truncates, upgrade worked.
+    # The dot boundary keeps 1.1 from matching 1.12.0.
     echo "updated"
   else
     echo "unchanged"
@@ -280,10 +288,10 @@ report_upgrade_verdict() {
       SUMMARY_FAILED=$((SUMMARY_FAILED + 1))
       ;;
     already-current)
-      # Upstream version string is stale (sd 1.1.0 reports 1.0.0). Skip this
-      # release so the next run does not download the same binary again.
-      printf "    ✓ Binary already matches release %s (its version string is stale); skipping %s from now on\n" "$latest" "$latest"
-      "$ROOT"/scripts/pin_version.sh "$tool" "$latest" >/dev/null 2>&1 || true
+      # Upstream version string is stale (sd 1.1.0 reports 1.0.0). No pin:
+      # the guide hides every pinned tool, which would also hide the next
+      # real release.
+      printf "    ✓ Binary already matches release %s (its version string is stale)\n" "$latest"
       SUMMARY_SKIPPED=$((SUMMARY_SKIPPED + 1))
       ;;
     held-back)
@@ -533,6 +541,7 @@ process_tool() {
 
     # Execute the install with version-specific environment variables
     local auto_update_success=0
+    clear_upgrade_markers "$catalog_tool"
     if [ "$catalog_tool" = "python" ] || [ -n "$is_multi_version" ] && [ "$catalog_tool" = "python" ]; then
       UV_PYTHON_SPEC="$latest" "$ROOT"/scripts/$install_cmd && auto_update_success=1 || true
     elif [ "$catalog_tool" = "ruby" ]; then
@@ -656,6 +665,7 @@ process_tool() {
     [Yy])
       # Handle tool-specific version environment variables
       local upgrade_success=0
+      clear_upgrade_markers "$catalog_tool"
       if [ "$catalog_tool" = "python" ]; then
         UV_PYTHON_SPEC="$latest" "$ROOT"/scripts/$install_cmd && upgrade_success=1 || true
       elif [ "$catalog_tool" = "ruby" ]; then
@@ -680,7 +690,7 @@ process_tool() {
       verdict="$(upgrade_verdict "$upgrade_success" "$catalog_tool" "$tool" "$installed" "$latest" "$version_cycle")"
       report_upgrade_verdict "$verdict" "$tool" "$installed" "$latest"
       case "$verdict" in
-        failed|unchanged)
+        failed|unchanged|held-back)
           prompt_pin_version "$tool" "$installed"
           ;;
         updated)
@@ -701,6 +711,7 @@ process_tool() {
 
       # Handle tool-specific version environment variables
       local upgrade_success_a=0
+      clear_upgrade_markers "$catalog_tool"
       if [ "$catalog_tool" = "python" ]; then
         UV_PYTHON_SPEC="$latest" "$ROOT"/scripts/$install_cmd && upgrade_success_a=1 || true
       elif [ "$catalog_tool" = "ruby" ]; then

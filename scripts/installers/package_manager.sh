@@ -73,11 +73,15 @@ fi
 
 # Install via appropriate package manager
 installed=false
+# true only when the package manager itself ran without error; a failed
+# install (dpkg lock, refused sudo, no network) must not read as "no newer
+# version available"
+pm_ok=false
 
 if have brew; then
   pkg="$(echo "$PACKAGES" | jq -r '.brew // empty')"
   if [ "$pkg" != "null" ] && [ -n "$pkg" ]; then
-    brew install "$pkg" || brew upgrade "$pkg" || true
+    if brew install "$pkg" || brew upgrade "$pkg"; then pm_ok=true; fi
     installed=true
   fi
 fi
@@ -107,7 +111,16 @@ if ! $installed && have apt-get; then
     if ! $ppa_added; then
       sudo apt-get update || true
     fi
-    sudo apt-get install -y $pkg || true
+    if sudo apt-get install -y $pkg; then
+      # Installed version must equal the candidate, or the unchanged version
+      # means something else (e.g. another copy earlier on PATH)
+      first_pkg="${pkg%% *}"
+      pkg_installed="$(dpkg-query -W -f='${Version}' "$first_pkg" 2>/dev/null || true)"
+      pkg_candidate="$(apt-cache policy "$first_pkg" 2>/dev/null | awk '/Candidate:/ { print $2; exit }' || true)"
+      if [ -n "$pkg_installed" ] && [ "$pkg_installed" = "$pkg_candidate" ]; then
+        pm_ok=true
+      fi
+    fi
     installed=true
   fi
 fi
@@ -115,7 +128,7 @@ fi
 if ! $installed && have dnf; then
   pkg="$(echo "$PACKAGES" | jq -r '.dnf // .rpm // empty')"
   if [ "$pkg" != "null" ] && [ -n "$pkg" ]; then
-    sudo dnf install -y "$pkg" || true
+    if sudo dnf install -y "$pkg"; then pm_ok=true; fi
     installed=true
   fi
 fi
@@ -123,7 +136,7 @@ fi
 if ! $installed && have pacman; then
   pkg="$(echo "$PACKAGES" | jq -r '.pacman // .arch // empty')"
   if [ "$pkg" != "null" ] && [ -n "$pkg" ]; then
-    sudo pacman -S --noconfirm "$pkg" || true
+    if sudo pacman -S --noconfirm "$pkg"; then pm_ok=true; fi
     installed=true
   fi
 fi
@@ -151,7 +164,7 @@ printf "[%s] after:  %s\n" "$DISPLAY_NAME" "${after:-<none>}"
 if [ -n "$path" ]; then printf "[%s] path:   %s\n" "$DISPLAY_NAME" "$path"; fi
 
 # Warn if version didn't change (package manager can't provide newer version)
-if [ -n "$before" ] && [ -n "$after" ] && [ "$before" = "$after" ]; then
+if $pm_ok && [ -n "$before" ] && [ -n "$after" ] && [ "$before" = "$after" ]; then
   printf "[%s] Note: Package manager has no newer version available\n" "$DISPLAY_NAME" >&2
   # Signal held-back status to callers (guide.sh), so the run is not counted
   # as an upgrade
