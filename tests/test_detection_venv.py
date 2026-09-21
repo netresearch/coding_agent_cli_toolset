@@ -173,29 +173,81 @@ def test_reconcile_keeps_tool_manager_installation(tmp_path, monkeypatch, tool_e
 
 
 @pytest.mark.parametrize(
-    "layout, method, expected",
+    "layout, method, euid, expected",
     [
-        ("uv/tools/gam7/bin/gam", "uv", ["uv", "tool", "uninstall", "gam7"]),
-        ("pipx/venvs/httpie/bin/http", "pipx", ["pipx", "uninstall", "httpie"]),
-        ("global-pipx/venvs/httpie/bin/http", "pipx", ["pipx", "uninstall", "--global", "httpie"]),
+        ("uv/tools/gam7/bin/gam", "uv", 1000, ["uv", "tool", "uninstall", "gam7"]),
+        ("pipx/venvs/httpie/bin/http", "pipx", 1000, ["pipx", "uninstall", "httpie"]),
+        ("global-pipx/venvs/httpie/bin/http", "pipx", 0, ["pipx", "uninstall", "--global", "httpie"]),
     ],
 )
-def test_uninstall_names_the_package_and_scope(tmp_path, monkeypatch, layout, method, expected):
+def test_uninstall_names_the_package_and_scope(tmp_path, monkeypatch, layout, method, euid, expected):
     # catalog gam installs the gam7 package; a global pipx install needs --global
     from unittest.mock import MagicMock, patch
 
     from cli_audit.reconcile import Installation, _uninstall_installation
 
     monkeypatch.setenv("PIPX_GLOBAL_HOME", str(tmp_path / "global-pipx"))
+    monkeypatch.setattr(os, "geteuid", lambda: euid, raising=False)
     inst = Installation(tool=layout.split("/")[-1], version="1", method=method, path=str(tmp_path / layout), active=False)
     with patch("cli_audit.reconcile.subprocess.run", return_value=MagicMock(returncode=0)) as run:
         assert _uninstall_installation(inst, False) == (True, None)
     assert run.call_args[0][0] == expected
 
 
-def test_reinstall_hint_uses_the_managers_command():
-    from cli_audit.reconcile import _reinstall_hint
+def test_global_pipx_removal_is_manual_for_a_normal_user(tmp_path, monkeypatch):
+    # /opt/pipx is root-owned and this tool never runs sudo: report, do not run
+    from unittest.mock import patch
 
-    assert _reinstall_hint("uv", "black") == "uv tool install black"
-    assert _reinstall_hint("pipx", "black") == "pipx install black"
-    assert _reinstall_hint("apt", "byobu") == "sudo apt install byobu"
+    from cli_audit.reconcile import Installation, _is_manual_removal_error, _uninstall_installation
+
+    monkeypatch.setenv("PIPX_GLOBAL_HOME", str(tmp_path / "global-pipx"))
+    monkeypatch.setattr(os, "geteuid", lambda: 1000, raising=False)
+    path = tmp_path / "global-pipx" / "venvs" / "httpie" / "bin" / "http"
+    inst = Installation(tool="httpie", version="1", method="pipx", path=str(path), active=False)
+    with patch("cli_audit.reconcile.subprocess.run") as run:
+        ok, message = _uninstall_installation(inst, False)
+    assert not ok and not run.called
+    assert "sudo pipx uninstall --global httpie" in message
+    assert _is_manual_removal_error(message)
+
+
+def test_reinstall_hint_names_package_crate_and_scope(tmp_path, monkeypatch):
+    from cli_audit.reconcile import Installation, _reinstall_hint
+
+    monkeypatch.setenv("PIPX_GLOBAL_HOME", str(tmp_path / "global-pipx"))
+
+    def inst(tool, method, path):
+        return Installation(tool=tool, version="1", method=method, path=str(path), active=False)
+
+    assert _reinstall_hint(inst("gam", "uv", tmp_path / "uv/tools/gam7/bin/gam")) == "uv tool install gam7"
+    assert _reinstall_hint(inst("httpie", "pipx", tmp_path / "pipx/venvs/httpie/bin/http")) == "pipx install httpie"
+    assert (
+        _reinstall_hint(inst("httpie", "pipx", tmp_path / "global-pipx/venvs/httpie/bin/http"))
+        == "sudo pipx install --global httpie"
+    )
+    assert _reinstall_hint(inst("fd", "cargo", "/home/u/.cargo/bin/fd")) == "cargo install fd-find"
+    assert _reinstall_hint(inst("jq", "brew", "/usr/local/bin/jq")) == "brew install jq"
+    assert _reinstall_hint(inst("byobu", "apt", "/usr/bin/byobu")) == "sudo apt install byobu"
+
+
+def test_tool_manager_needs_package_bin_layout(tmp_path, monkeypatch):
+    from cli_audit.detection import tool_manager_of
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("PIPX_HOME", "~/pipx-home")  # literal ~, as a systemd unit or .env passes it
+    assert tool_manager_of(str(tmp_path / "share/uv/tools/black/bin")) == "uv"
+    assert tool_manager_of(str(tmp_path / "pipx-home/venvs/httpie/bin")) == "pipx"
+    # not <root>/<package>/bin
+    assert tool_manager_of(str(tmp_path / "share/uv/tools/bin")) == ""
+    assert tool_manager_of(str(tmp_path / "share/uv/tools/black/lib")) == ""
+
+
+def test_tool_bin_dir_directly_on_path_is_kept(tmp_path, monkeypatch):
+    from cli_audit.reconcile import clear_detection_cache, detect_installations
+
+    tool_bin = _make_venv(tmp_path / "share" / "uv" / "tools" / "fakedirect")
+    real = _make_bin(tool_bin, "fakedirect", "1.0.0")
+    monkeypatch.setenv("PATH", str(tool_bin))
+    clear_detection_cache()
+
+    assert [i.path for i in detect_installations("fakedirect", ["fakedirect"])] == [str(real)]

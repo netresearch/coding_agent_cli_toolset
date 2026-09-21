@@ -22,7 +22,7 @@ from typing import Sequence
 
 from .common import vlog
 from .config import Config
-from .detection import _installation_path, _is_tool_manager_env, _is_virtualenv_bin, tool_manager_of
+from .detection import _env_dir, _installation_path, _is_tool_manager_env, _is_virtualenv_bin, tool_manager_of
 from .environment import Environment
 from .upgrade import compare_versions
 
@@ -224,8 +224,9 @@ def detect_installations(
 
     # Search each PATH directory
     for path_dir in path_dirs:
-        # Virtualenv/conda bins are environments, not installations
-        if _is_virtualenv_bin(path_dir):
+        # Virtualenv/conda bins are environments, not installations (a uv/pipx
+        # per-tool bin dir put on PATH directly is an installation)
+        if _is_virtualenv_bin(path_dir) and not _is_tool_manager_env(path_dir):
             vlog(f"  Skipping environment dir: {path_dir}", verbose)
             continue
         for candidate in candidates:
@@ -650,6 +651,9 @@ def _catalog_meta(tool_name: str) -> dict:
                 raw = getattr(entry, "_raw_data", None) or {}
                 meta["version_flag"] = raw.get("version_flag")
                 meta["version_command"] = raw.get("version_command")
+                for method in raw.get("available_methods") or ():
+                    if method.get("method") == "cargo" and (method.get("config") or {}).get("crate"):
+                        meta["cargo_crate"] = method["config"]["crate"]
         except Exception:
             meta = {}
         # Only cache successful lookups — an empty result may be transient.
@@ -884,7 +888,7 @@ def _reconcile_aggressive(
         if not probe:
             errors.append(
                 f"kept installation {preferred.path} no longer works after removal — "
-                f"reinstall the removed package (e.g. {_reinstall_hint(removed[0].method, tool_name)}) "
+                f"reinstall the removed package (e.g. {_reinstall_hint(removed[0])}) "
                 f"or remove the broken survivor"
             )
 
@@ -1033,14 +1037,23 @@ def _tool_env_package(path: str, tool: str) -> str:
 
 def _is_pipx_global(path: str) -> bool:
     """True if path lies in pipx's global venvs (`pipx install --global`)."""
-    root = os.path.realpath(os.environ.get("PIPX_GLOBAL_HOME") or "/opt/pipx")
-    return os.path.normpath(path).startswith(os.path.join(root, "venvs") + "/")
+    root = _env_dir("PIPX_GLOBAL_HOME", "venvs") or os.path.realpath("/opt/pipx/venvs")
+    return os.path.normpath(path).startswith(root + "/")
 
 
-def _reinstall_hint(method: str, tool: str) -> str:
-    """Command that reinstalls a removed package, for the broken-survivor message."""
-    commands = {"uv": "uv tool install", "pipx": "pipx install", "cargo": "cargo install"}
-    return f"{commands.get(method, f'sudo {method} install')} {tool}"
+def _reinstall_hint(installation: Installation) -> str:
+    """Command that reinstalls a removed installation, for the broken-survivor message."""
+    method, tool, path = installation.method, installation.tool, installation.path
+    if method == "uv":
+        return f"uv tool install {_tool_env_package(path, tool)}"
+    if method == "pipx":
+        scope = "sudo pipx install --global" if _is_pipx_global(path) else "pipx install"
+        return f"{scope} {_tool_env_package(path, tool)}"
+    if method == "cargo":
+        return f"cargo install {_catalog_meta(tool).get('cargo_crate') or tool}"
+    if method == "brew":
+        return f"brew install {tool}"
+    return f"sudo {method} install {tool}"
 
 
 def _uninstall_installation(installation: Installation, verbose: bool) -> tuple[bool, str | None]:
@@ -1075,6 +1088,12 @@ def _uninstall_installation(installation: Installation, verbose: bool) -> tuple[
 
     # Pipx
     elif method == "pipx":
+        if _is_pipx_global(path) and hasattr(os, "geteuid") and os.geteuid() != 0:
+            # Global pipx venvs are root-owned; this tool never runs sudo itself
+            return (
+                False,
+                f"System package removal requires manual sudo: sudo pipx uninstall --global {_tool_env_package(path, tool)}",
+            )
         try:
             result = subprocess.run(
                 ["pipx", "uninstall"] + (["--global"] if _is_pipx_global(path) else []) + [_tool_env_package(path, tool)],

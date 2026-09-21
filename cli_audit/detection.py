@@ -79,21 +79,33 @@ def _is_virtualenv_bin(bin_dir: str) -> bool:
 _TOOL_ENV_ROOTS = (("uv", "/uv/tools/"), ("pipx", "/pipx/venvs/"))
 
 
+def _env_dir(name: str, *parts: str) -> str:
+    """Resolved directory from an environment variable ("" if unset), as the managers read it."""
+    value = os.environ.get(name, "")
+    if not value:
+        return ""
+    # bin_dir is a resolved path; resolve the root the same way (~, a symlinked
+    # home, macOS /var -> /private/var, a relative value)
+    return os.path.realpath(os.path.join(os.path.expanduser(value), *parts))
+
+
 def tool_manager_of(bin_dir: str) -> str:
-    """Return "uv" or "pipx" if bin_dir belongs to that manager's per-tool venv, else ""."""
-    normalized = os.path.normpath(bin_dir) + "/"
+    """Return "uv" or "pipx" if bin_dir is a manager's per-tool venv bin dir, <root>/<package>/bin, else ""."""
+    normalized = os.path.normpath(bin_dir)
+    if os.path.basename(normalized) != "bin":
+        return ""
+    # <root> is the dir above <package>/bin
+    root = os.path.dirname(os.path.dirname(normalized)) + "/"
     for manager, fragment in _TOOL_ENV_ROOTS:
-        if fragment in normalized:
+        if root.endswith(fragment):
             return manager
     relocated = (
-        ("uv", os.environ.get("UV_TOOL_DIR", "")),
-        ("pipx", os.path.join(os.environ["PIPX_HOME"], "venvs") if os.environ.get("PIPX_HOME") else ""),
-        ("pipx", os.path.join(os.environ["PIPX_GLOBAL_HOME"], "venvs") if os.environ.get("PIPX_GLOBAL_HOME") else ""),
+        ("uv", _env_dir("UV_TOOL_DIR")),
+        ("pipx", _env_dir("PIPX_HOME", "venvs")),
+        ("pipx", _env_dir("PIPX_GLOBAL_HOME", "venvs")),
     )
-    for manager, root in relocated:
-        # bin_dir is a resolved path; resolve the root the same way (symlinked
-        # home, macOS /var -> /private/var, a relative value)
-        if root and normalized.startswith(os.path.realpath(root) + "/"):
+    for manager, env_root in relocated:
+        if env_root and root == env_root + "/":
             return manager
     return ""
 
