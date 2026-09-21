@@ -153,6 +153,10 @@ if [ -n "$path" ]; then printf "[%s] path:   %s\n" "$DISPLAY_NAME" "$path"; fi
 # Warn if version didn't change (package manager can't provide newer version)
 if [ -n "$before" ] && [ -n "$after" ] && [ "$before" = "$after" ]; then
   printf "[%s] Note: Package manager has no newer version available\n" "$DISPLAY_NAME" >&2
+  # Signal held-back status to callers (guide.sh), so the run is not counted
+  # as an upgrade
+  mkdir -p /tmp/.cli-audit
+  echo "$after" > "/tmp/.cli-audit/${TOOL}.held-back"
 fi
 
 # Refresh snapshot after successful installation
