@@ -22,7 +22,7 @@ from typing import Sequence
 
 from .common import vlog
 from .config import Config
-from .detection import _env_dir, _installation_path, _is_tool_manager_env, _is_virtualenv_bin, tool_manager_of
+from .detection import _env_dir, _installation_path, _is_environment_bin, tool_manager_of
 from .environment import Environment
 from .upgrade import compare_versions
 
@@ -226,7 +226,7 @@ def detect_installations(
     for path_dir in path_dirs:
         # Virtualenv/conda bins are environments, not installations (a uv/pipx
         # per-tool bin dir put on PATH directly is an installation)
-        if _is_virtualenv_bin(path_dir) and not _is_tool_manager_env(path_dir):
+        if _is_environment_bin(path_dir):
             vlog(f"  Skipping environment dir: {path_dir}", verbose)
             continue
         for candidate in candidates:
@@ -250,7 +250,7 @@ def detect_installations(
 
             # A symlink can point into an environment as well
             real_dir = os.path.dirname(real_path)
-            if _is_virtualenv_bin(real_dir) and not _is_tool_manager_env(real_dir):
+            if _is_environment_bin(real_dir):
                 vlog(f"  Skipping environment binary: {real_path}", verbose)
                 continue
 
@@ -652,6 +652,8 @@ def _catalog_meta(tool_name: str) -> dict:
                 meta["version_flag"] = raw.get("version_flag")
                 meta["version_command"] = raw.get("version_command")
                 for method in raw.get("available_methods") or ():
+                    if not isinstance(method, dict):
+                        continue
                     if method.get("method") == "cargo" and (method.get("config") or {}).get("crate"):
                         meta["cargo_crate"] = method["config"]["crate"]
         except Exception:

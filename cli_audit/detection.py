@@ -115,6 +115,15 @@ def _is_tool_manager_env(bin_dir: str) -> bool:
     return bool(tool_manager_of(bin_dir))
 
 
+def _is_environment_bin(bin_dir: str) -> bool:
+    """True if bin_dir is an environment's bin dir and no tool manager's per-tool venv.
+
+    The one rule for "environment, not installation", shared by the audit and
+    reconcile. Tool roots are compared resolved, so bin_dir is resolved too.
+    """
+    return _is_virtualenv_bin(bin_dir) and not _is_tool_manager_env(os.path.realpath(bin_dir))
+
+
 def _installation_path() -> str:
     """PATH without virtualenv/conda bin dirs.
 
@@ -123,7 +132,7 @@ def _installation_path() -> str:
     upgrade of the real installation never shows up in the audit.
     """
     dirs = [d for d in os.environ.get("PATH", os.defpath).split(os.pathsep) if d]
-    return os.pathsep.join(d for d in dirs if not _is_virtualenv_bin(d))
+    return os.pathsep.join(d for d in dirs if not _is_environment_bin(d))
 
 
 def _which(command_name: str) -> str | None:

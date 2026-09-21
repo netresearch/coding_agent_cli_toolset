@@ -250,4 +250,47 @@ def test_tool_bin_dir_directly_on_path_is_kept(tmp_path, monkeypatch):
     monkeypatch.setenv("PATH", str(tool_bin))
     clear_detection_cache()
 
-    assert [i.path for i in detect_installations("fakedirect", ["fakedirect"])] == [str(real)]
+    assert [(i.path, i.active) for i in detect_installations("fakedirect", ["fakedirect"])] == [(str(real), True)]
+    # the audit must agree: the tool is installed
+    assert find_paths("fakedirect") == [str(real)]
+
+
+def test_symlinked_relocated_tool_dir_on_path_is_kept(tmp_path, monkeypatch):
+    from cli_audit.reconcile import clear_detection_cache, detect_installations
+
+    (tmp_path / "real-tools").mkdir()
+    (tmp_path / "linked").symlink_to(tmp_path / "real-tools")
+    monkeypatch.setenv("UV_TOOL_DIR", str(tmp_path / "linked"))
+    real = _make_bin(_make_venv(tmp_path / "real-tools" / "fakelinked"), "fakelinked", "1.0.0")
+    on_path = tmp_path / "linked" / "fakelinked" / "bin"
+    monkeypatch.setenv("PATH", str(on_path))
+    clear_detection_cache()
+
+    assert [i.path for i in detect_installations("fakelinked", ["fakelinked"])] == [str(real)]
+    assert find_paths("fakelinked") == [str(on_path / "fakelinked")]
+
+
+def test_malformed_available_method_keeps_other_catalog_data(monkeypatch):
+    from cli_audit import reconcile
+
+    class Entry:
+        _raw_data = {"version_flag": "--ver", "available_methods": ["cargo", {"method": "cargo", "config": {"crate": "c"}}]}
+
+        def to_tool(self):
+            class T:
+                candidates = ("x",)
+
+            return T()
+
+    class Catalog:
+        def get(self, name):
+            return Entry()
+
+        def all_tools(self):
+            return [1]
+
+    monkeypatch.setattr(reconcile, "_catalog_instance", Catalog())
+    monkeypatch.setattr(reconcile, "_catalog_cache", {})
+    meta = reconcile._catalog_meta("x")
+    assert meta["version_flag"] == "--ver"
+    assert meta["cargo_crate"] == "c"
