@@ -41,6 +41,15 @@ def _make_bin(bin_dir: Path, name: str, version: str) -> Path:
     return binary
 
 
+@pytest.fixture(autouse=True)
+def tool_roots_in_tmp(tmp_path, monkeypatch):
+    """Point uv's and pipx's roots at tmp_path, as they are per machine."""
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "share"))
+    monkeypatch.setenv("UV_TOOL_DIR", str(tmp_path / "uv" / "tools"))
+    monkeypatch.setenv("PIPX_HOME", str(tmp_path / "pipx"))
+    monkeypatch.setenv("PIPX_GLOBAL_HOME", str(tmp_path / "global-pipx"))
+
+
 def _make_tool_venv(root: Path, *entrypoints: str) -> Path:
     """A uv/pipx per-tool venv whose own record lists these entry points."""
     bin_dir = _make_venv(root)
@@ -166,6 +175,10 @@ def test_reconcile_keeps_tool_manager_installation(tmp_path, monkeypatch, tool_e
         (tmp_path / "linked").symlink_to(tmp_path / "real-tools")
         tool_env = tool_env.replace("linked/", "real-tools/")
         monkeypatch.setenv("UV_TOOL_DIR", str(tmp_path / "linked"))
+    if tool_env.startswith("share/"):
+        # reached through XDG_DATA_HOME, so no variable may shadow it
+        monkeypatch.delenv("UV_TOOL_DIR", raising=False)
+        monkeypatch.delenv("PIPX_HOME", raising=False)
     real = _make_bin(_make_tool_venv(tmp_path / tool_env, "fakeuvtool"), "fakeuvtool", "26.5.1")
     local_bin = tmp_path / "local" / "bin"
     local_bin.mkdir(parents=True)
@@ -198,7 +211,6 @@ def test_uninstall_names_the_package_and_scope(tmp_path, monkeypatch, layout, me
 
     from cli_audit.reconcile import Installation, _uninstall_installation
 
-    monkeypatch.setenv("PIPX_GLOBAL_HOME", str(tmp_path / "global-pipx"))
     monkeypatch.setattr(os, "geteuid", lambda: euid, raising=False)
     inst = Installation(tool=layout.split("/")[-1], version="1", method=method, path=str(tmp_path / layout), active=False)
     with patch("cli_audit.reconcile.subprocess.run", return_value=MagicMock(returncode=0)) as run:
@@ -212,7 +224,6 @@ def test_global_pipx_removal_is_manual_for_a_normal_user(tmp_path, monkeypatch):
 
     from cli_audit.reconcile import Installation, _is_manual_removal_error, _uninstall_installation
 
-    monkeypatch.setenv("PIPX_GLOBAL_HOME", str(tmp_path / "global-pipx"))
     monkeypatch.setattr(os, "geteuid", lambda: 1000, raising=False)
     path = tmp_path / "global-pipx" / "venvs" / "httpie" / "bin" / "http"
     inst = Installation(tool="httpie", version="1", method="pipx", path=str(path), active=False)
@@ -226,8 +237,6 @@ def test_global_pipx_removal_is_manual_for_a_normal_user(tmp_path, monkeypatch):
 
 def test_reinstall_hint_names_package_crate_and_scope(tmp_path, monkeypatch):
     from cli_audit.reconcile import Installation, _reinstall_hint
-
-    monkeypatch.setenv("PIPX_GLOBAL_HOME", str(tmp_path / "global-pipx"))
 
     def inst(tool, method, path):
         return Installation(tool=tool, version="1", method=method, path=str(path), active=False)
@@ -247,7 +256,10 @@ def test_tool_manager_needs_package_bin_layout(tmp_path, monkeypatch):
     from cli_audit.detection import tool_manager_of
 
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv("UV_TOOL_DIR", raising=False)
     monkeypatch.setenv("PIPX_HOME", "~/pipx-home")  # literal ~, as a systemd unit or .env passes it
+    (tmp_path / "share/uv/tools/black/bin").mkdir(parents=True)
+    (tmp_path / "pipx-home/venvs/httpie/bin").mkdir(parents=True)
     assert tool_manager_of(str(tmp_path / "share/uv/tools/black/bin")) == "uv"
     assert tool_manager_of(str(tmp_path / "pipx-home/venvs/httpie/bin")) == "pipx"
     # not <root>/<package>/bin
@@ -258,6 +270,7 @@ def test_tool_manager_needs_package_bin_layout(tmp_path, monkeypatch):
 def test_tool_bin_dir_directly_on_path_is_kept(tmp_path, monkeypatch):
     from cli_audit.reconcile import clear_detection_cache, detect_installations
 
+    monkeypatch.delenv("UV_TOOL_DIR", raising=False)
     tool_bin = _make_tool_venv(tmp_path / "share" / "uv" / "tools" / "fakedirect", "fakedirect")
     real = _make_bin(tool_bin, "fakedirect", "1.0.0")
     monkeypatch.setenv("PATH", str(tool_bin))
@@ -322,6 +335,7 @@ def test_dependency_executable_in_a_tool_venv_is_no_installation(tmp_path, monke
     # installation would let reconcile run `uv tool uninstall httpie` for it.
     from cli_audit.reconcile import clear_detection_cache, detect_installations
 
+    monkeypatch.delenv("UV_TOOL_DIR", raising=False)
     tool_bin = _make_tool_venv(tmp_path / "share" / "uv" / "tools" / "fakehttpie", "fakehttp")
     _make_bin(tool_bin, "fakehttp", "3.2.4")
     _make_bin(tool_bin, "fakepygmentize", "2.19.0")
@@ -352,6 +366,7 @@ def test_dependency_copy_answers_no_lookup(tmp_path, monkeypatch):
     # A tool venv bin dir first on PATH (uv tool run): its dependency copies
     # must not answer for the audit, the bulk check, the install validation,
     # the version_command, or reconcile
+    monkeypatch.delenv("UV_TOOL_DIR", raising=False)
     tool_bin = _make_tool_venv(tmp_path / "share" / "uv" / "tools" / "fakehttpie2", "fakehttp2")
     _make_bin(tool_bin, "fakedep", "2.19.0")
     real_bin = tmp_path / "local" / "bin"
@@ -373,9 +388,28 @@ def test_tool_venv_is_not_used_to_resolve_a_command(tmp_path, monkeypatch):
     # version_command runs outside every environment
     from cli_audit.detection import _command_path, _installation_path
 
+    monkeypatch.delenv("UV_TOOL_DIR", raising=False)
     tool_bin = _make_tool_venv(tmp_path / "share" / "uv" / "tools" / "fakeonly", "fakeonly")
     _make_bin(tool_bin, "fakeonly", "1.0.0")
     monkeypatch.setenv("PATH", str(tool_bin))
 
     assert _installation_path() == str(tool_bin)
     assert _command_path() == ""
+
+
+@pytest.mark.parametrize("package", ["weird name", ".hidden", "-rf"], ids=["space", "dot", "dash"])
+def test_odd_package_dir_name_is_no_tool_venv(tmp_path, monkeypatch, package):
+    # No uv/pipx package is named like this; the record path is built from this
+    # name, so only a plain package name is accepted
+    from cli_audit.detection import _tool_venv_of
+
+    monkeypatch.delenv("UV_TOOL_DIR", raising=False)
+    bin_dir = tmp_path / "share" / "uv" / "tools" / package / "bin"
+    bin_dir.mkdir(parents=True)
+
+    assert _tool_venv_of(str(bin_dir)) == ("", "", "")
+    assert _tool_venv_of(str(tmp_path / "share" / "uv" / "tools" / "black" / "bin")) == (
+        "uv",
+        str(tmp_path / "share" / "uv" / "tools"),
+        "black",
+    )

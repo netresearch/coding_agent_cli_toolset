@@ -77,9 +77,11 @@ def _is_virtualenv_bin(bin_dir: str) -> bool:
 
 # Tool managers install each tool into a venv of its own; a binary linked
 # from there (~/.local/bin/black -> ~/.local/share/uv/tools/black/bin/black)
-# is an installation, not an environment. Default locations, matched as path
-# fragments; relocated ones come from the managers' own variables.
-_TOOL_ENV_ROOTS = (("uv", "/uv/tools/"), ("pipx", "/pipx/venvs/"))
+# is an installation, not an environment.
+_TOOL_RECORDS = {"uv": "uv-receipt.toml", "pipx": "pipx_metadata.json"}
+
+# A package directory name: no separator, no "..", so it cannot leave the root
+_PACKAGE_DIR_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]*\Z")
 
 
 def _env_dir(name: str, *parts: str) -> str:
@@ -92,31 +94,43 @@ def _env_dir(name: str, *parts: str) -> str:
     return os.path.realpath(os.path.join(os.path.expanduser(value), *parts))
 
 
-def tool_manager_of(bin_dir: str) -> str:
-    """Return "uv" or "pipx" if bin_dir is a manager's per-tool venv bin dir, <root>/<package>/bin, else ""."""
-    normalized = os.path.normpath(bin_dir)
-    if os.path.basename(normalized) != "bin":
-        return ""
-    # <root> is the dir above <package>/bin
-    root = os.path.dirname(os.path.dirname(normalized)) + "/"
-    for manager, fragment in _TOOL_ENV_ROOTS:
-        if root.endswith(fragment):
-            return manager
-    data_home = os.environ.get("XDG_DATA_HOME") or os.path.join(os.path.expanduser("~"), ".local", "share")
-    relocated = (
-        ("uv", _env_dir("UV_TOOL_DIR")),
-        ("pipx", _env_dir("PIPX_HOME", "venvs")),
-        ("pipx", _env_dir("PIPX_GLOBAL_HOME", "venvs")),
-        # default roots that are themselves symlinks (tools kept on another disk)
-        ("uv", os.path.realpath(os.path.join(data_home, "uv", "tools"))),
-        ("pipx", os.path.realpath(os.path.join(data_home, "pipx", "venvs"))),
-        ("pipx", os.path.realpath(os.path.join(os.path.expanduser("~"), ".local", "pipx", "venvs"))),
-        ("pipx", os.path.realpath("/opt/pipx/venvs")),
+def _tool_roots() -> tuple[tuple[str, str], ...]:
+    """(manager, root) for every per-tool venv root of uv and pipx on this machine."""
+    home = os.path.expanduser("~")
+    data_home = os.environ.get("XDG_DATA_HOME") or os.path.join(home, ".local", "share")
+    roots = (
+        ("uv", _env_dir("UV_TOOL_DIR") or os.path.realpath(os.path.join(data_home, "uv", "tools"))),
+        ("pipx", _env_dir("PIPX_HOME", "venvs") or os.path.realpath(os.path.join(data_home, "pipx", "venvs"))),
+        ("pipx", _env_dir("PIPX_GLOBAL_HOME", "venvs") or os.path.realpath("/opt/pipx/venvs")),
+        # pipx before 1.5 kept its venvs outside the data dir
+        ("pipx", os.path.realpath(os.path.join(home, ".local", "pipx", "venvs"))),
     )
-    for manager, env_root in relocated:
-        if env_root and root == env_root + "/":
-            return manager
-    return ""
+    return tuple((manager, root) for manager, root in roots if root)
+
+
+def _tool_venv_of(bin_dir: str) -> tuple[str, str, str]:
+    """(manager, root, package) if bin_dir is a per-tool venv's <root>/<package>/bin, else ("", "", "").
+
+    The package directory name is validated, and callers rebuild any path from
+    root + package, so a bin_dir from PATH cannot reach another directory.
+    """
+    resolved = os.path.realpath(bin_dir)
+    if os.path.basename(resolved) != "bin":
+        return ("", "", "")
+    venv = os.path.dirname(resolved)
+    package = os.path.basename(venv)
+    if not _PACKAGE_DIR_RE.match(package):
+        return ("", "", "")
+    parent = os.path.dirname(venv)
+    for manager, root in _tool_roots():
+        if parent == root:
+            return (manager, root, package)
+    return ("", "", "")
+
+
+def tool_manager_of(bin_dir: str) -> str:
+    """Return "uv" or "pipx" if bin_dir is a manager's per-tool venv bin dir, else ""."""
+    return _tool_venv_of(bin_dir)[0]
 
 
 def _is_tool_manager_env(bin_dir: str) -> bool:
@@ -132,13 +146,12 @@ def tool_entrypoints(bin_dir: str) -> set[str] | None:
     --include-apps). Everything else in that bin dir belongs to dependencies.
     None if the venv has no readable record.
     """
-    # bin_dir comes from PATH. Read only inside a manager's own tool root, and
-    # only that manager's record name, so no other file can be reached.
-    manager = tool_manager_of(bin_dir)
+    # bin_dir comes from PATH, so the path that gets opened is rebuilt from a
+    # known tool root, a validated package dir name and a fixed record name.
+    manager, root, package = _tool_venv_of(bin_dir)
     if not manager:
         return None
-    venv = os.path.dirname(os.path.realpath(bin_dir))
-    record = os.path.join(venv, "uv-receipt.toml" if manager == "uv" else "pipx_metadata.json")
+    record = os.path.join(root, package, _TOOL_RECORDS[manager])
     if not os.path.isfile(record):
         return None
     try:

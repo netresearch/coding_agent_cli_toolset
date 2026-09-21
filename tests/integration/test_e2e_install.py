@@ -4,27 +4,25 @@ End-to-end integration tests for installation workflows.
 Tests complete installation scenarios from detection through execution.
 """
 
-import sys
-import pytest
-import tempfile
 import shutil
+import sys
+import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 # Skip marker for Windows (rollback scripts use Unix paths and shell syntax)
-skip_on_windows = pytest.mark.skipif(
-    sys.platform == "win32",
-    reason="Rollback scripts use Unix paths (/tmp) and shell syntax"
-)
+skip_on_windows = pytest.mark.skipif(sys.platform == "win32", reason="Rollback scripts use Unix paths (/tmp) and shell syntax")
 
-from cli_audit import (
-    install_tool,
-    bulk_install,
+from cli_audit import (  # noqa: E402  (imported after the skip marker)
+    BulkInstallResult,
     Config,
     Environment,
     InstallResult,
-    BulkInstallResult,
     ToolSpec,
+    bulk_install,
+    install_tool,
 )
 
 
@@ -32,7 +30,7 @@ class TestSingleToolInstallation:
     """Integration tests for single tool installation."""
 
     @patch("cli_audit.installer.subprocess.run")
-    @patch("cli_audit.installer.shutil.which")
+    @patch("cli_audit.installer._which")
     @patch("cli_audit.package_managers.subprocess.run")
     def test_install_python_tool_with_pipx(self, mock_pm_run, mock_which, mock_run):
         """Test installing a Python tool using pipx."""
@@ -71,7 +69,7 @@ class TestSingleToolInstallation:
         assert len(result.steps_completed) > 0
 
     @patch("cli_audit.installer.subprocess.run")
-    @patch("cli_audit.installer.shutil.which")
+    @patch("cli_audit.installer._which")
     @patch("cli_audit.package_managers.subprocess.run")
     def test_install_rust_tool_with_cargo(self, mock_pm_run, mock_which, mock_run):
         """Test installing a Rust tool using cargo."""
@@ -113,8 +111,8 @@ class TestSingleToolInstallation:
             MagicMock(returncode=0, stdout="Success", stderr=""),
         ]
 
-        from cli_audit.installer import execute_step_with_retry
         from cli_audit.install_plan import InstallStep
+        from cli_audit.installer import execute_step_with_retry
 
         step = InstallStep("Download package", ("curl", "-O", "package.tar.gz"))
         result = execute_step_with_retry(step, max_retries=3)
@@ -169,6 +167,7 @@ class TestBulkInstallation:
     @patch("cli_audit.bulk.install_tool")
     def test_bulk_install_with_fail_fast(self, mock_install):
         """Test bulk installation with fail-fast enabled."""
+
         # First tool succeeds, second fails, third should be skipped
         def mock_install_fn(tool_name, **kwargs):
             if tool_name == "fd":
@@ -218,7 +217,7 @@ class TestDependencyResolution:
 
     def test_resolve_dependencies_simple_chain(self):
         """Test resolving simple dependency chain."""
-        from cli_audit.bulk import resolve_dependencies, ToolSpec
+        from cli_audit.bulk import ToolSpec, resolve_dependencies
 
         specs = [
             ToolSpec("tool_a", "tool_a", dependencies=()),
@@ -236,7 +235,7 @@ class TestDependencyResolution:
 
     def test_resolve_dependencies_parallel(self):
         """Test resolving parallel dependencies."""
-        from cli_audit.bulk import resolve_dependencies, ToolSpec
+        from cli_audit.bulk import ToolSpec, resolve_dependencies
 
         specs = [
             ToolSpec("tool_a", "tool_a", dependencies=()),
@@ -261,6 +260,7 @@ class TestRollbackScenarios:
     @patch("cli_audit.bulk.install_tool")
     def test_atomic_rollback_on_failure(self, mock_install, mock_generate, mock_execute):
         """Test atomic rollback when installation fails."""
+
         # First tool succeeds, second fails
         def mock_install_fn(tool_name, **kwargs):
             if tool_name == "tool_b":
@@ -308,7 +308,7 @@ class TestConfigurationIntegration:
 
     def test_config_with_custom_preferences(self):
         """Test installation with custom preferences."""
-        from cli_audit.config import Preferences, BulkPreferences
+        from cli_audit.config import BulkPreferences, Preferences
 
         # Create config with custom preferences
         bulk_prefs = BulkPreferences(
