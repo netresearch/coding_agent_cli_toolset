@@ -884,7 +884,7 @@ def _reconcile_aggressive(
         if not probe:
             errors.append(
                 f"kept installation {preferred.path} no longer works after removal — "
-                f"reinstall the removed package (e.g. sudo {removed[0].method} install {tool_name}) "
+                f"reinstall the removed package (e.g. {_reinstall_hint(removed[0].method, tool_name)}) "
                 f"or remove the broken survivor"
             )
 
@@ -1019,6 +1019,30 @@ def _cargo_package_for(binary: str, tool: str) -> str:
     return tool
 
 
+def _tool_env_package(path: str, tool: str) -> str:
+    """Package name of a uv-tool or pipx install: its venv dir, <root>/<package>/bin/<binary>.
+
+    The catalog name can differ (catalog gam installs the gam7 package), and
+    `uv tool uninstall` / `pipx uninstall` need the package.
+    """
+    bin_dir = os.path.dirname(path)
+    if tool_manager_of(bin_dir):
+        return os.path.basename(os.path.dirname(bin_dir)) or tool
+    return tool
+
+
+def _is_pipx_global(path: str) -> bool:
+    """True if path lies in pipx's global venvs (`pipx install --global`)."""
+    root = os.path.realpath(os.environ.get("PIPX_GLOBAL_HOME") or "/opt/pipx")
+    return os.path.normpath(path).startswith(os.path.join(root, "venvs") + "/")
+
+
+def _reinstall_hint(method: str, tool: str) -> str:
+    """Command that reinstalls a removed package, for the broken-survivor message."""
+    commands = {"uv": "uv tool install", "pipx": "pipx install", "cargo": "cargo install"}
+    return f"{commands.get(method, f'sudo {method} install')} {tool}"
+
+
 def _uninstall_installation(installation: Installation, verbose: bool) -> tuple[bool, str | None]:
     """
     Uninstall a single installation.
@@ -1053,7 +1077,7 @@ def _uninstall_installation(installation: Installation, verbose: bool) -> tuple[
     elif method == "pipx":
         try:
             result = subprocess.run(
-                ["pipx", "uninstall", tool],
+                ["pipx", "uninstall"] + (["--global"] if _is_pipx_global(path) else []) + [_tool_env_package(path, tool)],
                 capture_output=True,
                 text=True,
                 timeout=30,
@@ -1070,7 +1094,7 @@ def _uninstall_installation(installation: Installation, verbose: bool) -> tuple[
     elif method == "uv":
         try:
             result = subprocess.run(
-                ["uv", "tool", "uninstall", tool],
+                ["uv", "tool", "uninstall", _tool_env_package(path, tool)],
                 capture_output=True,
                 text=True,
                 timeout=30,

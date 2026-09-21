@@ -91,7 +91,9 @@ def tool_manager_of(bin_dir: str) -> str:
         ("pipx", os.path.join(os.environ["PIPX_GLOBAL_HOME"], "venvs") if os.environ.get("PIPX_GLOBAL_HOME") else ""),
     )
     for manager, root in relocated:
-        if root and normalized.startswith(os.path.normpath(root) + "/"):
+        # bin_dir is a resolved path; resolve the root the same way (symlinked
+        # home, macOS /var -> /private/var, a relative value)
+        if root and normalized.startswith(os.path.realpath(root) + "/"):
             return manager
     return ""
 

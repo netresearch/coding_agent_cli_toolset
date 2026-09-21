@@ -136,7 +136,12 @@ def test_trailing_slash_venv_bin_is_skipped(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize(
     "tool_env, manager",
-    [("share/uv/tools/fakeuvtool", "uv"), ("share/pipx/venvs/fakeuvtool", "pipx"), ("relocated/fakeuvtool", "uv")],
+    [
+        ("share/uv/tools/fakeuvtool", "uv"),
+        ("share/pipx/venvs/fakeuvtool", "pipx"),
+        ("relocated/fakeuvtool", "uv"),
+        ("linked/fakeuvtool", "uv"),  # UV_TOOL_DIR names a symlink to the real dir
+    ],
 )
 def test_reconcile_keeps_tool_manager_installation(tmp_path, monkeypatch, tool_env, manager):
     # ~/.local/bin/<tool> -> <manager dir>/<tool>/bin/<tool>; the tool dir carries
@@ -144,6 +149,11 @@ def test_reconcile_keeps_tool_manager_installation(tmp_path, monkeypatch, tool_e
     from cli_audit.reconcile import _check_path_ordering, clear_detection_cache, detect_installations
 
     monkeypatch.setenv("UV_TOOL_DIR", str(tmp_path / "relocated"))
+    if tool_env.startswith("linked/"):
+        (tmp_path / "real-tools").mkdir()
+        (tmp_path / "linked").symlink_to(tmp_path / "real-tools")
+        tool_env = tool_env.replace("linked/", "real-tools/")
+        monkeypatch.setenv("UV_TOOL_DIR", str(tmp_path / "linked"))
     real = _make_bin(_make_venv(tmp_path / tool_env), "fakeuvtool", "26.5.1")
     local_bin = tmp_path / "local" / "bin"
     local_bin.mkdir(parents=True)
@@ -160,3 +170,32 @@ def test_reconcile_keeps_tool_manager_installation(tmp_path, monkeypatch, tool_e
     inactive = installs[0].__class__(**{**installs[0].__dict__, "active": False})
     other = installs[0].__class__(**{**installs[0].__dict__, "path": "/usr/bin/fakeuvtool"})
     assert f"Ensure {local_bin} appears first" in _check_path_ordering(inactive, other, False)[0]
+
+
+@pytest.mark.parametrize(
+    "layout, method, expected",
+    [
+        ("uv/tools/gam7/bin/gam", "uv", ["uv", "tool", "uninstall", "gam7"]),
+        ("pipx/venvs/httpie/bin/http", "pipx", ["pipx", "uninstall", "httpie"]),
+        ("global-pipx/venvs/httpie/bin/http", "pipx", ["pipx", "uninstall", "--global", "httpie"]),
+    ],
+)
+def test_uninstall_names_the_package_and_scope(tmp_path, monkeypatch, layout, method, expected):
+    # catalog gam installs the gam7 package; a global pipx install needs --global
+    from unittest.mock import MagicMock, patch
+
+    from cli_audit.reconcile import Installation, _uninstall_installation
+
+    monkeypatch.setenv("PIPX_GLOBAL_HOME", str(tmp_path / "global-pipx"))
+    inst = Installation(tool=layout.split("/")[-1], version="1", method=method, path=str(tmp_path / layout), active=False)
+    with patch("cli_audit.reconcile.subprocess.run", return_value=MagicMock(returncode=0)) as run:
+        assert _uninstall_installation(inst, False) == (True, None)
+    assert run.call_args[0][0] == expected
+
+
+def test_reinstall_hint_uses_the_managers_command():
+    from cli_audit.reconcile import _reinstall_hint
+
+    assert _reinstall_hint("uv", "black") == "uv tool install black"
+    assert _reinstall_hint("pipx", "black") == "pipx install black"
+    assert _reinstall_hint("apt", "byobu") == "sudo apt install byobu"
