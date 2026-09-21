@@ -230,11 +230,9 @@ def get_version_line(
     # from user input — e.g. `uv python list --only-installed | grep … | sed …`.
     # shell=True is required for the pipelines used in the catalog.
     if version_command:
-        # The command names the tool, not the path: resolve it to the detected
-        # binary first, and never to an activated environment's copy.
+        # The command names the tool, not the path: resolve that name the way
+        # find_paths does, never to an activated environment's copy.
         search_path = _installation_path()
-        if path:
-            search_path = os.pathsep.join([os.path.dirname(path), search_path])
         try:
             proc = subprocess.run(  # nosec B602
                 version_command,
