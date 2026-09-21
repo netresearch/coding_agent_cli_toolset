@@ -6,10 +6,12 @@ Phase 2.0: Detection and Auditing - Local Detection
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
 import subprocess
+import tomllib
 from typing import Sequence
 
 # Constants
@@ -99,10 +101,16 @@ def tool_manager_of(bin_dir: str) -> str:
     for manager, fragment in _TOOL_ENV_ROOTS:
         if root.endswith(fragment):
             return manager
+    data_home = os.environ.get("XDG_DATA_HOME") or os.path.join(os.path.expanduser("~"), ".local", "share")
     relocated = (
         ("uv", _env_dir("UV_TOOL_DIR")),
         ("pipx", _env_dir("PIPX_HOME", "venvs")),
         ("pipx", _env_dir("PIPX_GLOBAL_HOME", "venvs")),
+        # default roots that are themselves symlinks (tools kept on another disk)
+        ("uv", os.path.realpath(os.path.join(data_home, "uv", "tools"))),
+        ("pipx", os.path.realpath(os.path.join(data_home, "pipx", "venvs"))),
+        ("pipx", os.path.realpath(os.path.join(os.path.expanduser("~"), ".local", "pipx", "venvs"))),
+        ("pipx", os.path.realpath("/opt/pipx/venvs")),
     )
     for manager, env_root in relocated:
         if env_root and root == env_root + "/":
@@ -113,6 +121,48 @@ def tool_manager_of(bin_dir: str) -> str:
 def _is_tool_manager_env(bin_dir: str) -> bool:
     """True if bin_dir belongs to a uv-tool or pipx per-tool venv."""
     return bool(tool_manager_of(bin_dir))
+
+
+def tool_entrypoints(bin_dir: str) -> set[str] | None:
+    """Executables the manager installed from a per-tool venv, per its own record.
+
+    uv writes uv-receipt.toml ([tool] entrypoints), pipx pipx_metadata.json
+    (main_package.apps, plus apps of injected packages installed with
+    --include-apps). Everything else in that bin dir belongs to dependencies.
+    None if the venv has no readable record.
+    """
+    venv = os.path.dirname(os.path.normpath(bin_dir))
+    try:
+        receipt = os.path.join(venv, "uv-receipt.toml")
+        if os.path.isfile(receipt):
+            with open(receipt, "rb") as f:
+                entries = tomllib.load(f).get("tool", {}).get("entrypoints", [])
+            return {e["name"] for e in entries if isinstance(e, dict) and e.get("name")}
+        metadata = os.path.join(venv, "pipx_metadata.json")
+        if os.path.isfile(metadata):
+            with open(metadata, encoding="utf-8") as f:
+                data = json.load(f)
+            packages = [data.get("main_package") or {}]
+            packages += [p for p in (data.get("injected_packages") or {}).values() if p.get("include_apps")]
+            return {app for p in packages for app in (p.get("apps") or [])}
+    except OSError, ValueError, AttributeError, TypeError, KeyError:
+        return None
+    return None
+
+
+def _is_tool_dependency_binary(path: str) -> bool:
+    """True if path resolves into a uv/pipx per-tool venv but is not one of its entry points.
+
+    A dependency's executable there (pygmentize in httpie's venv) is no
+    installation of anything: removing it as a duplicate would uninstall the
+    tool that pulled it in.
+    """
+    real = os.path.realpath(path)
+    real_dir = os.path.dirname(real)
+    if not tool_manager_of(real_dir):
+        return False
+    names = tool_entrypoints(real_dir)
+    return names is None or os.path.basename(real) not in names
 
 
 def _is_environment_bin(bin_dir: str) -> bool:
@@ -136,8 +186,16 @@ def _installation_path() -> str:
 
 
 def _which(command_name: str) -> str | None:
-    """shutil.which restricted to installation dirs (see _installation_path)."""
-    return shutil.which(command_name, path=_installation_path())
+    """shutil.which restricted to installation dirs (see _installation_path).
+
+    Skips a dependency's executable inside a uv/pipx per-tool venv and keeps
+    searching the next PATH dir.
+    """
+    for path_dir in _installation_path().split(os.pathsep):
+        found = shutil.which(command_name, path=path_dir) if path_dir else None
+        if found and not _is_tool_dependency_binary(found):
+            return found
+    return None
 
 
 def find_paths(command_name: str, deep: bool = False) -> list[str]:
@@ -174,7 +232,7 @@ def find_paths(command_name: str, deep: bool = False) -> list[str]:
             for line in (proc.stdout or "").splitlines():
                 line = line.strip()
                 if line and os.path.isfile(line) and os.access(line, os.X_OK):
-                    if line not in paths:
+                    if line not in paths and not _is_tool_dependency_binary(line):
                         paths.append(line)
         except Exception:
             pass

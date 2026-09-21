@@ -22,7 +22,13 @@ from typing import Sequence
 
 from .common import vlog
 from .config import Config
-from .detection import _env_dir, _installation_path, _is_environment_bin, tool_manager_of
+from .detection import (
+    _env_dir,
+    _installation_path,
+    _is_environment_bin,
+    _is_tool_dependency_binary,
+    tool_manager_of,
+)
 from .environment import Environment
 from .upgrade import compare_versions
 
@@ -250,7 +256,7 @@ def detect_installations(
 
             # A symlink can point into an environment as well
             real_dir = os.path.dirname(real_path)
-            if _is_environment_bin(real_dir):
+            if _is_environment_bin(real_dir) or _is_tool_dependency_binary(real_path):
                 vlog(f"  Skipping environment binary: {real_path}", verbose)
                 continue
 
@@ -651,11 +657,11 @@ def _catalog_meta(tool_name: str) -> dict:
                 raw = getattr(entry, "_raw_data", None) or {}
                 meta["version_flag"] = raw.get("version_flag")
                 meta["version_command"] = raw.get("version_command")
-                for method in raw.get("available_methods") or ():
-                    if not isinstance(method, dict):
-                        continue
-                    if method.get("method") == "cargo" and (method.get("config") or {}).get("crate"):
-                        meta["cargo_crate"] = method["config"]["crate"]
+                methods = raw.get("available_methods")
+                for method in methods if isinstance(methods, list) else ():
+                    config = method.get("config") if isinstance(method, dict) else None
+                    if isinstance(config, dict) and method.get("method") == "cargo" and config.get("crate"):
+                        meta["cargo_crate"] = config["crate"]
         except Exception:
             meta = {}
         # Only cache successful lookups — an empty result may be transient.

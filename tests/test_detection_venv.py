@@ -10,6 +10,7 @@ audit detection must too.
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import sys
@@ -38,6 +39,17 @@ def _make_bin(bin_dir: Path, name: str, version: str) -> Path:
     binary.write_text(f"#!/bin/sh\necho '{name} {version}'\n")
     binary.chmod(0o755)
     return binary
+
+
+def _make_tool_venv(root: Path, *entrypoints: str) -> Path:
+    """A uv/pipx per-tool venv whose own record lists these entry points."""
+    bin_dir = _make_venv(root)
+    if "/pipx/" in str(root):
+        (root / "pipx_metadata.json").write_text(json.dumps({"main_package": {"apps": list(entrypoints)}}))
+    else:
+        lines = ",\n".join(f'    {{ name = "{e}", install-path = "/x/{e}" }}' for e in entrypoints)
+        (root / "uv-receipt.toml").write_text(f"[tool]\nentrypoints = [\n{lines}\n]\n")
+    return bin_dir
 
 
 def _make_venv(root: Path) -> Path:
@@ -154,7 +166,7 @@ def test_reconcile_keeps_tool_manager_installation(tmp_path, monkeypatch, tool_e
         (tmp_path / "linked").symlink_to(tmp_path / "real-tools")
         tool_env = tool_env.replace("linked/", "real-tools/")
         monkeypatch.setenv("UV_TOOL_DIR", str(tmp_path / "linked"))
-    real = _make_bin(_make_venv(tmp_path / tool_env), "fakeuvtool", "26.5.1")
+    real = _make_bin(_make_tool_venv(tmp_path / tool_env, "fakeuvtool"), "fakeuvtool", "26.5.1")
     local_bin = tmp_path / "local" / "bin"
     local_bin.mkdir(parents=True)
     (local_bin / "fakeuvtool").symlink_to(real)
@@ -245,7 +257,7 @@ def test_tool_manager_needs_package_bin_layout(tmp_path, monkeypatch):
 def test_tool_bin_dir_directly_on_path_is_kept(tmp_path, monkeypatch):
     from cli_audit.reconcile import clear_detection_cache, detect_installations
 
-    tool_bin = _make_venv(tmp_path / "share" / "uv" / "tools" / "fakedirect")
+    tool_bin = _make_tool_venv(tmp_path / "share" / "uv" / "tools" / "fakedirect", "fakedirect")
     real = _make_bin(tool_bin, "fakedirect", "1.0.0")
     monkeypatch.setenv("PATH", str(tool_bin))
     clear_detection_cache()
@@ -261,7 +273,7 @@ def test_symlinked_relocated_tool_dir_on_path_is_kept(tmp_path, monkeypatch):
     (tmp_path / "real-tools").mkdir()
     (tmp_path / "linked").symlink_to(tmp_path / "real-tools")
     monkeypatch.setenv("UV_TOOL_DIR", str(tmp_path / "linked"))
-    real = _make_bin(_make_venv(tmp_path / "real-tools" / "fakelinked"), "fakelinked", "1.0.0")
+    real = _make_bin(_make_tool_venv(tmp_path / "real-tools" / "fakelinked", "fakelinked"), "fakelinked", "1.0.0")
     on_path = tmp_path / "linked" / "fakelinked" / "bin"
     monkeypatch.setenv("PATH", str(on_path))
     clear_detection_cache()
@@ -274,7 +286,10 @@ def test_malformed_available_method_keeps_other_catalog_data(monkeypatch):
     from cli_audit import reconcile
 
     class Entry:
-        _raw_data = {"version_flag": "--ver", "available_methods": ["cargo", {"method": "cargo", "config": {"crate": "c"}}]}
+        _raw_data = {
+            "version_flag": "--ver",
+            "available_methods": ["cargo", {"method": "cargo", "config": "x"}, {"method": "cargo", "config": {"crate": "c"}}],
+        }
 
         def to_tool(self):
             class T:
@@ -294,3 +309,34 @@ def test_malformed_available_method_keeps_other_catalog_data(monkeypatch):
     meta = reconcile._catalog_meta("x")
     assert meta["version_flag"] == "--ver"
     assert meta["cargo_crate"] == "c"
+
+
+def test_dependency_executable_in_a_tool_venv_is_no_installation(tmp_path, monkeypatch):
+    # httpie's uv venv also holds pygmentize (a dependency). Treating it as an
+    # installation would let reconcile run `uv tool uninstall httpie` for it.
+    from cli_audit.reconcile import clear_detection_cache, detect_installations
+
+    tool_bin = _make_tool_venv(tmp_path / "share" / "uv" / "tools" / "fakehttpie", "fakehttp")
+    _make_bin(tool_bin, "fakehttp", "3.2.4")
+    _make_bin(tool_bin, "fakepygmentize", "2.19.0")
+    other_bin = tmp_path / "usr" / "bin"
+    real_pyg = _make_bin(other_bin, "fakepygmentize", "2.18.0")
+    monkeypatch.setenv("PATH", os.pathsep.join([str(tool_bin), str(other_bin), WHICH_DIR]))
+    clear_detection_cache()
+
+    assert [i.path for i in detect_installations("fakepygmentize", ["fakepygmentize"])] == [str(real_pyg)]
+    assert find_paths("fakepygmentize", deep=True) == [str(real_pyg)]
+    assert find_paths("fakehttp") == [str(tool_bin / "fakehttp")]
+
+
+def test_symlinked_default_tool_root_is_recognised(tmp_path, monkeypatch):
+    # ~/.local/share/uv/tools -> /data/uvtools, UV_TOOL_DIR unset
+    from cli_audit.detection import tool_manager_of
+
+    monkeypatch.delenv("UV_TOOL_DIR", raising=False)
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "share"))
+    (tmp_path / "data" / "uvtools" / "black" / "bin").mkdir(parents=True)
+    (tmp_path / "share" / "uv").mkdir(parents=True)
+    (tmp_path / "share" / "uv" / "tools").symlink_to(tmp_path / "data" / "uvtools")
+
+    assert tool_manager_of(str(tmp_path / "data" / "uvtools" / "black" / "bin")) == "uv"
