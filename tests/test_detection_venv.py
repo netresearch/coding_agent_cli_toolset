@@ -218,7 +218,8 @@ def test_global_pipx_removal_is_manual_for_a_normal_user(tmp_path, monkeypatch):
     inst = Installation(tool="httpie", version="1", method="pipx", path=str(path), active=False)
     with patch("cli_audit.reconcile.subprocess.run") as run:
         ok, message = _uninstall_installation(inst, False)
-    assert not ok and not run.called
+    assert not ok
+    assert not run.called
     assert "sudo pipx uninstall --global httpie" in message
     assert _is_manual_removal_error(message)
 
@@ -282,14 +283,19 @@ def test_symlinked_relocated_tool_dir_on_path_is_kept(tmp_path, monkeypatch):
     assert find_paths("fakelinked") == [str(on_path / "fakelinked")]
 
 
-def test_malformed_available_method_keeps_other_catalog_data(monkeypatch):
+@pytest.mark.parametrize(
+    "available_methods",
+    [
+        ["cargo", {"method": "cargo", "config": "x"}, {"method": "cargo", "config": {"crate": "c"}}],
+        5,  # not a list at all
+    ],
+    ids=["malformed-entries", "not-a-list"],
+)
+def test_malformed_available_method_keeps_other_catalog_data(monkeypatch, available_methods):
     from cli_audit import reconcile
 
     class Entry:
-        _raw_data = {
-            "version_flag": "--ver",
-            "available_methods": ["cargo", {"method": "cargo", "config": "x"}, {"method": "cargo", "config": {"crate": "c"}}],
-        }
+        _raw_data = {"version_flag": "--ver", "available_methods": available_methods}
 
         def to_tool(self):
             class T:
@@ -308,7 +314,7 @@ def test_malformed_available_method_keeps_other_catalog_data(monkeypatch):
     monkeypatch.setattr(reconcile, "_catalog_cache", {})
     meta = reconcile._catalog_meta("x")
     assert meta["version_flag"] == "--ver"
-    assert meta["cargo_crate"] == "c"
+    assert meta.get("cargo_crate", "") == ("c" if isinstance(available_methods, list) else "")
 
 
 def test_dependency_executable_in_a_tool_venv_is_no_installation(tmp_path, monkeypatch):

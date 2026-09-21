@@ -630,6 +630,19 @@ _catalog_instance = None
 _catalog_lock = threading.Lock()
 
 
+def _cargo_crate_of(available_methods: object) -> str:
+    """Crate name from a catalog entry's cargo install method ("" if it has none)."""
+    if not isinstance(available_methods, list):
+        return ""
+    for method in available_methods:
+        if not isinstance(method, dict) or method.get("method") != "cargo":
+            continue
+        config = method.get("config")
+        if isinstance(config, dict) and isinstance(config.get("crate"), str):
+            return config["crate"]
+    return ""
+
+
 def _catalog_meta(tool_name: str) -> dict:
     """Return cached catalog metadata for a tool: candidates + version command.
 
@@ -657,11 +670,9 @@ def _catalog_meta(tool_name: str) -> dict:
                 raw = getattr(entry, "_raw_data", None) or {}
                 meta["version_flag"] = raw.get("version_flag")
                 meta["version_command"] = raw.get("version_command")
-                methods = raw.get("available_methods")
-                for method in methods if isinstance(methods, list) else ():
-                    config = method.get("config") if isinstance(method, dict) else None
-                    if isinstance(config, dict) and method.get("method") == "cargo" and config.get("crate"):
-                        meta["cargo_crate"] = config["crate"]
+                crate = _cargo_crate_of(raw.get("available_methods"))
+                if crate:
+                    meta["cargo_crate"] = crate
         except Exception:
             meta = {}
         # Only cache successful lookups — an empty result may be transient.

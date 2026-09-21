@@ -131,23 +131,27 @@ def tool_entrypoints(bin_dir: str) -> set[str] | None:
     --include-apps). Everything else in that bin dir belongs to dependencies.
     None if the venv has no readable record.
     """
-    venv = os.path.dirname(os.path.normpath(bin_dir))
+    # bin_dir comes from PATH. Read only inside a manager's own tool root, and
+    # only that manager's record name, so no other file can be reached.
+    manager = tool_manager_of(bin_dir)
+    if not manager:
+        return None
+    venv = os.path.dirname(os.path.realpath(bin_dir))
+    record = os.path.join(venv, "uv-receipt.toml" if manager == "uv" else "pipx_metadata.json")
+    if not os.path.isfile(record):
+        return None
     try:
-        receipt = os.path.join(venv, "uv-receipt.toml")
-        if os.path.isfile(receipt):
-            with open(receipt, "rb") as f:
+        if manager == "uv":
+            with open(record, "rb") as f:
                 entries = tomllib.load(f).get("tool", {}).get("entrypoints", [])
             return {e["name"] for e in entries if isinstance(e, dict) and e.get("name")}
-        metadata = os.path.join(venv, "pipx_metadata.json")
-        if os.path.isfile(metadata):
-            with open(metadata, encoding="utf-8") as f:
-                data = json.load(f)
-            packages = [data.get("main_package") or {}]
-            packages += [p for p in (data.get("injected_packages") or {}).values() if p.get("include_apps")]
-            return {app for p in packages for app in (p.get("apps") or [])}
+        with open(record, encoding="utf-8") as f:
+            data = json.load(f)
+        packages = [data.get("main_package") or {}]
+        packages += [p for p in (data.get("injected_packages") or {}).values() if p.get("include_apps")]
+        return {app for p in packages for app in (p.get("apps") or [])}
     except OSError, ValueError, AttributeError, TypeError, KeyError:
         return None
-    return None
 
 
 def _is_tool_dependency_binary(path: str) -> bool:
