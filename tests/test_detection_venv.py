@@ -11,17 +11,25 @@ audit detection must too.
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 from pathlib import Path
 
 import pytest
 
+from cli_audit.bulk import get_missing_tools
 from cli_audit.detection import audit_tool_installation, find_paths
+from cli_audit.installer import validate_installation
 
 pytestmark = pytest.mark.skipif(
     sys.platform == "win32",
     reason="Uses Unix-style paths and PATH separator (:)",
 )
+
+
+# The deep search runs `which -a`; without its dir on PATH the subprocess
+# fails, the error is swallowed and only the fast path would be tested
+WHICH_DIR = os.path.dirname(shutil.which("which") or "/usr/bin/which")
 
 
 def _make_bin(bin_dir: Path, name: str, version: str) -> Path:
@@ -55,7 +63,7 @@ def test_deep_search_skips_venv_bin(tmp_path, monkeypatch):
     _make_bin(venv_bin, "faketool", "1.0.0")
     other_bin = tmp_path / "other" / "bin"
     real = _make_bin(other_bin, "faketool", "2.0.0")
-    monkeypatch.setenv("PATH", os.pathsep.join([str(venv_bin), str(other_bin)]))
+    monkeypatch.setenv("PATH", os.pathsep.join([str(venv_bin), str(other_bin), WHICH_DIR]))
 
     assert find_paths("faketool", deep=True) == [str(real)]
 
@@ -63,7 +71,7 @@ def test_deep_search_skips_venv_bin(tmp_path, monkeypatch):
 def test_tool_only_in_venv_is_not_installed(tmp_path, monkeypatch):
     venv_bin = _make_venv(tmp_path / ".venv")
     _make_bin(venv_bin, "fakeonlyvenv", "7.3.0")
-    monkeypatch.setenv("PATH", str(venv_bin))
+    monkeypatch.setenv("PATH", os.pathsep.join([str(venv_bin), WHICH_DIR]))
 
     assert find_paths("fakeonlyvenv", deep=True) == []
 
@@ -91,3 +99,25 @@ def test_bin_pattern_needs_a_directory_boundary(tmp_path, monkeypatch):
     monkeypatch.setenv("PATH", str(extra_bin))
 
     assert find_paths("faketool3") == [str(real)]
+
+
+def test_missing_tool_check_ignores_venv_copy(tmp_path, monkeypatch):
+    # bulk install must agree with the audit: a venv-only tool is missing
+    venv_bin = _make_venv(tmp_path / ".venv")
+    _make_bin(venv_bin, "fakeonlyvenv2", "7.3.0")
+    monkeypatch.setenv("PATH", str(venv_bin))
+
+    assert get_missing_tools(["fakeonlyvenv2"]) == ["fakeonlyvenv2"]
+
+
+def test_install_validation_checks_the_installed_copy(tmp_path, monkeypatch):
+    venv_bin = _make_venv(tmp_path / ".venv")
+    _make_bin(venv_bin, "fakeblack3", "25.11.0")
+    local_bin = tmp_path / ".local" / "bin"
+    real = _make_bin(local_bin, "fakeblack3", "26.5.1")
+    monkeypatch.setenv("PATH", os.pathsep.join([str(venv_bin), str(local_bin)]))
+
+    ok, path, version = validate_installation("fakeblack3")
+
+    assert (ok, path) == (True, str(real))
+    assert "26.5.1" in (version or "")

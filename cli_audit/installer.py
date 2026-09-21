@@ -16,6 +16,7 @@ from dataclasses import dataclass
 
 from .common import vlog
 from .config import Config
+from .detection import _installation_path
 from .environment import Environment
 from .install_plan import InstallStep, generate_install_plan
 from .package_managers import select_package_manager
@@ -37,6 +38,7 @@ class StepResult:
         error_message: Human-readable error message if failed
         attempt_number: Which retry attempt this was (1-indexed)
     """
+
     step: InstallStep
     success: bool
     stdout: str
@@ -77,6 +79,7 @@ class InstallResult:
         error_message: Human-readable error message if failed
         binary_path: Path to installed binary (if validation passed)
     """
+
     tool_name: str
     success: bool
     installed_version: str | None
@@ -113,6 +116,7 @@ class InstallError(Exception):
         retryable: Whether this error can be retried
         remediation: Suggested fix for the error
     """
+
     def __init__(
         self,
         message: str,
@@ -137,23 +141,29 @@ def is_retryable_error(exit_code: int, stderr: str) -> bool:
         True if error is transient and should be retried
     """
     # Network-related errors
-    if any(indicator in stderr.lower() for indicator in [
-        "connection refused",
-        "connection timed out",
-        "connection reset",
-        "temporary failure",
-        "network unreachable",
-        "could not resolve host",
-    ]):
+    if any(
+        indicator in stderr.lower()
+        for indicator in [
+            "connection refused",
+            "connection timed out",
+            "connection reset",
+            "temporary failure",
+            "network unreachable",
+            "could not resolve host",
+        ]
+    ):
         return True
 
     # Package manager lock contention
-    if any(indicator in stderr.lower() for indicator in [
-        "could not get lock",
-        "lock file exists",
-        "waiting for cache lock",
-        "dpkg frontend lock",
-    ]):
+    if any(
+        indicator in stderr.lower()
+        for indicator in [
+            "could not get lock",
+            "lock file exists",
+            "waiting for cache lock",
+            "dpkg frontend lock",
+        ]
+    ):
         return True
 
     # Temporary failure exit codes
@@ -176,7 +186,7 @@ def calculate_backoff_delay(attempt: int, base_delay: float = 1.0, max_delay: fl
         Delay in seconds with jitter applied
     """
     # Exponential backoff: base * 2^attempt
-    delay = base_delay * (2 ** attempt)
+    delay = base_delay * (2**attempt)
     delay = min(delay, max_delay)
 
     # Add jitter (±20%)
@@ -371,8 +381,9 @@ def validate_installation(
     Returns:
         Tuple of (success, binary_path, actual_version)
     """
-    # Check if binary exists in PATH
-    binary_path = shutil.which(tool_name)
+    # Check if binary exists in PATH. Same lookup as the audit: a copy inside
+    # an activated venv would shadow the tool that was just installed.
+    binary_path = shutil.which(tool_name, path=_installation_path())
     if not binary_path:
         vlog(f"Binary not found in PATH: {tool_name}", verbose)
         return (False, None, None)
@@ -381,9 +392,9 @@ def validate_installation(
 
     # Try to get version
     version_commands = [
-        (tool_name, "--version"),
-        (tool_name, "-V"),
-        (tool_name, "version"),
+        (binary_path, "--version"),
+        (binary_path, "-V"),
+        (binary_path, "version"),
     ]
 
     actual_version = None
@@ -399,7 +410,8 @@ def validate_installation(
             if result.returncode == 0 and result.stdout:
                 # Extract version from output (first line, first version-like pattern)
                 import re
-                version_pattern = r'\d+\.\d+(?:\.\d+)?(?:-[\w.]+)?'
+
+                version_pattern = r"\d+\.\d+(?:\.\d+)?(?:-[\w.]+)?"
                 match = re.search(version_pattern, result.stdout)
                 if match:
                     actual_version = match.group(0)

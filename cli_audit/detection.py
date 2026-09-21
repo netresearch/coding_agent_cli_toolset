@@ -77,7 +77,7 @@ def _installation_path() -> str:
     lookup reports the environment's copy (e.g. ~/.venv/bin/black) and an
     upgrade of the real installation never shows up in the audit.
     """
-    dirs = [d for d in os.environ.get("PATH", "").split(os.pathsep) if d]
+    dirs = [d for d in os.environ.get("PATH", os.defpath).split(os.pathsep) if d]
     return os.pathsep.join(d for d in dirs if not _is_virtualenv_bin(d))
 
 

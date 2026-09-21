@@ -21,6 +21,7 @@ from typing import Callable, Sequence
 
 from .common import vlog
 from .config import Config
+from .detection import _installation_path
 from .environment import Environment
 from .installer import InstallResult, install_tool
 from .package_managers import select_package_manager
@@ -38,6 +39,7 @@ class ToolSpec:
         language: Tool language/ecosystem (e.g., "python", "rust")
         dependencies: Tool names that must be installed first
     """
+
     tool_name: str
     package_name: str
     target_version: str = "latest"
@@ -65,6 +67,7 @@ class ProgressTracker:
         _progress: Progress state for each tool
         _callbacks: Callbacks to invoke on progress updates
     """
+
     _lock: threading.Lock = field(default_factory=threading.Lock)
     _progress: dict[str, dict] = field(default_factory=dict)
     _callbacks: list[Callable[[str, str, str], None]] = field(default_factory=list)
@@ -132,6 +135,7 @@ class BulkInstallResult:
         duration_seconds: Total execution time
         rollback_script: Path to generated rollback script (if any)
     """
+
     tools_attempted: tuple[str, ...]
     successes: tuple[InstallResult, ...]
     failures: tuple[InstallResult, ...]
@@ -164,7 +168,8 @@ def get_missing_tools(tool_names: Sequence[str], verbose: bool = False) -> list[
     """
     missing = []
     for tool_name in tool_names:
-        binary_path = shutil.which(tool_name)
+        # Same lookup as the audit: a copy inside an activated venv is no installation
+        binary_path = shutil.which(tool_name, path=_installation_path())
         if not binary_path:
             missing.append(tool_name)
             vlog(f"Tool not found: {tool_name}", verbose)
@@ -252,26 +257,30 @@ def get_tools_to_install(
             return []
         for name in tool_names:
             tool_config = config.get_tool_config(name)
-            specs.append(ToolSpec(
-                tool_name=name,
-                package_name=name,
-                target_version=tool_config.version if tool_config else "latest",
-                language=None,
-                dependencies=(),
-            ))
+            specs.append(
+                ToolSpec(
+                    tool_name=name,
+                    package_name=name,
+                    target_version=tool_config.version if tool_config else "latest",
+                    language=None,
+                    dependencies=(),
+                )
+            )
 
     elif mode == "missing":
         all_tools = list(config.tools.keys())
         missing = get_missing_tools(all_tools, verbose)
         for name in missing:
             tool_config = config.get_tool_config(name)
-            specs.append(ToolSpec(
-                tool_name=name,
-                package_name=name,
-                target_version=tool_config.version if tool_config else "latest",
-                language=None,
-                dependencies=(),
-            ))
+            specs.append(
+                ToolSpec(
+                    tool_name=name,
+                    package_name=name,
+                    target_version=tool_config.version if tool_config else "latest",
+                    language=None,
+                    dependencies=(),
+                )
+            )
 
     elif mode == "preset":
         if not preset_name or not hasattr(config, "presets"):
@@ -280,25 +289,29 @@ def get_tools_to_install(
         preset_tools = getattr(config.presets, preset_name, [])
         for name in preset_tools:
             tool_config = config.get_tool_config(name)
-            specs.append(ToolSpec(
-                tool_name=name,
-                package_name=name,
-                target_version=tool_config.version if tool_config else "latest",
-                language=None,
-                dependencies=(),
-            ))
+            specs.append(
+                ToolSpec(
+                    tool_name=name,
+                    package_name=name,
+                    target_version=tool_config.version if tool_config else "latest",
+                    language=None,
+                    dependencies=(),
+                )
+            )
 
     elif mode == "all":
         all_tools = list(config.tools.keys())
         for name in all_tools:
             tool_config = config.get_tool_config(name)
-            specs.append(ToolSpec(
-                tool_name=name,
-                package_name=name,
-                target_version=tool_config.version if tool_config else "latest",
-                language=None,
-                dependencies=(),
-            ))
+            specs.append(
+                ToolSpec(
+                    tool_name=name,
+                    package_name=name,
+                    target_version=tool_config.version if tool_config else "latest",
+                    language=None,
+                    dependencies=(),
+                )
+            )
 
     vlog(f"Mode '{mode}' resolved to {len(specs)} tools", verbose)
     return specs
@@ -502,6 +515,7 @@ def bulk_install(
     # Determine max workers
     if max_workers is None:
         import os
+
         max_workers = min(16, os.cpu_count() or 4 + 4)
 
     # Execute installations level by level
@@ -551,7 +565,7 @@ def bulk_install(
         # Stop if fail-fast triggered
         if fail_fast and failures:
             # Mark remaining tools as skipped
-            for level in levels[level_idx + 1:]:
+            for level in levels[level_idx + 1 :]:
                 for spec in level:
                     skipped.append(spec.tool_name)
                     progress_tracker.update(spec.tool_name, "skipped", "Skipped due to fail-fast")
