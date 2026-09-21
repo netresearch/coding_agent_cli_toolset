@@ -22,6 +22,7 @@ from typing import Sequence
 
 from .common import vlog
 from .config import Config
+from .detection import _is_virtualenv_bin
 from .environment import Environment
 from .upgrade import compare_versions
 
@@ -179,38 +180,6 @@ Reconciliation Summary:
   Conflicts resolved: {self.conflicts_resolved}{manual_line}
   Duration: {self.duration_seconds:.1f}s
 """
-
-
-# Environment-name patterns for env managers without a pyvenv.cfg (conda etc.).
-# Mirrors the venv skip list in scripts/lib/capability.sh:detect_all_installations.
-_ENV_DIR_PATTERNS = (
-    "/venv/bin",
-    "/.venv/bin",
-    "/env/bin",
-    "/venvs/",
-    "/.venvs/",
-    "/virtualenvs/",
-    "/.virtualenvs/",
-    "/envs/",
-    "/conda/",
-    "/miniconda",
-    "/anaconda",
-)
-
-
-def _is_virtualenv_bin(bin_dir: str) -> bool:
-    """True if bin_dir is a virtualenv/conda environment's bin directory.
-
-    Environments are not installations: their binaries vanish with the env,
-    and classifying them by method (e.g. `uv` because the tool also appears
-    in `uv tool list`) makes removal delete a DIFFERENT installation.
-    """
-    # Definitive signal: PEP 405 venvs carry pyvenv.cfg next to bin/
-    if os.path.isfile(os.path.join(os.path.dirname(bin_dir), "pyvenv.cfg")):
-        return True
-    # Name-based fallback for conda/virtualenvwrapper layouts
-    normalized = bin_dir.rstrip("/") + "/"
-    return any(pat in normalized for pat in _ENV_DIR_PATTERNS)
 
 
 def detect_installations(

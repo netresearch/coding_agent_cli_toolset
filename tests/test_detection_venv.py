@@ -1,0 +1,84 @@
+"""Tests for virtualenv exclusion in audit detection.
+
+An always-activated ~/.venv put ~/.venv/bin first on PATH. The audit reported
+~/.venv/bin/black (25.11.0, "via manual") as the installation, so every
+`uv tool upgrade black` of the real ~/.local/bin/black (26.5.1) looked like a
+no-op and the tool stayed "outdated" run after run. Environments are not
+installations: reconcile.py and capability.sh already skip them, and the
+audit detection must too.
+"""
+
+from __future__ import annotations
+
+import os
+import sys
+from pathlib import Path
+
+import pytest
+
+from cli_audit.detection import audit_tool_installation, find_paths
+
+pytestmark = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Uses Unix-style paths and PATH separator (:)",
+)
+
+
+def _make_bin(bin_dir: Path, name: str, version: str) -> Path:
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    binary = bin_dir / name
+    binary.write_text(f"#!/bin/sh\necho '{name} {version}'\n")
+    binary.chmod(0o755)
+    return binary
+
+
+def _make_venv(root: Path) -> Path:
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "pyvenv.cfg").write_text("home = /usr/bin\n")
+    return root / "bin"
+
+
+def test_activated_venv_does_not_shadow_the_installation(tmp_path, monkeypatch):
+    venv_bin = _make_venv(tmp_path / "home" / ".venv")
+    _make_bin(venv_bin, "fakeblack", "25.11.0")
+    local_bin = tmp_path / "home" / ".local" / "bin"
+    real = _make_bin(local_bin, "fakeblack", "26.5.1")
+    monkeypatch.setenv("PATH", os.pathsep.join([str(venv_bin), str(local_bin)]))
+
+    version, _line, path, _method = audit_tool_installation("fakeblack", ("fakeblack",))
+
+    assert (version, path) == ("26.5.1", str(real))
+
+
+def test_deep_search_skips_venv_bin(tmp_path, monkeypatch):
+    venv_bin = _make_venv(tmp_path / "env-with-any-name")
+    _make_bin(venv_bin, "faketool", "1.0.0")
+    other_bin = tmp_path / "other" / "bin"
+    real = _make_bin(other_bin, "faketool", "2.0.0")
+    monkeypatch.setenv("PATH", os.pathsep.join([str(venv_bin), str(other_bin)]))
+
+    assert find_paths("faketool", deep=True) == [str(real)]
+
+
+def test_tool_only_in_venv_is_not_installed(tmp_path, monkeypatch):
+    venv_bin = _make_venv(tmp_path / ".venv")
+    _make_bin(venv_bin, "fakeonlyvenv", "7.3.0")
+    monkeypatch.setenv("PATH", str(venv_bin))
+
+    assert find_paths("fakeonlyvenv", deep=True) == []
+
+
+def test_version_command_runs_the_detected_binary(tmp_path, monkeypatch):
+    # Catalog version_command names the tool ("black --version"); it must not
+    # resolve to the activated venv's copy either
+    venv_bin = _make_venv(tmp_path / ".venv")
+    _make_bin(venv_bin, "fakeblack2", "25.11.0")
+    local_bin = tmp_path / ".local" / "bin"
+    real = _make_bin(local_bin, "fakeblack2", "26.5.1")
+    monkeypatch.setenv("PATH", os.pathsep.join([str(venv_bin), str(local_bin)]))
+
+    version, _line, path, _method = audit_tool_installation(
+        "fakeblack2", ("fakeblack2",), version_command="fakeblack2 --version"
+    )
+
+    assert (version, path) == ("26.5.1", str(real))

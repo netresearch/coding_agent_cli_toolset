@@ -38,6 +38,53 @@ VERSION_PROBE_TIMEOUT = "<probe-timeout>"
 # catalog version_command instead of a binary on disk.
 VERSION_COMMAND_PATH = "<version_command>"
 
+# Environment-name patterns for env managers without a pyvenv.cfg (conda etc.).
+# Mirrors the venv skip list in scripts/lib/capability.sh:detect_all_installations.
+_ENV_DIR_PATTERNS = (
+    "/venv/bin",
+    "/.venv/bin",
+    "/env/bin",
+    "/venvs/",
+    "/.venvs/",
+    "/virtualenvs/",
+    "/.virtualenvs/",
+    "/envs/",
+    "/conda/",
+    "/miniconda",
+    "/anaconda",
+)
+
+
+def _is_virtualenv_bin(bin_dir: str) -> bool:
+    """True if bin_dir is a virtualenv/conda environment's bin directory.
+
+    Environments are not installations: their binaries vanish with the env,
+    and classifying them by method (e.g. `uv` because the tool also appears
+    in `uv tool list`) makes removal delete a DIFFERENT installation.
+    """
+    # Definitive signal: PEP 405 venvs carry pyvenv.cfg next to bin/
+    if os.path.isfile(os.path.join(os.path.dirname(bin_dir), "pyvenv.cfg")):
+        return True
+    # Name-based fallback for conda/virtualenvwrapper layouts
+    normalized = bin_dir.rstrip("/") + "/"
+    return any(pat in normalized for pat in _ENV_DIR_PATTERNS)
+
+
+def _installation_path() -> str:
+    """PATH without virtualenv/conda bin dirs.
+
+    An activated environment puts its bin dir first on PATH, so a plain
+    lookup reports the environment's copy (e.g. ~/.venv/bin/black) and an
+    upgrade of the real installation never shows up in the audit.
+    """
+    dirs = [d for d in os.environ.get("PATH", "").split(os.pathsep) if d]
+    return os.pathsep.join(d for d in dirs if not _is_virtualenv_bin(d))
+
+
+def _which(command_name: str) -> str | None:
+    """shutil.which restricted to installation dirs (see _installation_path)."""
+    return shutil.which(command_name, path=_installation_path())
+
 
 def find_paths(command_name: str, deep: bool = False) -> list[str]:
     """Find all paths for a command.
@@ -52,7 +99,7 @@ def find_paths(command_name: str, deep: bool = False) -> list[str]:
     paths: list[str] = []
 
     # Fast path: shutil.which
-    p = shutil.which(command_name)
+    p = _which(command_name)
     if p:
         paths.append(p)
 
@@ -67,7 +114,8 @@ def find_paths(command_name: str, deep: bool = False) -> list[str]:
                 text=True,
                 timeout=0.2,
                 check=False,
-                env={**os.environ, "TERM": "dumb"},  # Disable ANSI output
+                # Disable ANSI output; search installation dirs only
+                env={**os.environ, "TERM": "dumb", "PATH": _installation_path()},
             )
             for line in (proc.stdout or "").splitlines():
                 line = line.strip()
@@ -182,6 +230,11 @@ def get_version_line(
     # from user input — e.g. `uv python list --only-installed | grep … | sed …`.
     # shell=True is required for the pipelines used in the catalog.
     if version_command:
+        # The command names the tool, not the path: resolve it to the detected
+        # binary first, and never to an activated environment's copy.
+        search_path = _installation_path()
+        if path:
+            search_path = os.pathsep.join([os.path.dirname(path), search_path])
         try:
             proc = subprocess.run(  # nosec B602
                 version_command,
@@ -192,7 +245,7 @@ def get_version_line(
                 text=True,
                 timeout=TIMEOUT_SECONDS,
                 check=False,
-                env={**os.environ, "TERM": "dumb"},
+                env={**os.environ, "TERM": "dumb", "PATH": search_path},
             )
             line = (proc.stdout or "").strip()
             if line:
@@ -523,7 +576,7 @@ def detect_multi_versions(
         # (used only when no version-specific binary like go1.25 is found)
         go_default_info = None
         if tool_name == "go":
-            default_go = shutil.which("go")
+            default_go = _which("go")
             if default_go:
                 version_line = get_version_line(default_go, "go", version_flag="version")
                 default_version = extract_version_number(version_line or "")
@@ -555,7 +608,7 @@ def detect_multi_versions(
                         found_path = binary_name
                 else:
                     # Search in PATH
-                    path = shutil.which(binary_name)
+                    path = _which(binary_name)
                     if path:
                         found_path = path
 
