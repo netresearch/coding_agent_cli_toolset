@@ -184,3 +184,29 @@ def test_failed_install_is_not_held_back(tmp_path):
 def test_newer_candidate_is_not_held_back(tmp_path):
     # apt has a newer package, yet the detected version did not move: something shadows it
     assert not _run_package_manager(tmp_path, install_rc=0, candidate="0.12.0-1")
+
+
+def _pin_applies(*args: str) -> bool:
+    script = "\n".join(["set -euo pipefail", _function("pin_applies"), "pin_applies " + " ".join(f'"{a}"' for a in args)])
+    return subprocess.run(["bash", "-c", script]).returncode == 0
+
+
+def test_skipped_release_hides_the_tool_until_a_newer_one_is_out():
+    # s = "Skip only 1.1.0 (ask again when newer patch available)"
+    assert _pin_applies("1.1.0", "1.1.0", "1.0.0")
+    assert not _pin_applies("1.1.0", "1.2.0", "1.0.0")
+
+
+def test_held_version_keeps_hiding_the_tool():
+    # p = "Pin to 1.0.0 (don't ask for upgrades)"
+    assert _pin_applies("1.0.0", "1.2.0", "1.0.0")
+
+
+def test_never_and_cycle_pins_apply():
+    assert _pin_applies("never", "1.2.0", "")
+    assert _pin_applies("3.13", "3.13.11", "3.13.4", "3.13")
+    assert not _pin_applies("", "1.2.0", "1.0.0")
+
+
+def test_guide_loop_uses_pin_applies_for_both_pin_kinds():
+    assert GUIDE.read_text().count("if pin_applies ") == 2

@@ -220,6 +220,19 @@ probe_installed_version() {
   printf '%s\n' "$ver" | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -n1
 }
 
+# True while a pin still hides the tool: "never", the release the user chose
+# to skip (s: pin == latest), the version the user chose to hold (p: pin ==
+# installed), or for a cycle the cycle itself. A skipped release no longer
+# hides the tool once a newer one is out.
+# Args: pin latest installed [cycle]
+pin_applies() {
+  local pin="$1" latest="$2" installed="$3" cycle="${4:-}"
+  [ -n "$pin" ] || return 1
+  [ "$pin" = "never" ] && return 0
+  [ -n "$cycle" ] && [ "$pin" = "$cycle" ] && return 0
+  [ "$pin" = "$latest" ] || [ "$pin" = "$installed" ]
+}
+
 # Remove installer markers before an install, so a marker left by an earlier
 # run (make upgrade-<tool>, an interrupted guide, another cycle of the same
 # tool) cannot decide this run's verdict.
@@ -1087,8 +1100,9 @@ while read -r line; do
         if [ "$multi_pin" = "never" ]; then
           continue
         fi
-        # Skip if this specific version cycle is pinned to a version
-        if [ -n "$multi_pin" ]; then
+        # Skip while the cycle pin still applies
+        if pin_applies "$multi_pin" "$(json_field "$tool_name" latest_upstream)" \
+          "$(json_field "$tool_name" installed)" "$version_cycle"; then
           continue
         fi
       else
@@ -1097,8 +1111,9 @@ while read -r line; do
           continue
         fi
 
-        # Skip if pinned to any specific version (don't prompt for upgrades)
-        if [ -n "$pinned_version" ]; then
+        # Skip while the pin still applies (don't prompt for that release)
+        if pin_applies "$pinned_version" "$(json_field "$tool_name" latest_upstream)" \
+          "$(json_field "$tool_name" installed)"; then
           continue
         fi
       fi
