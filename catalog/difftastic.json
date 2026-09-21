@@ -6,7 +6,7 @@
   "homepage": "https://github.com/Wilfred/difftastic",
   "github_repo": "Wilfred/difftastic",
   "binary_name": "difft",
-  "download_url_template": "https://github.com/Wilfred/difftastic/releases/download/{version}/difft-{arch}-unknown-linux-gnu.tar.gz",
+  "download_url_template": "https://github.com/Wilfred/difftastic/releases/download/{version}/difft-{version}-{arch}-unknown-linux-gnu.tar.gz",
   "arch_map": {
     "x86_64": "x86_64",
     "aarch64": "aarch64"
@@ -17,7 +17,7 @@
       "priority": 1,
       "config": {
         "repo": "Wilfred/difftastic",
-        "asset_pattern": "difft-x86_64-unknown-linux-gnu.tar.gz"
+        "asset_pattern": "difft-{version}-x86_64-unknown-linux-gnu.tar.gz"
       }
     },
     {

@@ -92,7 +92,7 @@ class TestGithubApiGet:
 @skip_on_windows
 class TestGhErrorBodyFallback:
     def test_byobu_falls_back_to_curl_when_gh_fails(self, fake_bin, tmp_path):
-        proc = _run_sourced("install_byobu.sh", "get_target_version", fake_bin, tmp_path)
+        proc = _run_sourced("install_byobu.sh", "get_target_tag", fake_bin, tmp_path)
         assert proc.returncode == 0, proc.stderr
         assert proc.stdout.strip() == "7.18"
         assert "Cannot index" not in proc.stderr
@@ -100,9 +100,27 @@ class TestGhErrorBodyFallback:
     def test_byobu_uses_gh_result_when_gh_succeeds(self, fake_bin, tmp_path):
         _write_stub(fake_bin, "gh", f"printf '%s' '{BYOBU_TAGS_JSON}'\n")
         _write_stub(fake_bin, "curl", "exit 99\n")
-        proc = _run_sourced("install_byobu.sh", "get_target_version", fake_bin, tmp_path)
+        proc = _run_sourced("install_byobu.sh", "get_target_tag", fake_bin, tmp_path)
         assert proc.returncode == 0, proc.stderr
         assert proc.stdout.strip() == "7.18"
+
+    def test_byobu_accepts_trustmux_prefixed_tags(self, fake_bin, tmp_path):
+        # Real first page of the tags API after the trustmux rename: no plain tag on it
+        tags = (
+            '[{"name":"trustmux-v7.20rc5"},{"name":"trustmux-v7.19"},'
+            '{"name":"trustmux-v7.19rc17"},{"name":"trustmux-v7.18"}]'
+        )
+        _write_stub(fake_bin, "gh", f"printf '%s' '{tags}'\n")
+        proc = _run_sourced("install_byobu.sh", "get_target_tag", fake_bin, tmp_path)
+        assert proc.returncode == 0, proc.stderr
+        assert proc.stdout.strip() == "trustmux-v7.19"
+
+    def test_byobu_prefers_plain_tag_for_equal_versions(self, fake_bin, tmp_path):
+        tags = '[{"name":"trustmux-v7.19"},{"name":"7.19"},{"name":"7.18"}]'
+        _write_stub(fake_bin, "gh", f"printf '%s' '{tags}'\n")
+        proc = _run_sourced("install_byobu.sh", "get_target_tag", fake_bin, tmp_path)
+        assert proc.returncode == 0, proc.stderr
+        assert proc.stdout.strip() == "7.19"
 
     def test_tmux_falls_back_to_release_redirect_when_gh_fails(self, fake_bin, tmp_path):
         proc = _run_sourced("install_tmux.sh", "get_target_version", fake_bin, tmp_path)

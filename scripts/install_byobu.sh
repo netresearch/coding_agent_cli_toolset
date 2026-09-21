@@ -53,18 +53,22 @@ get_installed_version() {
     fi
 }
 
-get_target_version() {
+# Print the newest stable release tag. Upstream tags releases both as "7.19"
+# and, since the trustmux rename, as "trustmux-v7.19"; the prefixed tags fill
+# the first page of the tags API, so accept both forms. For equal versions
+# the plain tag wins.
+get_target_tag() {
     local tags_json=""
-    local version=""
 
     tags_json="$(github_api_get "repos/$GITHUB_REPO/tags?per_page=100")" || tags_json=""
 
-    version="$(printf '%s' "$tags_json" |
+    printf '%s' "$tags_json" |
         jq -r 'if type == "array" then .[].name else empty end' |
-        grep -E '^[0-9]+([.][0-9]+)+$' |
-        sort -V |
-        tail -1)"
-    printf '%s' "$version"
+        grep -E '^(trustmux-v)?[0-9]+([.][0-9]+)+$' |
+        awk '{ v = $0; sub(/^trustmux-v/, "", v); print v "\t" ($0 == v ? 1 : 0) "\t" $0 }' |
+        sort -t "$(printf '\t')" -k1,1V -k2,2n |
+        tail -1 |
+        cut -f3 || true
 }
 
 remove_manifest_files() {
@@ -84,6 +88,7 @@ remove_manifest_files() {
 
 install_byobu() {
     local version="${1:-}"
+    local tag="$version"
     local before=""
     local after=""
     local archive=""
@@ -96,7 +101,8 @@ install_byobu() {
 
     if [ -z "$version" ]; then
         echo "[$TOOL] Fetching latest stable tag..." >&2
-        version="$(get_target_version)"
+        tag="$(get_target_tag)"
+        version="${tag#trustmux-v}"
     fi
     if ! grep -Eq '^[0-9]+([.][0-9]+)+$' <<<"$version"; then
         echo "[$TOOL] Error: Invalid stable version: ${version:-<none>}" >&2
@@ -108,7 +114,7 @@ install_byobu() {
     BUILD_LOG="$BUILD_TMPDIR/build.log"
     archive="$BUILD_TMPDIR/byobu-$version.tar.gz"
     stage_dir="$BUILD_TMPDIR/stage"
-    url="https://github.com/$GITHUB_REPO/archive/refs/tags/${version}.tar.gz"
+    url="https://github.com/$GITHUB_REPO/archive/refs/tags/${tag}.tar.gz"
 
     echo "[$TOOL] Downloading $url..." >&2
     if ! curl --proto '=https' --proto-redir '=https' -fL \
