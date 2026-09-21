@@ -150,6 +150,7 @@ def _run_package_manager(
     detected: str = "0.9.0",
     lang: str = "C",
     owner: str = "bubblewrap",
+    dpkg_stub: str = "",
 ) -> bool:
     """Run package_manager.sh bwrap against stub apt tools; return whether held-back was marked."""
     if not shutil.which("jq"):
@@ -161,7 +162,7 @@ def _run_package_manager(
         "apt-get": f'[ "$1" = install ] && exit {install_rc}; exit 0',
         "dpkg-query": "echo 0.9.0-1ubuntu0.3",
         # dpkg -S <path>: which package owns the binary found on PATH
-        "dpkg": f'[ "$1" = -S ] && [ -n "{owner}" ] && echo "{owner}: $2" && exit 0; exit 1',
+        "dpkg": dpkg_stub or f'[ "$1" = -S ] && [ -n "{owner}" ] && echo "{owner}: $2" && exit 0; exit 1',
         # apt-cache translates its labels unless LC_ALL=C
         "apt-cache": (
             'label="Candidate:"; [ "${LC_ALL:-}" != C ] && [ "${LANG:-C}" != C ] && label="Installationskandidat:"\n'
@@ -268,3 +269,17 @@ def test_probe_path_skips_venv_dirs(tmp_path):
     script = "\n".join(["set -euo pipefail", _function("installation_path"), f'PATH="{path}"', "installation_path"])
     out = subprocess.run(["/bin/bash", "-c", script], capture_output=True, text=True, check=True).stdout
     assert out == str(keep)
+
+
+# Real `dpkg -S` output shapes (Ubuntu 24.04): diversions, several owners,
+# multiarch suffixes, and merged-/usr packages that still record /bin/x
+DPKG_DIVERTED = 'echo "diversion by other from: $2"; echo "diversion by other to: $2.other"; echo "bubblewrap, other: $2"'
+DPKG_MULTIARCH = 'echo "bubblewrap:amd64: $2"'
+DPKG_BIN_ONLY = 'case "$2" in /bin/bwrap) echo "bubblewrap: /bin/bwrap" ;; *) echo "no path found" >&2; exit 1 ;; esac'
+
+
+@pytest.mark.parametrize(
+    "dpkg_stub", [DPKG_DIVERTED, DPKG_MULTIARCH, DPKG_BIN_ONLY], ids=["diverted", "multiarch", "bin-only"]
+)
+def test_owner_is_found_in_real_dpkg_output_shapes(tmp_path, dpkg_stub):
+    assert _run_package_manager(tmp_path, install_rc=0, candidate="0.9.0-1ubuntu0.3", dpkg_stub=dpkg_stub)

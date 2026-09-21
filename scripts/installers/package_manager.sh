@@ -42,6 +42,21 @@ if [ -n "${GO_VERSION:-}" ] && [ "$TOOL" = "go" ]; then
   VERSIONED_BINARY="go${GO_VERSION}"
 fi
 
+# Print the packages owning the first of the given files that dpkg knows,
+# one per line. Parses `dpkg -S`: skips "diversion by X from/to:" and
+# "local diversion" lines, splits "a, b: /path", drops ":arch" suffixes.
+dpkg_owners() {
+  local file line
+  for file in "$@"; do
+    [ -n "$file" ] || continue
+    line="$(LC_ALL=C dpkg -S "$file" 2>/dev/null | grep -vE '^(local )?diversion ' | head -1 || true)"
+    [ -n "$line" ] || continue
+    line="${line%%: /*}"
+    printf '%s\n' "$line" | tr ',' '\n' | sed 's/^ *//; s/:.*$//'
+    return 0
+  done
+}
+
 # Get current version (use versioned binary if specified)
 get_version() {
   local bin="$1"
@@ -124,14 +139,20 @@ if ! $installed && have apt-get; then
       # The binary on PATH must belong to one of these packages; otherwise
       # another copy shadows the package and "unchanged" says nothing about apt.
       # Versions cannot decide this: universal-ctags 5.9.20210829.0 prints 5.9.0.
-      bin_real="$(readlink -f "$(command -v "$VERSIONED_BINARY" 2>/dev/null)" 2>/dev/null || true)"
-      bin_owner=""
-      if [ -n "$bin_real" ]; then
-        bin_owner="$(LC_ALL=C dpkg -S "$bin_real" 2>/dev/null | head -1 || true)"
-        bin_owner="${bin_owner%%: *}"
-        bin_owner="${bin_owner%%:*}"
+      bin_path="$(command -v "$VERSIONED_BINARY" 2>/dev/null || true)"
+      bin_real="$(readlink -f "$bin_path" 2>/dev/null || true)"
+      owned=false
+      if [ -n "$bin_path" ]; then
+        # Resolved path first (alternatives: ctags -> ctags-universal), then
+        # the PATH entry and /bin/<name>: on merged-/usr systems some packages
+        # still record /bin/x while readlink gives /usr/bin/x
+        for owner in $(dpkg_owners "$bin_real" "$bin_path" "/bin/${bin_real##*/}"); do
+          if [[ " $pkg " == *" $owner "* ]]; then
+            owned=true
+          fi
+        done
       fi
-      if [ -z "$bin_owner" ] || [[ " $pkg " != *" $bin_owner "* ]]; then
+      if ! $owned; then
         pm_ok=false
       fi
     fi
