@@ -74,14 +74,31 @@ def _is_virtualenv_bin(bin_dir: str) -> bool:
 
 # Tool managers install each tool into a venv of its own; a binary linked
 # from there (~/.local/bin/black -> ~/.local/share/uv/tools/black/bin/black)
-# is an installation, not an environment.
-_TOOL_ENV_ROOTS = ("/uv/tools/", "/pipx/venvs/")
+# is an installation, not an environment. Default locations, matched as path
+# fragments; relocated ones come from the managers' own variables.
+_TOOL_ENV_ROOTS = (("uv", "/uv/tools/"), ("pipx", "/pipx/venvs/"))
+
+
+def tool_manager_of(bin_dir: str) -> str:
+    """Return "uv" or "pipx" if bin_dir belongs to that manager's per-tool venv, else ""."""
+    normalized = os.path.normpath(bin_dir) + "/"
+    for manager, fragment in _TOOL_ENV_ROOTS:
+        if fragment in normalized:
+            return manager
+    relocated = (
+        ("uv", os.environ.get("UV_TOOL_DIR", "")),
+        ("pipx", os.path.join(os.environ["PIPX_HOME"], "venvs") if os.environ.get("PIPX_HOME") else ""),
+        ("pipx", os.path.join(os.environ["PIPX_GLOBAL_HOME"], "venvs") if os.environ.get("PIPX_GLOBAL_HOME") else ""),
+    )
+    for manager, root in relocated:
+        if root and normalized.startswith(os.path.normpath(root) + "/"):
+            return manager
+    return ""
 
 
 def _is_tool_manager_env(bin_dir: str) -> bool:
     """True if bin_dir belongs to a uv-tool or pipx per-tool venv."""
-    normalized = os.path.normpath(bin_dir) + "/"
-    return any(root in normalized for root in _TOOL_ENV_ROOTS)
+    return bool(tool_manager_of(bin_dir))
 
 
 def _installation_path() -> str:

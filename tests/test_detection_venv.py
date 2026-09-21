@@ -134,17 +134,20 @@ def test_trailing_slash_venv_bin_is_skipped(tmp_path, monkeypatch):
     assert find_paths("faketool4") == [str(real)]
 
 
-def test_reconcile_keeps_uv_tool_installation(tmp_path, monkeypatch):
-    # ~/.local/bin/black -> ~/.local/share/uv/tools/black/bin/black; the tool
-    # dir carries a pyvenv.cfg but the tool is installed, not an environment
-    from cli_audit.reconcile import clear_detection_cache, detect_installations
+@pytest.mark.parametrize(
+    "tool_env, manager",
+    [("share/uv/tools/fakeuvtool", "uv"), ("share/pipx/venvs/fakeuvtool", "pipx"), ("relocated/fakeuvtool", "uv")],
+)
+def test_reconcile_keeps_tool_manager_installation(tmp_path, monkeypatch, tool_env, manager):
+    # ~/.local/bin/<tool> -> <manager dir>/<tool>/bin/<tool>; the tool dir carries
+    # a pyvenv.cfg but the tool is installed, not an environment
+    from cli_audit.reconcile import _check_path_ordering, clear_detection_cache, detect_installations
 
-    tool_env = tmp_path / "share" / "uv" / "tools" / "fakeuvtool"
-    real = _make_bin(_make_venv(tool_env), "fakeuvtool", "26.5.1")
+    monkeypatch.setenv("UV_TOOL_DIR", str(tmp_path / "relocated"))
+    real = _make_bin(_make_venv(tmp_path / tool_env), "fakeuvtool", "26.5.1")
     local_bin = tmp_path / "local" / "bin"
     local_bin.mkdir(parents=True)
     (local_bin / "fakeuvtool").symlink_to(real)
-    # an activated venv with its own copy sits in front
     venv_bin = _make_venv(tmp_path / ".venv")
     _make_bin(venv_bin, "fakeuvtool", "25.11.0")
     monkeypatch.setenv("PATH", os.pathsep.join([str(venv_bin), str(local_bin)]))
@@ -152,5 +155,8 @@ def test_reconcile_keeps_uv_tool_installation(tmp_path, monkeypatch):
 
     installs = detect_installations("fakeuvtool", ["fakeuvtool"])
 
-    assert [i.path for i in installs] == [str(real)]
-    assert installs[0].active
+    assert [(i.path, i.method, i.active) for i in installs] == [(str(real), manager, True)]
+    # PATH advice names the dir on PATH, not the manager's internal bin dir
+    inactive = installs[0].__class__(**{**installs[0].__dict__, "active": False})
+    other = installs[0].__class__(**{**installs[0].__dict__, "path": "/usr/bin/fakeuvtool"})
+    assert f"Ensure {local_bin} appears first" in _check_path_ordering(inactive, other, False)[0]

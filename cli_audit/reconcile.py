@@ -22,7 +22,7 @@ from typing import Sequence
 
 from .common import vlog
 from .config import Config
-from .detection import _installation_path, _is_tool_manager_env, _is_virtualenv_bin
+from .detection import _installation_path, _is_tool_manager_env, _is_virtualenv_bin, tool_manager_of
 from .environment import Environment
 from .upgrade import compare_versions
 
@@ -85,6 +85,8 @@ class Installation:
     active: bool
     valid: bool = True
     preference_score: tuple[int, str, int] = (0, "0.0.0", 0)
+    # PATH dir the binary was found in (differs from dirname(path) for symlinks)
+    path_dir: str = ""
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
@@ -292,6 +294,7 @@ def detect_installations(
                     path=real_path,
                     active=is_active,
                     valid=valid,
+                    path_dir=path_dir,
                 )
             )
 
@@ -327,6 +330,13 @@ def classify_install_method(
     Returns:
         Installation method string (cargo, pipx, apt, brew, etc.)
     """
+    # A binary inside a uv-tool or pipx venv belongs to that manager. The
+    # queries below match the tool name as a substring of `pipx list` or
+    # `uv tool list` and could name the wrong one, i.e. the wrong uninstaller.
+    manager = tool_manager_of(os.path.dirname(path))
+    if manager:
+        return manager
+
     # Try package manager queries first
     method = _classify_via_queries(path, tool_name, verbose)
     if method != "unknown":
@@ -914,7 +924,7 @@ def _check_path_ordering(
             f"Preferred installation is not active\n"
             f"  Preferred: {preferred.path}\n"
             f"  Active:    {active.path}\n"
-            f"  Fix: Ensure {os.path.dirname(preferred.path)} appears first in PATH"
+            f"  Fix: Ensure {preferred.path_dir or os.path.dirname(preferred.path)} appears first in PATH"
         )
 
     return tuple(issues)
