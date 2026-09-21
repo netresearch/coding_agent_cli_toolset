@@ -189,8 +189,8 @@ osc8() {
   [ -n "$url" ] && printf '\e]8;;%s\e\\%s\e]8;;\e\\' "$url" "$text" || printf '%s' "$text"
 }
 
-# PATH without virtualenv/conda bin dirs; mirrors
-# cli_audit.detection._installation_path
+# PATH without virtualenv/conda bin dirs: the dirs the Python audit treats as
+# environments (pyvenv.cfg next to bin/, venv/conda name patterns)
 installation_path() {
   local dir parent out=""
   local -a dirs=()
@@ -234,7 +234,7 @@ probe_installed_version() {
     [ -x "$binary" ] || return 1
     bin_path="$binary"
   else
-    # Same lookup as the audit: an activated venv's copy is no installation
+    # An activated venv's copy is no installation
     bin_path="$(PATH="$(installation_path)" command -v "$binary" 2>/dev/null)" || return 1
   fi
 
@@ -300,6 +300,9 @@ upgrade_verdict() {
     echo "updated"
   elif [ -n "$marker" ]; then
     echo "$marker"
+  elif [ -z "$new_installed" ]; then
+    # Nothing detectable after an install: it did not happen
+    echo "unchanged"
   elif [ -z "$latest" ]; then
     echo "unverified"
   elif [ -n "$new_installed" ] && { [[ "$latest" == "$new_installed".* ]] || [[ "$new_installed" == "$latest".* ]]; }; then

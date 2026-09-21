@@ -121,12 +121,17 @@ if ! $installed && have apt-get; then
       if [ -n "$pkg_installed" ] && [ "$pkg_installed" = "$pkg_candidate" ]; then
         pm_ok=true
       fi
-      # The detected binary must be this package's: upstream part of the
-      # package version (no epoch, no revision) starts with the detected one
-      pkg_upstream="${pkg_installed#*:}"
-      pkg_upstream="${pkg_upstream%%-*}"
-      after_num="$(get_version "$VERSIONED_BINARY" | grep -oE '[0-9]+(\.[0-9]+)+' | head -1 || true)"
-      if [ -z "$after_num" ] || [[ "$pkg_upstream" != "$after_num"* ]]; then
+      # The binary on PATH must belong to one of these packages; otherwise
+      # another copy shadows the package and "unchanged" says nothing about apt.
+      # Versions cannot decide this: universal-ctags 5.9.20210829.0 prints 5.9.0.
+      bin_real="$(readlink -f "$(command -v "$VERSIONED_BINARY" 2>/dev/null)" 2>/dev/null || true)"
+      bin_owner=""
+      if [ -n "$bin_real" ]; then
+        bin_owner="$(LC_ALL=C dpkg -S "$bin_real" 2>/dev/null | head -1 || true)"
+        bin_owner="${bin_owner%%: *}"
+        bin_owner="${bin_owner%%:*}"
+      fi
+      if [ -z "$bin_owner" ] || [[ " $pkg " != *" $bin_owner "* ]]; then
         pm_ok=false
       fi
     fi

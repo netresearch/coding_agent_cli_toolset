@@ -142,7 +142,15 @@ def test_every_upgrade_branch_uses_the_verdict():
 SCRIPTS = PROJECT_ROOT / "scripts"
 
 
-def _run_package_manager(tmp_path: Path, *, install_rc: int, candidate: str, detected: str = "0.9.0", lang: str = "C") -> bool:
+def _run_package_manager(
+    tmp_path: Path,
+    *,
+    install_rc: int,
+    candidate: str,
+    detected: str = "0.9.0",
+    lang: str = "C",
+    owner: str = "bubblewrap",
+) -> bool:
     """Run package_manager.sh bwrap against stub apt tools; return whether held-back was marked."""
     if not shutil.which("jq"):
         pytest.skip("jq not installed")
@@ -152,6 +160,8 @@ def _run_package_manager(tmp_path: Path, *, install_rc: int, candidate: str, det
         "sudo": 'exec "$@"',
         "apt-get": f'[ "$1" = install ] && exit {install_rc}; exit 0',
         "dpkg-query": "echo 0.9.0-1ubuntu0.3",
+        # dpkg -S <path>: which package owns the binary found on PATH
+        "dpkg": f'[ "$1" = -S ] && [ -n "{owner}" ] && echo "{owner}: $2" && exit 0; exit 1',
         # apt-cache translates its labels unless LC_ALL=C
         "apt-cache": (
             'label="Candidate:"; [ "${LC_ALL:-}" != C ] && [ "${LANG:-C}" != C ] && label="Installationskandidat:"\n'
@@ -222,8 +232,22 @@ def test_held_back_detection_is_locale_independent(tmp_path):
 
 
 def test_shadowed_package_is_not_held_back(tmp_path):
-    # apt installed its newest 0.9.0, but a /usr/local copy 0.8.0 answers on PATH
-    assert not _run_package_manager(tmp_path, install_rc=0, candidate="0.9.0-1ubuntu0.3", detected="0.8.0")
+    # apt installed its newest 0.9.0, but a copy no package owns answers on PATH
+    assert not _run_package_manager(tmp_path, install_rc=0, candidate="0.9.0-1ubuntu0.3", detected="0.8.0", owner="")
+
+
+def test_package_version_longer_than_binary_version_is_held_back(tmp_path):
+    # universal-ctags 5.9.20210829.0-1 prints 5.9.0; ownership decides, not versions
+    assert _run_package_manager(tmp_path, install_rc=0, candidate="0.9.0-1ubuntu0.3", detected="0.9")
+
+
+def test_binary_owned_by_another_package_is_not_held_back(tmp_path):
+    assert not _run_package_manager(tmp_path, install_rc=0, candidate="0.9.0-1ubuntu0.3", owner="otherpkg")
+
+
+def test_install_that_left_nothing_is_a_failure(tmp_path):
+    out, counters = _run(tmp_path, script_ok="1", installed="", latest="", audited="")
+    assert counters == "COUNTERS updated=0 skipped=0 failed=1"
 
 
 def test_unknown_upstream_is_not_a_failure(tmp_path):
