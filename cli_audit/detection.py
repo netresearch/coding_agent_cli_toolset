@@ -43,7 +43,8 @@ VERSION_PROBE_TIMEOUT = "<probe-timeout>"
 VERSION_COMMAND_PATH = "<version_command>"
 
 # Environment-name patterns for env managers without a pyvenv.cfg (conda etc.).
-# Mirrors the venv skip list in scripts/lib/capability.sh:detect_all_installations.
+# scripts/lib/capability.sh has a similar list, but it matches the unresolved
+# path and skips every */venvs/*/bin, so the two no longer agree by construction.
 _ENV_DIR_PATTERNS = (
     "/venv/bin/",
     "/.venv/bin/",
@@ -84,7 +85,7 @@ def _is_virtualenv_bin(bin_dir: str) -> bool:
 _TOOL_RECORDS = {"uv": "uv-receipt.toml", "pipx": "pipx_metadata.json"}
 
 # A package directory name: no separator, no "..", so it cannot leave the root
-_PACKAGE_DIR_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]*\Z")
+_PACKAGE_DIR_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+@-]*\Z")
 
 
 def _env_dir(name: str, *parts: str) -> str:
@@ -217,8 +218,8 @@ def _is_environment_bin(bin_dir: str) -> bool:
 @lru_cache(maxsize=8)
 def _filter_path(path_env: str, strict: bool) -> str:
     dirs = [d for d in path_env.split(os.pathsep) if d]
-    keep = _is_virtualenv_bin if strict else _is_environment_bin
-    return os.pathsep.join(d for d in dirs if not keep(d))
+    is_foreign_dir = _is_virtualenv_bin if strict else _is_environment_bin
+    return os.pathsep.join(d for d in dirs if not is_foreign_dir(d))
 
 
 def _command_path() -> str:
@@ -252,7 +253,11 @@ def _which(command_name: str) -> str | None:
     if not found or not _is_foreign_binary(found):
         return found
     # rare: keep looking in the dirs after the one that answered
-    for path_dir in search_path.split(os.pathsep):
+    dirs = search_path.split(os.pathsep)
+    answered = os.path.dirname(found)
+    if answered in dirs:
+        dirs = dirs[dirs.index(answered) + 1 :]
+    for path_dir in dirs:
         other = shutil.which(command_name, path=path_dir) if path_dir else None
         if other and not _is_foreign_binary(other):
             return other

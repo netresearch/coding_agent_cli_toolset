@@ -24,7 +24,7 @@ from .common import vlog
 from .config import Config
 from .detection import (
     _env_dir,
-    _is_environment_bin,
+    _installation_path,
     _is_foreign_binary,
     _which,
     tool_manager_of,
@@ -224,17 +224,12 @@ def detect_installations(
     installations = []
     seen_paths = set()
 
-    # Get PATH directories
-    path_env = os.environ.get("PATH", "")
-    path_dirs = [d for d in path_env.split(os.pathsep) if d]
+    # PATH without environment bin dirs — the audit's own filtered PATH, so
+    # both sides apply one rule and pay for the filtering once
+    path_dirs = [d for d in _installation_path().split(os.pathsep) if d]
 
     # Search each PATH directory
     for path_dir in path_dirs:
-        # Virtualenv/conda bins are environments, not installations (a uv/pipx
-        # per-tool bin dir put on PATH directly is an installation)
-        if _is_environment_bin(path_dir):
-            vlog(f"  Skipping environment dir: {path_dir}", verbose)
-            continue
         for candidate in candidates:
             full_path = os.path.join(path_dir, candidate)
 
