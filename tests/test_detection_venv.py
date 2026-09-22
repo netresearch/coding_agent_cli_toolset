@@ -470,3 +470,20 @@ def test_filtered_path_is_computed_once_per_path(monkeypatch):
     detection._installation_path()
     detection._installation_path()
     assert detection._filter_path.cache_info().hits >= 1
+
+
+def test_symlinked_path_dir_into_a_venv_is_skipped(tmp_path, monkeypatch):
+    # PATH holds ~/current-bin -> ~/proj/.venv/bin
+    from cli_audit.detection import _command_path, _installation_path
+
+    venv_bin = _make_venv(tmp_path / "proj" / ".venv")
+    _make_bin(venv_bin, "fakelinked3", "1.0.0")
+    link = tmp_path / "current-bin"
+    link.symlink_to(venv_bin)
+    other_bin = tmp_path / "other" / "bin"
+    real = _make_bin(other_bin, "fakelinked3", "2.0.0")
+    monkeypatch.setenv("PATH", os.pathsep.join([str(link), str(other_bin), WHICH_DIR]))
+
+    assert str(link) not in _installation_path()
+    assert str(link) not in _command_path()
+    assert find_paths("fakelinked3") == [str(real)]

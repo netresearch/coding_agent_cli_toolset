@@ -66,8 +66,10 @@ def _is_virtualenv_bin(bin_dir: str) -> bool:
     and classifying them by method (e.g. `uv` because the tool also appears
     in `uv tool list`) makes removal delete a DIFFERENT installation.
     """
-    # "/x/env/bin/" must behave like "/x/env/bin" (dirname would stay in bin/)
-    bin_dir = os.path.normpath(bin_dir)
+    # Resolve first: a PATH entry can be a symlink to an environment's bin dir
+    # (~/bin -> ~/proj/.venv/bin), and normpath alone would not see the venv.
+    # This also makes "/x/env/bin/" behave like "/x/env/bin".
+    bin_dir = os.path.realpath(os.path.expanduser(bin_dir))
     # Definitive signal: PEP 405 venvs carry pyvenv.cfg next to bin/
     if os.path.isfile(os.path.join(os.path.dirname(bin_dir), "pyvenv.cfg")):
         return True
