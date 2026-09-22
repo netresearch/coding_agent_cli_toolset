@@ -53,18 +53,22 @@ get_installed_version() {
     fi
 }
 
-get_target_version() {
+# Print the newest stable release tag. Upstream tags releases both as "7.19"
+# and, since the trustmux rename, as "trustmux-v7.19"; the prefixed tags fill
+# the first page of the tags API, so accept both forms. For equal versions
+# the plain tag wins.
+get_target_tag() {
     local tags_json=""
-    local version=""
 
     tags_json="$(github_api_get "repos/$GITHUB_REPO/tags?per_page=100")" || tags_json=""
 
-    version="$(printf '%s' "$tags_json" |
+    printf '%s' "$tags_json" |
         jq -r 'if type == "array" then .[].name else empty end' |
-        grep -E '^[0-9]+([.][0-9]+)+$' |
-        sort -V |
-        tail -1)"
-    printf '%s' "$version"
+        grep -E '^(trustmux-v)?[0-9]+([.][0-9]+)+$' |
+        awk '{ v = $0; sub(/^trustmux-v/, "", v); print v "\t" ($0 == v ? 1 : 0) "\t" $0 }' |
+        sort -t "$(printf '\t')" -k1,1V -k2,2n |
+        tail -1 |
+        cut -f3 || true
 }
 
 remove_manifest_files() {
@@ -84,6 +88,9 @@ remove_manifest_files() {
 
 install_byobu() {
     local version="${1:-}"
+    local tag="$version"
+    local candidate=""
+    local -a tags=()
     local before=""
     local after=""
     local archive=""
@@ -96,7 +103,13 @@ install_byobu() {
 
     if [ -z "$version" ]; then
         echo "[$TOOL] Fetching latest stable tag..." >&2
-        version="$(get_target_version)"
+        tag="$(get_target_tag)"
+    fi
+    version="${tag#trustmux-v}"
+    # An explicit plain version may exist only as trustmux-v<version>
+    tags=("$tag")
+    if [ "$tag" = "$version" ]; then
+        tags+=("trustmux-v$version")
     fi
     if ! grep -Eq '^[0-9]+([.][0-9]+)+$' <<<"$version"; then
         echo "[$TOOL] Error: Invalid stable version: ${version:-<none>}" >&2
@@ -108,13 +121,18 @@ install_byobu() {
     BUILD_LOG="$BUILD_TMPDIR/build.log"
     archive="$BUILD_TMPDIR/byobu-$version.tar.gz"
     stage_dir="$BUILD_TMPDIR/stage"
-    url="https://github.com/$GITHUB_REPO/archive/refs/tags/${version}.tar.gz"
-
-    echo "[$TOOL] Downloading $url..." >&2
-    if ! curl --proto '=https' --proto-redir '=https' -fL \
-        --retry 3 --retry-delay 1 --connect-timeout 10 \
-        "$url" -o "$archive"; then
-        echo "[$TOOL] Error: Failed to download $url" >&2
+    url=""
+    for candidate in "${tags[@]}"; do
+        echo "[$TOOL] Downloading tag $candidate..." >&2
+        if curl --proto '=https' --proto-redir '=https' -fsSL \
+            --retry 3 --retry-delay 1 --connect-timeout 10 \
+            "https://github.com/$GITHUB_REPO/archive/refs/tags/${candidate}.tar.gz" -o "$archive"; then
+            url="https://github.com/$GITHUB_REPO/archive/refs/tags/${candidate}.tar.gz"
+            break
+        fi
+    done
+    if [ -z "$url" ]; then
+        echo "[$TOOL] Error: Failed to download tag(s): ${tags[*]}" >&2
         return 1
     fi
     if ! tar -xzf "$archive" -C "$BUILD_TMPDIR"; then

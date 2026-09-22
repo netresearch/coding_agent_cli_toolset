@@ -20,6 +20,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 - Binary-probe fallback in `guide.sh` when the post-install snapshot refresh is stale.
 
 ### Fixed
+- difftastic 0.71.0 puts the version into its release file names (`difft-0.71.0-x86_64-unknown-linux-gnu.tar.gz`); the catalog download URL now includes it. byobu is tagged `trustmux-v7.19` since the trustmux rename, and those tags fill the first page of the tags API, so the installer found no stable tag; it now accepts both tag forms.
 - `cmd_update_local` in MERGE mode now refreshes multi-version cycle entries (`python@3.14`, …) instead of only the base-tool entry. Resolved false-negative "Upgrade did not succeed" messages after successful uv installs.
 
 ### Changed

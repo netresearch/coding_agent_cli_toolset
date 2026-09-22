@@ -392,7 +392,8 @@ class TestByobuInstallScript:
 
         content = script_path.read_text()
         assert "^[0-9]+([.][0-9]+)+$" in content
-        assert "archive/refs/tags/${version}.tar.gz" in content
+        # The tag, not the version: releases are tagged "trustmux-v7.19" too
+        assert "archive/refs/tags/${candidate}.tar.gz" in content
         assert './configure --prefix="$INSTALL_PREFIX"' in content
         assert "$INSTALL_PREFIX/bin/byobu" in content
         assert "uninstall)" in content
