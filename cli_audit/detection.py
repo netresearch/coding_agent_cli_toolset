@@ -13,6 +13,7 @@ import re
 import shutil
 import subprocess
 import tomllib
+from functools import lru_cache
 from typing import Sequence
 
 # Constants
@@ -97,13 +98,15 @@ def _env_dir(name: str, *parts: str) -> str:
 def _tool_roots() -> tuple[tuple[str, str], ...]:
     """(manager, root) for every per-tool venv root of uv and pipx on this machine."""
     home = os.path.expanduser("~")
-    data_home = os.environ.get("XDG_DATA_HOME") or os.path.join(home, ".local", "share")
+    data_home = os.path.expanduser(os.environ.get("XDG_DATA_HOME") or "") or os.path.join(home, ".local", "share")
     roots = (
         ("uv", _env_dir("UV_TOOL_DIR") or os.path.realpath(os.path.join(data_home, "uv", "tools"))),
         ("pipx", _env_dir("PIPX_HOME", "venvs") or os.path.realpath(os.path.join(data_home, "pipx", "venvs"))),
         ("pipx", _env_dir("PIPX_GLOBAL_HOME", "venvs") or os.path.realpath("/opt/pipx/venvs")),
         # pipx before 1.5 kept its venvs outside the data dir
         ("pipx", os.path.realpath(os.path.join(home, ".local", "pipx", "venvs"))),
+        # pipx >= 1.5 asks platformdirs, which answers differently on macOS
+        ("pipx", os.path.realpath(os.path.join(home, "Library", "Application Support", "pipx", "venvs"))),
     )
     return tuple((manager, root) for manager, root in roots if root)
 
@@ -163,7 +166,10 @@ def tool_entrypoints(bin_dir: str) -> set[str] | None:
             data = json.load(f)
         packages = [data.get("main_package") or {}]
         packages += [p for p in (data.get("injected_packages") or {}).values() if p.get("include_apps")]
-        return {app for p in packages for app in (p.get("apps") or [])}
+        apps = {app for p in packages for app in (p.get("apps") or [])}
+        # `pipx install --include-deps` links a dependency's apps on purpose
+        apps |= {app for p in packages if p.get("include_dependencies") for app in (p.get("apps_of_dependencies") or [])}
+        return apps
     except (OSError, ValueError, AttributeError, TypeError, KeyError) as exc:
         # Unreadable record: every executable in that venv then counts as a
         # dependency, so say which file and why
@@ -186,6 +192,17 @@ def _is_tool_dependency_binary(path: str) -> bool:
     return names is None or os.path.basename(real) not in names
 
 
+def _is_foreign_binary(path: str) -> bool:
+    """True if path is no installation: it resolves into an environment, or it is
+    a dependency's executable inside a tool manager's per-tool venv.
+
+    The audit and reconcile both ask this, so a symlink from an ordinary PATH
+    dir into a venv is judged the same way on both sides.
+    """
+    real = os.path.realpath(path)
+    return _is_environment_bin(os.path.dirname(real)) or _is_tool_dependency_binary(real)
+
+
 def _is_environment_bin(bin_dir: str) -> bool:
     """True if bin_dir is an environment's bin dir and no tool manager's per-tool venv.
 
@@ -195,6 +212,13 @@ def _is_environment_bin(bin_dir: str) -> bool:
     return _is_virtualenv_bin(bin_dir) and not _is_tool_manager_env(os.path.realpath(bin_dir))
 
 
+@lru_cache(maxsize=8)
+def _filter_path(path_env: str, strict: bool) -> str:
+    dirs = [d for d in path_env.split(os.pathsep) if d]
+    keep = _is_virtualenv_bin if strict else _is_environment_bin
+    return os.pathsep.join(d for d in dirs if not keep(d))
+
+
 def _command_path() -> str:
     """PATH for running a tool by its name: no environment bin dirs at all.
 
@@ -202,8 +226,7 @@ def _command_path() -> str:
     running a name there can hit a dependency's executable (pygmentize in
     httpie's venv) instead of the installation.
     """
-    dirs = [d for d in os.environ.get("PATH", os.defpath).split(os.pathsep) if d]
-    return os.pathsep.join(d for d in dirs if not _is_virtualenv_bin(d))
+    return _filter_path(os.environ.get("PATH", os.defpath), True)
 
 
 def _installation_path() -> str:
@@ -213,8 +236,7 @@ def _installation_path() -> str:
     lookup reports the environment's copy (e.g. ~/.venv/bin/black) and an
     upgrade of the real installation never shows up in the audit.
     """
-    dirs = [d for d in os.environ.get("PATH", os.defpath).split(os.pathsep) if d]
-    return os.pathsep.join(d for d in dirs if not _is_environment_bin(d))
+    return _filter_path(os.environ.get("PATH", os.defpath), False)
 
 
 def _which(command_name: str) -> str | None:
@@ -223,10 +245,15 @@ def _which(command_name: str) -> str | None:
     Skips a dependency's executable inside a uv/pipx per-tool venv and keeps
     searching the next PATH dir.
     """
-    for path_dir in _installation_path().split(os.pathsep):
-        found = shutil.which(command_name, path=path_dir) if path_dir else None
-        if found and not _is_tool_dependency_binary(found):
-            return found
+    search_path = _installation_path()
+    found = shutil.which(command_name, path=search_path)
+    if not found or not _is_foreign_binary(found):
+        return found
+    # rare: keep looking in the dirs after the one that answered
+    for path_dir in search_path.split(os.pathsep):
+        other = shutil.which(command_name, path=path_dir) if path_dir else None
+        if other and not _is_foreign_binary(other):
+            return other
     return None
 
 
@@ -264,7 +291,7 @@ def find_paths(command_name: str, deep: bool = False) -> list[str]:
             for line in (proc.stdout or "").splitlines():
                 line = line.strip()
                 if line and os.path.isfile(line) and os.access(line, os.X_OK):
-                    if line not in paths and not _is_tool_dependency_binary(line):
+                    if line not in paths and not _is_foreign_binary(line):
                         paths.append(line)
         except Exception:
             pass

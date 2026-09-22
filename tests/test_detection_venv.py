@@ -413,3 +413,60 @@ def test_odd_package_dir_name_is_no_tool_venv(tmp_path, monkeypatch, package):
         str(tmp_path / "share" / "uv" / "tools"),
         "black",
     )
+
+
+def test_pipx_include_deps_app_is_an_installation(tmp_path, monkeypatch):
+    # `pipx install --include-deps ansible` links ansible-playbook on purpose
+    venv = tmp_path / "pipx" / "venvs" / "fakeansible"
+    bin_dir = _make_venv(venv)
+    (venv / "pipx_metadata.json").write_text(
+        json.dumps(
+            {
+                "main_package": {
+                    "apps": ["fakeansible"],
+                    "include_dependencies": True,
+                    "apps_of_dependencies": ["fakeansible-playbook"],
+                }
+            }
+        )
+    )
+    _make_bin(bin_dir, "fakeansible", "2.21.4")
+    real = _make_bin(bin_dir, "fakeansible-playbook", "2.21.4")
+    _make_bin(bin_dir, "fakedeponly", "1.0.0")
+    local_bin = tmp_path / "local" / "bin"
+    local_bin.mkdir(parents=True)
+    (local_bin / "fakeansible-playbook").symlink_to(real)
+    monkeypatch.setenv("PATH", os.pathsep.join([str(local_bin), WHICH_DIR]))
+
+    assert find_paths("fakeansible-playbook") == [str(local_bin / "fakeansible-playbook")]
+    assert get_missing_tools(["fakeansible-playbook"]) == []
+    # a dependency the manager did not expose stays out
+    monkeypatch.setenv("PATH", os.pathsep.join([str(bin_dir), WHICH_DIR]))
+    assert find_paths("fakedeponly") == []
+
+
+def test_symlink_from_path_dir_into_a_venv_is_no_installation(tmp_path, monkeypatch):
+    # ~/.local/bin/tool -> ~/proj/.venv/bin/tool: the audit and reconcile must agree
+    from cli_audit.reconcile import clear_detection_cache, detect_installations
+
+    venv_bin = _make_venv(tmp_path / "proj" / ".venv")
+    venv_copy = _make_bin(venv_bin, "fakelinked2", "1.0.0")
+    local_bin = tmp_path / "local" / "bin"
+    local_bin.mkdir(parents=True)
+    (local_bin / "fakelinked2").symlink_to(venv_copy)
+    monkeypatch.setenv("PATH", os.pathsep.join([str(local_bin), WHICH_DIR]))
+    clear_detection_cache()
+
+    assert find_paths("fakelinked2", deep=True) == []
+    assert detect_installations("fakelinked2", ["fakelinked2"]) == []
+
+
+def test_filtered_path_is_computed_once_per_path(monkeypatch):
+    # the filter stats every PATH entry; a WSL PATH makes that expensive
+    import cli_audit.detection as detection
+
+    monkeypatch.setenv("PATH", os.pathsep.join(["/usr/bin", "/bin"]))
+    detection._filter_path.cache_clear()
+    detection._installation_path()
+    detection._installation_path()
+    assert detection._filter_path.cache_info().hits >= 1

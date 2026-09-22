@@ -25,7 +25,7 @@ from .config import Config
 from .detection import (
     _env_dir,
     _is_environment_bin,
-    _is_tool_dependency_binary,
+    _is_foreign_binary,
     _which,
     tool_manager_of,
 )
@@ -255,8 +255,7 @@ def detect_installations(
                 continue
 
             # A symlink can point into an environment as well
-            real_dir = os.path.dirname(real_path)
-            if _is_environment_bin(real_dir) or _is_tool_dependency_binary(real_path):
+            if _is_foreign_binary(real_path):
                 vlog(f"  Skipping environment binary: {real_path}", verbose)
                 continue
 
@@ -1057,7 +1056,7 @@ def _tool_env_package(path: str, tool: str) -> str:
 def _is_pipx_global(path: str) -> bool:
     """True if path lies in pipx's global venvs (`pipx install --global`)."""
     root = _env_dir("PIPX_GLOBAL_HOME", "venvs") or os.path.realpath("/opt/pipx/venvs")
-    return os.path.normpath(path).startswith(root + "/")
+    return os.path.realpath(path).startswith(root + "/")
 
 
 def _reinstall_hint(installation: Installation) -> str:
