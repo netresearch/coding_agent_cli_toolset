@@ -1,81 +1,42 @@
 # Catalog Coverage
 
-This file documents which tools have catalog entries and which use dedicated install scripts.
+This file documents which tools have catalog entries and how each one is installed.
 
-## Tools with Catalog Entries (57)
+## Catalog entries (107)
 
-These tools use the catalog-based installation system with generic installers:
+Counted from `catalog/*.json` on 2026-09-22. Every tool the audit tracks has a catalog entry; its `install_method` selects the installer (`scripts/installers/<method>.sh`). `dedicated_script` runs the script named in the entry's `script` field. `auto` goes through the reconciliation system (`reconcile_tool` in `scripts/lib/reconcile.sh`).
 
-- ansible, ast-grep, aws, bandit, bat, black, codex, composer, curlie, dasel
-- delta, direnv, dive, entr, fd, flake8, fx, fzf, gem, gemini, gh, git-absorb
-- git-branchless, git-lfs, gitleaks, glab, golangci-lint, httpie, isort, just
-- kubectl, ninja, npm, opengrep, parallel, pip, pipx, pnpm, poetry, pre-commit
-- prettier, rga, ripgrep, ruff, sd, semgrep, shellcheck, shfmt, sponge, terraform
-- tfsec, trivy, vault, watchexec, xsv, yarn, yq
-
-## Tools with Dedicated Install Scripts
-
-### Runtime Environments
-These have their own complex installers in `scripts/`:
-- **go** - `install_go.sh`
-- **rust** - `install_rust.sh`
-- **python** - `install_python.sh`
-- **node** - `install_node.sh`
-
-### Package Managers
-Most now in catalog, one dedicated script:
-- **uv** - `install_uv.sh` (special bootstrap installer)
-- All others (pip, pipx, npm, pnpm, yarn, gem, composer, poetry, sponge) - Now in catalog!
-
-### Docker Tools
-- **docker** - `install_docker.sh` (uses official Docker install script)
-- **docker-compose** - Typically installed with Docker
-
-### System Tools
-- **git** - System package (apt/dnf/brew)
-- **ctags** - System package
-- **sponge** - Part of moreutils package
-- **prename** - System package (Perl rename)
-- **rename.ul** - System package (util-linux rename)
-
-### Other
-- **gam** - Google Apps Manager (special installation)
-- **claude** - Claude CLI (special installation)
-- **ansible-core** - Subset of ansible package
-- **eslint** - Node.js package (installed via npm)
-
-## Installation Method Distribution
-
-- **github_release_binary**: 32 tools
-- **uv_tool**: 8 tools (Python CLI tools)
-- **package_manager**: 10 tools (pip, pipx, poetry, npm, pnpm, yarn, gem, composer, sponge, entr)
-- **hashicorp_zip**: 2 tools (terraform, vault)
-- **aws_installer**: 1 tool (aws)
-- **npm_global**: 1 tool (prettier)
-- **script**: 1 tool (parallel)
-- **dedicated_script**: 10 tools (runtimes: go, rust, python, node; special: uv, docker, git, ctags, gam)
-- **system_package**: 2 tools (cscope, rename variants)
-
-## Total: 72 tools tracked
-
-- **57 tools** have catalog entries
-- **10 tools** use dedicated scripts (runtimes + special cases)
-- **5 tools** are system packages only
-
-All installable tools either have catalog entries or use appropriate dedicated scripts.
+| install_method | Count | Tools |
+|---|---|---|
+| `github_release_binary` | 38 | ast-grep, curlie, dasel, direnv, dive, fx, fzf, gh, gh-aw, gh-aw-firewall, git-absorb, git-branchless, git-lfs, gitleaks, glab, golangci-lint, google-workspace-cli, gosec, herdr, jq, just, kubectl, mlr, ninja, opengrep, qsv, rga, sd, shellcheck, shfmt, symfony, tfsec, trivy, vhs, watchexec, xsv, yq, zellij |
+| `dedicated_script` | 18 | blesh, byobu, claude, composer, docker, gem, go, node, parallel, pip, python, ruby, rust, tmux, tree, uv, wslu, yarn |
+| `auto` | 13 | actionlint, bat, delta, difftastic, dust, fd, gup, hyperfine, jj, pnpm, ripgrep, scc, tokei |
+| `uv_tool` | 12 | ansible-core, bandit, black, flake8, gam, git-filter-repo, httpie, isort, pre-commit, ruff, semgrep, trustmux |
+| `package_manager` | 10 | bwrap, ctags, entr, git, php, pipx, poetry, prename, rename.ul, sponge |
+| `npm_global` | 7 | bw, codex, eslint, gemini, jules, pi, prettier |
+| `github_clone` | 2 | rbenv, ruby-build |
+| `hashicorp_zip` | 2 | terraform, vault |
+| `aws_installer` | 1 | aws |
+| `docker_plugin` | 1 | compose |
+| `gcloud_installer` | 1 | gcloud |
+| `go_install` | 1 | templ |
+| `npm_self_update` | 1 | npm |
 
 ## Bash completion coverage
 
-Every catalog entry was audited for a bash-completion generator (sweep of
-2026-07-22; each generator was executed and its output validated against
-`complete -…` / `compgen ` / `COMPREPLY`, then checked to confirm it registers
-the entry's own `binary_name`).
+A sweep on 2026-07-22 (commit 9b6c053) audited the entries present in that
+commit for a bash-completion generator: each generator was executed and its
+output validated against `complete -…` / `compgen ` / `COMPREPLY`, then
+checked to confirm it registers the entry's own `binary_name`. codex, pip and
+pipx were not installed then; see the end of this section. herdr, jules, pi
+and vault were checked when they were added. Five entries are not audited:
+blesh, bw, bwrap, byobu, trustmux.
 
-**40 entries declare `bash_completion`** — 39 `command`, 1 `source_path` (rbenv).
+**42 entries declare `bash_completion`** — 41 `command`, 1 `source_path` (rbenv).
 
 Declared (`command`): ast-grep, bat, black, codex, composer, dasel, delta, dive,
-docker, fd, fx, gh, git-absorb, git-lfs, gitleaks, glab, golangci-lint, gup, jj,
-just, kubectl, mlr, node, npm, parallel, pip, pipx, pnpm, poetry, ripgrep, ruff,
+docker, fd, fx, gh, git-absorb, git-lfs, gitleaks, glab, golangci-lint, gup, herdr, jj,
+jules, just, kubectl, mlr, node, npm, parallel, pip, pipx, pnpm, poetry, ripgrep, ruff,
 scc, symfony, trivy, uv, vhs, watchexec, yq, zellij
 
 Declared (`source_path`): rbenv (`completions/rbenv.bash`, under its `clone_path`)
@@ -99,7 +60,7 @@ The completion file is named after `binary_name`, so a script that registers a
 actionlint, ansible-core, aws, bandit, claude, ctags, curlie, difftastic,
 direnv, dust, entr, eslint, flake8, gam, gem, gemini, gh-aw-firewall, git,
 git-branchless, git-filter-repo, go, google-workspace-cli, gosec, httpie,
-hyperfine, isort, jq, ninja, opengrep, php, pre-commit, prename, prettier,
+hyperfine, isort, jq, ninja, opengrep, php, pi, pre-commit, prename, prettier,
 python, qsv, rename.ul, ruby, ruby-build, sd, semgrep, shellcheck, shfmt,
 sponge, templ, terraform, tfsec, tmux, tokei, tree, vault, wslu, xsv, yarn
 

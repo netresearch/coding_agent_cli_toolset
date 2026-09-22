@@ -65,8 +65,27 @@ remove_installation() {
       ;;
     npm)
       if command -v npm >/dev/null 2>&1; then
-        echo "[$tool] Uninstalling npm global package: $tool" >&2
-        npm uninstall -g "$tool" 2>/dev/null || true
+        # The package name can differ from the tool name (pi is
+        # @earendil-works/pi-coding-agent, and an unrelated package `pi`
+        # exists), so read it from the bin symlink: node_modules/<pkg>/...
+        # One level only: `npm link` and folder installs make the package
+        # directory a symlink too, and readlink -f would resolve past it.
+        local npm_pkg="$tool" npm_path npm_target npm_rest
+        npm_path="${known_path:-$(command -v "$binary" 2>/dev/null || echo "")}"
+        npm_target="$(readlink "$npm_path" 2>/dev/null || echo "")"
+        case "$npm_target" in
+          */node_modules/*|node_modules/*)
+            # First node_modules = the global prefix; a later one would be
+            # a bundled dependency of the package
+            npm_rest="${npm_target#*node_modules/}"
+            case "$npm_rest" in
+              @*/*) npm_pkg="$(echo "$npm_rest" | cut -d/ -f1-2)" ;;
+              *) npm_pkg="${npm_rest%%/*}" ;;
+            esac
+            ;;
+        esac
+        echo "[$tool] Uninstalling npm global package: $npm_pkg" >&2
+        npm uninstall -g "$npm_pkg" 2>/dev/null || true
       fi
       ;;
     nvm)

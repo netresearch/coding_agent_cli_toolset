@@ -8,6 +8,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 ## [Unreleased]
 
 ### Added
+- `pi` catalog entry: the pi coding agent, installed from npm as `@earendil-works/pi-coding-agent` (the earlier `@mariozechner/pi-coding-agent` package is deprecated); upstream version from GitHub `earendil-works/pi`.
+- `jules` catalog entry: the Google Jules CLI (`@google/jules`), Google's asynchronous coding agent, with bash completion from `jules completion bash`.
 - `herdr` catalog entry (`catalog/herdr.json`): terminal multiplexer for coding agents, installed as a raw linux binary from GitHub releases (x86_64, aarch64) with bash completion.
 - `wslu`/`wslview` catalog entry (`catalog/wslu.json` + `scripts/install_wslu.sh`), gated by a new `requires_wsl` catalog flag so it is only surfaced and installed under WSL. Its installer also points the xdg default browser at `wslview` (so links open in the Windows browser); opt out with `WSLU_SET_DEFAULT_BROWSER=0`.
 - Governance files: PR template, `CHANGELOG.md`. Security reporting is covered by the [org-level SECURITY.md](https://github.com/netresearch/.github/blob/main/SECURITY.md).
@@ -20,6 +22,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 - Binary-probe fallback in `guide.sh` when the post-install snapshot refresh is stale.
 
 ### Fixed
+- `make uninstall-<tool>` removed an npm global package by the tool name. For `pi` (package `@earendil-works/pi-coding-agent`) that ran `npm uninstall -g pi`, which leaves the agent installed and names an unrelated npm package `pi`. The package name is now read from the binary's symlink into `node_modules`.
 - The network-free refresh that `make upgrade` runs first (`audit.py --update-local`) skipped every multi-version row, so `python@3.14`, `node@26` and the other cycles kept the version they were last written with. After a successful upgrade the guide still offered the same upgrade until an install ran again. The refresh re-detects the cycle rows, the same way the post-install merge refresh already did.
 - Audit detection skips virtualenv/conda bin dirs, like reconcile already did. An activated `~/.venv` made the audit report its own copy (`~/.venv/bin/black` 25.11.0) instead of the installation (`uv tool` black 26.5.1), so every upgrade of black, isort and python@3.14 looked like a no-op. Catalog `version_command`s run with the same filtered PATH. Reconcile no longer drops uv-tool and pipx installations, whose per-tool directories also carry a `pyvenv.cfg`. A tool that exists only inside a virtualenv or conda environment is now reported as not installed; the bulk missing-tool check and the post-install validation use the same lookup.
 - `make upgrade` hid every pinned tool, whatever the pin. A release skipped with `s` ("ask again when newer patch available") hid the tool for good. A pin now hides a tool only while it is `never`, equals the target release (`s`), equals the installed version (`p`), or equals the cycle.
