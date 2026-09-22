@@ -16,5 +16,5 @@
     "install_action": "upgrade",
     "order": 404
   },
-  "notes": "Published as @earendil-works/pi-coding-agent; the earlier @mariozechner/pi-coding-agent package is deprecated. Requires Node.js >= 20.6."
+  "notes": "Published as @earendil-works/pi-coding-agent; the earlier @mariozechner/pi-coding-agent package is deprecated. Requires Node.js >= 22.19."
 }
