@@ -1,0 +1,20 @@
+{
+  "name": "pi",
+  "category": "ai",
+  "install_method": "npm_global",
+  "description": "pi - coding agent CLI with read, bash, edit and write tools and session management",
+  "homepage": "https://github.com/earendil-works/pi",
+  "github_repo": "earendil-works/pi",
+  "package_name": "@earendil-works/pi-coding-agent",
+  "binary_name": "pi",
+  "requires": [
+    "node"
+  ],
+  "version_command": "pi --version 2>/dev/null | grep -oE '[0-9]+\\.[0-9]+\\.[0-9]+' | head -1",
+  "guide": {
+    "display_name": "pi coding agent",
+    "install_action": "upgrade",
+    "order": 404
+  },
+  "notes": "Published as @earendil-works/pi-coding-agent; the earlier @mariozechner/pi-coding-agent package is deprecated. Requires Node.js >= 20.6."
+}

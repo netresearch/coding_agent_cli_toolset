@@ -1,0 +1,22 @@
+{
+  "name": "jules",
+  "category": "ai",
+  "install_method": "npm_global",
+  "description": "Google Jules CLI - terminal client for Jules, Google's asynchronous coding agent",
+  "homepage": "https://jules.google",
+  "package_name": "@google/jules",
+  "binary_name": "jules",
+  "requires": [
+    "node"
+  ],
+  "version_command": "jules version 2>/dev/null | grep -oE '[0-9]+\\.[0-9]+\\.[0-9]+' | head -1",
+  "guide": {
+    "display_name": "Google Jules CLI",
+    "install_action": "upgrade",
+    "order": 405
+  },
+  "notes": "Sessions run remotely (`jules remote`); `jules teleport` applies a session's changes locally. Sign in with `jules login`. Requires Node.js >= 18.",
+  "bash_completion": {
+    "command": "jules completion bash"
+  }
+}

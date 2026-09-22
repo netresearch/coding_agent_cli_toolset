@@ -579,6 +579,22 @@ make audit-offline-data-core
 - **Install:** `npm install -g @google/gemini-cli`
 - **Upgrade:** `npm update -g @google/gemini-cli`
 
+### jules
+- **Purpose:** Google Jules CLI - terminal client for Jules, Google's asynchronous coding agent
+- **Executable:** `jules`
+- **Upstream:** npm (@google/jules)
+- **Use Case:** Assign coding sessions that run remotely and apply their changes locally (`jules teleport`)
+- **Install:** `npm install -g @google/jules`
+- **Upgrade:** `npm update -g @google/jules`
+
+### pi
+- **Purpose:** pi - coding agent CLI with read, bash, edit and write tools and session management
+- **Executable:** `pi`
+- **Upstream:** GitHub (earendil-works/pi), published on npm as @earendil-works/pi-coding-agent
+- **Use Case:** Minimal terminal coding agent
+- **Install:** `npm install -g @earendil-works/pi-coding-agent`
+- **Upgrade:** `npm update -g @earendil-works/pi-coding-agent`
+
 ### claude
 - **Purpose:** Anthropic Claude Code CLI
 - **Executable:** `claude`

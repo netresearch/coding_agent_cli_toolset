@@ -71,11 +71,11 @@ Every catalog entry was audited for a bash-completion generator (sweep of
 `complete -…` / `compgen ` / `COMPREPLY`, then checked to confirm it registers
 the entry's own `binary_name`).
 
-**40 entries declare `bash_completion`** — 39 `command`, 1 `source_path` (rbenv).
+**41 entries declare `bash_completion`** — 40 `command`, 1 `source_path` (rbenv).
 
 Declared (`command`): ast-grep, bat, black, codex, composer, dasel, delta, dive,
 docker, fd, fx, gh, git-absorb, git-lfs, gitleaks, glab, golangci-lint, gup, jj,
-just, kubectl, mlr, node, npm, parallel, pip, pipx, pnpm, poetry, ripgrep, ruff,
+jules, just, kubectl, mlr, node, npm, parallel, pip, pipx, pnpm, poetry, ripgrep, ruff,
 scc, symfony, trivy, uv, vhs, watchexec, yq, zellij
 
 Declared (`source_path`): rbenv (`completions/rbenv.bash`, under its `clone_path`)
@@ -99,7 +99,7 @@ The completion file is named after `binary_name`, so a script that registers a
 actionlint, ansible-core, aws, bandit, claude, ctags, curlie, difftastic,
 direnv, dust, entr, eslint, flake8, gam, gem, gemini, gh-aw-firewall, git,
 git-branchless, git-filter-repo, go, google-workspace-cli, gosec, httpie,
-hyperfine, isort, jq, ninja, opengrep, php, pre-commit, prename, prettier,
+hyperfine, isort, jq, ninja, opengrep, php, pi, pre-commit, prename, prettier,
 python, qsv, rename.ul, ruby, ruby-build, sd, semgrep, shellcheck, shfmt,
 sponge, templ, terraform, tfsec, tmux, tokei, tree, vault, wslu, xsv, yarn
 

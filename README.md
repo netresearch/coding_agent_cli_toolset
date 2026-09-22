@@ -468,7 +468,7 @@ make test-parallel     # Parallel via pytest-xdist
 
 ## Installation scripts
 
-All 97 cataloged tools can be installed, upgraded, uninstalled, or reconciled via generic Make targets:
+All 107 cataloged tools can be installed, upgraded, uninstalled, or reconciled via generic Make targets:
 
 ```bash
 # Generic pattern targets - work for ANY cataloged tool
@@ -539,7 +539,7 @@ When ambiguous, the audit may report a generic bucket (e.g., `~/.local/bin`). Th
 
 ### Actions: install, upgrade, uninstall, reconcile
 
-All pattern targets (`install-%`, `upgrade-%`, `uninstall-%`, `reconcile-%`) work for any of the 97 cataloged tools. They use a three-step fallback: dedicated script, then generic installer, then error.
+All pattern targets (`install-%`, `upgrade-%`, `uninstall-%`, `reconcile-%`) work for any of the 107 cataloged tools. They use a three-step fallback: dedicated script, then generic installer, then error.
 
 ```bash
 # Upgrade any tool
