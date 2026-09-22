@@ -868,6 +868,89 @@ def cmd_update(args: argparse.Namespace) -> int:
         return 1
 
 
+def _refresh_multi_version_entries(tools_list, tools_by_name: dict, existing_tools: list) -> None:
+    """Re-detect each multi-version cycle (python@3.14, node@22, …) into tools_by_name.
+
+    build_legacy_snapshot emits only the base-tool key, so without this the cycle
+    rows keep the version they were written with, and the guide offers an upgrade
+    for a version that is no longer installed. Network-free: the supported cycles
+    come from the existing snapshot.
+    """
+    try:
+        from cli_audit.catalog import ToolCatalog
+
+        _catalog = ToolCatalog()
+    except Exception:
+        _catalog = None
+    if _catalog is not None:
+        for tool in tools_list:
+            if not _catalog.has_tool(tool.name):
+                continue
+            catalog_data = _catalog.get_raw_data(tool.name)
+            mv_config = catalog_data.get("multi_version", {})
+            if not mv_config.get("enabled"):
+                continue
+            # Reuse supported-cycle metadata from existing snapshot so this
+            # fast-path stays network-free. First full audit populates it;
+            # subsequent refreshes just re-detect local installs.
+            supported: list[dict] = []
+            for t in existing_tools:
+                if t.get("base_tool") == tool.name and t.get("version_cycle"):
+                    supported.append(
+                        {
+                            "cycle": t["version_cycle"],
+                            "latest": t.get("latest_upstream", ""),
+                            "status": t.get("lifecycle_status", "unknown"),
+                            "eol": None,
+                            "support": None,
+                            "release_date": None,
+                            "lts": False,
+                        }
+                    )
+            if not supported:
+                continue
+            detected = detect_multi_versions(tool.name, mv_config, supported)
+            for info in detected:
+                cycle = str(info.get("cycle", ""))
+                if not cycle:
+                    continue
+                installed_v = info.get("installed")
+                latest_v = info.get("latest_upstream", "")
+                if installed_v and installed_v == latest_v:
+                    status_v = "UP-TO-DATE"
+                elif installed_v:
+                    status_v = "OUTDATED"
+                else:
+                    status_v = STATUS_NOT_INSTALLED
+                method = info.get("install_method")
+                versioned = f"{tool.name}@{cycle}"
+                entry = dict(tools_by_name.get(versioned, {}))
+                entry.update(
+                    {
+                        "tool": versioned,
+                        "category": catalog_data.get("category", tool.name),
+                        "installed": installed_v or "",
+                        "installed_method": method,
+                        "installed_version": installed_v or "",
+                        "installed_path_selected": info.get("path"),
+                        "classification_reason_selected": (
+                            f"Detected via path analysis: {method}" if method else "No installation detected"
+                        ),
+                        "latest_upstream": latest_v,
+                        "latest_version": latest_v,
+                        "status": status_v,
+                        "is_multi_version": True,
+                        "base_tool": tool.name,
+                        "version_cycle": cycle,
+                        "lifecycle_status": info.get("status", "unknown"),
+                    }
+                )
+                # Hint stays empty for generic multi-version runtimes;
+                # the tool name + state already tell the user what to do.
+                entry["hint"] = ""
+                tools_by_name[versioned] = entry
+
+
 def cmd_update_local(args: argparse.Namespace) -> int:
     """Update only local installation state (fast, no network)."""
     # Check if we're in merge mode (updating specific tools only)
@@ -955,84 +1038,7 @@ def cmd_update_local(args: argparse.Namespace) -> int:
             if tool_name in updated_tool_names:
                 tools_by_name[tool_name] = updated_tool
 
-        # Multi-version tools (python@3.14, node@22, php@8.3, …) have one
-        # snapshot entry per cycle. build_legacy_snapshot/merge_for_display
-        # only emits the base-tool key, so without this block the cycle
-        # entries would stay stale after an upgrade — masking successful
-        # installs as "version unchanged" in the guide.
-        try:
-            from cli_audit.catalog import ToolCatalog
-
-            _catalog = ToolCatalog()
-        except Exception:
-            _catalog = None
-        if _catalog is not None:
-            for tool in tools_list:
-                if not _catalog.has_tool(tool.name):
-                    continue
-                catalog_data = _catalog.get_raw_data(tool.name)
-                mv_config = catalog_data.get("multi_version", {})
-                if not mv_config.get("enabled"):
-                    continue
-                # Reuse supported-cycle metadata from existing snapshot so this
-                # fast-path stays network-free. First full audit populates it;
-                # subsequent refreshes just re-detect local installs.
-                supported: list[dict] = []
-                for t in existing_tools:
-                    if t.get("base_tool") == tool.name and t.get("version_cycle"):
-                        supported.append(
-                            {
-                                "cycle": t["version_cycle"],
-                                "latest": t.get("latest_upstream", ""),
-                                "status": t.get("lifecycle_status", "unknown"),
-                                "eol": None,
-                                "support": None,
-                                "release_date": None,
-                                "lts": False,
-                            }
-                        )
-                if not supported:
-                    continue
-                detected = detect_multi_versions(tool.name, mv_config, supported)
-                for info in detected:
-                    cycle = str(info.get("cycle", ""))
-                    if not cycle:
-                        continue
-                    installed_v = info.get("installed")
-                    latest_v = info.get("latest_upstream", "")
-                    if installed_v and installed_v == latest_v:
-                        status_v = "UP-TO-DATE"
-                    elif installed_v:
-                        status_v = "OUTDATED"
-                    else:
-                        status_v = STATUS_NOT_INSTALLED
-                    method = info.get("install_method")
-                    versioned = f"{tool.name}@{cycle}"
-                    entry = dict(tools_by_name.get(versioned, {}))
-                    entry.update(
-                        {
-                            "tool": versioned,
-                            "category": catalog_data.get("category", tool.name),
-                            "installed": installed_v or "",
-                            "installed_method": method,
-                            "installed_version": installed_v or "",
-                            "installed_path_selected": info.get("path"),
-                            "classification_reason_selected": (
-                                f"Detected via path analysis: {method}" if method else "No installation detected"
-                            ),
-                            "latest_upstream": latest_v,
-                            "latest_version": latest_v,
-                            "status": status_v,
-                            "is_multi_version": True,
-                            "base_tool": tool.name,
-                            "version_cycle": cycle,
-                            "lifecycle_status": info.get("status", "unknown"),
-                        }
-                    )
-                    # Hint stays empty for generic multi-version runtimes;
-                    # the tool name + state already tell the user what to do.
-                    entry["hint"] = ""
-                    tools_by_name[versioned] = entry
+        _refresh_multi_version_entries(tools_list, tools_by_name, existing_tools)
 
         # Write merged snapshot
         merged_tools = list(tools_by_name.values())
@@ -1046,10 +1052,17 @@ def cmd_update_local(args: argparse.Namespace) -> int:
         # is lower than the installed version.
         existing = load_snapshot().get("tools", [])
         if existing:
+            # Cycle rows carry no base-tool local state, so they need their own
+            # detection — otherwise `make upgrade` opens with a stale version
+            # for every runtime cycle (python@3.14, node@26, …).
+            by_name = {t.get("tool"): t for t in existing}
+            _refresh_multi_version_entries(tools_list, by_name, existing)
             for entry in existing:
                 name = entry.get("tool", "")
                 if "@" in name:
-                    continue  # multi-version cycle: no per-cycle local-only data
+                    entry.clear()
+                    entry.update(by_name[name])
+                    continue
                 inst = local_state.tools.get(name)
                 if inst is None:
                     continue

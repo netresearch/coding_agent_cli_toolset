@@ -22,10 +22,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 # Skip marker for Windows
-skip_on_windows = pytest.mark.skipif(
-    sys.platform == "win32",
-    reason="Uses Unix-style paths and shell scripts"
-)
+skip_on_windows = pytest.mark.skipif(sys.platform == "win32", reason="Uses Unix-style paths and shell scripts")
 
 PROJECT_ROOT = Path(__file__).parent.parent
 CATALOG_DIR = PROJECT_ROOT / "catalog"
@@ -36,12 +33,14 @@ SCRIPTS_DIR = PROJECT_ROOT / "scripts"
 # 1. filter_tools handles multi-version tool names
 # ===========================================================================
 
+
 class TestFilterToolsMultiVersion:
     """Tests for filter_tools handling tool@version format (Issue #1, #2)."""
 
     def test_filter_node_at_version(self):
         """filter_tools('node@25') should match the 'node' tool."""
         from cli_audit.tools import filter_tools
+
         result = filter_tools(["node@25"])
         names = [t.name for t in result]
         assert "node" in names
@@ -49,6 +48,7 @@ class TestFilterToolsMultiVersion:
     def test_filter_go_at_version(self):
         """filter_tools('go@1.25') should match the 'go' tool."""
         from cli_audit.tools import filter_tools
+
         result = filter_tools(["go@1.25"])
         names = [t.name for t in result]
         assert "go" in names
@@ -56,6 +56,7 @@ class TestFilterToolsMultiVersion:
     def test_filter_python_at_version(self):
         """filter_tools('python@3.14') should match the 'python' tool."""
         from cli_audit.tools import filter_tools
+
         result = filter_tools(["python@3.14"])
         names = [t.name for t in result]
         assert "python" in names
@@ -63,6 +64,7 @@ class TestFilterToolsMultiVersion:
     def test_filter_multiple_multi_version(self):
         """filter_tools with multiple tool@version entries."""
         from cli_audit.tools import filter_tools
+
         result = filter_tools(["node@25", "python@3.13"])
         names = [t.name for t in result]
         assert "node" in names
@@ -71,6 +73,7 @@ class TestFilterToolsMultiVersion:
     def test_filter_mixed_plain_and_versioned(self):
         """filter_tools with both plain and versioned tool names."""
         from cli_audit.tools import filter_tools
+
         result = filter_tools(["git", "node@24"])
         names = [t.name for t in result]
         assert "git" in names
@@ -79,6 +82,7 @@ class TestFilterToolsMultiVersion:
     def test_filter_plain_tools_still_work(self):
         """filter_tools with plain names still works as before."""
         from cli_audit.tools import filter_tools
+
         result = filter_tools(["git"])
         names = [t.name for t in result]
         assert "git" in names
@@ -86,12 +90,14 @@ class TestFilterToolsMultiVersion:
     def test_filter_unknown_tool_returns_empty(self):
         """filter_tools with unknown tool name returns empty list."""
         from cli_audit.tools import filter_tools
+
         result = filter_tools(["nonexistent_tool_xyz"])
         assert len(result) == 0
 
     def test_filter_empty_list(self):
         """filter_tools with empty list returns empty."""
         from cli_audit.tools import filter_tools
+
         result = filter_tools([])
         assert len(result) == 0
 
@@ -99,6 +105,7 @@ class TestFilterToolsMultiVersion:
 # ===========================================================================
 # 2. audit.py COLLECT_MODE handles multi-version tools
 # ===========================================================================
+
 
 class TestAuditCollectModeMultiVersion:
     """Tests for audit.py COLLECT_MODE multi-version support (Issue #1, #2)."""
@@ -113,8 +120,11 @@ class TestAuditCollectModeMultiVersion:
 
         result = subprocess.run(
             [sys.executable, "audit.py", "node@25"],
-            capture_output=True, text=True, cwd=str(PROJECT_ROOT),
-            env=env, timeout=60,
+            capture_output=True,
+            text=True,
+            cwd=str(PROJECT_ROOT),
+            env=env,
+            timeout=60,
         )
 
         # Should not crash (was ValueError: max_workers must be > 0)
@@ -137,8 +147,11 @@ class TestAuditCollectModeMultiVersion:
 
         result = subprocess.run(
             [sys.executable, "audit.py", "go@1.25"],
-            capture_output=True, text=True, cwd=str(PROJECT_ROOT),
-            env=env, timeout=60,
+            capture_output=True,
+            text=True,
+            cwd=str(PROJECT_ROOT),
+            env=env,
+            timeout=60,
         )
 
         assert result.returncode == 0, f"audit.py crashed: {result.stderr}"
@@ -157,8 +170,11 @@ class TestAuditCollectModeMultiVersion:
 
         result = subprocess.run(
             [sys.executable, "audit.py", "nonexistent_tool_xyz"],
-            capture_output=True, text=True, cwd=str(PROJECT_ROOT),
-            env=env, timeout=30,
+            capture_output=True,
+            text=True,
+            cwd=str(PROJECT_ROOT),
+            env=env,
+            timeout=30,
         )
 
         # Should exit cleanly, not crash
@@ -169,6 +185,7 @@ class TestAuditCollectModeMultiVersion:
 # 3. Catalog entry fixes
 # ===========================================================================
 
+
 class TestCatalogCodex:
     """Tests for codex.json catalog fixes (Issue #9, #10)."""
 
@@ -176,9 +193,9 @@ class TestCatalogCodex:
         """codex.json install_method should be 'npm_global', not 'npm'."""
         with open(CATALOG_DIR / "codex.json") as f:
             data = json.load(f)
-        assert data["install_method"] == "npm_global", (
-            "install_method should be 'npm_global' to match scripts/installers/npm_global.sh"
-        )
+        assert (
+            data["install_method"] == "npm_global"
+        ), "install_method should be 'npm_global' to match scripts/installers/npm_global.sh"
 
     def test_codex_installer_script_exists(self):
         """The installer for codex's install_method must exist."""
@@ -220,6 +237,7 @@ class TestCatalogTmux:
 # 4. Shell script: capability.sh - symlink dedup & venv exclusion
 # ===========================================================================
 
+
 @skip_on_windows
 class TestCapabilityShell:
     """Tests for capability.sh fixes (Issue #8, #15)."""
@@ -235,7 +253,9 @@ source "{SCRIPTS_DIR}/lib/policy.sh" 2>/dev/null || true
 """
         result = subprocess.run(
             ["bash", "-c", full_code],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         return result.stdout.strip()
 
@@ -274,7 +294,7 @@ export PATH="{real_dir}:{link_dir}:$PATH"
 detect_all_installations "test_dedup" "test_dedup"
 """)
             # Should only list one entry, not two
-            lines = [l for l in output.strip().split("\n") if l]
+            lines = [line for line in output.strip().split("\n") if line]
             assert len(lines) <= 1, f"Expected at most 1 entry (deduped), got {len(lines)}: {lines}"
 
     def test_classify_corepack_path(self):
@@ -284,8 +304,8 @@ detect_all_installations "test_dedup" "test_dedup"
         # directly since we can't create paths in /usr/bin from tests.
         # Verify the corepack detection code exists in classify_install_path.
         content = (SCRIPTS_DIR / "lib" / "capability.sh").read_text()
-        assert '*/corepack/*' in content, "classify_install_path should check for corepack in resolved path"
-        assert 'readlink -f' in content, "classify_install_path should resolve symlinks"
+        assert "*/corepack/*" in content, "classify_install_path should check for corepack in resolved path"
+        assert "readlink -f" in content, "classify_install_path should resolve symlinks"
 
         # Also verify /usr/bin/pnpm on this system is actually detected as corepack
         # (integration test - only runs if pnpm is available via corepack)
@@ -303,6 +323,7 @@ classify_install_path "pnpm" "{pnpm_path}"
 # 5. Shell script: reconcile.sh - manual removal & corepack handling
 # ===========================================================================
 
+
 @skip_on_windows
 class TestReconcileShell:
     """Tests for reconcile.sh fixes (Issue #4, #7, #12, #13)."""
@@ -316,7 +337,9 @@ source "{SCRIPTS_DIR}/lib/reconcile.sh"
 """
         return subprocess.run(
             ["bash", "-c", full_code],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
 
     def test_remove_installation_manual_method(self):
@@ -373,6 +396,7 @@ grep -q "proceeding with install via" "{reconcile_path}" && echo "PATTERN_FOUND"
 # 6. Shell script: uv_tool.sh - version detection from catalog
 # ===========================================================================
 
+
 @skip_on_windows
 class TestUvToolShell:
     """Tests for uv_tool.sh version detection fix (Issue #14)."""
@@ -405,6 +429,7 @@ class TestUvToolShell:
 # 7. Shell script: install_python.sh - unavailable version messaging
 # ===========================================================================
 
+
 @skip_on_windows
 class TestInstallPythonShell:
     """Tests for install_python.sh unavailable version handling (Issue #1, #2)."""
@@ -413,22 +438,21 @@ class TestInstallPythonShell:
         """install_python.sh should report when a version is unavailable in uv."""
         script = SCRIPTS_DIR / "install_python.sh"
         content = script.read_text()
-        assert "not available via uv" in content or "not yet available" in content, (
-            "Should have clear messaging when uv doesn't have the requested version"
-        )
+        assert (
+            "not available via uv" in content or "not yet available" in content
+        ), "Should have clear messaging when uv doesn't have the requested version"
 
     def test_install_python_reports_actual_installed_version(self):
         """install_python.sh should report what was actually installed on fallback."""
         script = SCRIPTS_DIR / "install_python.sh"
         content = script.read_text()
-        assert "Installed" in content and "target" in content, (
-            "Should report actual version vs target when falling back"
-        )
+        assert "Installed" in content and "target" in content, "Should report actual version vs target when falling back"
 
 
 # ===========================================================================
 # 8. Shell script: install_go.sh - refresh_snapshot
 # ===========================================================================
+
 
 @skip_on_windows
 class TestInstallGoShell:
@@ -451,6 +475,7 @@ class TestInstallGoShell:
 # 9. Shell script: package_manager.sh - apt version gap feedback
 # ===========================================================================
 
+
 @skip_on_windows
 class TestPackageManagerShell:
     """Tests for package_manager.sh apt feedback fix (Issue #8)."""
@@ -459,9 +484,9 @@ class TestPackageManagerShell:
         """package_manager.sh should report when package manager has no newer version."""
         script = SCRIPTS_DIR / "installers" / "package_manager.sh"
         content = script.read_text()
-        assert "no newer version" in content.lower() or "no newer version" in content, (
-            "Should warn when package manager can't provide a newer version"
-        )
+        assert (
+            "no newer version" in content.lower() or "no newer version" in content
+        ), "Should warn when package manager can't provide a newer version"
 
     def test_package_manager_avoids_redundant_apt_update(self):
         """package_manager.sh should skip apt-get update after PPA add."""
@@ -473,6 +498,7 @@ class TestPackageManagerShell:
 # ===========================================================================
 # 10. Shell script: install_tool.sh - uninstall improvements
 # ===========================================================================
+
 
 @skip_on_windows
 class TestInstallToolShell:
@@ -489,22 +515,19 @@ class TestInstallToolShell:
         """Uninstall should skip system binaries with a clear message."""
         script = SCRIPTS_DIR / "install_tool.sh"
         content = script.read_text()
-        assert "system" in content.lower() and "skip" in content.lower(), (
-            "Should skip system binaries during uninstall"
-        )
+        assert "system" in content.lower() and "skip" in content.lower(), "Should skip system binaries during uninstall"
 
     def test_install_tool_ignores_system_in_verification(self):
         """Post-uninstall verification should ignore system entries."""
         script = SCRIPTS_DIR / "install_tool.sh"
         content = script.read_text()
-        assert "remaining_nonsystem" in content or "grep -v" in content, (
-            "Verification should filter out system entries"
-        )
+        assert "remaining_nonsystem" in content or "grep -v" in content, "Verification should filter out system entries"
 
 
 # ===========================================================================
 # 11. Catalog JSON validity
 # ===========================================================================
+
 
 class TestCatalogValidity:
     """Validate all modified catalog files are valid JSON with required fields."""
@@ -537,14 +560,13 @@ class TestCatalogValidity:
             pass  # auto uses reconciliation, no installer script needed
         elif method:
             installer = SCRIPTS_DIR / "installers" / f"{method}.sh"
-            assert installer.exists(), (
-                f"{catalog_name}: installer {installer} not found for install_method={method}"
-            )
+            assert installer.exists(), f"{catalog_name}: installer {installer} not found for install_method={method}"
 
 
 # ===========================================================================
 # 12. Debian/Ubuntu package naming mismatches (#35)
 # ===========================================================================
+
 
 class TestCatalogDebianNaming:
     """Tests for #35: Debian/Ubuntu package naming mismatches."""
@@ -554,24 +576,16 @@ class TestCatalogDebianNaming:
         with open(CATALOG_DIR / "bat.json") as f:
             data = json.load(f)
         candidates = data.get("candidates", [])
-        assert "batcat" in candidates, (
-            "bat.json should have 'batcat' in candidates for Debian/Ubuntu"
-        )
-        assert "bat" in candidates, (
-            "bat.json should also keep 'bat' in candidates"
-        )
+        assert "batcat" in candidates, "bat.json should have 'batcat' in candidates for Debian/Ubuntu"
+        assert "bat" in candidates, "bat.json should also keep 'bat' in candidates"
 
     def test_fd_has_fdfind_candidate(self):
         """fd.json must include 'fdfind' in candidates for Debian detection."""
         with open(CATALOG_DIR / "fd.json") as f:
             data = json.load(f)
         candidates = data.get("candidates", [])
-        assert "fdfind" in candidates, (
-            "fd.json should have 'fdfind' in candidates for Debian/Ubuntu"
-        )
-        assert "fd" in candidates, (
-            "fd.json should also keep 'fd' in candidates"
-        )
+        assert "fdfind" in candidates, "fd.json should have 'fdfind' in candidates for Debian/Ubuntu"
+        assert "fd" in candidates, "fd.json should also keep 'fd' in candidates"
 
     def test_delta_has_apt_method(self):
         """delta.json must have an apt available_method with package 'git-delta'."""
@@ -579,31 +593,24 @@ class TestCatalogDebianNaming:
             data = json.load(f)
         methods = data.get("available_methods", [])
         apt_methods = [m for m in methods if m.get("method") == "apt"]
-        assert len(apt_methods) == 1, (
-            "delta.json should have exactly one apt available_method"
-        )
+        assert len(apt_methods) == 1, "delta.json should have exactly one apt available_method"
         apt_config = apt_methods[0].get("config", {})
-        assert apt_config.get("package") == "git-delta", (
-            "delta.json apt config should have package 'git-delta'"
-        )
+        assert apt_config.get("package") == "git-delta", "delta.json apt config should have package 'git-delta'"
 
     def test_delta_has_available_methods(self):
         """delta.json must have available_methods field."""
         with open(CATALOG_DIR / "delta.json") as f:
             data = json.load(f)
-        assert "available_methods" in data, (
-            "delta.json should have available_methods field"
-        )
+        assert "available_methods" in data, "delta.json should have available_methods field"
         # Should still have github_release_binary
         methods = data["available_methods"]
         method_names = [m.get("method") for m in methods]
-        assert "github_release_binary" in method_names, (
-            "delta.json should keep github_release_binary method"
-        )
+        assert "github_release_binary" in method_names, "delta.json should keep github_release_binary method"
 
     def test_bat_candidates_field_preserved_in_catalog_entry(self):
         """ToolCatalogEntry.from_dict should parse candidates from bat.json."""
         from cli_audit.catalog import ToolCatalogEntry
+
         with open(CATALOG_DIR / "bat.json") as f:
             data = json.load(f)
         entry = ToolCatalogEntry.from_dict(data)
@@ -614,6 +621,7 @@ class TestCatalogDebianNaming:
     def test_fd_candidates_field_preserved_in_catalog_entry(self):
         """ToolCatalogEntry.from_dict should parse candidates from fd.json."""
         from cli_audit.catalog import ToolCatalogEntry
+
         with open(CATALOG_DIR / "fd.json") as f:
             data = json.load(f)
         entry = ToolCatalogEntry.from_dict(data)
@@ -628,8 +636,20 @@ class TestCatalogDebianNaming:
 
 # All 14 dedicated scripts from the catalog
 DEDICATED_SCRIPTS = [
-    "claude", "composer", "docker", "gem", "go", "node", "parallel",
-    "python", "ruby", "rust", "tmux", "tree", "uv", "yarn",
+    "claude",
+    "composer",
+    "docker",
+    "gem",
+    "go",
+    "node",
+    "parallel",
+    "python",
+    "ruby",
+    "rust",
+    "tmux",
+    "tree",
+    "uv",
+    "yarn",
 ]
 
 
@@ -651,8 +671,7 @@ class TestDedicatedScriptUninstallHandler:
         assert script_path.exists(), f"{script_name} not found"
         content = script_path.read_text()
         assert "uninstall)" in content, (
-            f"{script_name} must have an 'uninstall)' case to handle "
-            f"'install_tool.sh {catalog_name} uninstall'"
+            f"{script_name} must have an 'uninstall)' case to handle " f"'install_tool.sh {catalog_name} uninstall'"
         )
 
     @pytest.mark.parametrize("catalog_name", DEDICATED_SCRIPTS)
@@ -667,11 +686,10 @@ class TestDedicatedScriptUninstallHandler:
         script_path = SCRIPTS_DIR / script_name
         content = script_path.read_text()
         # Script must either set ACTION="${1:-...}" or use case "${1:-...}"
-        has_action_var = 'ACTION="${1:-' in content or "ACTION=\"${1:-" in content
-        has_inline_case = 'case "${1:-' in content or "case \"${1:-" in content
+        has_action_var = 'ACTION="${1:-' in content or 'ACTION="${1:-' in content
+        has_inline_case = 'case "${1:-' in content or 'case "${1:-' in content
         assert has_action_var or has_inline_case, (
-            f"{script_name} must parse $1 as action "
-            f"(use ACTION=\"${{1:-install}}\" or case \"${{1:-install}}\")"
+            f"{script_name} must parse $1 as action " f'(use ACTION="${{1:-install}}" or case "${{1:-install}}")'
         )
 
     def test_install_go_uninstall_does_not_download(self):
@@ -703,12 +721,13 @@ class TestDedicatedScriptUninstallHandler:
             env["HOME"] = tmpdir
             result = subprocess.run(
                 ["bash", str(script_path), "uninstall"],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True,
+                text=True,
+                timeout=10,
                 env=env,
             )
             assert not marker.exists(), (
-                f"install_go.sh uninstall triggered a download! "
-                f"stdout: {result.stdout}\nstderr: {result.stderr}"
+                f"install_go.sh uninstall triggered a download! " f"stdout: {result.stdout}\nstderr: {result.stderr}"
             )
 
     def test_install_composer_uninstall_does_not_download(self):
@@ -735,12 +754,13 @@ class TestDedicatedScriptUninstallHandler:
             env["HOME"] = tmpdir
             result = subprocess.run(
                 ["bash", str(script_path), "uninstall"],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True,
+                text=True,
+                timeout=10,
                 env=env,
             )
             assert not marker.exists(), (
-                f"install_composer.sh uninstall triggered a download! "
-                f"stdout: {result.stdout}\nstderr: {result.stderr}"
+                f"install_composer.sh uninstall triggered a download! " f"stdout: {result.stdout}\nstderr: {result.stderr}"
             )
 
     def test_install_docker_uninstall_does_not_download(self):
@@ -762,12 +782,13 @@ class TestDedicatedScriptUninstallHandler:
             env["HOME"] = tmpdir
             result = subprocess.run(
                 ["bash", str(script_path), "uninstall"],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True,
+                text=True,
+                timeout=10,
                 env=env,
             )
             assert not marker.exists(), (
-                f"install_docker.sh uninstall triggered a download! "
-                f"stdout: {result.stdout}\nstderr: {result.stderr}"
+                f"install_docker.sh uninstall triggered a download! " f"stdout: {result.stdout}\nstderr: {result.stderr}"
             )
 
     def test_install_parallel_uninstall_does_not_download(self):
@@ -794,18 +815,20 @@ class TestDedicatedScriptUninstallHandler:
             env["HOME"] = tmpdir
             result = subprocess.run(
                 ["bash", str(script_path), "uninstall"],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True,
+                text=True,
+                timeout=10,
                 env=env,
             )
             assert not marker.exists(), (
-                f"install_parallel.sh uninstall triggered a download! "
-                f"stdout: {result.stdout}\nstderr: {result.stderr}"
+                f"install_parallel.sh uninstall triggered a download! " f"stdout: {result.stdout}\nstderr: {result.stderr}"
             )
 
 
 # ===========================================================================
 # 14. reconcile.sh: sudo-aware removal (Issue #37)
 # ===========================================================================
+
 
 @skip_on_windows
 class TestReconcileSudoAwareRemoval:
@@ -820,16 +843,17 @@ source "{SCRIPTS_DIR}/lib/reconcile.sh"
 """
         return subprocess.run(
             ["bash", "-c", full_code],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
 
     def test_remove_installation_checks_writability(self):
         """reconcile.sh should check directory writability before removal."""
         content = (SCRIPTS_DIR / "lib" / "reconcile.sh").read_text()
         # The github_release_binary|manual case should check writability
-        assert "-w " in content or "-w \"" in content, (
-            "reconcile.sh remove_installation() must check writability "
-            "with [ -w ] before removing binaries"
+        assert "-w " in content or '-w "' in content, (
+            "reconcile.sh remove_installation() must check writability " "with [ -w ] before removing binaries"
         )
 
     def test_remove_installation_no_sudo_for_writable_dir(self):
@@ -843,9 +867,7 @@ source "{SCRIPTS_DIR}/lib/reconcile.sh"
             # Create a sudo stub that records calls
             sudo_marker = Path(tmpdir) / "sudo_called"
             sudo_stub = Path(tmpdir) / "sudo"
-            sudo_stub.write_text(
-                f"#!/bin/sh\ntouch '{sudo_marker}'\nexec \"$@\"\n"
-            )
+            sudo_stub.write_text(f"#!/bin/sh\ntouch '{sudo_marker}'\nexec \"$@\"\n")
             sudo_stub.chmod(0o700)
 
             result = self._source_and_run(f"""
@@ -854,9 +876,7 @@ remove_installation "fake_tool" "manual" "fake_tool"
 """)
             assert result.returncode == 0, f"removal failed: {result.stderr}"
             assert not fake_bin.exists(), "Binary should have been removed"
-            assert not sudo_marker.exists(), (
-                "sudo should NOT be used for writable directories"
-            )
+            assert not sudo_marker.exists(), "sudo should NOT be used for writable directories"
 
     def test_remove_installation_uses_sudo_for_nonwritable_dir(self):
         """remove_installation should use sudo for non-writable directories."""
@@ -876,9 +896,7 @@ remove_installation "fake_tool" "manual" "fake_tool"
             # sudo was invoked.
             sudo_marker = Path(tmpdir) / "sudo_called"
             sudo_stub = Path(tmpdir) / "sudo"
-            sudo_stub.write_text(
-                f"#!/bin/sh\ntouch '{sudo_marker}'\nexec \"$@\"\n"
-            )
+            sudo_stub.write_text(f"#!/bin/sh\ntouch '{sudo_marker}'\nexec \"$@\"\n")
             sudo_stub.chmod(0o700)
 
             # Make the directory non-writable
@@ -889,9 +907,7 @@ remove_installation "fake_tool" "manual" "fake_tool"
 export PATH="{restricted_dir}:{tmpdir}:$PATH"
 remove_installation "fake_tool" "github_release_binary" "fake_tool" || true
 """)
-                assert sudo_marker.exists(), (
-                    "sudo SHOULD be used for non-writable directories like /usr/local/bin"
-                )
+                assert sudo_marker.exists(), "sudo SHOULD be used for non-writable directories like /usr/local/bin"
             finally:
                 # Restore permissions for cleanup
                 restricted_dir.chmod(0o700)
@@ -905,7 +921,10 @@ remove_installation "fake_tool" "github_release_binary" "fake_tool" || true
             os.chmod(tmpdir, 0o500)
             try:
                 result = subprocess.run(
-                    ["bash", "-c", f"""
+                    [
+                        "bash",
+                        "-c",
+                        f"""
                         source scripts/lib/reconcile.sh 2>/dev/null || source scripts/lib/common.sh
                         source scripts/lib/reconcile.sh
                         export PATH="{tmpdir}:$PATH"
@@ -913,12 +932,17 @@ remove_installation "fake_tool" "github_release_binary" "fake_tool" || true
                         sudo() {{ return 127; }}
                         export -f sudo
                         remove_installation "fake_tool" "manual" "fake_tool" 2>&1
-                    """],
-                    capture_output=True, text=True, timeout=10,
+                    """,
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
                     cwd=str(Path(__file__).parent.parent),
                 )
                 combined = result.stdout + result.stderr
-                assert "no write access" in combined.lower() or "sudo not available" in combined.lower() or result.returncode != 0
+                assert (
+                    "no write access" in combined.lower() or "sudo not available" in combined.lower() or result.returncode != 0
+                )
             finally:
                 os.chmod(tmpdir, 0o700)
 
@@ -927,9 +951,7 @@ remove_installation "fake_tool" "github_release_binary" "fake_tool" || true
         content = (SCRIPTS_DIR / "lib" / "reconcile.sh").read_text()
         # Find the github_release_binary|manual case and verify it has writability logic
         # The pattern should be: check -w on the directory, then use sudo if not writable
-        assert "sudo rm" in content, (
-            "reconcile.sh must use 'sudo rm' as fallback for non-writable dirs"
-        )
+        assert "sudo rm" in content, "reconcile.sh must use 'sudo rm' as fallback for non-writable dirs"
 
 
 # ===========================================================================
@@ -959,9 +981,9 @@ class TestCatalogGoogleWorkspaceCli:
         with open(CATALOG_DIR / "google-workspace-cli.json") as f:
             data = json.load(f)
         tmpl = data["download_url_template"]
-        assert "google-workspace-cli-{arch}-unknown-linux-gnu.tar.gz" in tmpl, (
-            "asset prefix must be 'google-workspace-cli-', the real release asset name"
-        )
+        assert (
+            "google-workspace-cli-{arch}-unknown-linux-gnu.tar.gz" in tmpl
+        ), "asset prefix must be 'google-workspace-cli-', the real release asset name"
         assert "/gws-{arch}-" not in tmpl, "the gws- asset prefix does not exist upstream"
 
 
@@ -977,7 +999,7 @@ class TestVersionLineRespectsFlag:
         script.write_text(
             "#!/bin/sh\n"
             'case "$1" in\n'
-            '  -v) echo \'time=2026-06-20T16:17:44.047+02:00 level=DEBUG '
+            "  -v) echo 'time=2026-06-20T16:17:44.047+02:00 level=DEBUG "
             'msg="processed args: []"\' >&2 ;;\n'
             "  --version) echo 'fakeyq (https://example/) version v4.53.3' ;;\n"
             "esac\n"
@@ -988,6 +1010,7 @@ class TestVersionLineRespectsFlag:
     def test_without_flag_misparses_verbose_output(self, tmp_path):
         """Regression: the generic probe (-v first) grabs the log timestamp."""
         from cli_audit.detection import extract_version_number, get_version_line
+
         path = self._fake_yq(tmp_path)
         line = get_version_line(path, "fakeyq")
         # The bug: -v emits a DEBUG line whose timestamp (…44.047…) is misparsed
@@ -998,6 +1021,7 @@ class TestVersionLineRespectsFlag:
     def test_with_version_flag_returns_clean_version(self, tmp_path):
         """Fix: catalog version_flag=--version yields the real version."""
         from cli_audit.detection import extract_version_number, get_version_line
+
         path = self._fake_yq(tmp_path)
         line = get_version_line(path, "fakeyq", version_flag="--version")
         assert extract_version_number(line) == "4.53.3"
@@ -1016,9 +1040,7 @@ class TestGithubReleaseStderrVersion:
 
     def test_detect_version_falls_back_to_stderr(self):
         # `2>&1 >/dev/null` captures stderr while discarding stdout
-        assert "2>&1 >/dev/null" in self._content(), (
-            "version detection must fall back to stderr for tools like gh-aw"
-        )
+        assert "2>&1 >/dev/null" in self._content(), "version detection must fall back to stderr for tools like gh-aw"
 
     def test_before_and_after_use_helper(self):
         content = self._content()
@@ -1042,13 +1064,20 @@ class TestPrefersNvmNodeSymlink:
         (local_bin / "node").symlink_to(real_node)
 
         result = subprocess.run(
-            ["bash", "-c", f"""
+            [
+                "bash",
+                "-c",
+                f"""
                 export HOME="{tmp_path}"
                 source scripts/lib/common.sh
                 export PATH="{local_bin}:$PATH"
                 if prefers_nvm_node; then echo NVM; else echo NOTNVM; fi
-            """],
-            capture_output=True, text=True, timeout=10, cwd=str(PROJECT_ROOT),
+            """,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            cwd=str(PROJECT_ROOT),
         )
         assert "NVM" in result.stdout and "NOTNVM" not in result.stdout
 
@@ -1072,34 +1101,55 @@ class TestResolveGlobalBin:
         npm.chmod(0o755)
 
         result = subprocess.run(
-            ["bash", "-c", f"""
+            [
+                "bash",
+                "-c",
+                f"""
                 source scripts/lib/common.sh
                 export PATH="{fake_bin}:/usr/bin:/bin"
                 resolve_global_bin faketool
-            """],
-            capture_output=True, text=True, timeout=10, cwd=str(PROJECT_ROOT),
+            """,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            cwd=str(PROJECT_ROOT),
         )
         assert str(tool) in result.stdout
 
     def test_warn_if_bin_off_path_warns_when_off_path(self):
         result = subprocess.run(
-            ["bash", "-c", """
+            [
+                "bash",
+                "-c",
+                """
                 source scripts/lib/common.sh
                 export PATH="/usr/bin:/bin"
                 warn_if_bin_off_path mytool /opt/nowhere/bin/mytool 2>&1
-            """],
-            capture_output=True, text=True, timeout=10, cwd=str(PROJECT_ROOT),
+            """,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            cwd=str(PROJECT_ROOT),
         )
         assert "not on PATH" in result.stdout
 
     def test_warn_if_bin_off_path_silent_when_on_path(self):
         result = subprocess.run(
-            ["bash", "-c", """
+            [
+                "bash",
+                "-c",
+                """
                 source scripts/lib/common.sh
                 export PATH="/usr/bin:/bin"
                 warn_if_bin_off_path mytool /bin/mytool 2>&1
-            """],
-            capture_output=True, text=True, timeout=10, cwd=str(PROJECT_ROOT),
+            """,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            cwd=str(PROJECT_ROOT),
         )
         assert "not on PATH" not in result.stdout
 
@@ -1129,20 +1179,24 @@ class TestDetectVersionStringBehavior:
         tool.write_text("#!/bin/sh\n" + tool_body)
         tool.chmod(0o755)
         grb = next(
-            ln for ln in (SCRIPTS_DIR / "installers/github_release_binary.sh")
-            .read_text().splitlines() if ln.startswith("GRB_VERSION_RE=")
+            ln
+            for ln in (SCRIPTS_DIR / "installers/github_release_binary.sh").read_text().splitlines()
+            if ln.startswith("GRB_VERSION_RE=")
         )
         func = _extract_shell_func("installers/github_release_binary.sh", "detect_version_string")
         script = (
             f'export PATH="{tmp_path}:$PATH"\n'
             # macOS/BSD has no `timeout`; shim it as a passthrough so the test is portable
             'if ! command -v timeout >/dev/null 2>&1; then timeout() { shift; "$@"; }; fi\n'
-            f'{grb}\n{func}\n'
+            f"{grb}\n{func}\n"
             "BINARY_NAME=faketool VERSION_COMMAND='' VERSION_FLAG='' detect_version_string\n"
         )
         return subprocess.run(
-            ["bash", "-c", script], capture_output=True, text=True,
-            timeout=10, cwd=str(PROJECT_ROOT),
+            ["bash", "-c", script],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            cwd=str(PROJECT_ROOT),
         ).stdout
 
     def test_stderr_only_version_is_detected(self, tmp_path):
@@ -1172,8 +1226,11 @@ class TestNpmGlobalVersionDetection:
             f'VERSION_COMMAND="{version_command}" VERSION_FLAG="" get_npm_tool_version "{bin_path}"\n'
         )
         return subprocess.run(
-            ["bash", "-c", script], capture_output=True, text=True,
-            timeout=10, cwd=str(PROJECT_ROOT),
+            ["bash", "-c", script],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            cwd=str(PROJECT_ROOT),
         ).stdout
 
     def test_prepends_offpath_bindir_for_version_command(self, tmp_path):
@@ -1201,26 +1258,31 @@ class TestComputeStatusDirection:
 
     def test_installed_ahead_of_stale_baseline_is_up_to_date(self):
         import audit
+
         # ansible-core ahead of a stale committed baseline must NOT be OUTDATED
         assert audit.compute_status("2.21.1", "2.20.1") == "UP-TO-DATE"
         assert audit.compute_status("0.141.0", "0.101.0") == "UP-TO-DATE"
 
     def test_installed_behind_is_outdated(self):
         import audit
+
         assert audit.compute_status("0.9.0", "0.10.0") == "OUTDATED"
 
     def test_equal_is_up_to_date(self):
         import audit
+
         assert audit.compute_status("1.2.3", "1.2.3") == "UP-TO-DATE"
         # trailing-zero normalization
         assert audit.compute_status("7.28.00", "7.28.0") == "UP-TO-DATE"
 
     def test_missing_installed_is_not_installed(self):
         import audit
+
         assert audit.compute_status("", "1.0.0") == "NOT INSTALLED"
 
     def test_missing_latest_is_unknown(self):
         import audit
+
         # no known latest -> UNKNOWN, never a false OUTDATED
         assert audit.compute_status("1.0.0", "") == "UNKNOWN"
 
@@ -1235,22 +1297,33 @@ class TestUpdateLocalPreservesLatest:
     def test_refreshes_installed_but_preserves_latest(self, tmp_path):
         snap = tmp_path / "snap.json"
         # git is present in CI; seed a stale installed + a deliberately-high latest
-        snap.write_text(json.dumps({
-            "__meta__": {"count": 1},
-            "tools": [{"tool": "git", "installed_version": "0.0.1",
-                       "latest_version": "999.0.0", "status": "OUTDATED"}],
-        }))
+        snap.write_text(
+            json.dumps(
+                {
+                    "__meta__": {"count": 1},
+                    "tools": [
+                        {"tool": "git", "installed_version": "0.0.1", "latest_version": "999.0.0", "status": "OUTDATED"}
+                    ],
+                }
+            )
+        )
         env = os.environ.copy()
-        env.update({
-            "CLI_AUDIT_SNAPSHOT_FILE": str(snap),
-            "CLI_AUDIT_LOCAL_FILE": str(tmp_path / "local.json"),
-            "CLI_AUDIT_UPSTREAM_FILE": str(tmp_path / "upstream.json"),
-            "CLI_AUDIT_OFFLINE": "1",
-            "PYTHONUTF8": "1",
-        })
+        env.update(
+            {
+                "CLI_AUDIT_SNAPSHOT_FILE": str(snap),
+                "CLI_AUDIT_LOCAL_FILE": str(tmp_path / "local.json"),
+                "CLI_AUDIT_UPSTREAM_FILE": str(tmp_path / "upstream.json"),
+                "CLI_AUDIT_OFFLINE": "1",
+                "PYTHONUTF8": "1",
+            }
+        )
         r = subprocess.run(
             [sys.executable, "audit.py", "--update-local", "git"],
-            capture_output=True, text=True, cwd=str(PROJECT_ROOT), env=env, timeout=60,
+            capture_output=True,
+            text=True,
+            cwd=str(PROJECT_ROOT),
+            env=env,
+            timeout=60,
         )
         assert r.returncode == 0, r.stderr
         entry = next(t for t in json.loads(snap.read_text())["tools"] if t["tool"] == "git")
@@ -1270,26 +1343,43 @@ class TestUpdateBaselineMerges:
     entry). Failed collections must likewise leave the existing entry intact."""
 
     def _seed_baseline(self, path):
-        path.write_text(json.dumps({
-            "__meta__": {"baseline_updated_at": "2026-01-01T00:00:00Z",
-                         "schema_version": 2, "source": "test"},
-            "versions": {
-                "keepme": {"latest_tag": "v1.0.0", "latest_version": "1.0.0",
-                           "latest_url": "", "tool_url": "", "upstream_method": "gh"},
-                "ripgrep": {"latest_tag": "v0.0.1", "latest_version": "0.0.1",
-                            "latest_url": "", "tool_url": "", "upstream_method": "gh"},
-            },
-        }))
+        path.write_text(
+            json.dumps(
+                {
+                    "__meta__": {"baseline_updated_at": "2026-01-01T00:00:00Z", "schema_version": 2, "source": "test"},
+                    "versions": {
+                        "keepme": {
+                            "latest_tag": "v1.0.0",
+                            "latest_version": "1.0.0",
+                            "latest_url": "",
+                            "tool_url": "",
+                            "upstream_method": "gh",
+                        },
+                        "ripgrep": {
+                            "latest_tag": "v0.0.1",
+                            "latest_version": "0.0.1",
+                            "latest_url": "",
+                            "tool_url": "",
+                            "upstream_method": "gh",
+                        },
+                    },
+                }
+            )
+        )
 
     def test_single_tool_update_preserves_other_entries(self, tmp_path, monkeypatch):
         import argparse
+
         import audit
+
         baseline = tmp_path / "upstream_versions.json"
         self._seed_baseline(baseline)
         monkeypatch.setenv("CLI_AUDIT_UPSTREAM_FILE", str(baseline))
 
-        with patch.object(audit, "collect_latest_version", return_value=("v9.9.9", "9.9.9")), \
-                patch.object(audit, "get_github_rate_limit", return_value=None):
+        with (
+            patch.object(audit, "collect_latest_version", return_value=("v9.9.9", "9.9.9")),
+            patch.object(audit, "get_github_rate_limit", return_value=None),
+        ):
             rc = audit.cmd_update_baseline(argparse.Namespace(tools=["ripgrep"]))
 
         assert rc == 0
@@ -1300,13 +1390,17 @@ class TestUpdateBaselineMerges:
 
     def test_failed_collection_keeps_existing_entry(self, tmp_path, monkeypatch):
         import argparse
+
         import audit
+
         baseline = tmp_path / "upstream_versions.json"
         self._seed_baseline(baseline)
         monkeypatch.setenv("CLI_AUDIT_UPSTREAM_FILE", str(baseline))
 
-        with patch.object(audit, "collect_latest_version", side_effect=RuntimeError("network down")), \
-                patch.object(audit, "get_github_rate_limit", return_value=None):
+        with (
+            patch.object(audit, "collect_latest_version", side_effect=RuntimeError("network down")),
+            patch.object(audit, "get_github_rate_limit", return_value=None),
+        ):
             rc = audit.cmd_update_baseline(argparse.Namespace(tools=["ripgrep"]))
 
         assert rc == 0
@@ -1314,3 +1408,80 @@ class TestUpdateBaselineMerges:
         # transient failure must not delete the committed entry
         assert data["versions"]["ripgrep"]["latest_version"] == "0.0.1"
         assert "keepme" in data["versions"]
+
+
+class TestUpdateLocalRefreshesCycles:
+    """`audit.py --update-local` must re-detect multi-version cycle rows.
+
+    `make upgrade` opens with this network-free refresh. It used to skip every
+    "tool@cycle" row, so the guide offered an upgrade for a python@3.14 that had
+    already been installed, and the snapshot only caught up after an install ran.
+    """
+
+    def _snapshot(self, tmp_path, installed: str) -> Path:
+        snap = tmp_path / "tools_snapshot.json"
+        snap.write_text(
+            json.dumps(
+                {
+                    "tools": [
+                        {
+                            "tool": "fakeruntime@1.2",
+                            "base_tool": "fakeruntime",
+                            "version_cycle": "1.2",
+                            "is_multi_version": True,
+                            "installed": installed,
+                            "installed_version": installed,
+                            "latest_upstream": "1.2.9",
+                            "latest_version": "1.2.9",
+                            "status": "OUTDATED",
+                            "lifecycle_status": "active",
+                        }
+                    ]
+                }
+            )
+        )
+        return snap
+
+    def test_cycle_row_is_re_detected(self, tmp_path):
+        import audit
+        from cli_audit.tools import Tool
+
+        snap = self._snapshot(tmp_path, "1.2.0")
+        existing = json.loads(snap.read_text())["tools"]
+        by_name = {t["tool"]: t for t in existing}
+        tool = Tool(name="fakeruntime", candidates=("fakeruntime",), source_kind="github", source_args=())
+
+        class _Catalog:
+            def has_tool(self, name):
+                return name == "fakeruntime"
+
+            def get_raw_data(self, name):
+                return {"category": "general", "multi_version": {"enabled": True}}
+
+        with (
+            patch("cli_audit.catalog.ToolCatalog", return_value=_Catalog()),
+            patch.object(
+                audit,
+                "detect_multi_versions",
+                return_value=[
+                    {
+                        "cycle": "1.2",
+                        "installed": "1.2.9",
+                        "latest_upstream": "1.2.9",
+                        "install_method": "manual",
+                        "path": "/x",
+                    }
+                ],
+            ),
+        ):
+            audit._refresh_multi_version_entries([tool], by_name, existing)
+
+        assert by_name["fakeruntime@1.2"]["installed"] == "1.2.9"
+        assert by_name["fakeruntime@1.2"]["status"] == "UP-TO-DATE"
+
+    def test_full_refresh_path_calls_the_re_detection(self):
+        """The non-merge branch must use the same helper, not skip '@' rows."""
+        source = (PROJECT_ROOT / "audit.py").read_text()
+        calls = [ln for ln in source.splitlines() if ln.strip().startswith("_refresh_multi_version_entries(")]
+        assert len(calls) == 2, calls  # merge path and full refresh path
+        assert "continue  # multi-version cycle: no per-cycle local-only data" not in source
