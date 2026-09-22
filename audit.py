@@ -909,7 +909,13 @@ def _refresh_multi_version_entries(tools_list, tools_by_name: dict, existing_too
                     )
             if not supported:
                 continue
-            detected = detect_multi_versions(tool.name, mv_config, supported)
+            try:
+                detected = detect_multi_versions(tool.name, mv_config, supported)
+            except Exception as exc:
+                # One failing runtime must not abort the refresh of the others, or
+                # leave local_state.json written and the snapshot not
+                print(f"# {tool.name}: multi-version detection failed: {exc!r}", file=sys.stderr)
+                continue
             for info in detected:
                 cycle = str(info.get("cycle", ""))
                 if not cycle:

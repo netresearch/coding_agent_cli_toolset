@@ -1591,3 +1591,52 @@ class TestRefreshCycleRows:
             audit._refresh_cycle_rows(existing, [tool])
 
         assert existing[0]["status"] == "UP-TO-DATE"
+
+    def test_failing_runtime_does_not_stop_the_others(self):
+        # the merge path calls the helper directly; one failing runtime is skipped
+        import audit
+        from cli_audit.tools import Tool
+
+        rows = [dict(self.ROW), dict(self.ROW, tool="otherruntime@2.0", base_tool="otherruntime", version_cycle="2.0")]
+        by_name = {r["tool"]: r for r in rows}
+        tools = [Tool(name=n, candidates=(n,), source_kind="github", source_args=()) for n in ("fakeruntime", "otherruntime")]
+
+        class _Catalog:
+            def has_tool(self, name):
+                return True
+
+            def get_raw_data(self, name):
+                return {"category": "general", "multi_version": {"enabled": True}}
+
+        def detect(name, cfg, supported):
+            if name == "fakeruntime":
+                raise RuntimeError("probe failed")
+            return [{"cycle": "2.0", "installed": "2.0.1", "latest_upstream": "2.0.1", "install_method": "manual"}]
+
+        with (
+            patch("cli_audit.catalog.ToolCatalog", return_value=_Catalog()),
+            patch.object(audit, "detect_multi_versions", side_effect=detect),
+        ):
+            audit._refresh_multi_version_entries(tools, by_name, rows)
+
+        assert by_name["fakeruntime@1.2"] == self.ROW
+        assert by_name["otherruntime@2.0"]["installed"] == "2.0.1"
+
+    def test_broken_catalog_entry_keeps_the_rows(self):
+        # a failure outside the per-runtime detection is caught by _refresh_cycle_rows
+        import audit
+        from cli_audit.tools import Tool
+
+        class _Catalog:
+            def has_tool(self, name):
+                return True
+
+            def get_raw_data(self, name):
+                raise ValueError("corrupt catalog entry")
+
+        existing = [dict(self.ROW)]
+        tool = Tool(name="fakeruntime", candidates=("fakeruntime",), source_kind="github", source_args=())
+        with patch("cli_audit.catalog.ToolCatalog", return_value=_Catalog()):
+            audit._refresh_cycle_rows(existing, [tool])
+
+        assert existing == [self.ROW]
