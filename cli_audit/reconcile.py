@@ -22,6 +22,13 @@ from typing import Sequence
 
 from .common import vlog
 from .config import Config
+from .detection import (
+    _env_dir,
+    _installation_path,
+    _is_foreign_binary,
+    _which,
+    tool_manager_of,
+)
 from .environment import Environment
 from .upgrade import compare_versions
 
@@ -84,6 +91,8 @@ class Installation:
     active: bool
     valid: bool = True
     preference_score: tuple[int, str, int] = (0, "0.0.0", 0)
+    # PATH dir the binary was found in (differs from dirname(path) for symlinks)
+    path_dir: str = ""
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
@@ -181,38 +190,6 @@ Reconciliation Summary:
 """
 
 
-# Environment-name patterns for env managers without a pyvenv.cfg (conda etc.).
-# Mirrors the venv skip list in scripts/lib/capability.sh:detect_all_installations.
-_ENV_DIR_PATTERNS = (
-    "/venv/bin",
-    "/.venv/bin",
-    "/env/bin",
-    "/venvs/",
-    "/.venvs/",
-    "/virtualenvs/",
-    "/.virtualenvs/",
-    "/envs/",
-    "/conda/",
-    "/miniconda",
-    "/anaconda",
-)
-
-
-def _is_virtualenv_bin(bin_dir: str) -> bool:
-    """True if bin_dir is a virtualenv/conda environment's bin directory.
-
-    Environments are not installations: their binaries vanish with the env,
-    and classifying them by method (e.g. `uv` because the tool also appears
-    in `uv tool list`) makes removal delete a DIFFERENT installation.
-    """
-    # Definitive signal: PEP 405 venvs carry pyvenv.cfg next to bin/
-    if os.path.isfile(os.path.join(os.path.dirname(bin_dir), "pyvenv.cfg")):
-        return True
-    # Name-based fallback for conda/virtualenvwrapper layouts
-    normalized = bin_dir.rstrip("/") + "/"
-    return any(pat in normalized for pat in _ENV_DIR_PATTERNS)
-
-
 def detect_installations(
     tool_name: str,
     candidates: Sequence[str] | None = None,
@@ -247,16 +224,12 @@ def detect_installations(
     installations = []
     seen_paths = set()
 
-    # Get PATH directories
-    path_env = os.environ.get("PATH", "")
-    path_dirs = [d for d in path_env.split(os.pathsep) if d]
+    # PATH without environment bin dirs — the audit's own filtered PATH, so
+    # both sides apply one rule and pay for the filtering once
+    path_dirs = [d for d in _installation_path().split(os.pathsep) if d]
 
     # Search each PATH directory
     for path_dir in path_dirs:
-        # Virtualenv/conda bins are environments, not installations
-        if _is_virtualenv_bin(path_dir):
-            vlog(f"  Skipping environment dir: {path_dir}", verbose)
-            continue
         for candidate in candidates:
             full_path = os.path.join(path_dir, candidate)
 
@@ -277,7 +250,7 @@ def detect_installations(
                 continue
 
             # A symlink can point into an environment as well
-            if _is_virtualenv_bin(os.path.dirname(real_path)):
+            if _is_foreign_binary(real_path):
                 vlog(f"  Skipping environment binary: {real_path}", verbose)
                 continue
 
@@ -310,7 +283,8 @@ def detect_installations(
             method = classify_install_method(real_path, tool_name, verbose)
 
             # Check if this is the active installation
-            active_path = shutil.which(candidate)
+            # The active copy is resolved the same way the audit resolves it
+            active_path = _which(candidate)
             is_active = (os.path.realpath(active_path) == real_path) if active_path else False
 
             installations.append(
@@ -321,6 +295,7 @@ def detect_installations(
                     path=real_path,
                     active=is_active,
                     valid=valid,
+                    path_dir=path_dir,
                 )
             )
 
@@ -356,6 +331,13 @@ def classify_install_method(
     Returns:
         Installation method string (cargo, pipx, apt, brew, etc.)
     """
+    # A binary inside a uv-tool or pipx venv belongs to that manager. The
+    # queries below match the tool name as a substring of `pipx list` or
+    # `uv tool list` and could name the wrong one, i.e. the wrong uninstaller.
+    manager = tool_manager_of(os.path.dirname(path))
+    if manager:
+        return manager
+
     # Try package manager queries first
     method = _classify_via_queries(path, tool_name, verbose)
     if method != "unknown":
@@ -642,6 +624,19 @@ _catalog_instance = None
 _catalog_lock = threading.Lock()
 
 
+def _cargo_crate_of(available_methods: object) -> str:
+    """Crate name from a catalog entry's cargo install method ("" if it has none)."""
+    if not isinstance(available_methods, list):
+        return ""
+    for method in available_methods:
+        if not isinstance(method, dict) or method.get("method") != "cargo":
+            continue
+        config = method.get("config")
+        if isinstance(config, dict) and isinstance(config.get("crate"), str):
+            return config["crate"]
+    return ""
+
+
 def _catalog_meta(tool_name: str) -> dict:
     """Return cached catalog metadata for a tool: candidates + version command.
 
@@ -669,6 +664,9 @@ def _catalog_meta(tool_name: str) -> dict:
                 raw = getattr(entry, "_raw_data", None) or {}
                 meta["version_flag"] = raw.get("version_flag")
                 meta["version_command"] = raw.get("version_command")
+                crate = _cargo_crate_of(raw.get("available_methods"))
+                if crate:
+                    meta["cargo_crate"] = crate
         except Exception:
             meta = {}
         # Only cache successful lookups — an empty result may be transient.
@@ -903,7 +901,7 @@ def _reconcile_aggressive(
         if not probe:
             errors.append(
                 f"kept installation {preferred.path} no longer works after removal — "
-                f"reinstall the removed package (e.g. sudo {removed[0].method} install {tool_name}) "
+                f"reinstall the removed package (e.g. {_reinstall_hint(removed[0])}) "
                 f"or remove the broken survivor"
             )
 
@@ -943,7 +941,7 @@ def _check_path_ordering(
             f"Preferred installation is not active\n"
             f"  Preferred: {preferred.path}\n"
             f"  Active:    {active.path}\n"
-            f"  Fix: Ensure {os.path.dirname(preferred.path)} appears first in PATH"
+            f"  Fix: Ensure {preferred.path_dir or os.path.dirname(preferred.path)} appears first in PATH"
         )
 
     return tuple(issues)
@@ -1038,6 +1036,39 @@ def _cargo_package_for(binary: str, tool: str) -> str:
     return tool
 
 
+def _tool_env_package(path: str, tool: str) -> str:
+    """Package name of a uv-tool or pipx install: its venv dir, <root>/<package>/bin/<binary>.
+
+    The catalog name can differ (catalog gam installs the gam7 package), and
+    `uv tool uninstall` / `pipx uninstall` need the package.
+    """
+    bin_dir = os.path.dirname(path)
+    if tool_manager_of(bin_dir):
+        return os.path.basename(os.path.dirname(bin_dir)) or tool
+    return tool
+
+
+def _is_pipx_global(path: str) -> bool:
+    """True if path lies in pipx's global venvs (`pipx install --global`)."""
+    root = _env_dir("PIPX_GLOBAL_HOME", "venvs") or os.path.realpath("/opt/pipx/venvs")
+    return os.path.realpath(path).startswith(root + "/")
+
+
+def _reinstall_hint(installation: Installation) -> str:
+    """Command that reinstalls a removed installation, for the broken-survivor message."""
+    method, tool, path = installation.method, installation.tool, installation.path
+    if method == "uv":
+        return f"uv tool install {_tool_env_package(path, tool)}"
+    if method == "pipx":
+        scope = "sudo pipx install --global" if _is_pipx_global(path) else "pipx install"
+        return f"{scope} {_tool_env_package(path, tool)}"
+    if method == "cargo":
+        return f"cargo install {_catalog_meta(tool).get('cargo_crate') or tool}"
+    if method == "brew":
+        return f"brew install {tool}"
+    return f"sudo {method} install {tool}"
+
+
 def _uninstall_installation(installation: Installation, verbose: bool) -> tuple[bool, str | None]:
     """
     Uninstall a single installation.
@@ -1070,9 +1101,15 @@ def _uninstall_installation(installation: Installation, verbose: bool) -> tuple[
 
     # Pipx
     elif method == "pipx":
+        if _is_pipx_global(path) and hasattr(os, "geteuid") and os.geteuid() != 0:
+            # Global pipx venvs are root-owned; this tool never runs sudo itself
+            return (
+                False,
+                f"System package removal requires manual sudo: sudo pipx uninstall --global {_tool_env_package(path, tool)}",
+            )
         try:
             result = subprocess.run(
-                ["pipx", "uninstall", tool],
+                ["pipx", "uninstall"] + (["--global"] if _is_pipx_global(path) else []) + [_tool_env_package(path, tool)],
                 capture_output=True,
                 text=True,
                 timeout=30,
@@ -1089,7 +1126,7 @@ def _uninstall_installation(installation: Installation, verbose: bool) -> tuple[
     elif method == "uv":
         try:
             result = subprocess.run(
-                ["uv", "tool", "uninstall", tool],
+                ["uv", "tool", "uninstall", _tool_env_package(path, tool)],
                 capture_output=True,
                 text=True,
                 timeout=30,

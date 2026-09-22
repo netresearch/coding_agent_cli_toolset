@@ -31,10 +31,7 @@ from cli_audit.environment import Environment
 from cli_audit.installer import InstallResult, StepResult
 
 # Skip marker for Windows (rollback scripts are Unix shell scripts)
-skip_on_windows = pytest.mark.skipif(
-    sys.platform == "win32",
-    reason="Rollback scripts use Unix shell syntax"
-)
+skip_on_windows = pytest.mark.skipif(sys.platform == "win32", reason="Rollback scripts use Unix shell syntax")
 
 
 class TestToolSpec:
@@ -225,7 +222,7 @@ class TestBulkInstallResult:
 class TestGetMissingTools:
     """Tests for get_missing_tools function."""
 
-    @patch("cli_audit.bulk.shutil.which")
+    @patch("cli_audit.bulk._which")
     def test_get_missing_tools_all_missing(self, mock_which):
         """Test when all tools are missing."""
         mock_which.return_value = None
@@ -236,7 +233,7 @@ class TestGetMissingTools:
         assert missing == tools
         assert mock_which.call_count == 3
 
-    @patch("cli_audit.bulk.shutil.which")
+    @patch("cli_audit.bulk._which")
     def test_get_missing_tools_all_installed(self, mock_which):
         """Test when all tools are installed."""
         mock_which.return_value = "/usr/bin/tool"
@@ -247,9 +244,10 @@ class TestGetMissingTools:
         assert missing == []
         assert mock_which.call_count == 3
 
-    @patch("cli_audit.bulk.shutil.which")
+    @patch("cli_audit.bulk._which")
     def test_get_missing_tools_mixed(self, mock_which):
         """Test when some tools are installed."""
+
         def which_side_effect(tool):
             if tool in ("ripgrep", "mypy"):
                 return "/usr/bin/" + tool
@@ -377,11 +375,13 @@ class TestGetToolsToInstall:
         """Test missing mode."""
         mock_get_missing.return_value = ["ripgrep", "black"]
 
-        config = Config(tools={
-            "ripgrep": ToolConfig(version="14.1.1"),
-            "black": ToolConfig(version="24.10.0"),
-            "mypy": ToolConfig(version="1.8.0"),  # not missing
-        })
+        config = Config(
+            tools={
+                "ripgrep": ToolConfig(version="14.1.1"),
+                "black": ToolConfig(version="24.10.0"),
+                "mypy": ToolConfig(version="1.8.0"),  # not missing
+            }
+        )
 
         specs = get_tools_to_install(
             mode="missing",
@@ -396,11 +396,13 @@ class TestGetToolsToInstall:
 
     def test_get_tools_all_mode(self):
         """Test all mode."""
-        config = Config(tools={
-            "ripgrep": ToolConfig(version="14.1.1"),
-            "black": ToolConfig(version="24.10.0"),
-            "mypy": ToolConfig(version="1.8.0"),
-        })
+        config = Config(
+            tools={
+                "ripgrep": ToolConfig(version="14.1.1"),
+                "black": ToolConfig(version="24.10.0"),
+                "mypy": ToolConfig(version="1.8.0"),
+            }
+        )
 
         specs = get_tools_to_install(
             mode="all",
@@ -437,6 +439,7 @@ class TestGroupByPackageManager:
     @patch("cli_audit.bulk.select_package_manager")
     def test_group_by_package_manager_multiple(self, mock_select):
         """Test grouping with multiple package managers."""
+
         def select_side_effect(tool_name, language, config, env, verbose=False):
             if language == "rust":
                 return ("cargo", "hierarchy")
@@ -777,11 +780,13 @@ class TestBulkInstall:
 
         # Create tools with dependency chain to ensure multi-level execution
         # tool1 → tool2 → tool3
-        config = Config(tools={
-            "tool1": ToolConfig(),
-            "tool2": ToolConfig(),
-            "tool3": ToolConfig(),
-        })
+        config = Config(
+            tools={
+                "tool1": ToolConfig(),
+                "tool2": ToolConfig(),
+                "tool3": ToolConfig(),
+            }
+        )
         env = Environment(mode="workstation", confidence=1.0)
 
         # We need to test the actual bulk_install, but with dependency resolution

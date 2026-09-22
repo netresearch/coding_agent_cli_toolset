@@ -6,10 +6,14 @@ Phase 2.0: Detection and Auditing - Local Detection
 
 from __future__ import annotations
 
+import json
+import logging
 import os
 import re
 import shutil
 import subprocess
+import tomllib
+from functools import lru_cache
 from typing import Sequence
 
 # Constants
@@ -38,6 +42,227 @@ VERSION_PROBE_TIMEOUT = "<probe-timeout>"
 # catalog version_command instead of a binary on disk.
 VERSION_COMMAND_PATH = "<version_command>"
 
+# Environment-name patterns for env managers without a pyvenv.cfg (conda etc.).
+# scripts/lib/capability.sh has a similar list, but it matches the unresolved
+# path and skips every */venvs/*/bin, so the two no longer agree by construction.
+_ENV_DIR_PATTERNS = (
+    "/venv/bin/",
+    "/.venv/bin/",
+    "/env/bin/",
+    "/venvs/",
+    "/.venvs/",
+    "/virtualenvs/",
+    "/.virtualenvs/",
+    "/envs/",
+    "/conda/",
+    "/miniconda",
+    "/anaconda",
+)
+
+
+def _is_virtualenv_bin(bin_dir: str) -> bool:
+    """True if bin_dir is a virtualenv/conda environment's bin directory.
+
+    Environments are not installations: their binaries vanish with the env,
+    and classifying them by method (e.g. `uv` because the tool also appears
+    in `uv tool list`) makes removal delete a DIFFERENT installation.
+    """
+    # Resolve first: a PATH entry can be a symlink to an environment's bin dir
+    # (~/bin -> ~/proj/.venv/bin), and normpath alone would not see the venv.
+    # This also makes "/x/env/bin/" behave like "/x/env/bin".
+    bin_dir = os.path.realpath(os.path.expanduser(bin_dir))
+    # Definitive signal: PEP 405 venvs carry pyvenv.cfg next to bin/
+    if os.path.isfile(os.path.join(os.path.dirname(bin_dir), "pyvenv.cfg")):
+        return True
+    # Name-based fallback for conda/virtualenvwrapper layouts
+    normalized = bin_dir.rstrip("/") + "/"
+    return any(pat in normalized for pat in _ENV_DIR_PATTERNS)
+
+
+# Tool managers install each tool into a venv of its own; a binary linked
+# from there (~/.local/bin/black -> ~/.local/share/uv/tools/black/bin/black)
+# is an installation, not an environment.
+_TOOL_RECORDS = {"uv": "uv-receipt.toml", "pipx": "pipx_metadata.json"}
+
+# A package directory name: no separator, no "..", so it cannot leave the root
+_PACKAGE_DIR_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+@-]*\Z")
+
+
+def _env_dir(name: str, *parts: str) -> str:
+    """Resolved directory from an environment variable ("" if unset), as the managers read it."""
+    value = os.environ.get(name, "")
+    if not value:
+        return ""
+    # bin_dir is a resolved path; resolve the root the same way (~, a symlinked
+    # home, macOS /var -> /private/var, a relative value)
+    return os.path.realpath(os.path.join(os.path.expanduser(value), *parts))
+
+
+def _tool_roots() -> tuple[tuple[str, str], ...]:
+    """(manager, root) for every per-tool venv root of uv and pipx on this machine."""
+    home = os.path.expanduser("~")
+    data_home = os.path.expanduser(os.environ.get("XDG_DATA_HOME") or "") or os.path.join(home, ".local", "share")
+    roots = (
+        ("uv", _env_dir("UV_TOOL_DIR") or os.path.realpath(os.path.join(data_home, "uv", "tools"))),
+        ("pipx", _env_dir("PIPX_HOME", "venvs") or os.path.realpath(os.path.join(data_home, "pipx", "venvs"))),
+        ("pipx", _env_dir("PIPX_GLOBAL_HOME", "venvs") or os.path.realpath("/opt/pipx/venvs")),
+        # pipx before 1.5 kept its venvs outside the data dir
+        ("pipx", os.path.realpath(os.path.join(home, ".local", "pipx", "venvs"))),
+        # pipx >= 1.5 asks platformdirs, which answers differently on macOS
+        ("pipx", os.path.realpath(os.path.join(home, "Library", "Application Support", "pipx", "venvs"))),
+    )
+    return tuple((manager, root) for manager, root in roots if root)
+
+
+def _tool_venv_of(bin_dir: str) -> tuple[str, str, str]:
+    """(manager, root, package) if bin_dir is a per-tool venv's <root>/<package>/bin, else ("", "", "").
+
+    The package directory name is validated, and callers rebuild any path from
+    root + package, so a bin_dir from PATH cannot reach another directory.
+    """
+    resolved = os.path.realpath(bin_dir)
+    if os.path.basename(resolved) != "bin":
+        return ("", "", "")
+    venv = os.path.dirname(resolved)
+    package = os.path.basename(venv)
+    if not _PACKAGE_DIR_RE.match(package):
+        return ("", "", "")
+    parent = os.path.dirname(venv)
+    for manager, root in _tool_roots():
+        if parent == root:
+            return (manager, root, package)
+    return ("", "", "")
+
+
+def tool_manager_of(bin_dir: str) -> str:
+    """Return "uv" or "pipx" if bin_dir is a manager's per-tool venv bin dir, else ""."""
+    return _tool_venv_of(bin_dir)[0]
+
+
+def _is_tool_manager_env(bin_dir: str) -> bool:
+    """True if bin_dir belongs to a uv-tool or pipx per-tool venv."""
+    return bool(tool_manager_of(bin_dir))
+
+
+def tool_entrypoints(bin_dir: str) -> set[str] | None:
+    """Executables the manager installed from a per-tool venv, per its own record.
+
+    uv writes uv-receipt.toml ([tool] entrypoints), pipx pipx_metadata.json
+    (main_package.apps, plus apps of injected packages installed with
+    --include-apps). Everything else in that bin dir belongs to dependencies.
+    None if the venv has no readable record.
+    """
+    # bin_dir comes from PATH, so the path that gets opened is rebuilt from a
+    # known tool root, a validated package dir name and a fixed record name.
+    manager, root, package = _tool_venv_of(bin_dir)
+    if not manager:
+        return None
+    record = os.path.join(root, package, _TOOL_RECORDS[manager])
+    if not os.path.isfile(record):
+        return None
+    try:
+        if manager == "uv":
+            with open(record, "rb") as f:
+                entries = tomllib.load(f).get("tool", {}).get("entrypoints", [])
+            return {e["name"] for e in entries if isinstance(e, dict) and e.get("name")}
+        with open(record, encoding="utf-8") as f:
+            data = json.load(f)
+        packages = [data.get("main_package") or {}]
+        packages += [p for p in (data.get("injected_packages") or {}).values() if p.get("include_apps")]
+        apps = {app for p in packages for app in (p.get("apps") or [])}
+        # `pipx install --include-deps` links a dependency's apps on purpose
+        apps |= {app for p in packages if p.get("include_dependencies") for app in (p.get("apps_of_dependencies") or [])}
+        return apps
+    except (OSError, ValueError, AttributeError, TypeError, KeyError) as exc:
+        # Unreadable record: every executable in that venv then counts as a
+        # dependency, so say which file and why
+        logging.getLogger(__name__).debug("unreadable tool record %s: %s", record, exc)
+        return None
+
+
+def _is_tool_dependency_binary(path: str) -> bool:
+    """True if path resolves into a uv/pipx per-tool venv but is not one of its entry points.
+
+    A dependency's executable there (pygmentize in httpie's venv) is no
+    installation of anything: removing it as a duplicate would uninstall the
+    tool that pulled it in.
+    """
+    real = os.path.realpath(path)
+    real_dir = os.path.dirname(real)
+    if not tool_manager_of(real_dir):
+        return False
+    names = tool_entrypoints(real_dir)
+    return names is None or os.path.basename(real) not in names
+
+
+def _is_foreign_binary(path: str) -> bool:
+    """True if path is no installation: it resolves into an environment, or it is
+    a dependency's executable inside a tool manager's per-tool venv.
+
+    The audit and reconcile both ask this, so a symlink from an ordinary PATH
+    dir into a venv is judged the same way on both sides.
+    """
+    real = os.path.realpath(path)
+    return _is_environment_bin(os.path.dirname(real)) or _is_tool_dependency_binary(real)
+
+
+def _is_environment_bin(bin_dir: str) -> bool:
+    """True if bin_dir is an environment's bin dir and no tool manager's per-tool venv.
+
+    The one rule for "environment, not installation", shared by the audit and
+    reconcile. Tool roots are compared resolved, so bin_dir is resolved too.
+    """
+    return _is_virtualenv_bin(bin_dir) and not _is_tool_manager_env(os.path.realpath(bin_dir))
+
+
+@lru_cache(maxsize=8)
+def _filter_path(path_env: str, strict: bool) -> str:
+    dirs = [d for d in path_env.split(os.pathsep) if d]
+    is_foreign_dir = _is_virtualenv_bin if strict else _is_environment_bin
+    return os.pathsep.join(d for d in dirs if not is_foreign_dir(d))
+
+
+def _command_path() -> str:
+    """PATH for running a tool by its name: no environment bin dirs at all.
+
+    Stricter than _installation_path, which keeps a manager's per-tool venv:
+    running a name there can hit a dependency's executable (pygmentize in
+    httpie's venv) instead of the installation.
+    """
+    return _filter_path(os.environ.get("PATH", os.defpath), True)
+
+
+def _installation_path() -> str:
+    """PATH without virtualenv/conda bin dirs.
+
+    An activated environment puts its bin dir first on PATH, so a plain
+    lookup reports the environment's copy (e.g. ~/.venv/bin/black) and an
+    upgrade of the real installation never shows up in the audit.
+    """
+    return _filter_path(os.environ.get("PATH", os.defpath), False)
+
+
+def _which(command_name: str) -> str | None:
+    """shutil.which restricted to installation dirs (see _installation_path).
+
+    Skips a dependency's executable inside a uv/pipx per-tool venv and keeps
+    searching the next PATH dir.
+    """
+    search_path = _installation_path()
+    found = shutil.which(command_name, path=search_path)
+    if not found or not _is_foreign_binary(found):
+        return found
+    # rare: keep looking in the dirs after the one that answered
+    dirs = search_path.split(os.pathsep)
+    answered = os.path.dirname(found)
+    if answered in dirs:
+        dirs = dirs[dirs.index(answered) + 1 :]
+    for path_dir in dirs:
+        other = shutil.which(command_name, path=path_dir) if path_dir else None
+        if other and not _is_foreign_binary(other):
+            return other
+    return None
+
 
 def find_paths(command_name: str, deep: bool = False) -> list[str]:
     """Find all paths for a command.
@@ -52,7 +277,7 @@ def find_paths(command_name: str, deep: bool = False) -> list[str]:
     paths: list[str] = []
 
     # Fast path: shutil.which
-    p = shutil.which(command_name)
+    p = _which(command_name)
     if p:
         paths.append(p)
 
@@ -67,12 +292,13 @@ def find_paths(command_name: str, deep: bool = False) -> list[str]:
                 text=True,
                 timeout=0.2,
                 check=False,
-                env={**os.environ, "TERM": "dumb"},  # Disable ANSI output
+                # Disable ANSI output; search installation dirs only
+                env={**os.environ, "TERM": "dumb", "PATH": _installation_path()},
             )
             for line in (proc.stdout or "").splitlines():
                 line = line.strip()
                 if line and os.path.isfile(line) and os.access(line, os.X_OK):
-                    if line not in paths:
+                    if line not in paths and not _is_foreign_binary(line):
                         paths.append(line)
         except Exception:
             pass
@@ -182,6 +408,9 @@ def get_version_line(
     # from user input — e.g. `uv python list --only-installed | grep … | sed …`.
     # shell=True is required for the pipelines used in the catalog.
     if version_command:
+        # The command names the tool, not the path: resolve that name outside
+        # every environment, including a tool manager's per-tool venv.
+        search_path = _command_path()
         try:
             proc = subprocess.run(  # nosec B602
                 version_command,
@@ -192,7 +421,7 @@ def get_version_line(
                 text=True,
                 timeout=TIMEOUT_SECONDS,
                 check=False,
-                env={**os.environ, "TERM": "dumb"},
+                env={**os.environ, "TERM": "dumb", "PATH": search_path},
             )
             line = (proc.stdout or "").strip()
             if line:
@@ -523,7 +752,7 @@ def detect_multi_versions(
         # (used only when no version-specific binary like go1.25 is found)
         go_default_info = None
         if tool_name == "go":
-            default_go = shutil.which("go")
+            default_go = _which("go")
             if default_go:
                 version_line = get_version_line(default_go, "go", version_flag="version")
                 default_version = extract_version_number(version_line or "")
@@ -555,7 +784,7 @@ def detect_multi_versions(
                         found_path = binary_name
                 else:
                     # Search in PATH
-                    path = shutil.which(binary_name)
+                    path = _which(binary_name)
                     if path:
                         found_path = path
 
