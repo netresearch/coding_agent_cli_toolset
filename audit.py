@@ -916,12 +916,9 @@ def _refresh_multi_version_entries(tools_list, tools_by_name: dict, existing_too
                     continue
                 installed_v = info.get("installed")
                 latest_v = info.get("latest_upstream", "")
-                if installed_v and installed_v == latest_v:
-                    status_v = "UP-TO-DATE"
-                elif installed_v:
-                    status_v = "OUTDATED"
-                else:
-                    status_v = STATUS_NOT_INSTALLED
+                # Directional, like base-tool rows: a runtime ahead of a stale
+                # stored latest is up to date, not an upgrade candidate
+                status_v = compute_status(installed_v or "", latest_v)
                 method = info.get("install_method")
                 versioned = f"{tool.name}@{cycle}"
                 entry = dict(tools_by_name.get(versioned, {}))

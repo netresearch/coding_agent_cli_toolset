@@ -1564,3 +1564,30 @@ class TestRefreshCycleRows:
 
         assert existing[0]["installed"] == "1.2.9"
         assert existing[0]["status"] == "UP-TO-DATE"
+
+    def test_runtime_ahead_of_stored_latest_is_up_to_date(self):
+        # 3.14.8 installed while the snapshot still says 3.14.7: no upgrade offer
+        import audit
+        from cli_audit.tools import Tool
+
+        existing = [dict(self.ROW)]
+        tool = Tool(name="fakeruntime", candidates=("fakeruntime",), source_kind="github", source_args=())
+        with (
+            patch("cli_audit.catalog.ToolCatalog", return_value=self._catalog()),
+            patch.object(
+                audit,
+                "detect_multi_versions",
+                return_value=[
+                    {
+                        "cycle": "1.2",
+                        "installed": "1.2.10",
+                        "latest_upstream": "1.2.9",
+                        "install_method": "manual",
+                        "path": "/x",
+                    }
+                ],
+            ),
+        ):
+            audit._refresh_cycle_rows(existing, [tool])
+
+        assert existing[0]["status"] == "UP-TO-DATE"
