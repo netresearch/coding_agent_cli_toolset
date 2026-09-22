@@ -951,6 +951,27 @@ def _refresh_multi_version_entries(tools_list, tools_by_name: dict, existing_too
                 tools_by_name[versioned] = entry
 
 
+def _refresh_cycle_rows(existing: list[dict], tools_list) -> None:
+    """Update the multi-version rows of a snapshot in place from a fresh detection.
+
+    Works on copies: a row the detection does not reach (its runtime is not in
+    tools_list, or its catalog entry is gone) keeps its data unchanged.
+    """
+    by_name = {t.get("tool"): dict(t) for t in existing}
+    try:
+        _refresh_multi_version_entries(tools_list, by_name, existing)
+    except Exception as exc:
+        # A failed probe must not abort the refresh before the snapshot is written
+        print(f"# Multi-version refresh skipped: {exc}", file=sys.stderr)
+        return
+    for entry in existing:
+        name = entry.get("tool", "")
+        if "@" in name and name in by_name:
+            refreshed = by_name[name]
+            entry.clear()
+            entry.update(refreshed)
+
+
 def cmd_update_local(args: argparse.Namespace) -> int:
     """Update only local installation state (fast, no network)."""
     # Check if we're in merge mode (updating specific tools only)
@@ -1055,14 +1076,11 @@ def cmd_update_local(args: argparse.Namespace) -> int:
             # Cycle rows carry no base-tool local state, so they need their own
             # detection — otherwise `make upgrade` opens with a stale version
             # for every runtime cycle (python@3.14, node@26, …).
-            by_name = {t.get("tool"): t for t in existing}
-            _refresh_multi_version_entries(tools_list, by_name, existing)
+            _refresh_cycle_rows(existing, tools_list)
             for entry in existing:
                 name = entry.get("tool", "")
                 if "@" in name:
-                    entry.clear()
-                    entry.update(by_name[name])
-                    continue
+                    continue  # refreshed by _refresh_cycle_rows
                 inst = local_state.tools.get(name)
                 if inst is None:
                     continue

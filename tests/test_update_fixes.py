@@ -1481,7 +1481,86 @@ class TestUpdateLocalRefreshesCycles:
 
     def test_full_refresh_path_calls_the_re_detection(self):
         """The non-merge branch must use the same helper, not skip '@' rows."""
-        source = (PROJECT_ROOT / "audit.py").read_text()
+        # explicit encoding: Windows defaults to cp1252, and audit.py holds non-ASCII text
+        source = (PROJECT_ROOT / "audit.py").read_text(encoding="utf-8")
         calls = [ln for ln in source.splitlines() if ln.strip().startswith("_refresh_multi_version_entries(")]
-        assert len(calls) == 2, calls  # merge path and full refresh path
+        # merge path, and _refresh_cycle_rows for the full path
+        assert len(calls) == 2, calls
+        assert "_refresh_cycle_rows(existing, tools_list)" in source
         assert "continue  # multi-version cycle: no per-cycle local-only data" not in source
+
+
+class TestRefreshCycleRows:
+    """_refresh_cycle_rows must keep every row it does not re-detect."""
+
+    ROW = {
+        "tool": "fakeruntime@1.2",
+        "base_tool": "fakeruntime",
+        "version_cycle": "1.2",
+        "installed": "1.2.0",
+        "latest_upstream": "1.2.9",
+        "status": "OUTDATED",
+    }
+
+    def _catalog(self, enabled=True):
+        class _Catalog:
+            def has_tool(self, name):
+                return name == "fakeruntime"
+
+            def get_raw_data(self, name):
+                return {"category": "general", "multi_version": {"enabled": enabled}}
+
+        return _Catalog()
+
+    def test_row_outside_the_tool_list_survives(self):
+        # `audit.py --update-local ripgrep` without MERGE: the runtime is not in tools_list
+        import audit
+        from cli_audit.tools import Tool
+
+        existing = [dict(self.ROW)]
+        other = Tool(name="fakeother", candidates=("fakeother",), source_kind="github", source_args=())
+        with patch("cli_audit.catalog.ToolCatalog", return_value=self._catalog()):
+            audit._refresh_cycle_rows(existing, [other])
+
+        assert existing == [self.ROW]
+
+    def test_failing_detection_keeps_the_rows(self):
+        import audit
+        from cli_audit.tools import Tool
+
+        existing = [dict(self.ROW)]
+        tool = Tool(name="fakeruntime", candidates=("fakeruntime",), source_kind="github", source_args=())
+        with (
+            patch("cli_audit.catalog.ToolCatalog", return_value=self._catalog()),
+            patch.object(audit, "detect_multi_versions", side_effect=RuntimeError("probe failed")),
+        ):
+            audit._refresh_cycle_rows(existing, [tool])
+
+        assert existing == [self.ROW]
+
+    def test_detected_row_is_updated_in_place(self):
+        import audit
+        from cli_audit.tools import Tool
+
+        existing = [dict(self.ROW)]
+        tool = Tool(name="fakeruntime", candidates=("fakeruntime",), source_kind="github", source_args=())
+        with (
+            patch("cli_audit.catalog.ToolCatalog", return_value=self._catalog()),
+            patch.object(
+                audit,
+                "detect_multi_versions",
+                return_value=[
+                    {
+                        "cycle": "1.2",
+                        "installed": "1.2.9",
+                        "latest_upstream": "1.2.9",
+                        "install_method": "manual",
+                        "path": "/x",
+                    }
+                ],
+            ),
+        ):
+            audit._refresh_cycle_rows(existing, [tool])
+
+        assert existing[0]["installed"] == "1.2.9"
+        assert existing[0]["status"] == "UP-TO-DATE"
