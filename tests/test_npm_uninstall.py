@@ -27,11 +27,22 @@ def _write_stub(stub_dir: Path, name: str, body: str) -> Path:
 class TestRemoveInstallationNpmPackageName:
     """The npm handler must uninstall the package that owns the binary."""
 
-    def _remove(self, tmpdir: str, bin_target: str, tool: str) -> str:
-        """Link <prefix>/bin/<tool> to bin_target and return the npm calls."""
+    def _remove(self, tmpdir: str, bin_target: str, tool: str, linked_pkg: str = "") -> str:
+        """Link <prefix>/bin/<tool> to bin_target and return the npm calls.
+
+        linked_pkg: make node_modules/<linked_pkg> a symlink to a source
+        folder, the layout of `npm link` and `npm install -g <folder>`.
+        """
         prefix = Path(tmpdir) / "prefix"
         target = prefix / "lib" / bin_target
-        target.parent.mkdir(parents=True)
+        if linked_pkg:
+            pkg_dir = prefix / "lib" / "node_modules" / linked_pkg
+            source = Path(tmpdir) / "src"
+            (source / Path(bin_target).relative_to(Path("node_modules") / linked_pkg)).parent.mkdir(parents=True)
+            pkg_dir.parent.mkdir(parents=True, exist_ok=True)
+            pkg_dir.symlink_to(source)
+        else:
+            target.parent.mkdir(parents=True)
         target.write_text("#!/usr/bin/env node\n")
         (prefix / "bin").mkdir()
         link = prefix / "bin" / tool
@@ -50,7 +61,7 @@ class TestRemoveInstallationNpmPackageName:
                 f"""
 set -euo pipefail
 source "{SCRIPTS_DIR}/lib/reconcile.sh"
-export PATH="{stub_dir}:$PATH"
+export PATH="{stub_dir}:/usr/bin:/bin"
 hash -r
 remove_installation "{tool}" "npm" "{tool}" "{link}"
 """,
@@ -78,6 +89,23 @@ remove_installation "{tool}" "npm" "{tool}" "{link}"
             # `tsc` is the bin of the package `typescript`
             log = self._remove(tmpdir, "node_modules/typescript/bin/tsc", "tsc")
             assert log == "npm uninstall -g typescript\n"
+
+    def test_linked_package_directory_is_not_resolved_past(self):
+        # `npm link` / `npm install -g <folder>`: the package directory is a
+        # symlink too, so a full resolution would leave node_modules behind
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log = self._remove(
+                tmpdir,
+                "node_modules/@earendil-works/pi-coding-agent/dist/cli.js",
+                "pi",
+                linked_pkg="@earendil-works/pi-coding-agent",
+            )
+            assert log == "npm uninstall -g @earendil-works/pi-coding-agent\n"
+
+    def test_nested_scoped_dependency_names_the_owning_package(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log = self._remove(tmpdir, "node_modules/owner/node_modules/@d/e/bin/x", "x")
+            assert log == "npm uninstall -g owner\n"
 
     def test_binary_outside_node_modules_falls_back_to_tool_name(self):
         with tempfile.TemporaryDirectory() as tmpdir:

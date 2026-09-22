@@ -24,10 +24,13 @@ Counted from `catalog/*.json` on 2026-09-22. Every tool the audit tracks has a c
 
 ## Bash completion coverage
 
-Every catalog entry was audited for a bash-completion generator (sweep of
-2026-07-22; each generator was executed and its output validated against
-`complete -…` / `compgen ` / `COMPREPLY`, then checked to confirm it registers
-the entry's own `binary_name`).
+A sweep on 2026-07-22 (commit 9b6c053) audited the entries present in that
+commit for a bash-completion generator: each generator was executed and its
+output validated against `complete -…` / `compgen ` / `COMPREPLY`, then
+checked to confirm it registers the entry's own `binary_name`. codex, pip and
+pipx were not installed then; see the end of this section. herdr, jules, pi
+and vault were checked when they were added. Five entries are not audited:
+blesh, bw, bwrap, byobu, trustmux.
 
 **42 entries declare `bash_completion`** — 41 `command`, 1 `source_path` (rbenv).
 
