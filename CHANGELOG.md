@@ -20,6 +20,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 - Binary-probe fallback in `guide.sh` when the post-install snapshot refresh is stale.
 
 ### Fixed
+- `make upgrade` hid every pinned tool, whatever the pin. A release skipped with `s` ("ask again when newer patch available") hid the tool for good. A pin now hides a tool only while it is `never`, equals the target release (`s`), equals the installed version (`p`), or equals the cycle.
+- `make upgrade` auto-update no longer reports an upgrade as "Updated" just because the install script exited 0. The version is compared after the re-audit, the same check the interactive `Y`/`a` answers use; an unchanged version counts as "Failed" with the old and target version. A package manager without a newer package (`bwrap` on apt) and a binary identical to the target release with a stale version string (`sd` 1.1.0 reports 1.0.0) count as "Skipped". "Held back" requires the install command to succeed and, for apt, the installed package to be the candidate and to own the binary found on PATH; otherwise the unchanged version counts as "Failed". Without an upstream version the result is reported as unverified ("Skipped").
 - difftastic 0.71.0 puts the version into its release file names (`difft-0.71.0-x86_64-unknown-linux-gnu.tar.gz`); the catalog download URL now includes it. byobu is tagged `trustmux-v7.19` since the trustmux rename, and those tags fill the first page of the tags API, so the installer found no stable tag; it now accepts both tag forms.
 - `cmd_update_local` in MERGE mode now refreshes multi-version cycle entries (`python@3.14`, …) instead of only the base-tool entry. Resolved false-negative "Upgrade did not succeed" messages after successful uv installs.
 

@@ -283,7 +283,7 @@ if [ -n "$PRESERVE_DIR" ] && [ -n "$EXTRACT_DIR" ]; then
   mkdir -p "$LIB_DIR"
 
   # Remove old installation
-  rm -rf "$LIB_DIR/$PRESERVE_DIR"
+  rm -rf "${LIB_DIR:?}/${PRESERVE_DIR:?}"
 
   # Move entire directory to ~/.local/lib
   mv "$EXTRACT_DIR/$PRESERVE_DIR" "$LIB_DIR/"
@@ -314,8 +314,9 @@ if [ -n "$path" ]; then printf "[%s] path:   %s\n" "$TOOL" "$path"; fi
 if [ "$BINARY_ALREADY_CURRENT" = "true" ]; then
   printf "[%s] note:   binary already matches target release %s (upstream version string may be stale)\n" "$TOOL" "$LATEST"
   # Signal already-current status to callers (e.g., guide.sh)
-  mkdir -p /tmp/.cli-audit
-  echo "$LATEST" > "/tmp/.cli-audit/${TOOL}.already-current"
+  marker_dir="${CLI_AUDIT_MARKER_DIR:-/tmp/.cli-audit}"
+  mkdir -p "$marker_dir"
+  echo "$LATEST" > "$marker_dir/${TOOL}.already-current"
 fi
 
 # Refresh snapshot after successful installation

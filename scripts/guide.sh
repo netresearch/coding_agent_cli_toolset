@@ -2,6 +2,7 @@
 set -euo pipefail
 trap '' PIPE
 # Graceful interrupt handling
+# shellcheck disable=SC2034  # written by the INT trap
 INTERRUPTED=0
 trap 'INTERRUPTED=1; echo; echo "⚠️  Interrupted. Partial summary:"; print_summary; exit 130' INT
 
@@ -22,6 +23,9 @@ LAST_MULTI_COUNT=0
 # Space-separated tool names seen with duplicate installs this run (for the
 # summary hint); de-duplicated when counted.
 GUIDE_DUP_LIST=""
+
+# Installers leave <tool>.already-current / <tool>.held-back here
+MARKER_DIR="${CLI_AUDIT_MARKER_DIR:-/tmp/.cli-audit}"
 
 # Summary counters
 SUMMARY_UPDATED=0
@@ -87,8 +91,10 @@ CACHE_MAX_AGE_HOURS="${CACHE_MAX_AGE_HOURS:-24}"
 
 check_cache_age() {
   [ ! -f "$SNAP_FILE" ] && { echo "⚠️  Warning: Snapshot cache missing" >&2; return 1; }
-  local now=$(date +%s)
-  local snap_time=$(stat -c %Y "$SNAP_FILE" 2>/dev/null || stat -f %m "$SNAP_FILE" 2>/dev/null || echo 0)
+  local now
+  now=$(date +%s) || true
+  local snap_time
+  snap_time=$(stat -c %Y "$SNAP_FILE" 2>/dev/null || stat -f %m "$SNAP_FILE" 2>/dev/null || echo 0) || true
   local age_hours=$(( (now - snap_time) / 3600 ))
   if [ $age_hours -gt $CACHE_MAX_AGE_HOURS ]; then
     echo "⚠️  Warning: Snapshot cache is ${age_hours}h old (threshold: ${CACHE_MAX_AGE_HOURS}h)" >&2
@@ -183,6 +189,26 @@ osc8() {
   [ -n "$url" ] && printf '\e]8;;%s\e\\%s\e]8;;\e\\' "$url" "$text" || printf '%s' "$text"
 }
 
+# PATH without virtualenv/conda bin dirs: the dirs the Python audit treats as
+# environments (pyvenv.cfg next to bin/, venv/conda name patterns)
+installation_path() {
+  local dir parent out=""
+  local -a dirs=()
+  IFS=: read -ra dirs <<<"$PATH"
+  for dir in "${dirs[@]}"; do
+    [ -n "$dir" ] || continue
+    # PEP 405 venvs carry pyvenv.cfg next to bin/ (no dirname: PATH may lack it)
+    parent="${dir%/}"
+    parent="${parent%/*}"
+    [ -f "$parent/pyvenv.cfg" ] && continue
+    case "${dir%/}/" in
+      */venv/bin/ | */.venv/bin/ | */env/bin/ | */venvs/* | */.venvs/* | */virtualenvs/* | */.virtualenvs/* | */envs/* | */conda/* | */miniconda* | */anaconda*) continue ;;
+    esac
+    out="${out:+$out:}$dir"
+  done
+  printf '%s' "$out"
+}
+
 # Probe the installed version directly from the binary — bypasses the
 # snapshot round-trip. Used as a fallback in upgrade-success checks so a
 # stale snapshot (e.g. after a transient endoflife failure) doesn't mask a
@@ -208,13 +234,118 @@ probe_installed_version() {
     [ -x "$binary" ] || return 1
     bin_path="$binary"
   else
-    bin_path="$(command -v "$binary" 2>/dev/null)" || return 1
+    # An activated venv's copy is no installation
+    bin_path="$(PATH="$(installation_path)" command -v "$binary" 2>/dev/null)" || return 1
   fi
 
   # Try --version first, then -v, capture both stdout and stderr. Extract
   # the first dotted version number we see.
   ver="$("$bin_path" --version 2>&1 || "$bin_path" -v 2>&1 || true)"
   printf '%s\n' "$ver" | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -n1
+}
+
+# True while a pin still hides the tool: "never", the release the user chose
+# to skip (s: pin == latest), the version the user chose to hold (p: pin ==
+# installed), or for a cycle the cycle itself. A skipped release no longer
+# hides the tool once a newer one is out.
+# Args: pin latest installed [cycle]
+pin_applies() {
+  local pin="$1" latest="$2" installed="$3" cycle="${4:-}"
+  [ -n "$pin" ] || return 1
+  [ "$pin" = "never" ] && return 0
+  [ -n "$cycle" ] && [ "$pin" = "$cycle" ] && return 0
+  [ "$pin" = "$latest" ] || [ "$pin" = "$installed" ]
+}
+
+# Remove installer markers before an install, so a marker left by an earlier
+# run (make upgrade-<tool>, an interrupted guide, another cycle of the same
+# tool) cannot decide this run's verdict.
+clear_upgrade_markers() {
+  rm -f "$MARKER_DIR/${1}.already-current" "$MARKER_DIR/${1}.held-back"
+}
+
+# Classify the outcome of an install/upgrade run. Call after the re-audit.
+# An install script that exits 0 has not necessarily changed anything: a
+# shadowed binary, an unchanged package or a stale version string all exit 0.
+# Args: script_ok catalog_tool tool installed latest [version_cycle]
+# Echoes: updated | failed | unchanged | unverified | already-current | held-back
+#   unverified:      version unchanged, but no upstream version to compare with
+#   already-current: installer found the binary identical to the target release
+#   held-back:       package manager has no newer version than the installed one
+upgrade_verdict() {
+  local script_ok="$1" catalog_tool="$2" tool="$3" installed="$4" latest="$5"
+  local version_cycle="${6:-}" marker="" new_installed="" probed=""
+  local marker_dir="$MARKER_DIR"
+  [ -f "$marker_dir/${catalog_tool}.already-current" ] && marker="already-current"
+  [ -f "$marker_dir/${catalog_tool}.held-back" ] && marker="held-back"
+  rm -f "$marker_dir/${catalog_tool}.already-current" "$marker_dir/${catalog_tool}.held-back"
+
+  if [ "$script_ok" != "1" ]; then
+    echo "failed"
+    return 0
+  fi
+
+  new_installed="$(json_field "$tool" installed)"
+  # If the snapshot still reports the pre-install version, the refresh
+  # may have hit a transient failure (endoflife timeout, flaky audit).
+  # Probe the binary directly as a tiebreaker.
+  if [ -z "$new_installed" ] || [ "$new_installed" = "$installed" ]; then
+    probed="$(probe_installed_version "$catalog_tool" "$version_cycle" 2>/dev/null || true)"
+    if [ -n "$probed" ] && [ "$probed" != "$installed" ]; then
+      new_installed="$probed"
+    fi
+  fi
+
+  if [ -n "$new_installed" ] && [ "$new_installed" != "$installed" ]; then
+    echo "updated"
+  elif [ -n "$marker" ]; then
+    echo "$marker"
+  elif [ -z "$new_installed" ]; then
+    # Nothing detectable after an install: it did not happen
+    echo "unchanged"
+  elif [ -z "$latest" ]; then
+    echo "unverified"
+  elif [ -n "$new_installed" ] && { [[ "$latest" == "$new_installed".* ]] || [[ "$new_installed" == "$latest".* ]]; }; then
+    # Short version form (3.13 vs 3.13.11): detection truncates, upgrade worked.
+    # The dot boundary keeps 1.1 from matching 1.12.0.
+    echo "updated"
+  else
+    echo "unchanged"
+  fi
+}
+
+# Print the verdict of an upgrade and update the summary counters.
+# Args: verdict tool installed latest
+report_upgrade_verdict() {
+  local verdict="$1" tool="$2" installed="$3" latest="$4"
+  case "$verdict" in
+    updated)
+      SUMMARY_UPDATED=$((SUMMARY_UPDATED + 1))
+      ;;
+    failed)
+      printf "    ⚠️  Upgrade failed (install script error)\n"
+      SUMMARY_FAILED=$((SUMMARY_FAILED + 1))
+      ;;
+    unchanged)
+      printf "    ⚠️  Upgrade did not take effect: still %s, target %s\n" "${installed:-<none>}" "${latest:-<unknown>}"
+      SUMMARY_FAILED=$((SUMMARY_FAILED + 1))
+      ;;
+    already-current)
+      # Upstream version string is stale (sd 1.1.0 reports 1.0.0). No pin:
+      # the guide hides every pinned tool, which would also hide the next
+      # real release.
+      printf "    ✓ Binary already matches release %s (its version string is stale)\n" "$latest"
+      SUMMARY_SKIPPED=$((SUMMARY_SKIPPED + 1))
+      ;;
+    unverified)
+      printf "    ⚠️  No upstream version known; cannot tell whether %s changed\n" "${installed:-the install}"
+      SUMMARY_SKIPPED=$((SUMMARY_SKIPPED + 1))
+      ;;
+    held-back)
+      printf "    ⏸  Package manager has no newer version than %s (upstream: %s)\n" "${installed:-<none>}" "${latest:-<unknown>}"
+      SUMMARY_SKIPPED=$((SUMMARY_SKIPPED + 1))
+      ;;
+  esac
 }
 
 # Print installed status line (reusable for auto-update and interactive prompts)
@@ -308,7 +439,8 @@ process_tool() {
   local is_multi_version=""
   local version_cycle=""
   if [[ "$tool" == *"@"* ]]; then
-    local base_tool="$(json_field "$tool" base_tool)"
+    local base_tool
+    base_tool="$(json_field "$tool" base_tool)" || true
     version_cycle="$(json_field "$tool" version_cycle)"
     if [ -n "$base_tool" ]; then
       catalog_tool="$base_tool"
@@ -321,22 +453,32 @@ process_tool() {
   fi
 
   # Get tool data from audit JSON (use full tool name for JSON queries)
-  local icon="$(json_field "$tool" state_icon)"
-  local installed="$(json_field "$tool" installed)"
-  local latest="$(json_field "$tool" latest_upstream)"
-  local url="$(json_field "$tool" latest_url)"
-  local method="$(json_field "$tool" installed_method)"
-  local is_up_to_date="$(json_bool "$tool" is_up_to_date)"
+  local icon
+  icon="$(json_field "$tool" state_icon)" || true
+  local installed
+  installed="$(json_field "$tool" installed)" || true
+  local latest
+  latest="$(json_field "$tool" latest_upstream)" || true
+  local url
+  url="$(json_field "$tool" latest_url)" || true
+  local method
+  method="$(json_field "$tool" installed_method)" || true
+  local is_up_to_date
+  is_up_to_date="$(json_bool "$tool" is_up_to_date)" || true
 
   # Get metadata from catalog (use base tool name for catalog queries)
-  local display="$(catalog_get_guide_property "$catalog_tool" display_name "$catalog_tool")"
+  local display
+  display="$(catalog_get_guide_property "$catalog_tool" display_name "$catalog_tool")" || true
   # For multi-version tools, append version cycle to display name
   if [ -n "$is_multi_version" ] && [ -n "$version_cycle" ]; then
     display="$display $version_cycle"
   fi
-  local install_action="$(catalog_get_guide_property "$catalog_tool" install_action "")"
-  local description="$(catalog_get_property "$catalog_tool" description)"
-  local homepage="$(catalog_get_property "$catalog_tool" homepage)"
+  local install_action
+  install_action="$(catalog_get_guide_property "$catalog_tool" install_action "")" || true
+  local description
+  description="$(catalog_get_property "$catalog_tool" description)" || true
+  local homepage
+  homepage="$(catalog_get_property "$catalog_tool" homepage)" || true
   # Multi-version tools (python@3.13, php@8.3, etc.) store auto-update per cycle,
   # so 'a' on one cycle doesn't silently apply to other cycles. Non-multi-version
   # tools use the bare catalog name.
@@ -344,7 +486,8 @@ process_tool() {
   if [ -n "$is_multi_version" ]; then
     auto_update_key="$tool"
   fi
-  local auto_update="$(config_get_auto_update "$auto_update_key")"
+  local auto_update
+  auto_update="$(config_get_auto_update "$auto_update_key")" || true
 
   # Check if runtime requirements are satisfied (e.g., npm requires node)
   local missing_req
@@ -426,7 +569,8 @@ process_tool() {
     print_installed_status "$installed" "$method"
     # Show target; for self-managed tools (skip_upstream) show "self-managed" instead of <unknown>
     local target_display="${latest:-<unknown>}"
-    local skip_upstream="$(catalog_get_property "$catalog_tool" skip_upstream)"
+    local skip_upstream
+    skip_upstream="$(catalog_get_property "$catalog_tool" skip_upstream)" || true
     if [ "$target_display" = "<unknown>" ] && [ "$skip_upstream" = "true" ]; then
       target_display="self-managed"
     fi
@@ -444,6 +588,7 @@ process_tool() {
 
     # Execute the install with version-specific environment variables
     local auto_update_success=0
+    clear_upgrade_markers "$catalog_tool"
     if [ "$catalog_tool" = "python" ] || [ -n "$is_multi_version" ] && [ "$catalog_tool" = "python" ]; then
       UV_PYTHON_SPEC="$latest" "$ROOT"/scripts/$install_cmd && auto_update_success=1 || true
     elif [ "$catalog_tool" = "ruby" ]; then
@@ -461,13 +606,9 @@ process_tool() {
     # Re-audit with fresh collection for this specific tool
     CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_MERGE=1 "$CLI" audit.py "$tool" >/dev/null 2>&1 || true
     reload_audit_json
-    # Clean up any already-current marker left by installer
-    rm -f "/tmp/.cli-audit/${catalog_tool}.already-current"
-    if [ "$auto_update_success" = "0" ]; then
-      SUMMARY_FAILED=$((SUMMARY_FAILED + 1))
-    else
-      SUMMARY_UPDATED=$((SUMMARY_UPDATED + 1))
-    fi
+    report_upgrade_verdict \
+      "$(upgrade_verdict "$auto_update_success" "$catalog_tool" "$tool" "$installed" "$latest" "$version_cycle")" \
+      "$tool" "$installed" "$latest"
     return 0
   fi
 
@@ -481,7 +622,8 @@ process_tool() {
 
   # Show target; for self-managed tools (skip_upstream) show "self-managed" instead of <unknown>
   local target_display_p="${latest:-<unknown>}"
-  local skip_upstream_p="$(catalog_get_property "$catalog_tool" skip_upstream)"
+  local skip_upstream_p
+  skip_upstream_p="$(catalog_get_property "$catalog_tool" skip_upstream)" || true
   if [ "$target_display_p" = "<unknown>" ] && [ "$skip_upstream_p" = "true" ]; then
     target_display_p="self-managed"
   fi
@@ -570,6 +712,7 @@ process_tool() {
     [Yy])
       # Handle tool-specific version environment variables
       local upgrade_success=0
+      clear_upgrade_markers "$catalog_tool"
       if [ "$catalog_tool" = "python" ]; then
         UV_PYTHON_SPEC="$latest" "$ROOT"/scripts/$install_cmd && upgrade_success=1 || true
       elif [ "$catalog_tool" = "ruby" ]; then
@@ -590,51 +733,22 @@ process_tool() {
       # Reload full audit JSON from updated snapshot (needed for subsequent tools)
       reload_audit_json
 
-      # Check if upgrade succeeded by comparing versions
-      local new_installed="$(json_field "$tool" installed)"
-      # If the snapshot still reports the pre-install version, the refresh
-      # may have hit a transient failure (endoflife timeout, flaky audit).
-      # Probe the binary directly as a tiebreaker — it's the ground truth.
-      if [ -z "$new_installed" ] || [ "$new_installed" = "$installed" ]; then
-        local probed_y
-        probed_y="$(probe_installed_version "$catalog_tool" "$version_cycle" 2>/dev/null || true)"
-        if [ -n "$probed_y" ] && [ "$probed_y" != "$installed" ]; then
-          new_installed="$probed_y"
-        fi
-      fi
-      # Check if installer flagged binary as already at target (hash match)
-      local already_current_marker="/tmp/.cli-audit/${catalog_tool}.already-current"
-      local binary_already_current=""
-      if [ -f "$already_current_marker" ]; then
-        binary_already_current="true"
-        rm -f "$already_current_marker"
-      fi
-      if [ "$upgrade_success" = "0" ]; then
-        # Install script failed
-        printf "\n    ⚠️  Upgrade failed (install script error)\n"
-        SUMMARY_FAILED=$((SUMMARY_FAILED + 1))
-        prompt_pin_version "$tool" "$installed"
-      elif [ -n "$binary_already_current" ]; then
-        # Binary hash matches target release - upgrade succeeded despite version string
-        printf "\n    ✓ Binary already matches target release (upstream version string may be stale)\n"
-      elif [ "$new_installed" = "$installed" ] && [ "$new_installed" != "$latest" ]; then
-        # Version didn't change and not at target
-        # BUT: if installed is a prefix of latest (e.g., 3.13 vs 3.13.11), consider it success
-        # This happens when version detection returns short form but upgrade actually worked
-        if [[ "$latest" == "$new_installed"* ]] || [[ "$new_installed" == "$latest"* ]]; then
-          : # Prefix match - upgrade likely succeeded, don't warn
-        else
-          printf "\n    ⚠️  Upgrade did not succeed (version unchanged)\n"
+      local verdict
+      verdict="$(upgrade_verdict "$upgrade_success" "$catalog_tool" "$tool" "$installed" "$latest" "$version_cycle")"
+      report_upgrade_verdict "$verdict" "$tool" "$installed" "$latest"
+      case "$verdict" in
+        failed|unchanged|held-back)
           prompt_pin_version "$tool" "$installed"
-        fi
-      else
-        # Upgrade succeeded - remove any existing pin to avoid stale pins
-        SUMMARY_UPDATED=$((SUMMARY_UPDATED + 1))
-        local existing_pin="$(pins_get "$tool")"
-        if [ -n "$existing_pin" ] && [ "$existing_pin" != "never" ]; then
-          "$ROOT"/scripts/unpin_version.sh "$tool" || true
-        fi
-      fi
+          ;;
+        updated)
+          # Remove any existing pin to avoid stale pins
+          local existing_pin
+          existing_pin="$(pins_get "$tool")"
+          if [ -n "$existing_pin" ] && [ "$existing_pin" != "never" ]; then
+            "$ROOT"/scripts/unpin_version.sh "$tool" || true
+          fi
+          ;;
+      esac
       ;;
     [Aa])
       # Install/upgrade AND enable auto-update for future. Use the cycle-qualified
@@ -644,6 +758,7 @@ process_tool() {
 
       # Handle tool-specific version environment variables
       local upgrade_success_a=0
+      clear_upgrade_markers "$catalog_tool"
       if [ "$catalog_tool" = "python" ]; then
         UV_PYTHON_SPEC="$latest" "$ROOT"/scripts/$install_cmd && upgrade_success_a=1 || true
       elif [ "$catalog_tool" = "ruby" ]; then
@@ -662,45 +777,21 @@ process_tool() {
       CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_MERGE=1 "$CLI" audit.py "$tool" >/dev/null 2>&1 || true
       reload_audit_json
 
-      # Check if upgrade succeeded
-      local new_installed_a="$(json_field "$tool" installed)"
-      # Binary-probe fallback (see [Yy] branch for rationale).
-      if [ -z "$new_installed_a" ] || [ "$new_installed_a" = "$installed" ]; then
-        local probed_a
-        probed_a="$(probe_installed_version "$catalog_tool" "$version_cycle" 2>/dev/null || true)"
-        if [ -n "$probed_a" ] && [ "$probed_a" != "$installed" ]; then
-          new_installed_a="$probed_a"
-        fi
-      fi
-      # Check if installer flagged binary as already at target (hash match)
-      local already_current_marker_a="/tmp/.cli-audit/${catalog_tool}.already-current"
-      local binary_already_current_a=""
-      if [ -f "$already_current_marker_a" ]; then
-        binary_already_current_a="true"
-        rm -f "$already_current_marker_a"
-      fi
-      if [ "$upgrade_success_a" = "0" ]; then
-        printf "\n    ⚠️  Upgrade failed (install script error)\n"
-        printf "    Auto-update is still enabled - will try again next time.\n"
-        SUMMARY_FAILED=$((SUMMARY_FAILED + 1))
-      elif [ -n "$binary_already_current_a" ]; then
-        printf "    ✓ Auto-update enabled. Binary already matches target release.\n"
-        SUMMARY_UPDATED=$((SUMMARY_UPDATED + 1))
-      elif [ "$new_installed_a" = "$installed" ] && [ "$new_installed_a" != "$latest" ]; then
-        # Version didn't change - but check for prefix match (e.g., 3.13 vs 3.13.11)
-        if [[ "$latest" == "$new_installed_a"* ]] || [[ "$new_installed_a" == "$latest"* ]]; then
-          printf "    ✓ Auto-update enabled. This tool will update automatically in future.\n"
-          SUMMARY_UPDATED=$((SUMMARY_UPDATED + 1))
-        else
-          printf "\n    ⚠️  Upgrade did not succeed (version unchanged)\n"
+      local verdict_a
+      verdict_a="$(upgrade_verdict "$upgrade_success_a" "$catalog_tool" "$tool" "$installed" "$latest" "$version_cycle")"
+      report_upgrade_verdict "$verdict_a" "$tool" "$installed" "$latest"
+      case "$verdict_a" in
+        failed|unchanged)
           printf "    Auto-update is still enabled - will try again next time.\n"
-          SUMMARY_FAILED=$((SUMMARY_FAILED + 1))
-        fi
-      else
-        printf "    ✓ Auto-update enabled. This tool will update automatically in future.\n"
-        SUMMARY_UPDATED=$((SUMMARY_UPDATED + 1))
+          ;;
+        *)
+          printf "    ✓ Auto-update enabled. This tool will update automatically in future.\n"
+          ;;
+      esac
+      if [ "$verdict_a" = "updated" ]; then
         # Remove any existing pin
-        local existing_pin_a="$(pins_get "$tool")"
+        local existing_pin_a
+        existing_pin_a="$(pins_get "$tool")"
         if [ -n "$existing_pin_a" ]; then
           "$ROOT"/scripts/unpin_version.sh "$tool" || true
         fi
@@ -757,13 +848,15 @@ process_tool() {
         reload_audit_json
 
         # Check if removal succeeded
-        local still_installed="$(json_field "$tool" installed)"
+        local still_installed
+        still_installed="$(json_field "$tool" installed)" || true
         if [ -z "$still_installed" ]; then
           printf "    ✓ %s has been removed\n" "$tool"
           SUMMARY_REMOVED=$((SUMMARY_REMOVED + 1))
         else
           # Check if remaining installation is a system/apt binary that we can't remove
-          local remaining_method="$(json_field "$tool" installed_method)"
+          local remaining_method
+          remaining_method="$(json_field "$tool" installed_method)" || true
           if [ "$remaining_method" = "apt" ] || [ "$remaining_method" = "system" ]; then
             printf "    ✓ User-managed %s removed (system %s still present at %s — managed by OS)\n" \
               "$tool" "$still_installed" "$remaining_method"
@@ -826,7 +919,8 @@ prompt_pin_version() {
   local tool="$1"
   local current_version="$2"
 
-  [ -z "$current_version" ] && current_version="<current>"
+  # Nothing installed: there is no version to pin
+  [ -z "$current_version" ] && return 0
 
   printf "    Pin to version %s to stop upgrade prompts? [y/N] " "$current_version"
 
@@ -853,11 +947,16 @@ process_deprecated_tool() {
   fi
 
   # Get tool data
-  local installed="$(json_field "$tool" installed)"
-  local method="$(json_field "$tool" installed_method)"
-  local description="$(catalog_get_property "$catalog_tool" description)"
-  local superseded_by="$(catalog_get_superseded_by "$catalog_tool")"
-  local deprecation_msg="$(catalog_get_deprecation_message "$catalog_tool")"
+  local installed
+  installed="$(json_field "$tool" installed)" || true
+  local method
+  method="$(json_field "$tool" installed_method)" || true
+  local description
+  description="$(catalog_get_property "$catalog_tool" description)" || true
+  local superseded_by
+  superseded_by="$(catalog_get_superseded_by "$catalog_tool")" || true
+  local deprecation_msg
+  deprecation_msg="$(catalog_get_deprecation_message "$catalog_tool")" || true
 
   # Get replacement tool info
   local replacement_desc=""
@@ -904,12 +1003,11 @@ process_deprecated_tool() {
         printf "    Migrating to %s...\n" "$superseded_by"
 
         # Check if replacement is already installed
-        local replacement_installed="$(json_field "$superseded_by" installed)"
+        local replacement_installed
+        replacement_installed="$(json_field "$superseded_by" installed)" || true
 
-        local already_installed=""
         if [ -n "$replacement_installed" ]; then
           printf "    ✓ %s %s already installed (skipping install)\n" "$superseded_by" "$replacement_installed"
-          already_installed="true"
         else
           # Install the replacement
           "$ROOT"/scripts/install_tool.sh "$superseded_by" || true
@@ -942,7 +1040,8 @@ process_deprecated_tool() {
             CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_MERGE=1 "$CLI" audit.py "$tool" >/dev/null 2>&1 || true
             reload_audit_json
 
-            local still_installed="$(json_field "$tool" installed)"
+            local still_installed
+            still_installed="$(json_field "$tool" installed)" || true
             if [ -z "$still_installed" ]; then
               printf "    ✓ Migration complete: %s → %s\n" "$tool" "$superseded_by"
             else
@@ -967,7 +1066,8 @@ process_deprecated_tool() {
       CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_MERGE=1 "$CLI" audit.py "$tool" >/dev/null 2>&1 || true
       reload_audit_json
 
-      local still_there="$(json_field "$tool" installed)"
+      local still_there
+      still_there="$(json_field "$tool" installed)" || true
       if [ -z "$still_there" ]; then
         printf "    ✓ %s has been removed\n" "$tool"
       else
@@ -1035,8 +1135,9 @@ while read -r line; do
         if [ "$multi_pin" = "never" ]; then
           continue
         fi
-        # Skip if this specific version cycle is pinned to a version
-        if [ -n "$multi_pin" ]; then
+        # Skip while the cycle pin still applies
+        if [ -n "$multi_pin" ] && pin_applies "$multi_pin" "$(json_field "$tool_name" latest_upstream)" \
+          "$(json_field "$tool_name" installed)" "$version_cycle"; then
           continue
         fi
       else
@@ -1045,8 +1146,9 @@ while read -r line; do
           continue
         fi
 
-        # Skip if pinned to any specific version (don't prompt for upgrades)
-        if [ -n "$pinned_version" ]; then
+        # Skip while the pin still applies (don't prompt for that release)
+        if [ -n "$pinned_version" ] && pin_applies "$pinned_version" "$(json_field "$tool_name" latest_upstream)" \
+          "$(json_field "$tool_name" installed)"; then
           continue
         fi
       fi
