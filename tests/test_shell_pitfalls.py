@@ -113,7 +113,15 @@ class TestFilesInPlace:
         assert target.read_text() == "hello\n"
 
 
-@pytest.mark.skipif(shutil.which("timeout") is None, reason="timeout(1) is GNU coreutils")
+def _has_gnu_timeout() -> bool:
+    # BusyBox timeout has no --foreground and keeps the caller's group.
+    if shutil.which("timeout") is None:
+        return False
+    proc = subprocess.run(["timeout", "--version"], capture_output=True, text=True)
+    return "GNU coreutils" in proc.stdout
+
+
+@pytest.mark.skipif(not _has_gnu_timeout(), reason="needs GNU coreutils timeout(1)")
 class TestProcessGroups:
     def test_timeout_puts_its_command_in_a_group_of_its_own(self):
         proc = bash(
@@ -125,6 +133,11 @@ class TestProcessGroups:
         assert foreground == caller
 
     def test_kill_zero_inside_timeout_does_not_reach_the_caller(self):
-        proc = bash('trap "echo caller-got-TERM" TERM; timeout 5 bash -c "kill -TERM 0"; echo survived')
+        # Own session: should the assumption ever fail, the signal hits this
+        # throwaway group, not the test runner.
+        proc = bash(
+            'trap "echo caller-got-TERM" TERM; timeout 5 bash -c "kill -TERM 0"; echo survived',
+            start_new_session=True,
+        )
         assert "caller-got-TERM" not in proc.stdout
         assert proc.stdout.strip().endswith("survived")

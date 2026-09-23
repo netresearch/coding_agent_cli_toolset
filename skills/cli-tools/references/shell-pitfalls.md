@@ -123,9 +123,12 @@ run it as a file.
 ## Signals and process groups
 
 **`timeout(1)` runs its command in a process group of its own** (GNU
-coreutils; `--foreground` keeps the caller's group). A signal sent to the
-caller's group — Ctrl-C, or `kill -TERM -- -$PGID` — therefore does not reach
-the command, and a `kill -TERM 0` inside the command does not reach the caller:
+coreutils; `--foreground` keeps the caller's group). A signal sent to a
+script's process group — `kill -TERM -- -$PGID` — therefore does not reach the
+command, and a `kill -TERM 0` inside the command does not reach the caller. A
+signal sent to `timeout` itself is different: it forwards it to the command, and
+at an interactive prompt `timeout` leads the job, so Ctrl-C still arrives that
+way. The trap:
 `bash -c 'trap "echo got" TERM; timeout 5 bash -c "kill -TERM 0"'` prints
 nothing from the trap. It matters most in tests of interruption handling: a
 test that makes a generator under `timeout` kill "its group" never interrupts
