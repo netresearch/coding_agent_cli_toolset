@@ -2,7 +2,7 @@
 """Claude Code hook: point a failed command at the cli-tools catalog.
 
 Registered in hooks/hooks.json for PostToolUseFailure and PostToolUse on Bash.
-A command that is not installed makes the shell print a "command not found"
+A command the shell cannot find on PATH makes it print a "command not found"
 line; this hook finds it, looks the binary up in catalog/*.json and adds the
 install command to Claude's context.
 
@@ -63,15 +63,15 @@ def advice(binary: str, root: Path) -> str:
     entry = catalog_entry(binary, root / "catalog")
     if entry is None:
         return (
-            f"`{binary}` is not installed and has no entry in the cli-tools catalog. "
-            "Check `type -P -a` and `hash -r` first; the cli-tools skill lists alternatives "
+            f"`{binary}` was not found on PATH and has no entry in the cli-tools catalog. "
+            f"Check `type -P -a {binary}` and `hash -r` first; the cli-tools skill lists alternatives "
             "and troubleshooting."
         )
     install = root / "scripts" / "install_tool.sh"
     via = "" if entry == binary else f" (provided by catalog entry `{entry}`)"
     return (
-        f"`{binary}` is not installed{via}. Check `type -P -a {binary}` and `hash -r` first "
-        f"in case it is only off PATH; otherwise install it with `{install} {entry} install`. "
+        f"`{binary}` was not found on PATH{via}. Check `type -P -a {binary}` and `hash -r` first "
+        f"in case it is installed elsewhere or the shell cached a stale path; otherwise install it with `{install} {entry} install`. "
         "The cli-tools skill covers the rest of the workflow."
     )
 
