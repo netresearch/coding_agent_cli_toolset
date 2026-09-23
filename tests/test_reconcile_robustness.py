@@ -9,8 +9,8 @@
   translations are installed, and every localized line was then dropped.
 * After removing an installation, nothing checked that the surviving binary
   still runs, though a wrapper can depend on files the removed package owned.
-* ``refresh_snapshot`` is bookkeeping after a successful install, but nineteen
-  installers called it unguarded, so a failed refresh turned the install into
+* ``refresh_snapshot`` is bookkeeping after a successful install, but 24 call
+  sites in 20 scripts ran it unguarded, so a failed refresh turned the install into
   a reported failure.
 """
 
@@ -24,6 +24,19 @@ PROJECT_ROOT = Path(__file__).parent.parent
 SCRIPTS = PROJECT_ROOT / "scripts"
 
 pytestmark = pytest.mark.skipif(sys.platform == "win32", reason="Shell script tests require POSIX shell")
+
+
+def _bash_major() -> int:
+    try:
+        out = subprocess.run(["bash", "-c", "echo ${BASH_VERSINFO[0]}"], capture_output=True, text=True).stdout
+        return int(out.strip() or 0)
+    except OSError, ValueError:
+        return 0
+
+
+# scripts/AGENTS.md requires Bash 4.0+ (capability.sh uses `local -A`); a
+# stock macOS ships 3.2 as `bash`.
+requires_bash4 = pytest.mark.skipif(_bash_major() < 4, reason="scripts/ require Bash 4.0+")
 
 CARGO_LIST = """ripgrep_all v0.10.10:
     rga
@@ -79,6 +92,7 @@ remove_installation "{binary}" cargo "{binary}"
         assert self._uninstall(tmp_path, "notinstalled") == "cargo uninstall notinstalled\n"
 
 
+@requires_bash4
 class TestDetectAllInstallationsIsLocaleIndependent:
     def test_localized_type_output_still_finds_the_binary(self, tmp_path):
         bin_dir = tmp_path / "bin"
@@ -105,6 +119,25 @@ class TestSurvivingBinaryMustRun:
         ok = _stub(tmp_path / "bin", "fine", 'echo "fine 1.0"')
         proc = _bash(f'source "{SCRIPTS}/lib/reconcile.sh"\nwarn_if_bin_does_not_run fine "{ok}"')
         assert proc.returncode == 0
+        assert proc.stderr == ""
+
+    def test_probes_without_timeout_on_path(self, tmp_path):
+        # timeout(1) is GNU coreutils; a stock macOS has none. A binary that
+        # runs must not be reported as broken just because the bound is missing.
+        ok = _stub(tmp_path / "bin", "fine", 'echo "fine 1.0"')
+        only_bash = tmp_path / "only-bash"
+        only_bash.mkdir()
+        (only_bash / "bash").symlink_to(
+            subprocess.run(["bash", "-c", "command -v bash"], capture_output=True, text=True).stdout.strip()
+        )
+        proc = _bash(f"""set -euo pipefail
+source "{SCRIPTS}/lib/reconcile.sh"
+PATH="{only_bash}"
+hash -r
+command -v timeout >/dev/null && exit 99
+warn_if_bin_does_not_run fine "{ok}"
+""")
+        assert proc.returncode == 0, proc.stderr
         assert proc.stderr == ""
 
 

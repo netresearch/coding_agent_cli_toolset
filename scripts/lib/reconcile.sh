@@ -418,8 +418,16 @@ reconcile_tool() {
 warn_if_bin_does_not_run() {
   local tool="$1" bin="$2"
   [ -x "$bin" ] || return 0
-  if ! timeout 5 "$bin" --version </dev/null >/dev/null 2>&1 \
-    && ! timeout 5 "$bin" version </dev/null >/dev/null 2>&1; then
+  # timeout(1) is GNU coreutils: absent from a stock macOS, where gtimeout
+  # may exist via Homebrew. Without either, probe unbounded.
+  local -a limit=()
+  if command -v timeout >/dev/null 2>&1; then
+    limit=(timeout 5)
+  elif command -v gtimeout >/dev/null 2>&1; then
+    limit=(gtimeout 5)
+  fi
+  if ! ${limit[@]+"${limit[@]}"} "$bin" --version </dev/null >/dev/null 2>&1 \
+    && ! ${limit[@]+"${limit[@]}"} "$bin" version </dev/null >/dev/null 2>&1; then
     echo "[$tool] Warning: $bin is installed but does not run — the removal may have broken a wrapper that depended on the removed package" >&2
   fi
   return 0
