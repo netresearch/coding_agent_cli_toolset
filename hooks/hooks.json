@@ -1,0 +1,29 @@
+{
+  "description": "Point a command-not-found failure at the cli-tools catalog",
+  "hooks": {
+    "PostToolUseFailure": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/detect_missing_tool.py\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/detect_missing_tool.py\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

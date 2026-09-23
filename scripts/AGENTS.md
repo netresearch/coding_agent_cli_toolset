@@ -52,6 +52,9 @@
 **Bash completion:**
 - `install_completion.sh`: Install/remove a tool's bash completion; `--all` backfills every declared tool
 
+**Claude Code plugin hook:**
+- `detect_missing_tool.py`: registered in `hooks/hooks.json` for `PostToolUseFailure` and `PostToolUse` on Bash; turns a shell "command not found" into the catalog entry and install command, passed to the model as `additionalContext`. Standard library only, fails open
+
 **Shared utilities:** `scripts/lib/` directory (12 modules):
 - `lib/common.sh` — Logging and output formatting
 - `lib/config.sh` — Read user config from `~/.config/cli-audit/config.yml`
