@@ -22,7 +22,7 @@
 **This project uses [uv](https://docs.astral.sh/uv/) for package management.** Always use `uv run` to execute Python commands.
 
 ```bash
-# Sync dependencies (run after clone or when pyproject.toml changes)
+# Sync dependencies (after clone, in every new worktree — .venv is per worktree — and when pyproject.toml changes)
 uv sync --extra dev
 
 # Run any Python command

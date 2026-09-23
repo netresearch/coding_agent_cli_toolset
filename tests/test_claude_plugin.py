@@ -53,7 +53,7 @@ class TestManifest:
 
     def test_plugin_json_sets_no_version(self):
         # Without a version, Claude Code versions the plugin by commit SHA, so
-        # every merge reaches users. A pinned version would freeze them until
+        # every merge is picked up by the next plugin update. A pinned version would freeze them until
         # someone bumps it -- and this repository has no release flow that does.
         manifest = json.loads((PROJECT_ROOT / ".claude-plugin" / "plugin.json").read_text())
         assert "version" not in manifest

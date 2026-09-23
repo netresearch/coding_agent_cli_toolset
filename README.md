@@ -31,8 +31,11 @@ this repository — the plugin carries no copy of them.
 ```
 
 The plugin sets no `version`, so Claude Code versions it by commit and every
-change on `main` reaches users without a release. The shell scripts need only
-bash and jq; `audit.py` needs the uv environment (see the skill's "Cold start").
+change on `main` becomes available with the user's next plugin update, without
+a release. Third-party marketplaces do not auto-update by default; where
+auto-update is off, run `claude plugin marketplace update` first. The shell
+scripts need only bash and jq; `audit.py` needs the uv environment (see the
+skill's "Cold start").
 
 ## Scope: agent toolchain
 - This audit targets CLIs that coding agents commonly utilize themselves if present on the machine. It is agent-focused; tools may be reported as NOT INSTALLED on your host if you don't use them.
