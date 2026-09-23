@@ -6,6 +6,7 @@ from the construct the reference describes. If a bash release changes one of
 these behaviours, this file fails and the reference needs updating.
 """
 
+import shutil
 import subprocess
 import sys
 
@@ -110,3 +111,20 @@ class TestFilesInPlace:
         proc = bash(f'sed -i s/zzz/y/ "{target}"')
         assert proc.returncode == 0
         assert target.read_text() == "hello\n"
+
+
+@pytest.mark.skipif(shutil.which("timeout") is None, reason="timeout(1) is GNU coreutils")
+class TestProcessGroups:
+    def test_timeout_puts_its_command_in_a_group_of_its_own(self):
+        proc = bash(
+            'echo $(ps -o pgid= -p $$); timeout 5 bash -c "ps -o pgid= -p \\$\\$"; '
+            'timeout --foreground 5 bash -c "ps -o pgid= -p \\$\\$"'
+        )
+        caller, child, foreground = proc.stdout.split()
+        assert child != caller
+        assert foreground == caller
+
+    def test_kill_zero_inside_timeout_does_not_reach_the_caller(self):
+        proc = bash('trap "echo caller-got-TERM" TERM; timeout 5 bash -c "kill -TERM 0"; echo survived')
+        assert "caller-got-TERM" not in proc.stdout
+        assert proc.stdout.strip().endswith("survived")

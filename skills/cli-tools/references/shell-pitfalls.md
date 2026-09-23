@@ -13,6 +13,7 @@ behind it actually ran and could have answered differently.**
 - Capturing output
 - Reading records
 - Quoting and expansion
+- Signals and process groups
 - Files written in place
 - grep in the agent shell is ugrep
 - Tool-specific traps
@@ -118,6 +119,19 @@ In `ssh host 'bash -s' <<'EOF' … EOF`, a command that reads stdin (`cat`,
 `mysql`, `docker exec -i`) swallows the rest of the script, which then never
 runs — no error. Give such commands `</dev/null`, or copy the script over and
 run it as a file.
+
+## Signals and process groups
+
+**`timeout(1)` runs its command in a process group of its own** (GNU
+coreutils; `--foreground` keeps the caller's group). A signal sent to the
+caller's group — Ctrl-C, or `kill -TERM -- -$PGID` — therefore does not reach
+the command, and a `kill -TERM 0` inside the command does not reach the caller:
+`bash -c 'trap "echo got" TERM; timeout 5 bash -c "kill -TERM 0"'` prints
+nothing from the trap. It matters most in tests of interruption handling: a
+test that makes a generator under `timeout` kill "its group" never interrupts
+the code under test, and passes against code with no cleanup at all. Signal
+the caller's process group instead, and wait for the command to finish before
+asserting, because it outlives the signal.
 
 ## Files written in place
 
