@@ -1,0 +1,14 @@
+{
+  "name": "cli-tools",
+  "description": "Install, audit, update and reconcile the CLI tools a coding agent depends on, from a JSON tool catalog",
+  "author": {
+    "name": "Netresearch DTT GmbH",
+    "url": "https://www.netresearch.de"
+  },
+  "repository": "https://github.com/netresearch/coding_agent_cli_toolset",
+  "license": "(MIT AND CC-BY-SA-4.0)",
+  "keywords": ["cli", "tools", "install", "audit", "environment"],
+  "skills": [
+    "./skills/cli-tools"
+  ]
+}

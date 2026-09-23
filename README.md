@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/netresearch/coding_agent_cli_toolset/actions/workflows/ci.yml/badge.svg)](https://github.com/netresearch/coding_agent_cli_toolset/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/netresearch/coding_agent_cli_toolset/branch/main/graph/badge.svg)](https://codecov.io/gh/netresearch/coding_agent_cli_toolset)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE-MIT)
 
 <!-- CodeQL runs via GitHub's default code-scanning setup; results are visible in the Security tab. -->
 
@@ -17,6 +17,22 @@ make upgrade   # Interactive remediation for outdated/missing tools
 ```
 
 That's it. Run these periodically to keep your AI coding agent toolchain current.
+
+## Claude Code plugin
+
+The repository is also a Claude Code plugin, `cli-tools`. Its skill
+(`skills/cli-tools/`) lets an agent resolve `command not found`, install or
+update catalog tools, and audit a project's environment through the scripts in
+this repository — the plugin carries no copy of them.
+
+```bash
+/plugin marketplace add netresearch/claude-code-marketplace
+/plugin install cli-tools@netresearch-claude-code-marketplace
+```
+
+The plugin sets no `version`, so Claude Code versions it by commit and every
+change on `main` reaches users without a release. The shell scripts need only
+bash and jq; `audit.py` needs the uv environment (see the skill's "Cold start").
 
 ## Scope: agent toolchain
 - This audit targets CLIs that coding agents commonly utilize themselves if present on the machine. It is agent-focused; tools may be reported as NOT INSTALLED on your host if you don't use them.
@@ -768,4 +784,8 @@ The audit system uses two JSON files:
 - **Baseline refresh**: Run `python audit.py --update-baseline` to update upstream versions
 
 ## License
-MIT
+
+Split licensing:
+
+- **Code** (scripts, Python package, workflows, configuration): [MIT](LICENSE-MIT)
+- **Content** (the skill in `skills/`: SKILL.md and its references): [CC-BY-SA-4.0](LICENSE-CC-BY-SA-4.0)
