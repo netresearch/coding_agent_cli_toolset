@@ -193,3 +193,23 @@ normalize_version_output() {
 }
 
 
+
+# Catalog command execution lives in its own file so libraries that must not
+# inherit this file's `set -euo pipefail` can load it too.
+. "$(dirname "${BASH_SOURCE[0]}")/catalog_command.sh"
+
+# Validate a whitespace-separated list of package names before it reaches a
+# package manager. Refuses a leading dash (option injection) and anything
+# outside the characters package names use, which also keeps the unquoted
+# list expansion at the call sites free of globbing and word tricks.
+validate_package_list() {
+  local pkg
+  local -a pkgs
+  read -ra pkgs <<<"$1" # split on whitespace without glob expansion
+  for pkg in "${pkgs[@]}"; do
+    if [[ ! "$pkg" =~ ^[A-Za-z0-9][A-Za-z0-9._+:@/-]*$ ]]; then
+      echo "Error: Invalid package name: $pkg" >&2
+      return 1
+    fi
+  done
+}

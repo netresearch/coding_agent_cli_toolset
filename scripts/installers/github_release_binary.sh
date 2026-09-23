@@ -70,8 +70,8 @@ detect_version_string() {
   bin_dir="$(dirname "$bin_path")"
   local out=""
   if [[ -n "$VERSION_COMMAND" ]]; then
-    out="$(PATH="$bin_dir:$PATH" timeout 3 bash -c "$VERSION_COMMAND" 2>/dev/null | head -1 || true)"
-    [[ -z "$out" ]] && out="$(PATH="$bin_dir:$PATH" timeout 3 bash -c "$VERSION_COMMAND" 2>&1 >/dev/null | grep -m1 -E "$GRB_VERSION_RE" || true)"
+    out="$(PATH="$bin_dir:$PATH" run_catalog_command "$VERSION_COMMAND" 3 2>/dev/null | head -1 || true)"
+    [[ -z "$out" ]] && out="$(PATH="$bin_dir:$PATH" run_catalog_command "$VERSION_COMMAND" 3 2>&1 >/dev/null | grep -m1 -E "$GRB_VERSION_RE" || true)"
   elif [[ -n "$VERSION_FLAG" ]]; then
     out="$(timeout 3 "$bin_path" $VERSION_FLAG </dev/null 2>/dev/null | head -1 || true)"
     [[ -z "$out" ]] && out="$(timeout 3 "$bin_path" $VERSION_FLAG </dev/null 2>&1 >/dev/null | grep -m1 -E "$GRB_VERSION_RE" || true)"

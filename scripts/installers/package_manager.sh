@@ -61,7 +61,7 @@ dpkg_owners() {
 get_version() {
   local bin="$1"
   if [ -n "$VERSION_CMD" ]; then
-    eval "$VERSION_CMD" 2>/dev/null || true
+    run_catalog_command "$VERSION_CMD" 2>/dev/null || true
   elif command -v "$bin" >/dev/null 2>&1; then
     timeout 2 "$bin" --version </dev/null 2>&1 | head -1 || true
   fi
@@ -96,6 +96,7 @@ pm_ok=false
 if have brew; then
   pkg="$(echo "$PACKAGES" | jq -r '.brew // empty')"
   if [ "$pkg" != "null" ] && [ -n "$pkg" ]; then
+    validate_package_list "$pkg" || exit 1
     if brew install "$pkg" || brew upgrade "$pkg"; then pm_ok=true; fi
     installed=true
   fi
@@ -126,7 +127,10 @@ if ! $installed && have apt-get; then
     if ! $ppa_added; then
       sudo apt-get update || true
     fi
-    if sudo apt-get install -y $pkg; then
+    # Validated after the PHP rewrite above; $pkg stays unquoted on purpose
+    # (it can list several packages), which the validation makes safe.
+    validate_package_list "$pkg" || exit 1
+    if sudo apt-get install -y -- $pkg; then
       # Installed version must equal the candidate, or the unchanged version
       # means something else (e.g. another copy earlier on PATH)
       first_pkg="${pkg%% *}"
@@ -165,7 +169,8 @@ fi
 if ! $installed && have dnf; then
   pkg="$(echo "$PACKAGES" | jq -r '.dnf // .rpm // empty')"
   if [ "$pkg" != "null" ] && [ -n "$pkg" ]; then
-    if sudo dnf install -y "$pkg"; then pm_ok=true; fi
+    validate_package_list "$pkg" || exit 1
+    if sudo dnf install -y -- "$pkg"; then pm_ok=true; fi
     installed=true
   fi
 fi
@@ -173,7 +178,8 @@ fi
 if ! $installed && have pacman; then
   pkg="$(echo "$PACKAGES" | jq -r '.pacman // .arch // empty')"
   if [ "$pkg" != "null" ] && [ -n "$pkg" ]; then
-    if sudo pacman -S --noconfirm "$pkg"; then pm_ok=true; fi
+    validate_package_list "$pkg" || exit 1
+    if sudo pacman -S --noconfirm -- "$pkg"; then pm_ok=true; fi
     installed=true
   fi
 fi

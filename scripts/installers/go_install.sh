@@ -34,7 +34,6 @@ fi
 BINARY_NAME="$(jq -r '.binary_name // .name' "$CATALOG_FILE")"
 GO_PACKAGE="$(jq -r '.go_package // empty' "$CATALOG_FILE")"
 VERSION_COMMAND="$(jq -r '.version_command // empty' "$CATALOG_FILE")"
-VERSION_REGEX="$(jq -r '.version_regex // empty' "$CATALOG_FILE")"
 
 if [ -z "$GO_PACKAGE" ]; then
   echo "[$TOOL] Error: No go_package specified in catalog" >&2
@@ -44,7 +43,7 @@ fi
 # Get current version
 get_version() {
   if [ -n "$VERSION_COMMAND" ]; then
-    timeout 2 bash -c "$VERSION_COMMAND" 2>/dev/null || true
+    run_catalog_command "$VERSION_COMMAND" 2 2>/dev/null || true
   elif command -v "$BINARY_NAME" >/dev/null 2>&1; then
     timeout 2 "$BINARY_NAME" --version </dev/null 2>/dev/null | head -1 || \
     timeout 2 "$BINARY_NAME" version </dev/null 2>/dev/null | head -1 || true
