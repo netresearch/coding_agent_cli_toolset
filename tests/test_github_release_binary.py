@@ -125,6 +125,10 @@ esac
     ), "fell back to the unauthenticated redirect although gh answered"
 
 
+@pytest.mark.skipif(
+    not sys.platform.startswith("linux"),
+    reason="the installer is Linux-only (OS=linux, GNU `install -T`); this case runs the install to completion",
+)
 def test_report_probes_the_installed_binary_not_the_first_on_path(sandbox):
     home, stubs, prefix, log = sandbox
     _write_exe(
