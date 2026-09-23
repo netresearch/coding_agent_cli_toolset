@@ -14,6 +14,7 @@
 _COMPLETION_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=scripts/lib/bashrc.sh
 . "$_COMPLETION_LIB_DIR/bashrc.sh"
+. "$_COMPLETION_LIB_DIR/catalog_command.sh"
 
 completion_dir() {
   printf '%s/bash-completion/completions' "${XDG_DATA_HOME:-$HOME/.local/share}"
@@ -50,14 +51,7 @@ _completion_name() {
 # gtimeout may exist via Homebrew). Falls back to a plain run rather than
 # failing, so completion generation still works without coreutils.
 _completion_run() {
-  local cmd="$1"
-  if command -v timeout >/dev/null 2>&1; then
-    timeout 30 bash -c "$cmd"
-  elif command -v gtimeout >/dev/null 2>&1; then
-    gtimeout 30 bash -c "$cmd"
-  else
-    bash -c "$cmd"
-  fi
+  run_catalog_command "$1" 30
 }
 
 # _completion_looks_valid FILE -> 0 if the file looks like a bash completion

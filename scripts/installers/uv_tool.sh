@@ -42,11 +42,11 @@ VERSION_FLAG="$(jq -r '.version_flag // empty' "$CATALOG_FILE")"
 VERSION_COMMAND="$(jq -r '.version_command // empty' "$CATALOG_FILE")"
 
 get_uv_tool_version() {
-  local tool="$1" bin="$2" flag="${3:---version}"
+  local bin="$2" flag="${3:---version}" # $1 (tool name) is not needed here
   # Use catalog-specified version command if available (most reliable)
   if [ -n "$VERSION_COMMAND" ]; then
     local ver
-    ver="$(timeout 2 bash -c "$VERSION_COMMAND" 2>/dev/null || true)"
+    ver="$(run_catalog_command "$VERSION_COMMAND" 2 2>/dev/null || true)"
     if [ -n "$ver" ]; then
       echo "$ver"
       return

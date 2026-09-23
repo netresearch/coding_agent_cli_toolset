@@ -75,7 +75,7 @@ get_npm_tool_version() {
     # sibling binary) in the common case.
     local pfx=""
     path_contains_dir "$bin_dir" || pfx="$bin_dir:"
-    PATH="${pfx}$PATH" timeout 8 bash -c "$VERSION_COMMAND" 2>/dev/null | head -1 || true
+    PATH="${pfx}$PATH" run_catalog_command "$VERSION_COMMAND" 8 2>/dev/null | head -1 || true
     return
   fi
   if [[ -n "$VERSION_FLAG" ]]; then

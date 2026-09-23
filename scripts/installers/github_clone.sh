@@ -3,6 +3,7 @@
 set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+. "$DIR/lib/catalog_command.sh"
 . "$DIR/lib/install_strategy.sh"
 
 TOOL="${1:-}"
@@ -17,7 +18,6 @@ if [[ "$TOOL" == *"/"* ]] || [[ "$TOOL" == *".."* ]]; then
   exit 1
 fi
 
-ACTION="${2:-install}"
 
 CATALOG_FILE="$DIR/../catalog/$TOOL.json"
 if [ ! -f "$CATALOG_FILE" ]; then
@@ -68,7 +68,8 @@ get_version() {
       bin_path="$clone_path/bin/$binary_name"
     fi
     if [ -n "$bin_path" ]; then
-      local ver="$("$bin_path" --version 2>/dev/null | head -1 | grep -oE '[0-9]+(\.[0-9]+)*' | head -1 || true)"
+      local ver
+      ver="$("$bin_path" --version 2>/dev/null | head -1 | grep -oE '[0-9]+(\.[0-9]+)*' | head -1 || true)"
       if [ -n "$ver" ]; then
         echo "$ver"
         return
@@ -78,7 +79,8 @@ get_version() {
 
   # Try version_command from catalog
   if [ -n "$version_cmd" ]; then
-    local ver="$(eval "$version_cmd" 2>/dev/null || true)"
+    local ver
+    ver="$(run_catalog_command "$version_cmd" 2>/dev/null || true)"
     if [ -n "$ver" ]; then
       echo "$ver"
       return

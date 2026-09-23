@@ -26,7 +26,6 @@ if [ ! -f "$CATALOG_FILE" ]; then
 fi
 
 # Parse catalog
-BINARY_NAME="$(jq -r '.binary_name' "$CATALOG_FILE")"
 GITHUB_REPO="$(jq -r '.github_repo // empty' "$CATALOG_FILE")"
 PLUGIN_NAME="$(jq -r '.plugin_name // .name' "$CATALOG_FILE")"
 VERSION_COMMAND="$(jq -r '.version_command // empty' "$CATALOG_FILE")"
@@ -38,7 +37,7 @@ mkdir -p "$PLUGIN_DIR"
 # Get current version
 before=""
 if [ -n "$VERSION_COMMAND" ]; then
-  before="$(eval "$VERSION_COMMAND" 2>/dev/null || true)"
+  before="$(run_catalog_command "$VERSION_COMMAND" 2>/dev/null || true)"
 elif [ -f "$PLUGIN_DIR/docker-$PLUGIN_NAME" ]; then
   before="$(docker $PLUGIN_NAME version 2>/dev/null | head -1 || true)"
 fi
@@ -99,7 +98,7 @@ mv "$tmpfile" "$PLUGIN_DIR/docker-$PLUGIN_NAME"
 # Report
 after=""
 if [ -n "$VERSION_COMMAND" ]; then
-  after="$(eval "$VERSION_COMMAND" 2>/dev/null || true)"
+  after="$(run_catalog_command "$VERSION_COMMAND" 2>/dev/null || true)"
 else
   after="$(docker $PLUGIN_NAME version 2>/dev/null | head -1 || true)"
 fi
