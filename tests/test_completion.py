@@ -247,6 +247,42 @@ class TestRobustness:
         )
         assert proc.returncode == 1
 
+    def test_generator_cannot_write_into_the_callers_directory(self, tmp_path):
+        # A tool that does not know `completion bash` may treat the words as
+        # file names; run from the repo root, that committed seven stray files.
+        catalog = tmp_path / "catalog"
+        _write_catalog(
+            catalog,
+            "w",
+            {
+                "name": "w",
+                "binary_name": "w",
+                "bash_completion": {"command": "touch bash complete-bash tags; printf 'complete -F _w w\\n'"},
+            },
+        )
+        caller = tmp_path / "caller"
+        caller.mkdir()
+        tmpdir = tmp_path / "tmp"
+        tmpdir.mkdir()
+        env = {
+            **os.environ,
+            "CLI_AUDIT_CATALOG_DIR": str(catalog),
+            "XDG_DATA_HOME": str(tmp_path / "xdg"),
+            "HOME": str(tmp_path),
+            "TMPDIR": str(tmpdir),
+        }
+        proc = subprocess.run(
+            ["bash", "-c", f'source "{LIB}"\ninstall_completion w'],
+            capture_output=True,
+            text=True,
+            env=env,
+            cwd=caller,
+        )
+        assert proc.returncode == 0, proc.stderr
+        assert _completions_path(tmp_path / "xdg", "w").exists()
+        assert sorted(p.name for p in caller.iterdir()) == []
+        assert list(tmpdir.iterdir()) == [], "scratch directory leaked"
+
     def test_framework_block_is_guarded_for_non_interactive_shells(self, tmp_path):
         # The distro bash_completion enables extglob/progcomp at top level and
         # has no guard of its own; sourcing it non-interactively changes glob

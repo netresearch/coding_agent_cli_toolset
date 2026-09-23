@@ -135,7 +135,14 @@ install_completion() {
     # the real work; the timeout is extra insurance for a generator that blocks
     # on something else, and is only used where available (macOS ships no
     # GNU `timeout` — hard-coding it made every generator fail there).
-    _completion_run "$cmd" >"$tmp" 2>/dev/null </dev/null || true
+    # It runs in an empty scratch directory: a tool that does not know the
+    # subcommand may take the probe words as file names and write them into
+    # the working directory (seven such files, `bash`, `complete-bash`,
+    # `tags`, …, were once committed to this repository from `make completions`).
+    local scratch
+    scratch="$(mktemp -d)"
+    (cd "$scratch" && _completion_run "$cmd") >"$tmp" 2>/dev/null </dev/null || true
+    rm -rf "$scratch"
   elif [ -n "$src" ] && [ "$src" != "null" ]; then
     local clone_path base full
     clone_path="$(jq -r '.clone_path // ""' "$catalog" 2>/dev/null)"
