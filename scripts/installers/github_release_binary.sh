@@ -130,9 +130,14 @@ if [ -z "$LATEST" ] && [ -n "$GITHUB_REPO" ]; then
     jq -r '.tag_name // empty' 2>/dev/null || true)"
 fi
 if [ -z "$LATEST" ] && [ -n "$GITHUB_REPO" ]; then
-  LATEST="$(curl --proto '=https' --proto-redir '=https' -fsSIL -H "User-Agent: cli-audit" \
+  # curl -f still prints its -w write-out on an HTTP error, and that URL ends
+  # in /releases/latest -- so accept only a successful redirect to a tag.
+  latest_url="$(curl --proto '=https' --proto-redir '=https' -fsSIL -H "User-Agent: cli-audit" \
     -o /dev/null -w '%{url_effective}' \
-    "https://github.com/$GITHUB_REPO/releases/latest" 2>/dev/null | awk -F'/' '{print $NF}' || true)"
+    "https://github.com/$GITHUB_REPO/releases/latest" 2>/dev/null)" || latest_url=""
+  case "$latest_url" in
+    */releases/tag/?*) LATEST="${latest_url##*/}" ;;
+  esac
 fi
 
 if [ -z "$LATEST" ]; then

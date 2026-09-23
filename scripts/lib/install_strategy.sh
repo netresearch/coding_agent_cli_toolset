@@ -114,7 +114,10 @@ github_api_get() {
   local body=""
 
   if command -v gh >/dev/null 2>&1; then
-    if body="$(gh api "$api_path" 2>/dev/null)"; then
+    # --hostname: without it gh follows GH_HOST, or the host of whatever
+    # repository it runs in, while the curl fallback below is api.github.com
+    # and every caller queries a github.com repository.
+    if body="$(gh api --hostname github.com "$api_path" 2>/dev/null)"; then
       printf '%s' "$body"
       return 0
     fi
