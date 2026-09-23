@@ -1045,7 +1045,8 @@ class TestGithubReleaseStderrVersion:
     def test_before_and_after_use_helper(self):
         content = self._content()
         assert 'before="$(detect_version_string)"' in content
-        assert 'after="$(detect_version_string)"' in content
+        # after probes the copy this run installed, through the same helper
+        assert 'after="$(detect_version_string "$installed_bin")"' in content
 
 
 @skip_on_windows

@@ -53,11 +53,14 @@ GRB_VERSION_RE='[0-9]+\.[0-9]+|[0-9]{8}'
 # line containing a version-like token so a stderr banner/warning is not
 # surfaced as the version. Echoes empty if not detectable.
 detect_version_string() {
-  # Resolve the binary: prefer PATH, fall back to the install dir. On a
+  # Resolve the binary. An explicit path (the copy this run just installed)
+  # wins; otherwise prefer PATH and fall back to the install dir. On a
   # first-time install that dir may not be on PATH yet, so command -v alone
-  # would miss a binary we just placed there.
-  local bin_path bin_dir
-  bin_path="$(command -v "$BINARY_NAME" 2>/dev/null || true)"
+  # would miss a binary we just placed there — and with several
+  # installations, PATH can resolve a different copy than the one written.
+  local bin_path="${1:-}" bin_dir
+  [[ -n "$bin_path" && ! -x "$bin_path" ]] && bin_path=""
+  [[ -z "$bin_path" ]] && bin_path="$(command -v "$BINARY_NAME" 2>/dev/null || true)"
   if [[ -z "$bin_path" ]]; then
     local target_dir
     target_dir="$(get_install_dir "$BINARY_NAME" 2>/dev/null || true)"
@@ -104,25 +107,41 @@ mkdir -p "$BIN_DIR" 2>/dev/null || true
 # Resolve latest version
 LATEST=""
 if [ -n "$VERSION_URL" ]; then
-  LATEST="$(curl -fsSL "$VERSION_URL" 2>/dev/null || true)"
+  LATEST="$(curl --proto '=https' --proto-redir '=https' -fsSL "$VERSION_URL" 2>/dev/null || true)"
 fi
 
 # Try GitLab project if available
 GITLAB_PROJECT="$(jq -r '.gitlab_project // empty' "$CATALOG_FILE")"
 if [ -z "$LATEST" ] && [ -n "$GITLAB_PROJECT" ]; then
   ENCODED_PROJECT="${GITLAB_PROJECT//\//%2F}"
-  LATEST="$(curl -fsSL "https://gitlab.com/api/v4/projects/${ENCODED_PROJECT}/releases?per_page=1" 2>/dev/null | \
+  LATEST="$(curl --proto '=https' --proto-redir '=https' -fsSL "https://gitlab.com/api/v4/projects/${ENCODED_PROJECT}/releases?per_page=1" 2>/dev/null | \
     jq -r '.[0].tag_name // empty' 2>/dev/null || true)"
 fi
 
-# Fallback to GitHub releases if no version URL
+# Fallback to GitHub releases if no version URL.
+# The API through github_api_get comes first: it authenticates via gh when
+# available, and anonymous requests from shared CI runner IPs are
+# rate-limited quickly. The redirect probe stays as the last resort.
+# Every lookup ends in `|| true`: under `set -euo pipefail` a failing curl
+# inside the assignment would otherwise end the script right here with no
+# output at all, never reaching the error message below.
 if [ -z "$LATEST" ] && [ -n "$GITHUB_REPO" ]; then
-  LATEST="$(curl -fsSIL -H "User-Agent: cli-audit" -o /dev/null -w '%{url_effective}' \
-    "https://github.com/$GITHUB_REPO/releases/latest" 2>/dev/null | awk -F'/' '{print $NF}')"
+  LATEST="$(github_api_get "repos/$GITHUB_REPO/releases/latest" 2>/dev/null | \
+    jq -r '.tag_name // empty' 2>/dev/null || true)"
+fi
+if [ -z "$LATEST" ] && [ -n "$GITHUB_REPO" ]; then
+  # curl -f still prints its -w write-out on an HTTP error, and that URL ends
+  # in /releases/latest -- so accept only a successful redirect to a tag.
+  latest_url="$(curl --proto '=https' --proto-redir '=https' -fsSIL -H "User-Agent: cli-audit" \
+    -o /dev/null -w '%{url_effective}' \
+    "https://github.com/$GITHUB_REPO/releases/latest" 2>/dev/null)" || latest_url=""
+  case "$latest_url" in
+    */releases/tag/?*) LATEST="${latest_url##*/}" ;;
+  esac
 fi
 
 if [ -z "$LATEST" ]; then
-  echo "[$TOOL] Error: Unable to resolve latest version" >&2
+  echo "[$TOOL] Error: Unable to resolve latest version (network failure or GitHub rate limit)" >&2
   echo "[$TOOL] before: ${before:-<none>}" >&2
   exit 1
 fi
@@ -149,12 +168,12 @@ DOWNLOAD_URL="${DOWNLOAD_URL//\{arch_suffix\}/$ARCH}"
 tmpfile="/tmp/$BINARY_NAME.$$"
 rm -f "$tmpfile"
 
-if ! curl -fL --retry 3 --retry-delay 1 --connect-timeout 10 -o "$tmpfile" "$DOWNLOAD_URL" 2>/dev/null; then
+if ! curl --proto '=https' --proto-redir '=https' -fL --retry 3 --retry-delay 1 --connect-timeout 10 -o "$tmpfile" "$DOWNLOAD_URL" 2>/dev/null; then
   if [ -n "$FALLBACK_URL_TEMPLATE" ]; then
     FALLBACK_URL="${FALLBACK_URL_TEMPLATE//\{version\}/$LATEST}"
     FALLBACK_URL="${FALLBACK_URL//\{os\}/$OS}"
     FALLBACK_URL="${FALLBACK_URL//\{arch\}/$ARCH}"
-    curl -fL --retry 3 --retry-delay 1 --connect-timeout 10 -o "$tmpfile" "$FALLBACK_URL"
+    curl --proto '=https' --proto-redir '=https' -fL --retry 3 --retry-delay 1 --connect-timeout 10 -o "$tmpfile" "$FALLBACK_URL"
   else
     echo "[$TOOL] Error: Download failed" >&2
     exit 1
@@ -302,12 +321,15 @@ if [ -n "$EXTRACT_DIR" ] && [ -d "$EXTRACT_DIR" ]; then
   rm -rf "$EXTRACT_DIR"
 fi
 
-# Report
-after="$(detect_version_string)"
+# Report — on the copy this run installed, not whichever PATH resolves first.
+installed_bin="$BIN_DIR/$BINARY_NAME"
+after="$(detect_version_string "$installed_bin")"
 # Normalize verbose version output
 before="$(normalize_version_output "${before:-}")"
 after="$(normalize_version_output "${after:-}")"
-path="$(command -v "$BINARY_NAME" 2>/dev/null || true)"
+path=""
+[[ -x "$installed_bin" ]] && path="$installed_bin"
+[[ -z "$path" ]] && path="$(command -v "$BINARY_NAME" 2>/dev/null || true)"
 printf "[%s] before: %s\n" "$TOOL" "${before:-<none>}"
 printf "[%s] after:  %s\n" "$TOOL" "${after:-<none>}"
 if [ -n "$path" ]; then printf "[%s] path:   %s\n" "$TOOL" "$path"; fi
