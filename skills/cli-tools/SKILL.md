@@ -83,3 +83,11 @@ which creates one on first use.
 
 PATH, permissions, portability (`timeout` on macOS) and probe pitfalls:
 `references/troubleshooting.md`.
+
+## Shell pitfalls
+
+Before trusting a status, a count or an empty result from a shell command,
+check `references/shell-pitfalls.md`: `set -e` with `$(…)`, SIGPIPE under
+`pipefail`, `read`/`IFS` field collapse, heredoc and quoting traps, `sed -i`
+no-ops — and that `grep` in the agent's shell is ugrep, which skips
+`.gitignore`d files and gets `grep -q -v` wrong.
