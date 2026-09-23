@@ -73,8 +73,7 @@ install_tree() {
   printf "[%s] path:   %s\n" "$TOOL" "$(command -v tree 2>/dev/null || echo "$INSTALL_DIR/tree")"
 
   # Refresh snapshot
-  refresh_snapshot "$TOOL"
-
+  refresh_snapshot "$TOOL" || true
   return 0
 }
 

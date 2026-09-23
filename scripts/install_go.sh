@@ -182,7 +182,7 @@ install_go() {
   printf "[%s] after:  %s\n"  "$DISPLAY_NAME" "${after:-<none>}"
   if [ -n "$path" ]; then printf "[%s] path:   %s\n" "$DISPLAY_NAME" "$path"; fi
 
-  refresh_snapshot "go"
+  refresh_snapshot "go" || true
 }
 
 uninstall_go() {
@@ -247,7 +247,7 @@ uninstall_go() {
   fi
 
   echo "[go] Uninstall complete" >&2
-  refresh_snapshot "go"
+  refresh_snapshot "go" || true
 }
 
 case "$ACTION" in

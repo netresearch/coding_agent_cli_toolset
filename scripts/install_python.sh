@@ -177,7 +177,7 @@ install_py_stack() {
   printf "[%s] after:  %s\n" "python" "${after:-<none>}"
   if [ -n "$path" ]; then printf "[%s] path:   %s\n" "python" "$path"; fi
 
-  refresh_snapshot "python"
+  refresh_snapshot "python" || true
 }
 
 update_py_stack() {
@@ -209,7 +209,7 @@ update_py_stack() {
   printf "[%s] after:  %s\n" "python" "${after:-<none>}"
   if [ -n "$path" ]; then printf "[%s] path:   %s\n" "python" "$path"; fi
 
-  refresh_snapshot "python"
+  refresh_snapshot "python" || true
 }
 
 uninstall_py_tools() {

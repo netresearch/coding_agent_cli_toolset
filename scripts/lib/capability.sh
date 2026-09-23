@@ -119,7 +119,7 @@ detect_install_method() {
   esac
 }
 
-# Detect ALL installations of a tool using `type -a`
+# Detect ALL installations of a tool using `type -P -a`
 # This finds all binaries in PATH order, then classifies each by install method
 # Args: tool_name, binary_name
 # Returns: newline-separated list of "method:path" pairs
@@ -131,10 +131,12 @@ detect_all_installations() {
   local binary="${2:-$tool}"
   local -A seen_paths=()  # associative array to track duplicates (by resolved path)
 
-  # Use type -a to find all binaries in PATH
+  # `type -P -a` prints one path per executable in PATH order and nothing
+  # else. The prose form of `type -a` ("<name> is <path>") is localized
+  # wherever bash's translations are installed, and a localized line would
+  # not parse.
   while IFS= read -r line; do
-    # Parse "binary is /path/to/binary" format
-    local path="${line##* is }"
+    local path="$line"
     [ -z "$path" ] && continue
     [ ! -x "$path" ] && continue
 
@@ -157,7 +159,7 @@ detect_all_installations() {
     method="$(classify_install_path "$tool" "$path")"
 
     echo "$method:$path"
-  done < <(type -a "$binary" 2>/dev/null || true)
+  done < <(type -P -a "$binary" 2>/dev/null || true)
 }
 
 # Classify an installation path to determine its install method

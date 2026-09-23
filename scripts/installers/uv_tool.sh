@@ -95,4 +95,4 @@ if [ -n "$path" ]; then printf "[%s] path:   %s\n" "$TOOL" "$path"; fi
 # Refresh snapshot after successful installation
 # Source install_strategy.sh for refresh_snapshot function
 . "$(dirname "${BASH_SOURCE[0]}")/../lib/install_strategy.sh"
-refresh_snapshot "$TOOL"
+refresh_snapshot "$TOOL" || true

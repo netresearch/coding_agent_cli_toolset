@@ -55,7 +55,7 @@ install_pip() {
   printf "[%s] after:  %s\n" "pip" "${after:-<none>}"
   if [ -n "$path" ]; then printf "[%s] path:   %s\n" "pip" "$path"; fi
 
-  refresh_snapshot "pip"
+  refresh_snapshot "pip" || true
 }
 
 uninstall_pip() {

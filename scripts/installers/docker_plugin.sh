@@ -108,4 +108,4 @@ printf "[%s] after:  %s\n" "$TOOL" "${after:-<none>}"
 printf "[%s] path:   %s\n" "$TOOL" "$PLUGIN_DIR/docker-$PLUGIN_NAME"
 
 # Refresh snapshot after successful installation
-refresh_snapshot "$TOOL"
+refresh_snapshot "$TOOL" || true

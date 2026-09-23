@@ -51,8 +51,21 @@ remove_installation() {
       ;;
     cargo)
       if command -v cargo >/dev/null 2>&1; then
-        echo "[$tool] Uninstalling cargo package: $tool" >&2
-        cargo uninstall "$tool" 2>/dev/null || true
+        # cargo uninstall wants the crate, which can be named differently from
+        # the binary it installs (ripgrep_all -> rga, git-delta -> delta), so
+        # read the owner from `cargo install --list`. The listing is captured
+        # first and handed to awk as a herestring: piping it into an awk that
+        # exits on the first match would let SIGPIPE, under pipefail, report
+        # the found match as a failure.
+        local cargo_list crate
+        cargo_list="$(cargo install --list 2>/dev/null || true)"
+        crate="$(awk -v bin="$binary" -v tool="$tool" '
+          /^[^[:space:]]/ { pkg = $1 }
+          /^[[:space:]]/  { if ($1 == bin || $1 == tool) { print pkg; exit } }' <<<"$cargo_list")"
+        crate="${crate:-$tool}"
+        echo "[$tool] Uninstalling cargo package: $crate" >&2
+        cargo uninstall "$crate" 2>/dev/null \
+          || echo "[$tool] Warning: cargo uninstall $crate failed" >&2
       fi
       ;;
     go)
@@ -390,11 +403,26 @@ reconcile_tool() {
       echo "[$tool] ✓ Reconciliation complete: now installed via $new_method" >&2
     fi
     warn_if_bin_off_path "$tool" "$resolved_bin"
+    [ "$current_method" != "$best_method" ] && warn_if_bin_does_not_run "$tool" "$resolved_bin"
     return 0
   else
     echo "[$tool] Error: Installation via $best_method completed but binary not found" >&2
     return 1
   fi
+}
+
+# warn_if_bin_does_not_run TOOL BINARY_PATH
+# Presence is not function: a surviving wrapper can depend on files the
+# removed package owned (byobu's launcher sources /usr/lib/byobu), so after a
+# removal probe that the remaining binary actually runs. Warns, never fails.
+warn_if_bin_does_not_run() {
+  local tool="$1" bin="$2"
+  [ -x "$bin" ] || return 0
+  if ! timeout 5 "$bin" --version </dev/null >/dev/null 2>&1 \
+    && ! timeout 5 "$bin" version </dev/null >/dev/null 2>&1; then
+    echo "[$tool] Warning: $bin is installed but does not run — the removal may have broken a wrapper that depended on the removed package" >&2
+  fi
+  return 0
 }
 
 # Batch reconciliation for multiple tools

@@ -67,4 +67,4 @@ printf "[%s] after:  %s\n" "$TOOL" "${after:-<none>}"
 if [ -n "$path" ]; then printf "[%s] path:   %s\n" "$TOOL" "$path"; fi
 
 # Refresh snapshot after successful installation
-refresh_snapshot "$TOOL"
+refresh_snapshot "$TOOL" || true
