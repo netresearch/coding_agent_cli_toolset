@@ -9,6 +9,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -282,6 +283,40 @@ class TestRobustness:
         assert _completions_path(tmp_path / "xdg", "w").exists()
         assert sorted(p.name for p in caller.iterdir()) == []
         assert list(tmpdir.iterdir()) == [], "scratch directory leaked"
+
+    def test_interrupted_generator_leaves_no_scratch_directory(self, tmp_path):
+        # Ctrl-C signals the caller's process group: the installing shell and
+        # its subshells. The generator itself runs under timeout(1), which puts
+        # it in a group of its own, so it is the one process that survives.
+        catalog = tmp_path / "catalog"
+        _write_catalog(
+            catalog,
+            "k",
+            {"name": "k", "binary_name": "k", "bash_completion": {"command": 'kill -TERM -- "-$CALLER_PGID"; sleep 1'}},
+        )
+        tmpdir = tmp_path / "tmp"
+        tmpdir.mkdir()
+        env = {
+            **os.environ,
+            "CLI_AUDIT_CATALOG_DIR": str(catalog),
+            "XDG_DATA_HOME": str(tmp_path / "xdg"),
+            "HOME": str(tmp_path),
+            "TMPDIR": str(tmpdir),
+        }
+        subprocess.run(
+            ["bash", "-c", f'export CALLER_PGID=$$\nsource "{LIB}"\ninstall_completion k'],
+            capture_output=True,
+            text=True,
+            env=env,
+            start_new_session=True,
+            timeout=30,
+        )
+        # The installing shell is gone at once; its subshell exits, and cleans
+        # up, only when the generator it waits on returns.
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline and any(p.is_dir() for p in tmpdir.iterdir()):
+            time.sleep(0.1)
+        assert [p.name for p in tmpdir.iterdir() if p.is_dir()] == []
 
     def test_framework_block_is_guarded_for_non_interactive_shells(self, tmp_path):
         # The distro bash_completion enables extglob/progcomp at top level and

@@ -139,10 +139,14 @@ install_completion() {
     # subcommand may take the probe words as file names and write them into
     # the working directory (seven such files, `bash`, `complete-bash`,
     # `tags`, …, were once committed to this repository from `make completions`).
-    local scratch
-    scratch="$(mktemp -d)"
-    (cd "$scratch" && _completion_run "$cmd") >"$tmp" 2>/dev/null </dev/null || true
-    rm -rf "$scratch"
+    # The subshell's EXIT trap removes the directory even when the run is
+    # interrupted.
+    (
+      scratch="$(mktemp -d)" || exit 1
+      trap 'rm -rf "$scratch"' EXIT
+      trap 'exit 130' INT TERM
+      cd "$scratch" && _completion_run "$cmd"
+    ) >"$tmp" 2>/dev/null </dev/null || true
   elif [ -n "$src" ] && [ "$src" != "null" ]; then
     local clone_path base full
     clone_path="$(jq -r '.clone_path // ""' "$catalog" 2>/dev/null)"
