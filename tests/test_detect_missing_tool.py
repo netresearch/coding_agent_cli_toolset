@@ -75,6 +75,13 @@ class TestContext:
         assert "catalog entry `ripgrep`" in context
         assert f"{PROJECT_ROOT / 'scripts' / 'install_tool.sh'} ripgrep install" in context
 
+    def test_says_what_it_knows_not_what_it_infers(self):
+        # A shell reports "not found on PATH"; the tool may still be installed
+        # somewhere else, which is why the advice checks `type -P -a` first.
+        context = hook.context_for(_failure("bash: rg: command not found"))
+        assert "not found on PATH" in context
+        assert "not installed" not in context
+
     def test_uncataloged_command_says_so(self):
         context = hook.context_for(_failure("bash: zzq: command not found"))
         assert "no entry in the cli-tools catalog" in context
