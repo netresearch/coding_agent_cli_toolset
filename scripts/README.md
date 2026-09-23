@@ -26,6 +26,8 @@ Configurable via `INSTALL_STRATEGY` in `.env`:
 | `install_tool.sh` | **Main orchestrator** - reads catalog, delegates to installers |
 | `install_group.sh` | **Group installer** - installs all tools with a specific tag |
 | `installers/*.sh` | **Generic installers** - one per installation method |
+| `check_environment.sh` | **Environment audit** - PATH, duplicate installs, package managers, a project's required tools |
+| `detect_project_type.sh` | **Project detection** - project types and their required/recommended catalog tools (`text`/`json`) |
 
 ## Usage Examples
 

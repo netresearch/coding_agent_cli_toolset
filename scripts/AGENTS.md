@@ -46,6 +46,8 @@
 **Utilities:**
 - `check_python_package_managers.sh`: Detect multiple Python package managers
 - `check_node_package_managers.sh`: Detect multiple Node.js package managers
+- `check_environment.sh`: Environment audit (PATH, duplicate installs, package managers, a project's required tools) — used by the `cli-tools` plugin skill; bash + jq only
+- `detect_project_type.sh`: Project types of a directory and their required/recommended catalog tools (`text` or `json`) — kept in sync with `skills/cli-tools/references/project_type_requirements.md` by `tests/test_claude_plugin.py`
 - `test_smoke.sh`: Smoke test for audit output
 - `auto_update_scope_prototype.sh`: Prototype for scope detection
 
