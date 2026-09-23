@@ -35,12 +35,14 @@ install_parallel() {
     return 1
   fi
 
-  local before="$(get_installed_version)"
+  local before
+  before="$(get_installed_version)"
   echo "[$TOOL] before: $before" >&2
 
   local tarball="parallel-${version}.tar.bz2"
   local url="${FTP_URL}${tarball}"
-  local tmpdir="$(mktemp -d)"
+  local tmpdir
+  tmpdir="$(mktemp -d)"
 
   echo "[$TOOL] Downloading $url..." >&2
 
@@ -77,13 +79,13 @@ install_parallel() {
 
   rm -rf "$tmpdir"
 
-  local after="$(get_installed_version)"
+  local after
+  after="$(get_installed_version)"
   echo "[$TOOL] after:  $after" >&2
   echo "[$TOOL] path:   $(command -v parallel 2>/dev/null || echo "$INSTALL_DIR/parallel")" >&2
 
   # Refresh snapshot
-  refresh_snapshot "$TOOL"
-
+  refresh_snapshot "$TOOL" || true
   return 0
 }
 
@@ -113,7 +115,7 @@ uninstall_parallel() {
   fi
 
   echo "[$TOOL] Uninstall complete" >&2
-  refresh_snapshot "$TOOL"
+  refresh_snapshot "$TOOL" || true
 }
 
 # Main

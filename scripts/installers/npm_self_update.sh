@@ -24,7 +24,6 @@ if [ ! -f "$CATALOG_FILE" ]; then
   exit 1
 fi
 
-BINARY_NAME="npm"
 
 # Load nvm if available (npm is bundled with nvm-managed Node.js)
 ensure_nvm_loaded
@@ -64,4 +63,4 @@ else
 fi
 
 # Refresh snapshot after successful installation
-refresh_snapshot "$TOOL"
+refresh_snapshot "$TOOL" || true

@@ -185,7 +185,7 @@ install_byobu() {
     printf "[%s] before: %s\n" "$TOOL" "${before:-<none>}"
     printf "[%s] after:  %s\n" "$TOOL" "$after"
     printf "[%s] path:   %s\n" "$TOOL" "$installed_binary"
-    refresh_snapshot "$TOOL"
+    refresh_snapshot "$TOOL" || true
 }
 
 # Only dispatch when executed directly; allow sourcing for tests.

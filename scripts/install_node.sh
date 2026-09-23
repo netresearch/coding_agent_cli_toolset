@@ -195,7 +195,7 @@ reconcile_node() {
   printf "[%s] after:  %s\n"  "$DISPLAY_NAME" "${after:-<none>}"
   if [ -n "$path" ] && [ -x "$path" ]; then printf "[%s] path:   %s\n" "$DISPLAY_NAME" "$path"; fi
 
-  refresh_snapshot "node"
+  refresh_snapshot "node" || true
 }
 
 case "$ACTION" in

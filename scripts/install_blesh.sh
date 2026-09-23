@@ -119,7 +119,7 @@ install_blesh() {
   printf "[%s] after:  %s\n" "$TOOL" "${after:-<unknown>}"
   printf "[%s] path:   %s\n" "$TOOL" "$BLE_FILE"
 
-  refresh_snapshot "$TOOL"
+  refresh_snapshot "$TOOL" || true
   return 0
 }
 

@@ -133,4 +133,4 @@ printf "[%s] after:  %s\n" "$TOOL" "${after:-<unknown>}"
 printf "[%s] path:   %s\n" "$TOOL" "$CLONE_PATH"
 
 # Refresh snapshot after successful installation
-refresh_snapshot "$TOOL"
+refresh_snapshot "$TOOL" || true

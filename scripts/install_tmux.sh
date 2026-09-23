@@ -155,8 +155,7 @@ install_tmux() {
   fi
 
   # Refresh snapshot
-  refresh_snapshot "$TOOL"
-
+  refresh_snapshot "$TOOL" || true
   return 0
 }
 
