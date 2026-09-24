@@ -50,14 +50,60 @@ get_specific_node_version() {
   fi
 }
 
+# Multi-version installs keep the default's major version, but the default
+# follows a newer minor/patch of that same major. nvm keeps global npm
+# packages per version, so they move along; otherwise tools such as bw
+# vanish from PATH with the old version.
+follow_default_within_major() {
+  local old_default resolved old_major
+  old_default="$(nvm version default 2>/dev/null || true)"
+  [ -n "$old_default" ] && [ "$old_default" != "N/A" ] || return 0
+  old_major="${old_default#v}"
+  old_major="${old_major%%.*}"
+  [ "$old_major" = "${NODE_VERSION:-}" ] || return 0
+  resolved="$(nvm version "$NODE_CHANNEL" 2>/dev/null || true)"
+  [ -n "$resolved" ] && [ "$resolved" != "N/A" ] || return 0
+  [ "$resolved" != "$old_default" ] || return 0
+  # reinstall-packages installs into the active version, so switch first
+  nvm use "$resolved" || return 0
+  echo "[node] Moving default $old_default -> $resolved with its global npm packages"
+  nvm reinstall-packages "$old_default" || true
+  nvm alias default "$resolved" || true
+}
+
+# Remove older patches of the major just installed. The newest patch of each
+# major stays, and so do the default and the active version. Runs only for
+# multi-version installs, after follow_default_within_major has carried the
+# default's global npm packages over.
+prune_older_patches() {
+  local resolved major default current dir v
+  resolved="$(nvm version "$NODE_CHANNEL" 2>/dev/null || true)"
+  [ -n "$resolved" ] && [ "$resolved" != "N/A" ] || return 0
+  major="${resolved#v}"
+  major="${major%%.*}"
+  default="$(nvm version default 2>/dev/null || true)"
+  current="$(nvm current 2>/dev/null || true)"
+  for dir in "${NVM_DIR:-$HOME/.nvm}/versions/node/v${major}."*; do
+    [ -d "$dir" ] || continue
+    v="${dir##*/}"
+    if [ "$v" = "$resolved" ] || [ "$v" = "$default" ] || [ "$v" = "$current" ]; then
+      continue
+    fi
+    # Only versions older than the one just installed
+    [ "$(printf '%s\n%s\n' "$v" "$resolved" | sort -V | tail -n1)" = "$resolved" ] || continue
+    echo "[node] Removing $v (superseded by $resolved)"
+    nvm uninstall "$v" || true
+  done
+}
+
 install_node() {
   ensure_nvm
   nvm install "$NODE_CHANNEL"
   # Re-source nvm to ensure the new version is active in this shell
   ensure_nvm_loaded
 
-  # Only set default if this is NOT a multi-version install
-  # (multi-version = specific major version like 24, 25)
+  # A multi-version install (specific major like 24, 25) never switches the
+  # default to another major; see follow_default_within_major
   if [ -z "${NODE_VERSION:-}" ]; then
     # Resolve the concrete version (e.g. v24.8.0) and pin default to it
     local resolved
@@ -76,6 +122,8 @@ install_node() {
     corepack prepare yarn@1 --activate 2>/dev/null || true
     npm install -g eslint prettier || true
   else
+    follow_default_within_major
+    prune_older_patches
     echo "=> Node.js version $NODE_VERSION has been successfully installed"
   fi
 }
@@ -94,7 +142,8 @@ update_node() {
   # Re-source nvm to ensure the new version is active in this shell
   ensure_nvm_loaded
 
-  # Only set default and update global packages if NOT a multi-version install
+  # A multi-version install never switches the default to another major;
+  # see follow_default_within_major
   if [ -z "${NODE_VERSION:-}" ]; then
     # Resolve and pin default to the exact installed version
     local resolved
@@ -119,6 +168,8 @@ update_node() {
     fi
     npm update -g eslint prettier || true
   else
+    follow_default_within_major
+    prune_older_patches
     echo "=> Node.js version $NODE_VERSION has been updated"
   fi
 }
