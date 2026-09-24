@@ -36,6 +36,15 @@ class TestMultiVersionPicksNumericallyHighest:
         assert rows[0]["installed"] == "26.10.0"
         assert Path(rows[0]["path"]).parts[-3:] == ("v26.10.0", "bin", "node")
 
+    def test_release_beats_its_prerelease(self, tmp_path):
+        base = _fake_nvm(tmp_path, ["26.0.0-rc.1", "26.0.0"])
+        rows = detect_multi_versions(
+            "node",
+            {"version_manager_dir": base, "version_prefix": "v", "binary_name": "node"},
+            [{"cycle": "26", "latest": "26.0.0", "status": "active"}],
+        )
+        assert rows[0]["installed"] == "26.0.0"
+
 
 class TestBitwardenUpstreamIsNpm:
     def test_bw_version_comes_from_the_npm_package(self):

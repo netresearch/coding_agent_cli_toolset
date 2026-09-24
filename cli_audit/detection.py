@@ -614,8 +614,15 @@ def audit_tool_installation(
 
 
 def _numeric_version_key(version: str) -> tuple[int, ...]:
-    """Sort key for version strings: "26.10.0" -> (26, 10, 0)."""
-    return tuple(int(part) for part in re.findall(r"\d+", version))
+    """Sort key for version strings: "26.10.0" -> (26, 10, 0, 1).
+
+    A prerelease ranks below its release: "26.0.0-rc.1" -> (26, 0, 0, 0, 1).
+    """
+    base, _, prerelease = version.partition("-")
+    base_key = tuple(int(part) for part in re.findall(r"\d+", base))
+    if not prerelease:
+        return base_key + (1,)
+    return base_key + (0,) + tuple(int(part) for part in re.findall(r"\d+", prerelease))
 
 
 def scan_version_manager_dir(
