@@ -613,6 +613,18 @@ def audit_tool_installation(
     return (version_num, version_line, path, install_method)
 
 
+def _numeric_version_key(version: str) -> tuple[int, ...]:
+    """Sort key for version strings: "26.10.0" -> (26, 10, 0, 1).
+
+    A prerelease ranks below its release: "26.0.0-rc.1" -> (26, 0, 0, 0, 1).
+    """
+    base, _, prerelease = version.partition("-")
+    base_key = tuple(int(part) for part in re.findall(r"\d+", base))
+    if not prerelease:
+        return base_key + (1,)
+    return base_key + (0,) + tuple(int(part) for part in re.findall(r"\d+", prerelease))
+
+
 def scan_version_manager_dir(
     base_dir: str,
     version_prefix: str = "",
@@ -716,8 +728,9 @@ def detect_multi_versions(
                     key = f"{parts[0]}.{parts[1]}"
                 else:
                     key = major
-                # Keep the highest patch version for each major/minor
-                if key not in installed_map or version > installed_map[key][0]:
+                # Keep the highest patch version for each major/minor. Compare
+                # numerically: as strings, "26.9.0" sorts above "26.10.0".
+                if key not in installed_map or _numeric_version_key(version) > _numeric_version_key(installed_map[key][0]):
                     installed_map[key] = (version, path)
 
         for version_info in supported_versions:

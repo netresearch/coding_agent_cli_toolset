@@ -6,6 +6,7 @@
   "homepage": "https://bitwarden.com/help/cli/",
   "github_repo": "bitwarden/clients",
   "package_name": "@bitwarden/cli",
+  "source_kind": "npm",
   "binary_name": "bw",
   "requires": [
     "node"
