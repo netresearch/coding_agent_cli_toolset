@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 from cli_audit.catalog import ToolCatalog
 from cli_audit.detection import detect_multi_versions
@@ -20,7 +21,7 @@ def _fake_nvm(tmp_path, versions):
         bin_dir.mkdir(parents=True)
         node = bin_dir / "node"
         node.write_text("#!/bin/sh\n")
-        os.chmod(node, 0o755)
+        os.chmod(node, 0o700)
     return str(tmp_path)
 
 
@@ -33,7 +34,7 @@ class TestMultiVersionPicksNumericallyHighest:
             [{"cycle": "26", "latest": "26.10.0", "status": "active"}],
         )
         assert rows[0]["installed"] == "26.10.0"
-        assert rows[0]["path"].endswith("/v26.10.0/bin/node")
+        assert Path(rows[0]["path"]).parts[-3:] == ("v26.10.0", "bin", "node")
 
 
 class TestBitwardenUpstreamIsNpm:
