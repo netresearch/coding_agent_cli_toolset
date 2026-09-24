@@ -71,6 +71,31 @@ follow_default_within_major() {
   nvm alias default "$resolved" || true
 }
 
+# Remove older patches of the major just installed. The newest patch of each
+# major stays, and so do the default and the active version. Runs only for
+# multi-version installs, after follow_default_within_major has carried the
+# default's global npm packages over.
+prune_older_patches() {
+  local resolved major default current dir v
+  resolved="$(nvm version "$NODE_CHANNEL" 2>/dev/null || true)"
+  [ -n "$resolved" ] && [ "$resolved" != "N/A" ] || return 0
+  major="${resolved#v}"
+  major="${major%%.*}"
+  default="$(nvm version default 2>/dev/null || true)"
+  current="$(nvm current 2>/dev/null || true)"
+  for dir in "${NVM_DIR:-$HOME/.nvm}/versions/node/v${major}."*; do
+    [ -d "$dir" ] || continue
+    v="${dir##*/}"
+    if [ "$v" = "$resolved" ] || [ "$v" = "$default" ] || [ "$v" = "$current" ]; then
+      continue
+    fi
+    # Only versions older than the one just installed
+    [ "$(printf '%s\n%s\n' "$v" "$resolved" | sort -V | tail -n1)" = "$resolved" ] || continue
+    echo "[node] Removing $v (superseded by $resolved)"
+    nvm uninstall "$v" || true
+  done
+}
+
 install_node() {
   ensure_nvm
   nvm install "$NODE_CHANNEL"
@@ -98,6 +123,7 @@ install_node() {
     npm install -g eslint prettier || true
   else
     follow_default_within_major
+    prune_older_patches
     echo "=> Node.js version $NODE_VERSION has been successfully installed"
   fi
 }
@@ -143,6 +169,7 @@ update_node() {
     npm update -g eslint prettier || true
   else
     follow_default_within_major
+    prune_older_patches
     echo "=> Node.js version $NODE_VERSION has been updated"
   fi
 }
