@@ -613,6 +613,11 @@ def audit_tool_installation(
     return (version_num, version_line, path, install_method)
 
 
+def _numeric_version_key(version: str) -> tuple[int, ...]:
+    """Sort key for version strings: "26.10.0" -> (26, 10, 0)."""
+    return tuple(int(part) for part in re.findall(r"\d+", version))
+
+
 def scan_version_manager_dir(
     base_dir: str,
     version_prefix: str = "",
@@ -716,8 +721,9 @@ def detect_multi_versions(
                     key = f"{parts[0]}.{parts[1]}"
                 else:
                     key = major
-                # Keep the highest patch version for each major/minor
-                if key not in installed_map or version > installed_map[key][0]:
+                # Keep the highest patch version for each major/minor. Compare
+                # numerically: as strings, "26.9.0" sorts above "26.10.0".
+                if key not in installed_map or _numeric_version_key(version) > _numeric_version_key(installed_map[key][0]):
                     installed_map[key] = (version, path)
 
         for version_info in supported_versions:
