@@ -47,7 +47,7 @@ NODE_VERSION="{node_version}"
 NODE_CHANNEL="{node_version}"
 {_func("follow_default_within_major")}
 follow_default_within_major >/dev/null
-printf '%s\\n' "${{calls[@]}}"
+printf '%s\\n' ${{calls[@]+"${{calls[@]}}"}}
 """
     res = subprocess.run(["bash", "-c", script], capture_output=True, text=True, check=True)
     return [c for c in res.stdout.splitlines() if c and not c.startswith("version ")]
