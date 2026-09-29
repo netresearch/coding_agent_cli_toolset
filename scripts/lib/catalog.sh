@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # Catalog query functions for reading tool metadata
 # Assumes: Scripts are run from app root, catalog is at $ROOT/catalog
 

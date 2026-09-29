@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # Install the newest stable Byobu tag from upstream source.
 # Distribution packages commonly lag behind the upstream release.
 set -euo pipefail

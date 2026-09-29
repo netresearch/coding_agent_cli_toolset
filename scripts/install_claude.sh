@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # Dedicated installer for Claude Code CLI
 # Uses official native installer (recommended) with fallbacks
 set -euo pipefail

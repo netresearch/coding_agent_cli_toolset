@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 """Tests for multi-version go installs (GO_VERSION=1.26 install_go.sh).
 
 After `go install golang.org/dl/go1.26.5@latest`, the script verified the

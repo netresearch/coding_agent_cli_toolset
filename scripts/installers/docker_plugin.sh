@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # Installer for Docker CLI plugins (e.g., compose, buildx)
 # Installs plugins to ~/.docker/cli-plugins/
 set -euo pipefail

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # Main orchestrator for tool installation
 # Reads catalog and delegates to appropriate installer or reconciliation system
 set -euo pipefail

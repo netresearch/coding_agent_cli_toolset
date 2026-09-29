@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # dependency.sh - Dependency resolution and ordering
 #
 # This library handles tool dependencies:

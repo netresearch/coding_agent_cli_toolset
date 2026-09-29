@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # Install tmux from GitHub source releases (builds from source)
 # Needed because apt often lags several major versions behind.
 set -euo pipefail

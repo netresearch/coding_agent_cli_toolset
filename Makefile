@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 PYTHON ?= python3
 
 # Suppress "Entering directory" / "Leaving directory" messages

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 """Tests for virtualenv exclusion in audit detection.
 
 An always-activated ~/.venv put ~/.venv/bin first on PATH. The audit reported

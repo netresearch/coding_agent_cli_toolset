@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # Guards the safety-critical reconcile invariants at the shell/CLI boundary:
 #   - the dry-run make target must NEVER pass --apply (no removals)
 #   - the real target must pass --apply

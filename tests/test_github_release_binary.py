@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 """scripts/installers/github_release_binary.sh — version resolution and report.
 
 Three failure shapes, each observed in the field:

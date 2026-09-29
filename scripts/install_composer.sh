@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # Dedicated installer for Composer
 # Downloads latest stable composer.phar and installs to /usr/local/bin
 set -euo pipefail

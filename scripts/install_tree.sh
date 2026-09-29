@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # Install tree from GitHub source (builds from source)
 # Needed because apt often lags behind upstream.
 set -euo pipefail

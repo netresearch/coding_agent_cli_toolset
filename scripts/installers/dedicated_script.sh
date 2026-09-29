@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # Delegator for tools with dedicated installation scripts
 # Reads catalog to find which script to run, then delegates
 set -euo pipefail

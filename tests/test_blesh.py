@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 """Tests for the ble.sh (Bash Line Editor) catalog entry and installer.
 
 ble.sh is a dedicated_script tool that is *sourced* into interactive Bash

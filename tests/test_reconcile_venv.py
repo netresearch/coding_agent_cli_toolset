@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 """Tests for reconcile venv exclusion and prompt serialization.
 
 `make reconcile-all` flagged binaries inside an activated virtualenv

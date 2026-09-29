@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 """The plugin hook that points a command-not-found failure at the catalog.
 
 The hook input shapes follow the Claude Code hooks reference: PostToolUseFailure

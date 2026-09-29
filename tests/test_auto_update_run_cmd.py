@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 """Tests for auto_update.sh run_cmd: hidden-prompt protection, slow-command
 notice, and failure output.
 

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # set_auto_update.sh - Enable/disable automatic updates for a tool
 #
 # Stores auto_update preferences in user config (~/.config/cli-audit/config.yml)

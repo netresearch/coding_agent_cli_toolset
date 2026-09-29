@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 """Tests for ``cli_audit.render`` — pipe-delimited audit table rendering."""
 
 from __future__ import annotations

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 """scripts/lib/catalog_command.sh and common.sh::validate_package_list.
 
 Two catalog fields are shell code stored as JSON strings -- ``version_command``

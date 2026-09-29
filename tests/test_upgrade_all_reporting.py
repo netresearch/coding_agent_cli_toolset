@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 """Regression tests for make upgrade-all version and path reporting."""
 
 from __future__ import annotations

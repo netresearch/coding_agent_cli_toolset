@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 [build-system]
 requires = ["setuptools>=82.0.1", "wheel"]
 build-backend = "setuptools.build_meta"

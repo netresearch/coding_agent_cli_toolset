@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 """Regression tests for preserving deliberately uninstalled optional tools."""
 
 import os

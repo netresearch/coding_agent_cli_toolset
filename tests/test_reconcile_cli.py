@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 """Tests for the `audit.py --reconcile` entrypoint and its helpers.
 
 Covers plan shaping (active vs preferred markers), catalog candidate

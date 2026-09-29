@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 """Tests for the version-pin reader (``cli_audit.pins``)."""
 
 from __future__ import annotations

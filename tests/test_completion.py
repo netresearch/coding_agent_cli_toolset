@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 """Tests for the catalog-driven bash-completion framework.
 
 Exercises scripts/lib/completion.sh directly (sourced in a subshell) against a

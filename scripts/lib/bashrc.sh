@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # Idempotent management of delimited "managed blocks" in a shell rc file.
 # Shared helper: insert a block once, remove it cleanly without disturbing the
 # surrounding user content.

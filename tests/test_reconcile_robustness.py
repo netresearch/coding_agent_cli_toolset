@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 """Reconcile and installer robustness, ported from the cli-tools-skill fork.
 
 * ``remove_installation`` passed the *tool* name to ``cargo uninstall``. Cargo

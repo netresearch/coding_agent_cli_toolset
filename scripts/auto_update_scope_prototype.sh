@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # Prototype: Package Manager Scope Detection System
 # This is a working proof-of-concept for scope distinction (system/user/project)
 

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # policy.sh - Installation method policy resolution
 #
 # This library resolves which installation method to use by evaluating:

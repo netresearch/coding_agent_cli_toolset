@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # smart_column.py
 # A "column -s" replacement that preserves emojis and OSC 8 hyperlinks,
 # aligns by *display width*, and ignores ANSI escapes for width calculations.

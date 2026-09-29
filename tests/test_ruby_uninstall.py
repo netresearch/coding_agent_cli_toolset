@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 """Tests for per-cycle ruby uninstall (RUBY_VERSION=3.3 install_ruby.sh uninstall).
 
 node (NODE_VERSION) and python (UV_PYTHON_SPEC) support removing a single
