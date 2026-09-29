@@ -902,7 +902,7 @@ class TestCheckUpgradeAvailableAptResolved:
             stdout="ripgrep:\n  Installed: 14.1.0-1\n  Candidate: 14.1.1-1\n",
         )
 
-        version = get_available_version("ripgrep", "apt")
+        get_available_version("ripgrep", "apt")
 
         call_args = mock_run.call_args[0][0]
         assert call_args == ["apt-cache", "policy", "ripgrep"], (

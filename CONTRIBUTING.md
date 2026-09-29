@@ -239,7 +239,6 @@ ai_cli_preparation/
 ├── CONTRIBUTING.md
 ├── pyproject.toml         # Package configuration
 ├── pytest.ini             # Pytest configuration
-├── mypy.ini              # Mypy configuration
 └── .flake8               # Flake8 configuration
 ```
 

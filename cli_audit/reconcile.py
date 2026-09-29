@@ -632,8 +632,9 @@ def _cargo_crate_of(available_methods: object) -> str:
         if not isinstance(method, dict) or method.get("method") != "cargo":
             continue
         config = method.get("config")
-        if isinstance(config, dict) and isinstance(config.get("crate"), str):
-            return config["crate"]
+        crate = config.get("crate") if isinstance(config, dict) else None
+        if isinstance(crate, str):
+            return crate
     return ""
 
 
@@ -1005,7 +1006,9 @@ _MANUAL_REMOVAL_MARKERS = (
 
 def _is_manual_removal_error(message: str | None) -> bool:
     """True if a removal failure only needs the user to run a sudo command."""
-    return bool(message) and any(marker in message for marker in _MANUAL_REMOVAL_MARKERS)
+    if not message:
+        return False
+    return any(marker in message for marker in _MANUAL_REMOVAL_MARKERS)
 
 
 def _cargo_package_for(binary: str, tool: str) -> str:

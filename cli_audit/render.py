@@ -191,7 +191,8 @@ def _auto_update_explicit(tool: dict[str, Any], config: Any) -> bool | None:
     tool_cfg = config.tools.get(name) or config.tools.get(base)
     if tool_cfg is None:
         return None
-    return tool_cfg.auto_update  # may be None if the key isn't set
+    auto_update: bool | None = tool_cfg.auto_update  # may be None if the key isn't set
+    return auto_update
 
 
 def _installed_markers(pin: str, cycle: str | None, installed: str, auto: bool | None) -> str:

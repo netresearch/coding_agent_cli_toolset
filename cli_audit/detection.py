@@ -797,9 +797,9 @@ def detect_multi_versions(
                         found_path = binary_name
                 else:
                     # Search in PATH
-                    path = _which(binary_name)
-                    if path:
-                        found_path = path
+                    which_path = _which(binary_name)
+                    if which_path:
+                        found_path = which_path
 
                 if found_path:
                     # Get version info

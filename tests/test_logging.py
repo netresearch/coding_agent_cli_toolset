@@ -9,12 +9,6 @@ from pathlib import Path
 
 import pytest
 
-# Skip marker for Windows (file locking issues with temp files)
-skip_on_windows = pytest.mark.skipif(
-    sys.platform == "win32",
-    reason="Windows file locking prevents temp file cleanup"
-)
-
 from cli_audit.logging_config import (
     setup_logging,
     get_logger,
@@ -24,6 +18,12 @@ from cli_audit.logging_config import (
     warning,
     error,
     critical,
+)
+
+# Skip marker for Windows (file locking issues with temp files)
+skip_on_windows = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Windows file locking prevents temp file cleanup"
 )
 
 

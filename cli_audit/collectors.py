@@ -712,8 +712,9 @@ def collect_endoflife(
     if isinstance(cached, dict) and isinstance(cached.get("entries"), list):
         age = int(time.time()) - int(cached.get("at", 0))
         logger.debug(f"endoflife.date {product}: using file cache (age {age}s)")
-        _endoflife_memo[memo_key] = cached["entries"]
-        return cached["entries"]
+        entries: list[dict[str, Any]] = cached["entries"]
+        _endoflife_memo[memo_key] = entries
+        return entries
 
     # Legacy offline_cache argument (from write_upstream_cache dumps).
     if offline_cache and product in offline_cache:
