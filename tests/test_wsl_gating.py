@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 """Tests for WSL-conditional catalog tools (the ``requires_wsl`` gate).
 
 A tool flagged ``requires_wsl`` (currently ``wslu``/``wslview``) must only be

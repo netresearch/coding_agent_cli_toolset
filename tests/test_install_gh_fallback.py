@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 """Installer tag lookup must survive a failing `gh api` call.
 
 `gh api` prints the HTTP error body (e.g. a 401 "Bad credentials" for an

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # Bash-completion installation for cataloged tools.
 #
 # Catalog-driven: a tool's catalog JSON may declare an optional "bash_completion"

@@ -456,7 +456,6 @@ pytest -n auto
 |------|---------|
 | [pyproject.toml](pyproject.toml) | Package metadata, black, isort, pytest, mypy config |
 | [.flake8](.flake8) | Linting rules (max line 127, ignores) |
-| [mypy.ini](mypy.ini) | Type checking configuration |
 | [pytest.ini](pytest.ini) | Test discovery and coverage config |
 
 ---

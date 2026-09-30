@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # reset_pins.sh - Remove version pins from ~/.config/cli-audit/pins.json
 #
 # Default: wipe every pin.

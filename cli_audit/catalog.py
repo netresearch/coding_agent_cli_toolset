@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 """
 Tool catalog management and pin/skip functionality.
 
@@ -11,7 +13,7 @@ import logging
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from cli_audit.tools import Tool
@@ -73,7 +75,7 @@ class ToolCatalogEntry:
         # homepage is python-poetry.org and install_method is package_manager)
         # still declare its upstream, e.g. {"source_kind": "pypi"}.
         explicit_kind = self._raw_data.get("source_kind") if self._raw_data else None
-        if explicit_kind:
+        if explicit_kind and self._raw_data:
             explicit_args = self._raw_data.get("source_args")
             if explicit_args:
                 # A single string must not be split into characters by tuple().
@@ -86,7 +88,12 @@ class ToolCatalogEntry:
 
         # Priority 0b: Skip version checking for pure package_manager tools
         # These are OS-managed and can't be manually upgraded
-        if self.install_method == "package_manager" and not self.github_repo and not self.gitlab_project and not self.package_name:
+        if (
+            self.install_method == "package_manager"
+            and not self.github_repo
+            and not self.gitlab_project
+            and not self.package_name
+        ):
             return ("skip", ())
 
         # Priority 1: Explicit GitLab project
@@ -296,15 +303,15 @@ def resolve_apt_package_name(tool_name: str) -> str:
         # Check available_methods for apt entry (modern format)
         for method in data.get("available_methods", []):
             if method.get("method") == "apt":
-                return method.get("config", {}).get("package", tool_name)
+                return cast(str, method.get("config", {}).get("package", tool_name))
         # Check legacy package_managers field
         pkg_mgrs = data.get("package_managers", {})
         if "apt" in pkg_mgrs:
-            return pkg_mgrs["apt"]
+            return cast(str, pkg_mgrs["apt"])
         # Check legacy packages field
         packages = data.get("packages", {})
         if "apt" in packages:
-            return packages["apt"]
+            return cast(str, packages["apt"])
     except json.JSONDecodeError:
         pass
     return tool_name

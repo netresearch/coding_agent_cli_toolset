@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 set -euo pipefail
 
 # reconcile_pipx_to_uv.sh - Migrate pipx tools to UV

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 """
 Prerequisite resolution for tool installation.
 
@@ -10,7 +12,7 @@ from __future__ import annotations
 import shutil
 import sys
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 from .common import vlog
 
@@ -94,7 +96,7 @@ def is_tool_installed(tool_name: str, verbose: bool = False) -> bool:
     # Special case: python might be python3
     if tool_name == "python":
         if shutil.which("python"):
-            vlog(f"Found python (as python)", verbose)
+            vlog("Found python (as python)", verbose)
             return True
 
     vlog(f"{tool_name} not found in PATH", verbose)
@@ -258,7 +260,7 @@ def prompt_install_all_prerequisites(
         print(f"  - {prereq}", file=sys.stderr)
 
     try:
-        response = input(f"\nInstall all prerequisites? [Y/n] ").strip().lower()
+        response = input("\nInstall all prerequisites? [Y/n] ").strip().lower()
         return response in ("", "y", "yes")
     except (EOFError, KeyboardInterrupt):
         print("\nInstallation cancelled.", file=sys.stderr)
@@ -268,7 +270,7 @@ def prompt_install_all_prerequisites(
 def ensure_prerequisites(
     tool_name: str,
     catalog: ToolCatalog,
-    install_func: callable | None = None,
+    install_func: Callable[[str], bool] | None = None,
     interactive: bool = True,
     verbose: bool = False,
 ) -> PrerequisiteResult:
@@ -335,7 +337,7 @@ def ensure_prerequisites(
         )
 
     # Interactive mode: prompt user
-    user_declined = []
+    user_declined: list[str] = []
 
     # Ask about all missing at once for better UX
     if not prompt_install_all_prerequisites(missing, tool_name):

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # Shared installation strategy logic for all install scripts
 
 # Determine installation directory based on INSTALL_STRATEGY

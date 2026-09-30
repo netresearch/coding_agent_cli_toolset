@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # pins.sh - Shared library for reading/writing version pins
 #
 # Pins are stored in a user-local JSON file, not in git-tracked catalog files.

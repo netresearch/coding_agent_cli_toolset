@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 name: CI
 
 on:
@@ -35,12 +37,17 @@ jobs:
       os-versions: '["ubuntu-latest", "macos-latest", "windows-latest"]'
       install-cmd: "python -m pip install --upgrade pip && pip install -r requirements-dev.txt"
       run-lint: true
+      # First command: every pycodestyle/pyflakes check under .flake8 blocks.
+      # Second command: McCabe complexity (C901, threshold 10) is reported
+      # but does not block. 23 existing functions in ten cli_audit modules
+      # exceed it; splitting them is a refactor of that logic, not a lint
+      # fix. See CONTRIBUTING.md "Code quality checks".
       lint-cmd: >-
-        flake8 cli_audit tests --count --select=E9,F63,F7,F82 --show-source --statistics &&
-        flake8 cli_audit tests --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        flake8 cli_audit tests --count --show-source --statistics &&
+        flake8 cli_audit tests --count --exit-zero --select=C901 --max-complexity=10 --statistics
       run-type-check: true
-      # mypy stays non-blocking (was continue-on-error: true).
-      type-check-cmd: "mypy cli_audit --ignore-missing-imports || true"
+      # mypy blocks. Its configuration is [tool.mypy] in pyproject.toml.
+      type-check-cmd: "mypy cli_audit --ignore-missing-imports"
       run-tests: true
       test-cmd: >-
         pytest tests/ --ignore=tests/integration -v --cov=cli_audit
@@ -104,7 +111,14 @@ jobs:
       run-lint: false
       run-type-check: false
       run-tests: true
+      # pipefail: the reusable runs this with `bash -c`, and without it the
+      # pipe reports jq's status, which hid that audit.py rejected the former
+      # `--only` argument. A fresh checkout has no snapshot, so `audit.py
+      # <tool>` exits 1 until `--update-local` (no network) has written one.
       test-cmd: >-
+        set -o pipefail &&
         python audit.py --help &&
-        CLI_AUDIT_JSON=1 python audit.py --only python-core | jq '.' &&
+        python audit.py --update-local &&
+        CLI_AUDIT_JSON=1 python audit.py python |
+        jq -e 'map(.tool) == ["python"]' &&
         python -c "from cli_audit import Config, Environment, load_config; c = Config(); print('API works')"

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 [flake8]
 max-line-length = 127
 extend-ignore = E203, W503

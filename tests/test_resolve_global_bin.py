@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 """Tests for resolve_global_bin's GOPATH fallback.
 
 A successful `go install` lands in ${GOPATH:-$HOME/go}/bin; when that dir is

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 """Tests for prerequisite resolution."""
 
 from __future__ import annotations
@@ -70,6 +72,7 @@ class TestIsToolInstalled:
     def test_python_fallback_to_python(self):
         """Python should check both python3 and python."""
         call_count = 0
+
         def mock_which(binary):
             nonlocal call_count
             call_count += 1

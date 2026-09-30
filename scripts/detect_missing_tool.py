@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 """Claude Code hook: point a failed command at the cli-tools catalog.
 
 Registered in hooks/hooks.json for PostToolUseFailure and PostToolUse on Bash.

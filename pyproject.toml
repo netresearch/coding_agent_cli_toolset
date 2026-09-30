@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 [build-system]
 requires = ["setuptools>=82.0.1", "wheel"]
 build-backend = "setuptools.build_meta"
@@ -50,9 +52,9 @@ dev = [
 cli-audit = "cli_audit.__main__:main"
 
 [project.urls]
-Homepage = "https://github.com/your-org/ai_cli_preparation"
-Issues = "https://github.com/your-org/ai_cli_preparation/issues"
-Repository = "https://github.com/your-org/ai_cli_preparation"
+Homepage = "https://github.com/netresearch/coding_agent_cli_toolset"
+Issues = "https://github.com/netresearch/coding_agent_cli_toolset/issues"
+Repository = "https://github.com/netresearch/coding_agent_cli_toolset"
 
 [tool.black]
 line-length = 127

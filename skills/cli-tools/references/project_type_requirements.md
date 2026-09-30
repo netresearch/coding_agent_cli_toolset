@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # Project Type Requirements
 
 `scripts/detect_project_type.sh json <dir>` detects the types below and lists

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # Scope Detection Library for Package Managers
 # Provides functions to detect and count packages by scope (system/user/project)
 

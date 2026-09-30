@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # Run shell commands that come from the catalog: `version_command` and
 # `bash_completion`. Both are shell code stored as JSON strings -- review them
 # as code. They are not parsed here: the catalog's real entries use pipes,

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 """The Claude Code plugin shipped from this repository.
 
 The skill in ``skills/cli-tools`` calls the repository's own scripts and names

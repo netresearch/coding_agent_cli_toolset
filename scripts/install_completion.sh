@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # Install or remove a tool's bash completion (catalog-driven).
 # Usage: install_completion.sh TOOL [install|remove]
 #        install_completion.sh --all

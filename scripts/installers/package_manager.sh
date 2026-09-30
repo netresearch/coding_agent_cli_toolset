@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # Generic installer for package manager tools
 # Installs tools via system package managers (apt, brew, etc.)
 set -euo pipefail

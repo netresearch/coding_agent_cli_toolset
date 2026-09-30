@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # path_check.sh - PATH validation and auto-fix for package managers and language environments
 
 set -euo pipefail

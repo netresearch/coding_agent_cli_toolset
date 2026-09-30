@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 """Tests for the npm handler of remove_installation: the package name comes
 from the binary's symlink into node_modules, not from the tool name."""
 

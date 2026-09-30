@@ -53,27 +53,26 @@ Use this tool to quickly confirm that the CLIs your AI coding agents rely on are
 - Simple, parse-friendly output
 
 ## Output Format
-The program prints a header followed by one line per tool (6 columns):
+`audit.py` prints a header followed by one line per tool (5 columns, rendered by `cli_audit/render.py`):
 
 ```
-state|tool|installed|installed_method|latest_upstream|upstream_method
-+|fd|9.0.0 (140ms)|apt/dpkg|9.0.0 (220ms)|github
+state|tool|installed|latest_upstream|notes
+✓|fx|39.2.0|39.2.0|system
 ...
 ```
 
 - `state`: single-character/emoji indicator of status
 - `tool`: logical tool name
-- `installed`: local version display (may include timing)
-- `installed_method`: detected installation source (e.g., `uv tool`, `npm (user)`, `apt/dpkg`)
-- `latest_upstream`: upstream version display (may include timing)
-- `upstream_method`: where the upstream version came from (`github`, `pypi`, `crates`, `npm`, `gnu-ftp`)
+- `installed`: local version display (auto-update and pin markers appear next to it)
+- `latest_upstream`: upstream version display
+- `notes`: detected installation method (e.g., `uv tool`, `npm (user)`, `apt/dpkg`)
 
 ### JSON mode
 
 Set `CLI_AUDIT_JSON=1` to emit a JSON array of tool objects instead of the table:
 
 ```bash
-CLI_AUDIT_JSON=1 python3 cli_audit.py | jq '.'
+CLI_AUDIT_JSON=1 uv run python audit.py | jq '.'
 ```
 
 Fields (subset):
@@ -131,10 +130,10 @@ Note: Not all of these are expected to be installed globally; the report simply 
 ## Quick Start
 
 ```bash
-python3 cli_audit.py | column -s '|' -t
+uv run python audit.py | column -s '|' -t
 ```
 
-Tip: On systems where `column` is unavailable, just view the raw output or import into your tool of choice.
+`audit.py` renders from the snapshot written by `make update`. Tip: On systems where `column` is unavailable, just view the raw output or import into your tool of choice.
 
 ## Code Examples
 
@@ -421,20 +420,20 @@ The snapshot (`tools_snapshot.json`) includes `__meta__` (schema version, timest
 - Table scan for a quick look:
 
 ```bash
-python3 cli_audit.py | column -s '|' -t
+uv run python audit.py | column -s '|' -t
 ```
 
 - JSON for actionable filtering (e.g., list anything not up to date):
 
 ```bash
-CLI_AUDIT_JSON=1 python3 cli_audit.py \
+CLI_AUDIT_JSON=1 uv run python audit.py \
   | jq -r '.[] | select(.status != "UP-TO-DATE") | [.tool, .status] | @tsv'
 ```
 
 - JSON by category (e.g., focus on security):
 
 ```bash
-CLI_AUDIT_JSON=1 python3 cli_audit.py \
+CLI_AUDIT_JSON=1 uv run python audit.py \
   | jq -r '.[] | select(.category=="security" and .status != "UP-TO-DATE") | [.tool, .status] | @tsv'
 ```
 
@@ -444,18 +443,7 @@ CLI_AUDIT_JSON=1 python3 cli_audit.py \
   3. Re-run the audit until only up-to-date tools remain.
 
 ## Extending the Tool List
-Agent-focused tools live in the `TOOLS` tuple in `cli_audit.py`. Prefer upstreams with discoverable latest releases:
-
-```python
-Tool("fd", ("fd", "fdfind"), "gh", ("sharkdp", "fd")),
-```
-
-- `name`: logical name displayed in output
-- `candidates`: executable names to search on PATH (first line of their version output is used)
-- `source_kind`: one of `gh`, `pypi`, `crates`, `npm`, or `skip`
-- `source_args`: parameters for the source (e.g., owner/repo for GitHub, package name for PyPI/crates/npm)
-
-If `source_kind` is `skip`, upstream lookup is disabled for that tool.
+Each tool is one JSON file under `catalog/` (for example `catalog/fd.json`); `cli_audit/tools.py` builds its `TOOLS` tuple from these files, so adding a tool means adding a catalog entry, not editing Python. Prefer upstreams with discoverable latest releases. The fields (`name`, `candidates`, `github_repo`, `available_methods`, `category`, …) are described in [docs/CATALOG_GUIDE.md](docs/CATALOG_GUIDE.md).
 
 ## Notes and Caveats
 - Timeouts are kept intentionally short (3s) to avoid blocking; transient network failures may mark `latest_upstream` as empty.
@@ -468,13 +456,13 @@ If `source_kind` is `skip`, upstream lookup is disabled for that tool.
 
 ### Empty selection handling
 
-- When selecting tools via `--only` or `CLI_AUDIT_ONLY`, unknown names now yield an empty JSON array in JSON mode and a header-only table in text mode.
+- Tools are selected by passing their names as positional arguments (`uv run python audit.py jq ripgrep`); there is no `--only` option. When rendering from the snapshot, unknown names yield an empty JSON array in JSON mode and a header-only table in text mode.
 
 ## Development
 
-- Lint (optional):
+- Lint:
 ```bash
-python3 -m pyflakes cli_audit.py
+uv run python -m flake8 cli_audit tests
 ```
 
 - Run tests:
@@ -518,29 +506,23 @@ The pattern targets use a fallback chain: if a dedicated script exists (`scripts
 
 ### Role-focused quick checks (local-only)
 
-Use friendly `--only` aliases to focus on a subset quickly (these expand to explicit tool lists under the hood):
+`audit.py` has no role aliases or `--only` option. Name the tools to check as positional arguments, and align the pipe-delimited output with `smart_column.py` as the `make audit` targets do:
 
 ```bash
-# Agent-centric core tools
-python3 cli_audit.py --only agent-core | python3 smart_column.py -s "|" -t --right 3,5 --header
+# One tool (same as the `make audit-<tool>` target, e.g. make audit-ripgrep)
+uv run python audit.py ripgrep | uv run python smart_column.py -s "|" -t --right 3,4 --header
 
-# Python / Node / Go cores
-python3 cli_audit.py --only python-core | python3 smart_column.py -s "|" -t --right 3,5 --header
-python3 cli_audit.py --only node-core   | python3 smart_column.py -s "|" -t --right 3,5 --header
-python3 cli_audit.py --only go-core     | python3 smart_column.py -s "|" -t --right 3,5 --header
+# Several tools
+uv run python audit.py python pip uv node npm | uv run python smart_column.py -s "|" -t --right 3,4 --header
 
-# Infra and Security
-python3 cli_audit.py --only infra-core    | python3 smart_column.py -s "|" -t --right 3,5 --header
-python3 cli_audit.py --only security-core | python3 smart_column.py -s "|" -t --right 3,5 --header
-
-# Data tooling
-python3 cli_audit.py --only data-core | python3 smart_column.py -s "|" -t --right 3,5 --header
+# Only missing or outdated tools (same as `make outdated`)
+CLI_AUDIT_FILTER_STATUS="NOT INSTALLED,OUTDATED" uv run python audit.py \
+  | uv run python smart_column.py -s "|" -t --right 3,4 --header
 ```
 
 Notes:
-- Category subheaders and a one-line "Readiness: ..." summary are printed for fast local scanning.
-- Set `CLI_AUDIT_HINTS=0` to suppress brief remediation hints inline.
-- When `CLI_AUDIT_OFFLINE=1`, the readiness line displays `(offline)` to indicate baseline-only latest checks.
+- A one-line "Readiness: ..." summary is printed to stderr after the table. With `CLI_AUDIT_GROUP=1` (the default when calling `audit.py` directly and in `make audit-<tool>`; the other table-rendering `make` targets set `0`), a category subheader is printed to stderr before each group.
+- The readiness line shows `(offline)` when the snapshot was collected with `CLI_AUDIT_OFFLINE=1` (baseline-only latest checks).
 
 ### Install-method classification (how local tools are attributed)
 

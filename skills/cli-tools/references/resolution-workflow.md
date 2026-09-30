@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # Missing Tool Resolution Workflow
 
 ## Phase 1: Diagnostic (BEFORE attempting install)

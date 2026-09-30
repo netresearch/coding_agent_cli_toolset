@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # Generic installer for GitHub release binaries
 # Reads tool metadata from catalog and installs binary
 set -euo pipefail

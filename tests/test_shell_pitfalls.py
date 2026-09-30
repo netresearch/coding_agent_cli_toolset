@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 """Re-run the bash claims in skills/cli-tools/references/shell-pitfalls.md.
 
 Each case is its own ``bash -c`` with the status captured: wrapping variants in

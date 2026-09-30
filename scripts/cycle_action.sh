@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # Dispatch tool@cycle make targets (e.g. make uninstall-node@24) to the
 # dedicated multi-version installer with the tool's version env var set.
 set -euo pipefail

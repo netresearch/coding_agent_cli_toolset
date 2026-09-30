@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # Binary to Catalog Entry
 
 A "command not found" names a binary; `install_tool.sh` wants the catalog

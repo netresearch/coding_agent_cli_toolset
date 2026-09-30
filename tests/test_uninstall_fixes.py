@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 """Tests for uninstall fixes: uv removal, nvm npm-package removal,
 multi-install loop resilience, and apt path precision.
 

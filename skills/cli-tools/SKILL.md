@@ -1,4 +1,6 @@
 ---
+# SPDX-License-Identifier: CC-BY-SA-4.0
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 name: cli-tools
 description: "Use when a command fails with 'command not found', when installing, updating or removing CLI tools (ripgrep, fd, jq, yq, bat, gh, …), when auditing what a project or machine has installed, or when choosing a modern tool over a legacy one (rg over grep -r, fd over find, jq over grep on JSON). Triggers on: command not found, install tool, missing binary, environment audit, update tools, duplicate installation, which, apt install, brew install."
 license: "(MIT AND CC-BY-SA-4.0)"

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # capability.sh - Installation method detection and availability checking
 #
 # This library provides capability detection for the reconciliation system:

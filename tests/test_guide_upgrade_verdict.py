@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 """Tests for the upgrade verdict in scripts/guide.sh.
 
 The auto-update branch counted an upgrade as "Updated" whenever the install

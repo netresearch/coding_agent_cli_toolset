@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # config.sh - Query user configuration from Python config system
 #
 # This bridges bash scripts to the Python configuration system,

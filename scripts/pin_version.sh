@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # pin_version.sh - Pin a tool to a specific version to suppress upgrade prompts
 set -euo pipefail
 

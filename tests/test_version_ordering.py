@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 """Regression tests for upgrades that `make upgrade` reported as not taking effect.
 
 - node@26: nvm installed v26.10.0 next to v26.9.0, and detection kept 26.9.0

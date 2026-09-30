@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 """Tests for tool@cycle make targets (make uninstall-node@24 etc.).
 
 cycle_action.sh maps TOOL@CYCLE to the dedicated installer with the tool's

@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # Preferred Tools - Detailed Reference
 
 Modern CLI tools that replace legacy Unix utilities. See `SKILL.md` for the

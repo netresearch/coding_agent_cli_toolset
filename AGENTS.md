@@ -42,14 +42,14 @@ Minimal pre-commit checks (also enforced by `.pre-commit-config.yaml`):
 ```bash
 uv run python -m pytest          # All tests (required)
 uv run python -m flake8 cli_audit tests  # flake8 (required)
-uv run python -m mypy cli_audit  # mypy (optional)
+uv run python -m mypy cli_audit  # mypy (required)
 ./scripts/test_smoke.sh          # Smoke tests (required)
 uv run python audit.py --help    # Verify CLI works
 ```
 
 Install the git hooks once per checkout: `uv run pre-commit install`.
 New features and bug fixes go on a feature branch (`fix/…`, `feat/…`, `chore/…`) → PR against `main` → signed commits (`git commit -S --signoff`).
-See [`SECURITY.md`](./SECURITY.md) for vulnerability reporting and [`CHANGELOG.md`](./CHANGELOG.md) for release history.
+See the organisation [`SECURITY.md`](https://github.com/netresearch/.github/blob/main/SECURITY.md) for vulnerability reporting and [`CHANGELOG.md`](./CHANGELOG.md) for release history.
 
 ## Testing
 

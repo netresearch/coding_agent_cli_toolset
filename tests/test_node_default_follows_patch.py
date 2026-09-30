@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 """The nvm default follows a newer patch of its own major, never another major.
 
 make upgrade installed node v26.10.0 while the default stayed v26.8.1, so new

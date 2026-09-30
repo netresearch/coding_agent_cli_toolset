@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 # Install ble.sh (Bash Line Editor) from source.
 # ble.sh is *sourced* into interactive Bash (not a PATH binary): it installs to
 # ~/.local/share/blesh/ble.sh and is loaded via a managed block in ~/.bashrc.

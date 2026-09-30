@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Netresearch DTT GmbH
 """
 AI CLI Preparation - Tool version auditing and installation management.
 
@@ -9,7 +11,7 @@ Core Modules:
 - Reconciliation: Multiple installation detection and conflict resolution
 """
 
-__version__ = "2.0.0"
+__version__ = "2.0.0-alpha.6"  # keep equal to [project].version in pyproject.toml
 __author__ = "AI CLI Preparation Contributors"
 
 # Version info for backward compatibility
