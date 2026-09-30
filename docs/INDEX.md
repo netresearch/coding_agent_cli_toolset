@@ -1,6 +1,6 @@
 # AI CLI Preparation - Documentation Index
 
-**Version:** 2.0.0
+**Version:** 2.0.0-alpha.6
 **Last Updated:** 2025-11-03
 
 ## Overview
@@ -10,7 +10,7 @@ AI CLI Preparation is a specialized environment audit tool designed to ensure AI
 **Architecture:** Modular design with 21 specialized Python modules and 107 JSON tool catalog entries, evolved from a 3,387-line monolith to a maintainable, extensible system.
 
 **Project Status:**
-- **Phase 1 (Detection & Auditing):** ✅ Complete - Modular refactoring complete (v2.0.0)
+- **Phase 1 (Detection & Auditing):** ✅ Complete - Modular refactoring complete
 - **Phase 2 (Installation & Upgrade):** ✅ Complete - Full implementation with comprehensive testing
 
 ## Documentation Structure
@@ -271,7 +271,7 @@ Documentation improvements are welcome! Please:
 
 ## Version History
 
-- **v2.0.0 (2025-11-03)**: Modular architecture release
+- **2025-11-03**: Modular architecture (package version still 2.0.0-alpha.6; no 2.0.0 was released)
   - 18 specialized Python modules
   - 73 JSON tool catalog entries
   - New entry point: audit.py

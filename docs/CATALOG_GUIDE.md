@@ -1,7 +1,7 @@
 # Catalog Guide: JSON Tool Definitions
 
 **Last Updated:** 2025-11-03
-**Version:** 2.0.0
+**Version:** 2.0.0-alpha.6
 
 ## Overview
 

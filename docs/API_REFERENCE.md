@@ -1,6 +1,6 @@
 # API Reference - v2.0 Modular Architecture
 
-**Version:** 2.0.0
+**Version:** 2.0.0-alpha.6
 **Last Updated:** 2025-11-06
 **Architecture:** 18 specialized Python modules with 100+ public APIs
 
@@ -1533,6 +1533,6 @@ See [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md) for detailed migration instructions
 
 ---
 
-**API Version:** 2.0.0
+**API Version:** 2.0.0-alpha.6
 **Last Updated:** 2025-11-06
 **Next Review:** After additional module expansions
