@@ -17,7 +17,7 @@ It runs no server and opens no listening port.
 | Id | Requirement |
 | --- | --- |
 | R1 | In the Python package and `audit.py`, data received from the network or from the output of installed programs is parsed as data and never passed to a shell. |
-| R2 | Network requests go to `https://` URLs and have a timeout. |
+| R2 | Network requests go to `https://` URLs. In the Python package every request has a timeout. |
 | R3 | An API token the user provides (`GITHUB_TOKEN`, `GITLAB_TOKEN`, `GITLAB_PRIVATE_TOKEN`, or the token of the `gh` or `glab` CLI) is sent only to the API of the service it belongs to and is not written to a file or a log. |
 | R4 | Configuration files are parsed without executing code. |
 | R5 | The tool runs as the invoking user and does not require root. Commands that need root are run through `sudo`, so `sudo`'s password prompt and policy apply. |
@@ -26,9 +26,9 @@ It runs no server and opens no listening port.
 ## What users can expect
 
 - The tool acts with the user's own permissions (R5). Installers call `sudo` only for the commands that need it, for example `sudo install` when the target is `/usr/local/bin` and not writable (`get_install_cmd` in `scripts/lib/install_strategy.sh`).
-- API tokens are used only as request headers for `https://api.github.com/rate_limit` and `https://gitlab.com/api/v4/user` (`get_github_rate_limit`, `get_gitlab_rate_limit` in `cli_audit/collectors.py`). Release lookups send no token. The CLI prints only where a token came from, never the token (R3).
+- In the Python package, API tokens are used only as request headers for `https://api.github.com/rate_limit` and `https://gitlab.com/api/v4/user` (`get_github_rate_limit`, `get_gitlab_rate_limit` in `cli_audit/collectors.py`); its release lookups send no token. The installer scripts look up GitHub releases and tags with `gh api --hostname github.com`, which sends the `gh` CLI's token to api.github.com, and fall back to an unauthenticated request (`github_api_get` in `scripts/lib/install_strategy.sh`). The CLI prints only where a token came from, never the token (R3).
 - Removing duplicate installations needs an explicit `--apply`; `audit.py --reconcile` alone only reports the plan (`audit.py --help`). `make upgrade-dry-run` lists the upgrades without making them (`scripts/auto_update.sh --dry-run`).
-- Strings from upstream sources are stripped of terminal control characters before they are printed (`_sanitize` in `audit.py`).
+- In the progress output of `cmd_update` in `audit.py`, installed and upstream version strings are stripped of terminal control characters before they are printed (`_sanitize`). The audit table (`cli_audit/render.py`) prints version strings as received.
 
 ## What users cannot expect
 
@@ -69,10 +69,10 @@ Out of scope: an attacker who already controls the user's account, the user's co
 | --- | --- | --- |
 | CWE-78 OS command injection | Argument lists without a shell; `shell=True` only for catalog commands | `cli_audit/detection.py`, `cli_audit/upgrade.py`, `cli_audit/reconcile.py` |
 | CWE-22 Path traversal in tool names | The installers reject tool names containing `/` or `..`; `install_tool.sh` also requires a catalog entry for the name | `scripts/install_tool.sh`, `scripts/installers/github_release_binary.sh` |
-| CWE-150 Terminal escape injection | Control characters are stripped from upstream strings before printing | `audit.py` (`_sanitize`) |
+| CWE-150 Terminal escape injection | Control characters are stripped from version strings in the progress output of `cmd_update`; the audit table prints them as received | `audit.py` (`_sanitize`) |
 | CWE-502 Deserialisation of untrusted data | `yaml.safe_load`; JSON only | `cli_audit/config.py`, `cli_audit/collectors.py` |
 | CWE-319 Cleartext transmission | `https://` URLs; the release-binary installer restricts `curl` to HTTPS, including redirects (`--proto '=https' --proto-redir '=https'`) | `cli_audit/collectors.py`, `scripts/installers/github_release_binary.sh` |
-| CWE-400 Uncontrolled resource consumption | Timeouts on network requests and version probes | `cli_audit/collectors.py`, `cli_audit/detection.py` |
+| CWE-400 Uncontrolled resource consumption | Timeouts on the Python package's network requests and on version probes | `cli_audit/collectors.py`, `cli_audit/detection.py` |
 | CWE-798 Hard-coded credentials | No credentials in the repository; Betterleaks scans every pull request | `.github/workflows/ci.yml` |
 | Vulnerable dependencies (OWASP A06) | Two runtime dependencies; dependency review and pip-audit on pull requests | `pyproject.toml`, `.github/workflows/dependency-review.yml`, `.github/workflows/ci.yml` |
 
