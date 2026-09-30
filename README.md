@@ -521,7 +521,7 @@ CLI_AUDIT_FILTER_STATUS="NOT INSTALLED,OUTDATED" uv run python audit.py \
 ```
 
 Notes:
-- A one-line "Readiness: ..." summary is printed to stderr after the table. With `CLI_AUDIT_GROUP=1` (the default when calling `audit.py` directly; the `make audit` targets set `0`), a category subheader is printed to stderr before each group.
+- A one-line "Readiness: ..." summary is printed to stderr after the table. With `CLI_AUDIT_GROUP=1` (the default when calling `audit.py` directly and in `make audit-<tool>`; the other table-rendering `make` targets set `0`), a category subheader is printed to stderr before each group.
 - The readiness line shows `(offline)` when the snapshot was collected with `CLI_AUDIT_OFFLINE=1` (baseline-only latest checks).
 
 ### Install-method classification (how local tools are attributed)

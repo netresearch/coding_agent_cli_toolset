@@ -39,8 +39,8 @@ jobs:
       run-lint: true
       # First command: every pycodestyle/pyflakes check under .flake8 blocks.
       # Second command: McCabe complexity (C901, threshold 10) is reported
-      # but does not block. 23 existing functions exceed it; splitting them
-      # is a refactor of the installer/reconcile/upgrade logic, not a lint
+      # but does not block. 23 existing functions in ten cli_audit modules
+      # exceed it; splitting them is a refactor of that logic, not a lint
       # fix. See CONTRIBUTING.md "Code quality checks".
       lint-cmd: >-
         flake8 cli_audit tests --count --show-source --statistics &&
