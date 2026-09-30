@@ -64,7 +64,7 @@ audit-%: scripts-perms ## Audit single tool (e.g., make audit-ripgrep)
 	@bash -c 'set -o pipefail; CLI_AUDIT_RENDER=1 CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 CLI_AUDIT_COLOR=1 $(PYTHON) audit.py $* | \
 	$(PYTHON) smart_column.py -s "|" -t --right 3,4 --header' || true
 
-audit-offline-%: scripts-perms ## Offline audit subset (e.g., make audit-offline-python-core)
+audit-offline-%: scripts-perms ## Offline audit of one tool (e.g., make audit-offline-ripgrep)
 	@bash -c 'set -o pipefail; CLI_AUDIT_OFFLINE=1 CLI_AUDIT_RENDER=1 CLI_AUDIT_GROUP=0 CLI_AUDIT_LINKS=1 CLI_AUDIT_EMOJI=1 CLI_AUDIT_COLOR=1 $(PYTHON) audit.py $* | \
 	$(PYTHON) smart_column.py -s "|" -t --right 3,4 --header' || true
 
