@@ -1,7 +1,4 @@
 <!--
-SPDX-License-Identifier: MIT
-SPDX-FileCopyrightText: Netresearch DTT GmbH
-
 Thanks for the contribution! Keep this template terse — reviewers read it.
 -->
 
