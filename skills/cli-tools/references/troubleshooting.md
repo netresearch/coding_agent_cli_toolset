@@ -9,6 +9,7 @@
 - Node/nvm: global installs land off-PATH (a `node` shim hijacks npm's prefix)
 - Installation Blocked (Permission/System Restrictions)
 - Batch Updaters That "Freeze"
+- Package Manager Fails Oddly: Check Free Disk, Then the Cache
 - `timeout` Is Not Portable — Guard It
 - Probing a Tool for a Capability: Validate the Output Shape
 
@@ -158,6 +159,30 @@ When wrapping package-manager commands for unattended runs:
 4. **Diagnose a stuck run** via `/proc/<pid>/fd` (fd 0 → `/dev/pts/*` with
    fd 1/2 → `/dev/null` = waiting on an invisible prompt) and
    `/proc/<pid>/wchan` (`wait_woken` ≈ tty read).
+
+## Package Manager Fails Oddly: Check Free Disk, Then the Cache
+
+A full disk rarely says "disk full". Observed with Composer 2 on a disk with
+27 MB free: `composer install` failed with `curl error 23 … Failure writing
+output to destination` and ended by printing the **usage text of `install`**,
+which reads like a wrong flag. Composer did warn that the disk holding its
+cache had less than 100 MiB free, but that line sat above a page of progress
+output. After space was freed, the next run still failed (`Unzip with unzip
+command failed` → `Install of typo3/cms-form failed`, exit 19, usage text
+again): the first run had left **truncated archives in the cache**, and Composer
+reused them.
+
+1. **Run `df -h` first** when an install fails without an obvious reason — and
+   before any large install on a machine that has been busy. Before it, never
+   after, so the numbers decide whether to start.
+2. **After freeing space, drop the cache entries the failed run wrote**:
+   `~/.cache/composer/files/<vendor>/<package>` for every package named in the
+   failure (or `composer clear-cache` when that is cheaper than re-downloading).
+   For npm, `npm cache verify` drops corrupt entries. For pip, `pip cache
+   remove <pkg>` removes cached wheels only; `pip cache purge` clears the
+   HTTP cache as well, which is where a truncated download sits.
+3. **Write the full output to a file and read it** — the cause sits well above
+   the usage text that ends the run.
 
 ## `timeout` Is Not Portable — Guard It
 
