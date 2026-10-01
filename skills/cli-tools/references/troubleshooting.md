@@ -178,8 +178,9 @@ reused them.
 2. **After freeing space, drop the cache entries the failed run wrote**:
    `~/.cache/composer/files/<vendor>/<package>` for every package named in the
    failure (or `composer clear-cache` when that is cheaper than re-downloading).
-   The equivalent for npm is `npm cache verify`, for pip `pip cache remove
-   <pkg>`.
+   For npm, `npm cache verify` drops corrupt entries. For pip, `pip cache
+   remove <pkg>` removes cached wheels only; `pip cache purge` clears the
+   HTTP cache as well, which is where a truncated download sits.
 3. **Write the full output to a file and read it** — the cause sits well above
    the usage text that ends the run.
 
