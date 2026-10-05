@@ -79,6 +79,11 @@ class TestReadingRecords:
         assert bash("printf 'a\\nb' | while read -r l; do echo $l; done").stdout == "a\n"
         assert bash("printf 'a\\nb' | while read -r l || [ -n \"$l\" ]; do echo $l; done").stdout == "a\nb\n"
 
+    def test_awk_counts_a_lone_cr_as_a_field(self):
+        crlf = "printf 'h\\r\\n\\r\\nx\\r\\n' | awk "
+        assert bash(crlf + "'NR == 2 {print NF}'").stdout == "1\n"
+        assert bash(crlf + "'{sub(/\\r$/, \"\")} NR == 2 {print NF}'").stdout == "0\n"
+
     def test_unquoted_for_globs(self, tmp_path):
         (tmp_path / "aa").touch()
         (tmp_path / "ab").touch()

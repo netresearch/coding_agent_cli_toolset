@@ -96,6 +96,13 @@ with `IFS=$'\037'`): `x=a y= z=b`.
 **`while read` skips a last line without a newline.** `printf 'a\nb' | while
 read -r l` sees only `a`. Use `while read -r l || [ -n "$l" ]`.
 
+**awk counts a lone `\r` as a field.** The default field separator splits on
+blanks and tabs only, so in a file with CRLF line ends a blank line is `\r` with
+`NF=1`, and a `NF` test for "first non-empty line" picks it. A body written on
+Windows was refused that way by a check that read the line after a heading
+(mawk 1.3.4 and gawk 5.2.1 alike). Strip the CR before anything else reads the
+record: `awk '{sub(/\r$/, "")} … NF …'` — the assignment re-splits, `NF=0`.
+
 **`for x in $var` splits and globs.** With `var='a*'` in a directory holding
 `aa` and `ab`, the loop runs over `aa ab`, not `a*`. Split with
 `read -ra arr <<<"$var"` and loop over `"${arr[@]}"`.
