@@ -45,7 +45,7 @@ Follow patterns in existing code (see sections below).
 
 ```bash
 # Manual testing (fresh check, JSON output, snapshot unchanged)
-CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py your-new-tool
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py --verbose your-new-tool
 
 # Smoke test
 bash scripts/test_smoke.sh
@@ -131,7 +131,7 @@ Set `version_flag` or `version_command` in the catalog entry; `get_version_line(
 
 ```bash
 # Test single tool (fresh check with debug output, JSON, snapshot unchanged)
-CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py your-tool
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py --verbose your-tool
 
 # Table view (renders from the snapshot written by make update)
 make update && make audit-your-tool
@@ -264,7 +264,7 @@ uv run python audit.py ripgrep
 CLI_AUDIT_JSON=1 uv run python audit.py | jq '.[] | select(.category == "python")'
 
 # Test with debug output
-CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py ripgrep
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py --verbose ripgrep
 
 # Test offline mode
 CLI_AUDIT_OFFLINE=1 uv run python audit.py ripgrep
@@ -367,7 +367,7 @@ def compare_versions(v1: str, v2: str) -> int:
 ### Enable Debug Output
 
 ```bash
-CLI_AUDIT_DEBUG=1 uv run python audit.py
+CLI_AUDIT_DEBUG=1 uv run python audit.py --verbose
 ```
 
 **Shows:**
@@ -384,7 +384,7 @@ CLI_AUDIT_DEBUG=1 uv run python audit.py --update --verbose
 ### Isolate Single Tool
 
 ```bash
-CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py problematic-tool 2>&1 | tee debug.log
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py --verbose problematic-tool 2>&1 | tee debug.log
 ```
 
 ### Check Cache State

@@ -150,7 +150,7 @@ The security design of the tool itself is described in [docs/SECURITY-ASSURANCE.
       """
   ```
 
-- New source files start with an SPDX header: `SPDX-License-Identifier: MIT` (`CC-BY-SA-4.0` under `skills/`) and `SPDX-FileCopyrightText: Netresearch DTT GmbH`.
+- New source files start with an SPDX header: `SPDX-License-Identifier: MIT` (`CC-BY-SA-4.0` under `skills/` and `docs/`, and for README.md) and `SPDX-FileCopyrightText: Netresearch DTT GmbH`.
 
 ## Project Structure
 
@@ -201,4 +201,4 @@ We use [Semantic Versioning](https://semver.org/):
 
 ## License
 
-Code (scripts, the Python package, workflows and configuration) is licensed under the [MIT License](LICENSE-MIT); the skill under `skills/` is licensed under [CC-BY-SA-4.0](LICENSE-CC-BY-SA-4.0). By contributing, you agree that your contributions are licensed under these terms.
+Code (scripts, the Python package, workflows and configuration) is licensed under the [MIT License](LICENSE-MIT); the skill under `skills/`, README.md and the documentation under `docs/` are licensed under [CC-BY-SA-4.0](LICENSE-CC-BY-SA-4.0). By contributing, you agree that your contributions are licensed under these terms.

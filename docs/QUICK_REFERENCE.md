@@ -88,7 +88,7 @@ CLI_AUDIT_OFFLINE=1 uv run python audit.py
 
 ```bash
 # Basic debug output
-CLI_AUDIT_DEBUG=1 uv run python audit.py
+CLI_AUDIT_DEBUG=1 uv run python audit.py --verbose
 
 # Debug output while collecting (shows network calls)
 CLI_AUDIT_DEBUG=1 uv run python audit.py --update --verbose
@@ -184,7 +184,7 @@ make audit-offline
 
 ```bash
 # Debug single tool (fresh local and upstream check, JSON output, snapshot unchanged)
-CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py problematic-tool
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py --verbose problematic-tool
 ```
 
 ## File Locations
@@ -338,7 +338,7 @@ git status
 git log --oneline -5
 
 # Test single upstream fetch and classification (JSON output, snapshot unchanged)
-CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py ripgrep
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py --verbose ripgrep
 ```
 
 ## Performance Benchmarks
@@ -378,7 +378,7 @@ uv run python audit.py --update
 
 ```bash
 # Debug detection
-CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py tool-name
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py --verbose tool-name
 
 # Check PATH
 echo $PATH | tr ':' '\n'

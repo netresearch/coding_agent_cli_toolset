@@ -684,7 +684,7 @@ FileNotFoundError: [Errno 2] No such file or directory
 
 1. **Enable Debug Mode:**
    ```bash
-   CLI_AUDIT_DEBUG=1 uv run python audit.py
+   CLI_AUDIT_DEBUG=1 uv run python audit.py --verbose
    ```
 
 2. **Enable Verbose Logging:**

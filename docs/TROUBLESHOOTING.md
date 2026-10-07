@@ -13,7 +13,7 @@ This guide helps diagnose and resolve common issues with AI CLI Preparation, inc
 
 ```bash
 # Fresh check of one tool, JSON output, snapshot unchanged
-CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py problematic-tool
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py --verbose problematic-tool
 ```
 
 **Shows:**
@@ -62,7 +62,7 @@ dig api.github.com
 dig registry.npmjs.org
 
 # Test with debug output
-CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py ripgrep
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py --verbose ripgrep
 ```
 
 **Solutions:**
@@ -166,7 +166,7 @@ rg version
 ls -l $(which rg)
 
 # Test with debug
-CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py ripgrep
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py --verbose ripgrep
 ```
 
 **Solutions:**
@@ -278,7 +278,7 @@ curl -v https://api.github.com/repos/BurntSushi/ripgrep/releases/latest
 python3 -c "import ssl; print(ssl.OPENSSL_VERSION)"
 
 # Test with debug output
-CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py ripgrep
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py --verbose ripgrep
 ```
 
 **Solutions:**
@@ -529,7 +529,7 @@ docker ps
 groups | grep docker
 
 # Fresh check of docker only
-CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py docker
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py --verbose docker
 ```
 
 **Solutions:**
@@ -602,7 +602,7 @@ env | grep CLI_AUDIT
 **Debug Variable Precedence:**
 ```bash
 # Print debug output for one tool
-CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py python 2>&1 | head -20
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py --verbose python 2>&1 | head -20
 ```
 
 ## Debugging Workflows
@@ -615,7 +615,7 @@ which ripgrep
 ripgrep --version
 
 # 2. Run audit with full debugging
-CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py ripgrep 2>&1 | tee ripgrep_debug.log
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py --verbose ripgrep 2>&1 | tee ripgrep_debug.log
 
 # 3. Check classification
 CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 uv run python audit.py ripgrep | jq '.[] | {installed_method, classification_reason_selected, installed_path_selected}'
@@ -638,7 +638,7 @@ for host in api.github.com registry.npmjs.org pypi.org crates.io; do
 done
 
 # 2. Test the upstream lookup with debug output
-CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py ripgrep
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py --verbose ripgrep
 
 # 3. Test offline fallback
 CLI_AUDIT_OFFLINE=1 uv run python audit.py ripgrep
@@ -797,13 +797,13 @@ env | grep CLI_AUDIT
 2. **Command:**
 ```bash
 # Exact command that failed
-CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py tool
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py --verbose tool
 ```
 
 3. **Output:**
 ```bash
 # Full debug output
-CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py tool 2>&1 | tee debug.log
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py --verbose tool 2>&1 | tee debug.log
 ```
 
 4. **Cache State:**

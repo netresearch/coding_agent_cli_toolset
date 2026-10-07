@@ -556,7 +556,7 @@ uv run python audit.py --update-local
 
 ```bash
 # Basic debug output
-CLI_AUDIT_DEBUG=1 uv run python audit.py 2> debug.log
+CLI_AUDIT_DEBUG=1 uv run python audit.py --verbose 2> debug.log
 
 # Debug output while collecting (shows network calls)
 make update-debug
@@ -598,7 +598,7 @@ CLI_AUDIT_OFFLINE=1 uv run python audit.py
 echo $PATH
 
 # Check extra search paths
-CLI_AUDIT_DEBUG=1 uv run python audit.py 2>&1 | grep -i "search"
+CLI_AUDIT_DEBUG=1 uv run python audit.py --verbose 2>&1 | grep -i "search"
 
 # Tools are found via PATH: add the tool's directory to PATH
 export PATH="/custom/path/to/tool:$PATH"
@@ -610,7 +610,7 @@ export PATH="/custom/path/to/tool:$PATH"
 
 ```bash
 # Debug version detection
-CLI_AUDIT_DEBUG=1 uv run python audit.py mytool 2> debug.log
+CLI_AUDIT_DEBUG=1 uv run python audit.py --verbose mytool 2> debug.log
 
 # Check tool's version flag manually
 mytool --version
