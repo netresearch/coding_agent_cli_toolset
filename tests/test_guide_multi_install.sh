@@ -329,19 +329,19 @@ echo "=== Test: marker file edge cases ==="
 
 # Marker content should contain the version
 markers="$(mktemp -d)"
-echo "v2.0.0" > $markers/test-marker.already-current
-content="$(cat $markers/test-marker.already-current)"
+echo "v2.0.0" > "$markers"/test-marker.already-current
+content="$(cat "$markers"/test-marker.already-current)"
 assert_eq "marker contains version" "$content" "v2.0.0"
 
 # Multiple markers for different tools should coexist
-echo "v1.0.0" > $markers/tool-a.already-current
-echo "v3.0.0" > $markers/tool-b.already-current
-assert_eq "tool-a marker" "$(cat $markers/tool-a.already-current)" "v1.0.0"
-assert_eq "tool-b marker" "$(cat $markers/tool-b.already-current)" "v3.0.0"
+echo "v1.0.0" > "$markers"/tool-a.already-current
+echo "v3.0.0" > "$markers"/tool-b.already-current
+assert_eq "tool-a marker" "$(cat "$markers"/tool-a.already-current)" "v1.0.0"
+assert_eq "tool-b marker" "$(cat "$markers"/tool-b.already-current)" "v3.0.0"
 
 # Cleaning one doesn't affect the other
-rm -f $markers/tool-a.already-current
-if [ ! -f $markers/tool-a.already-current ] && [ -f $markers/tool-b.already-current ]; then
+rm -f "$markers"/tool-a.already-current
+if [ ! -f "$markers"/tool-a.already-current ] && [ -f "$markers"/tool-b.already-current ]; then
   echo "  PASS: cleaning one marker doesn't affect another"
   ((PASS++)) || true
 else
@@ -350,8 +350,8 @@ else
 fi
 
 # Marker with empty content (edge case - should still exist as a file)
-: > $markers/empty-marker.already-current
-if [ -f $markers/empty-marker.already-current ]; then
+: > "$markers"/empty-marker.already-current
+if [ -f "$markers"/empty-marker.already-current ]; then
   echo "  PASS: empty marker file exists"
   ((PASS++)) || true
 else
@@ -360,11 +360,8 @@ else
 fi
 
 # Overwriting a marker updates its content
-echo "v4.0.0" > $markers/tool-b.already-current
-assert_eq "marker overwrite" "$(cat $markers/tool-b.already-current)" "v4.0.0"
-
-# Cleanup
-rm -rf "$markers"
+echo "v4.0.0" > "$markers"/tool-b.already-current
+assert_eq "marker overwrite" "$(cat "$markers"/tool-b.already-current)" "v4.0.0"
 
 # ════════════════════════════════════════════════════════════════════════════
 echo ""
@@ -372,7 +369,7 @@ echo "=== Test: end-to-end installer output ==="
 # ════════════════════════════════════════════════════════════════════════════
 
 if command -v sd >/dev/null 2>&1; then
-  output="$(bash "$DIR/scripts/install_tool.sh" sd update 2>&1 || true)"
+  output="$(CLI_AUDIT_MARKER_DIR="$markers" bash "$DIR/scripts/install_tool.sh" sd update 2>&1 || true)"
 
   # Should contain the note about already-current (if sd is at latest)
   if echo "$output" | grep -qF "binary already matches target release"; then
@@ -385,10 +382,10 @@ if command -v sd >/dev/null 2>&1; then
     assert_contains "sd installer shows path"   "$output" "[sd] path:"
 
     # After install_tool.sh, the marker should exist (guide.sh consumes it)
-    if [ -f $markers/sd.already-current ]; then
+    if [ -f "$markers/sd.already-current" ]; then
       echo "  PASS: sd marker file created by installer"
       ((PASS++)) || true
-      rm -f $markers/sd.already-current
+      rm -f "$markers/sd.already-current"
     else
       echo "  PASS: sd marker already consumed or not created (may depend on timing)"
       ((PASS++)) || true
@@ -402,6 +399,9 @@ if command -v sd >/dev/null 2>&1; then
 else
   echo "  SKIP: sd not installed"
 fi
+
+# Cleanup
+rm -rf "$markers"
 
 # ════════════════════════════════════════════════════════════════════════════
 echo ""
