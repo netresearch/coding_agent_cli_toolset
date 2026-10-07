@@ -10,6 +10,7 @@ dependency resolution, and atomic rollback capability.
 from __future__ import annotations
 
 import os
+import shlex
 import subprocess
 import tempfile
 import threading
@@ -17,7 +18,6 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime
-from pathlib import Path
 from typing import Callable, Sequence
 
 from .common import vlog
@@ -363,12 +363,16 @@ def generate_rollback_script(results: Sequence[InstallResult], verbose: bool = F
         verbose: Enable verbose logging
 
     Returns:
-        Path to generated rollback script
+        Path to generated rollback script. It sits in a directory created for
+        it alone (mode 0700) and is readable, writable and executable by the
+        owner only.
     """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    script_path = os.path.join(tempfile.gettempdir(), f"rollback_{timestamp}.sh")
+    script_dir = tempfile.mkdtemp(prefix="cli-audit-rollback-")
+    script_path = os.path.join(script_dir, f"rollback_{timestamp}.sh")
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
 
-    with open(script_path, "w") as f:
+    with os.fdopen(os.open(script_path, flags, 0o700), "w") as f:
         f.write("#!/bin/bash\n")
         f.write("set -euo pipefail\n\n")
         f.write("# Rollback script for bulk installation\n")
@@ -376,31 +380,30 @@ def generate_rollback_script(results: Sequence[InstallResult], verbose: bool = F
 
         for result in results:
             if result.success and result.binary_path:
-                f.write(f"# Rollback: {result.tool_name}\n")
+                f.write(f"# Rollback: {result.tool_name!r}\n")
                 pm = result.package_manager_used
+                tool = shlex.quote(result.tool_name)
 
                 # Generate uninstall command based on package manager
                 if pm in ("apt", "apt-get"):
-                    f.write(f"sudo apt-get remove -y {result.tool_name}\n")
+                    f.write(f"sudo apt-get remove -y {tool}\n")
                 elif pm == "dnf":
-                    f.write(f"sudo dnf remove -y {result.tool_name}\n")
+                    f.write(f"sudo dnf remove -y {tool}\n")
                 elif pm == "pacman":
-                    f.write(f"sudo pacman -R --noconfirm {result.tool_name}\n")
+                    f.write(f"sudo pacman -R --noconfirm {tool}\n")
                 elif pm == "brew":
-                    f.write(f"brew uninstall {result.tool_name}\n")
+                    f.write(f"brew uninstall {tool}\n")
                 elif pm == "cargo":
-                    f.write(f"cargo uninstall {result.tool_name}\n")
+                    f.write(f"cargo uninstall {tool}\n")
                 elif pm in ("pip", "pipx", "uv"):
-                    f.write(f"{pm} uninstall -y {result.tool_name}\n")
+                    f.write(f"{pm} uninstall -y {tool}\n")
                 elif pm == "npm":
-                    f.write(f"npm uninstall -g {result.tool_name}\n")
+                    f.write(f"npm uninstall -g {tool}\n")
                 else:
-                    f.write(f"# Manual removal required for {result.tool_name} ({pm})\n")
+                    f.write(f"# Manual removal required for {result.tool_name!r} ({pm!r})\n")
 
                 f.write("\n")
 
-    # Make script executable
-    Path(script_path).chmod(0o755)
     vlog(f"Generated rollback script: {script_path}", verbose)
     return script_path
 

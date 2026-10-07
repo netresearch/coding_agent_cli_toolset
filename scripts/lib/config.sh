@@ -27,24 +27,26 @@ config_get_auto_update() {
         return 1
     fi
 
-    # Use Python config system to check auto_update
-    python3 -c "
+    # Use Python config system to check auto_update. The tool name and the
+    # root path reach Python as arguments, never as part of the program text:
+    # multi-version keys carry a cycle taken from endoflife.date data.
+    python3 - "$_CONFIG_ROOT" "$tool" 2>/dev/null <<'PY' || echo "false"
 import sys
-sys.path.insert(0, '$_CONFIG_ROOT')
+sys.path.insert(0, sys.argv[1])
 from cli_audit.config import load_config
 config = load_config()
-print('true' if config.is_auto_update_enabled('$tool') else 'false')
-" 2>/dev/null || echo "false"
+print('true' if config.is_auto_update_enabled(sys.argv[2]) else 'false')
+PY
 }
 
 # Get the global auto_upgrade preference
 # Returns: "true" or "false"
 config_get_global_auto_upgrade() {
-    python3 -c "
+    python3 - "$_CONFIG_ROOT" 2>/dev/null <<'PY' || echo "true"
 import sys
-sys.path.insert(0, '$_CONFIG_ROOT')
+sys.path.insert(0, sys.argv[1])
 from cli_audit.config import load_config
 config = load_config()
 print('true' if config.preferences.auto_upgrade else 'false')
-" 2>/dev/null || echo "true"
+PY
 }

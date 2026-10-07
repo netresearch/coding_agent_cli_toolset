@@ -23,14 +23,19 @@ install_native() {
 
   if [ "$(uname)" = "Darwin" ] || [ "$(uname)" = "Linux" ]; then
     # macOS / Linux / WSL
-    local installer_script="/tmp/claude-install-$$.sh"
+    # The installer is saved in a directory that mktemp creates for this run
+    # only (mode 0700) and removed with it.
+    local work_dir installer_script
+    work_dir="$(mktemp -d "${TMPDIR:-/tmp}/cli-audit-claude.XXXXXX")" || return 1
+    installer_script="$work_dir/install.sh"
 
-    # Download installer script
+    # Download installer script. curl only: the URL redirects, and curl can
+    # hold every hop to HTTPS (--proto-redir); wget cannot.
     if command -v curl >/dev/null 2>&1; then
-      curl -fsSL https://claude.ai/install.sh -o "$installer_script" || return 1
-    elif command -v wget >/dev/null 2>&1; then
-      wget -qO "$installer_script" https://claude.ai/install.sh || return 1
+      curl --proto '=https' --proto-redir '=https' -fsSL https://claude.ai/install.sh -o "$installer_script" || { rm -rf "$work_dir"; return 1; }
     else
+      echo "[claude] curl is required for the native installer" >&2
+      rm -rf "$work_dir"
       return 1
     fi
 
@@ -48,13 +53,13 @@ install_native() {
     fi
 
     if bash "$installer_script" $installer_args; then
-      rm -f "$installer_script"
+      rm -rf "$work_dir"
       return 0
     fi
 
     # If failed, try direct binary download as final fallback
     echo "[claude] Native installer failed, trying direct download..." >&2
-    rm -f "$installer_script"
+    rm -rf "$work_dir"
 
     if install_direct; then
       return 0
@@ -221,6 +226,12 @@ cleanup_npm_versions() {
 
 # Migrate from npm to native installer
 migrate_npm_to_native() {
+  # The native installer needs curl; check before removing the npm packages,
+  # so a host without curl keeps the installation it has.
+  if ! command -v curl >/dev/null 2>&1; then
+    echo "[claude] curl is required for the native installer; keeping the npm installation" >&2
+    return 1
+  fi
   echo "[claude] Migrating from npm to native installer..." >&2
   echo "[claude] Removing npm packages..." >&2
 

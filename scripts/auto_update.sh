@@ -698,18 +698,19 @@ check_manager_outdated() {
 
   # Extract status for this tool from JSON snapshot
   local status
-  status="$(python3 -c "
+  status="$(python3 - "$snapshot_file" "$mgr" 2>/dev/null <<'PY'
 import json, sys
 try:
-    with open('$snapshot_file') as f:
+    with open(sys.argv[1]) as f:
         data = json.load(f)
         for tool in data.get('tools', []):
-            if tool.get('tool') == '$mgr':
+            if tool.get('tool') == sys.argv[2]:
                 print(tool.get('status', ''))
                 sys.exit(0)
-except:
+except Exception:
     pass
-" 2>/dev/null)" || status=""
+PY
+)" || status=""
 
   # Check if status is OUTDATED
   if [ "$status" = "OUTDATED" ]; then
