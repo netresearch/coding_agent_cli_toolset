@@ -3,7 +3,6 @@
 # SPDX-FileCopyrightText: Netresearch DTT GmbH
 set -euo pipefail
 
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ACTION="${1:-reconcile}"
 
 # Ensure only the official GitHub binary distribution of uv is present.

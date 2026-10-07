@@ -38,4 +38,3 @@ if missing:
 PY
 
 echo "[smoke] OK"
-

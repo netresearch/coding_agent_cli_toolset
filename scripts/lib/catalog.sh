@@ -100,7 +100,8 @@ catalog_is_deprecated() {
 
   local json="$catalog_dir/$tool.json"
   if [ -f "$json" ]; then
-    local deprecated="$(jq -r '.deprecated // false' "$json")"
+    local deprecated
+    deprecated="$(jq -r '.deprecated // false' "$json")" || true
     [ "$deprecated" = "true" ]
   else
     return 1
@@ -209,7 +210,8 @@ catalog_get_guide_property() {
 
   local json="$catalog_dir/$tool.json"
   if [ -f "$json" ]; then
-    local value="$(jq -r ".guide.$property // empty" "$json")"
+    local value
+    value="$(jq -r ".guide.$property // empty" "$json")" || true
     if [ -n "$value" ] && [ "$value" != "null" ]; then
       echo "$value"
     else

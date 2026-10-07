@@ -28,7 +28,8 @@ get_manager_scope() {
         scopes="user"
       else
         # Fallback: check brew --prefix ownership
-        local brew_prefix="$(brew --prefix 2>/dev/null || echo "")"
+        local brew_prefix
+        brew_prefix="$(brew --prefix 2>/dev/null || echo "")"
         if [ -n "$brew_prefix" ]; then
           if [[ "$brew_prefix" == "$HOME"* ]]; then
             scopes="user"
@@ -93,7 +94,8 @@ get_manager_scope() {
 
     npm)
       # NPM supports all three scopes
-      local npm_prefix="$(npm config get prefix 2>/dev/null || echo "")"
+      local npm_prefix
+      npm_prefix="$(npm config get prefix 2>/dev/null || echo "")"
 
       if [ -n "$npm_prefix" ]; then
         if [[ "$npm_prefix" == "$HOME"* ]]; then
@@ -111,7 +113,8 @@ get_manager_scope() {
 
     pnpm)
       # PNPM similar to NPM
-      local pnpm_prefix="$(pnpm config get prefix 2>/dev/null || echo "")"
+      local pnpm_prefix
+      pnpm_prefix="$(pnpm config get prefix 2>/dev/null || echo "")"
 
       if [ -n "$pnpm_prefix" ]; then
         if [[ "$pnpm_prefix" == "$HOME"* ]]; then
@@ -128,7 +131,8 @@ get_manager_scope() {
 
     yarn)
       # Yarn similar to NPM
-      local yarn_prefix="$(yarn global dir 2>/dev/null | head -n1 || echo "")"
+      local yarn_prefix
+      yarn_prefix="$(yarn global dir 2>/dev/null | head -n1 || echo "")"
 
       if [ -n "$yarn_prefix" ]; then
         if [[ "$yarn_prefix" == "$HOME"* ]]; then
@@ -150,7 +154,8 @@ get_manager_scope() {
 
     gem)
       # RubyGems can be system or user
-      local gem_dir="$(gem environment gemdir 2>/dev/null || echo "")"
+      local gem_dir
+      gem_dir="$(gem environment gemdir 2>/dev/null || echo "")"
 
       if [ -n "$gem_dir" ]; then
         if [[ "$gem_dir" == "$HOME"* ]]; then
@@ -285,11 +290,13 @@ get_scope_details() {
       ;;
 
     npm)
-      local global_count="$(npm list -g --depth=0 2>/dev/null | grep -c '^[├└]' || echo "0")"
+      local global_count
+      global_count="$(npm list -g --depth=0 2>/dev/null | grep -c '^[├└]' || echo "0")"
       scope_details="global:$global_count"
 
       if [ -f "./package.json" ]; then
-        local project_count="$(npm list --depth=0 2>/dev/null | grep -c '^[├└]' || echo "0")"
+        local project_count
+        project_count="$(npm list --depth=0 2>/dev/null | grep -c '^[├└]' || echo "0")"
         scope_details="$scope_details,project:$project_count"
       fi
       ;;
@@ -434,8 +441,10 @@ show_scope_analysis() {
       continue
     fi
 
-    local scope="$(get_manager_scope "$mgr")"
-    local scope_details="$(get_scope_details "$mgr")"
+    local scope
+    scope="$(get_manager_scope "$mgr")" || true
+    local scope_details
+    scope_details="$(get_scope_details "$mgr")" || true
 
     echo "[$mgr]"
     echo "  Scope: $scope"
@@ -466,7 +475,8 @@ update_npm_scope_aware() {
   echo "================================"
   echo ""
 
-  local scope="$(get_manager_scope "npm")"
+  local scope
+  scope="$(get_manager_scope "npm")" || true
   echo "Detected NPM scope: $scope"
   echo ""
 
@@ -492,7 +502,8 @@ update_flatpak_scope_aware() {
   echo "===================================="
   echo ""
 
-  local scope="$(get_manager_scope "flatpak")"
+  local scope
+  scope="$(get_manager_scope "flatpak")" || true
   echo "Detected Flatpak scope: $scope"
   echo ""
 

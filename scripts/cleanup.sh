@@ -60,8 +60,10 @@ process_tool() {
   local tool="$1"
 
   # Get tool info
-  local installed="$(json_field "$tool" installed)"
-  local method="$(json_field "$tool" installed_method)"
+  local installed
+  installed="$(json_field "$tool" installed)" || true
+  local method
+  method="$(json_field "$tool" installed_method)" || true
 
   # Skip if not installed
   [ -z "$installed" ] && return 0
@@ -72,7 +74,8 @@ process_tool() {
     catalog_tool="${tool%%@*}"
   fi
 
-  local description="$(catalog_get_property "$catalog_tool" description)"
+  local description
+  description="$(catalog_get_property "$catalog_tool" description)" || true
 
   printf "\n==> %s\n" "$tool"
   [ -n "$description" ] && printf "    %s\n" "$description"
@@ -97,7 +100,8 @@ process_tool() {
       CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_MERGE=1 "$CLI" audit.py "$tool" >/dev/null 2>&1 || true
       AUDIT_JSON="$(cd "$ROOT" && CLI_AUDIT_JSON=1 CLI_AUDIT_RENDER=1 "$CLI" audit.py || true)"
 
-      local still_installed="$(json_field "$tool" installed)"
+      local still_installed
+      still_installed="$(json_field "$tool" installed)" || true
       if [ -z "$still_installed" ]; then
         printf "    ✓ %s has been removed\n" "$tool"
       else
