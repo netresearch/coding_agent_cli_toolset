@@ -9,7 +9,8 @@ This guide helps diagnose and resolve common issues with AI CLI Preparation, inc
 ### Enable Debug Mode
 
 ```bash
-CLI_AUDIT_DEBUG=1 python3 cli_audit.py --only problematic-tool
+# Fresh check of one tool, JSON output, snapshot unchanged
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py problematic-tool
 ```
 
 **Shows:**
@@ -18,34 +19,17 @@ CLI_AUDIT_DEBUG=1 python3 cli_audit.py --only problematic-tool
 - Classification decisions
 - Best-effort fallbacks
 
-### Enable Trace Mode
+### Debug Output During Collection
 
 ```bash
-CLI_AUDIT_TRACE=1 python3 cli_audit.py --only problematic-tool
+# Full collection with debug output (shows network calls)
+make update-debug
 ```
-
-**Shows:**
-- Detailed execution flow
-- Function entry/exit
-- Timing breakdowns
-- Slow operation warnings
-
-### Network Trace
-
-```bash
-CLI_AUDIT_TRACE_NET=1 python3 cli_audit.py --only problematic-tool
-```
-
-**Shows:**
-- HTTP request URLs
-- Response codes
-- Retry attempts
-- Error details
 
 ### Combined Diagnostics
 
 ```bash
-CLI_AUDIT_DEBUG=1 CLI_AUDIT_TRACE=1 CLI_AUDIT_TRACE_NET=1 python3 cli_audit.py --only tool 2>&1 | tee debug.log
+CLI_AUDIT_DEBUG=1 uv run python audit.py --update --verbose 2>&1 | tee debug.log
 ```
 
 ## Common Issues
@@ -74,37 +58,27 @@ curl -I https://pypi.org
 dig api.github.com
 dig registry.npmjs.org
 
-# Test with network trace
-CLI_AUDIT_TRACE_NET=1 python3 cli_audit.py --only ripgrep
+# Test with debug output
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py ripgrep
 ```
 
 **Solutions:**
 
 **Increase Timeout:**
 ```bash
-CLI_AUDIT_TIMEOUT_SECONDS=10 python3 cli_audit.py
-```
-
-**Increase Retries:**
-```bash
-CLI_AUDIT_HTTP_RETRIES=5 CLI_AUDIT_BACKOFF_BASE=0.5 python3 cli_audit.py
+CLI_AUDIT_TIMEOUT_SECONDS=10 uv run python audit.py --update
 ```
 
 **Use Offline Mode:**
 ```bash
-CLI_AUDIT_OFFLINE=1 python3 cli_audit.py
-```
-
-**Use Manual-First Mode:**
-```bash
-CLI_AUDIT_MANUAL_FIRST=1 python3 cli_audit.py
+CLI_AUDIT_OFFLINE=1 uv run python audit.py
 ```
 
 **Configure Proxy (if needed):**
 ```bash
 export HTTP_PROXY=http://proxy.example.com:8080
 export HTTPS_PROXY=http://proxy.example.com:8080
-python3 cli_audit.py
+uv run python audit.py --update
 ```
 
 ### 2. GitHub Rate Limiting
@@ -125,8 +99,8 @@ python3 cli_audit.py
 curl -H "Authorization: Bearer $GITHUB_TOKEN" \
   https://api.github.com/rate_limit
 
-# Test with trace
-CLI_AUDIT_TRACE_NET=1 python3 cli_audit.py --only ripgrep 2>&1 | grep "403"
+# A collection run prints the GitHub rate limit before it starts
+uv run python audit.py --update
 ```
 
 **Solutions:**
@@ -135,18 +109,18 @@ CLI_AUDIT_TRACE_NET=1 python3 cli_audit.py --only ripgrep 2>&1 | grep "403"
 ```bash
 # Generate token at https://github.com/settings/tokens
 export GITHUB_TOKEN=ghp_your_token_here
-python3 cli_audit.py
+uv run python audit.py --update
 ```
 
 **Reduce Concurrency:**
 ```bash
-CLI_AUDIT_HOST_CAP_GITHUB_API=2 python3 cli_audit.py
+CLI_AUDIT_MAX_WORKERS=4 uv run python audit.py --update
 ```
 
 **Use Offline Mode:**
 ```bash
 # When rate limited, fall back to manual cache
-CLI_AUDIT_OFFLINE=1 python3 cli_audit.py
+CLI_AUDIT_OFFLINE=1 uv run python audit.py
 ```
 
 **Check Rate Limit in Script:**
@@ -189,29 +163,19 @@ rg version
 ls -l $(which rg)
 
 # Test with debug
-CLI_AUDIT_DEBUG=1 python3 cli_audit.py --only ripgrep
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py ripgrep
 ```
 
 **Solutions:**
 
 **Add Custom Version Detection:**
 
-Edit `cli_audit.py` function `get_version_line()`:
+Set `version_flag` or `version_command` in the tool's catalog entry (`catalog/<tool>.json`); `get_version_line()` in `cli_audit/detection.py` uses them:
 
-```python
-# Around line 1037
-def get_version_line(path: str, tool_name: str) -> str:
-    # Add custom handling for your tool
-    if tool_name == "your-tool":
-        return run_with_timeout([path, "version"])  # Custom flag
-
-    # Try common flags
-    for flag in ["--version", "-V", "version", "-v"]:
-        output = run_with_timeout([path, flag])
-        if output and not is_error_output(output):
-            return output
-
-    return ""
+```json
+{
+  "version_flag": "version"
+}
 ```
 
 **Fix PATH Issues:**
@@ -248,7 +212,7 @@ chmod +x ~/.local/bin/your-tool
 **Diagnosis:**
 ```bash
 # Check tool path and classification
-CLI_AUDIT_JSON=1 python3 cli_audit.py --only ripgrep | jq '.[] | {tool, installed_method, installed_path_resolved, classification_reason}'
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 uv run python audit.py ripgrep | jq '.[] | {tool, installed_method, installed_path_selected, classification_reason_selected}'
 
 # Check shebang
 head -1 $(which your-tool)
@@ -265,25 +229,7 @@ env | grep -E "(UV_|VIRTUAL_ENV|CONDA|NVM_)"
 
 **Refine Classification Rules:**
 
-Edit `cli_audit.py` function `_classify_install_method()`:
-
-```python
-# Around line 900
-def _classify_install_method(path: str, tool_name: str) -> tuple[str, str]:
-    # Add more specific path patterns
-    if "/.mymanager/bin/" in path:
-        return "mymanager", "path-under-~/.mymanager/bin"
-
-    # Read shebang for ~/.local/bin disambiguation
-    if "/.local/bin/" in path:
-        shebang = _read_first_line(path)
-        if "uv" in shebang:
-            return "uv tool", "shebang-contains-uv"
-        if "pipx" in shebang:
-            return "pipx/user", "shebang-contains-pipx"
-
-    # ... existing logic
-```
+Edit `detect_install_method(path, tool_name)` in `cli_audit/detection.py`.
 
 **Set Classification Hints:**
 
@@ -328,8 +274,8 @@ curl -v https://api.github.com/repos/BurntSushi/ripgrep/releases/latest
 # Check Python SSL
 python3 -c "import ssl; print(ssl.OPENSSL_VERSION)"
 
-# Test with network trace
-CLI_AUDIT_TRACE_NET=1 python3 cli_audit.py --only ripgrep 2>&1 | grep -A5 "http_exc"
+# Test with debug output
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py ripgrep
 ```
 
 **Solutions:**
@@ -351,22 +297,9 @@ export HTTPS_PROXY=http://proxy.example.com:8080
 export NO_PROXY=localhost,127.0.0.1
 ```
 
-**Increase Retry Attempts:**
-```bash
-CLI_AUDIT_HTTP_RETRIES=10 CLI_AUDIT_BACKOFF_BASE=1.0 python3 cli_audit.py
-```
+**Alternative Host:**
 
-**Use Alternative Host (if available):**
-
-Edit `cli_audit.py` function `latest_github()`:
-
-```python
-# Use Atom feed instead of API
-def latest_github(owner: str, repo: str) -> tuple[str, str]:
-    # Try feed first
-    feed_url = f"https://github.com/{owner}/{repo}/releases.atom"
-    # ... existing logic
-```
+`collect_github()` in `cli_audit/collectors.py` already falls back from the GitHub releases redirect to the API and then to the releases Atom feed.
 
 ### 6. Cache Corruption
 
@@ -453,7 +386,7 @@ python audit.py --update-baseline
 **Diagnosis:**
 ```bash
 # Check raw version strings
-CLI_AUDIT_JSON=1 python3 cli_audit.py --only jq | jq '.[] | {tool, installed, latest_upstream, installed_version, latest_version}'
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 uv run python audit.py jq | jq '.[] | {tool, installed, latest_upstream, installed_version, latest_version}'
 
 # Test version parsing
 python3 -c "
@@ -468,10 +401,9 @@ print(match.group(1) if match else 'FAIL')
 
 **Enhance Version Extraction:**
 
-Edit `cli_audit.py` function `extract_version_number()`:
+Edit `extract_version_number()` in `cli_audit/detection.py` (installed versions) or `cli_audit/collectors.py` (upstream tags):
 
 ```python
-# Around line 1100
 def extract_version_number(s: str) -> str:
     # Add custom patterns
 
@@ -501,7 +433,7 @@ Edit `upstream_versions.json`:
 
 **Add Comparison Override:**
 
-Edit `cli_audit.py` function `audit_tool()`:
+Edit `audit_tool()` in `audit.py`:
 
 ```python
 # Special case for date-based versions
@@ -531,11 +463,11 @@ if tool.name == "parallel":
 # Profile execution
 time make update
 
-# Identify slow tools
-CLI_AUDIT_TRACE=1 CLI_AUDIT_SLOW_MS=1000 make update 2>&1 | grep "slow"
+# Identify slow tools (debug output while collecting)
+make update-debug
 
 # Monitor resources
-top -p $(pgrep -f cli_audit.py)
+top -p $(pgrep -f audit.py)
 
 # Test render performance
 time make audit
@@ -559,21 +491,6 @@ done
 ```bash
 # Fail fast on slow tools
 CLI_AUDIT_TIMEOUT_SECONDS=2 make update
-```
-
-**Use Fast Mode:**
-```bash
-CLI_AUDIT_FAST=1 make update
-```
-
-**Enable Manual-First:**
-```bash
-CLI_AUDIT_MANUAL_FIRST=1 make update
-```
-
-**Limit Host Concurrency:**
-```bash
-CLI_AUDIT_HOST_CAP_GITHUB_API=2 CLI_AUDIT_HOST_CAP_NPM=2 make update
 ```
 
 **Use Snapshot Rendering:**
@@ -608,8 +525,8 @@ docker ps
 # Check permissions
 groups | grep docker
 
-# Test with docker info disabled
-CLI_AUDIT_DOCKER_INFO=0 python3 cli_audit.py --only docker
+# Fresh check of docker only
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py docker
 ```
 
 **Solutions:**
@@ -622,11 +539,6 @@ newgrp docker
 
 # Verify
 docker ps
-```
-
-**Disable Docker Info:**
-```bash
-CLI_AUDIT_DOCKER_INFO=0 make update
 ```
 
 **Start Docker Daemon:**
@@ -686,8 +598,8 @@ env | grep CLI_AUDIT
 
 **Debug Variable Precedence:**
 ```bash
-# Print all settings at startup
-CLI_AUDIT_DEBUG=1 python3 cli_audit.py --only python 2>&1 | head -20
+# Print debug output for one tool
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py python 2>&1 | head -20
 ```
 
 ## Debugging Workflows
@@ -700,19 +612,16 @@ which ripgrep
 ripgrep --version
 
 # 2. Run audit with full debugging
-CLI_AUDIT_DEBUG=1 \
-CLI_AUDIT_TRACE=1 \
-CLI_AUDIT_TRACE_NET=1 \
-python3 cli_audit.py --only ripgrep 2>&1 | tee ripgrep_debug.log
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py ripgrep 2>&1 | tee ripgrep_debug.log
 
 # 3. Check classification
-CLI_AUDIT_JSON=1 python3 cli_audit.py --only ripgrep | jq '.[] | {installed_method, classification_reason, installed_path_resolved}'
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 uv run python audit.py ripgrep | jq '.[] | {installed_method, classification_reason_selected, installed_path_selected}'
 
 # 4. Test upstream lookup
-python3 -c "
-from cli_audit import latest_github
-tag, method = latest_github('BurntSushi', 'ripgrep')
-print(f'Tag: {tag}, Method: {method}')
+uv run python -c "
+from cli_audit import collect_github
+tag, version = collect_github('BurntSushi', 'ripgrep')
+print(f'Tag: {tag}, Version: {version}')
 "
 ```
 
@@ -725,13 +634,11 @@ for host in api.github.com registry.npmjs.org pypi.org crates.io; do
   curl -I https://$host
 done
 
-# 2. Test with retries
-CLI_AUDIT_TRACE_NET=1 \
-CLI_AUDIT_HTTP_RETRIES=5 \
-python3 cli_audit.py --only ripgrep 2>&1 | grep -E "(http_|retry)"
+# 2. Test the upstream lookup with debug output
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py ripgrep
 
 # 3. Test offline fallback
-CLI_AUDIT_OFFLINE=1 python3 cli_audit.py --only ripgrep
+CLI_AUDIT_OFFLINE=1 uv run python audit.py ripgrep
 
 # 4. Check cache state
 jq '.versions.ripgrep' upstream_versions.json
@@ -741,10 +648,10 @@ jq '.versions.ripgrep' upstream_versions.json
 
 ```bash
 # 1. Baseline timing
-time CLI_AUDIT_COLLECT=1 python3 cli_audit.py
+time CLI_AUDIT_COLLECT=1 uv run python audit.py
 
-# 2. Identify slow tools
-CLI_AUDIT_TRACE=1 CLI_AUDIT_SLOW_MS=1000 make update 2>&1 | grep "slow"
+# 2. Identify slow tools (debug output while collecting)
+make update-debug
 
 # 3. Test different worker counts
 for workers in 8 12 16 20; do
@@ -752,11 +659,8 @@ for workers in 8 12 16 20; do
   time CLI_AUDIT_MAX_WORKERS=$workers make update
 done
 
-# 4. Test with optimizations
-time CLI_AUDIT_FAST=1 \
-CLI_AUDIT_MANUAL_FIRST=1 \
-CLI_AUDIT_TIMEOUT_SECONDS=2 \
-make update
+# 4. Test with a shorter version-probe timeout
+time CLI_AUDIT_TIMEOUT_SECONDS=2 make update
 ```
 
 ### Workflow 4: Diagnose Cache Issues
@@ -783,14 +687,14 @@ CLI_AUDIT_OFFLINE=1 make audit
 ### Python Debugger (pdb)
 
 ```python
-# Add breakpoint in cli_audit.py
-def audit_tool(tool: Tool) -> tuple:
+# Add breakpoint in audit.py
+def audit_tool(tool: Tool, offline_cache=None) -> dict[str, str]:
     import pdb; pdb.set_trace()  # Breakpoint
     # ... rest of function
 ```
 
 ```bash
-python3 cli_audit.py --only ripgrep
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 uv run python audit.py ripgrep
 # (Pdb) commands available:
 # n - next line
 # s - step into
@@ -808,32 +712,32 @@ make update 2>&1 | tee update.log
 # Filter for errors
 make update 2>&1 | grep -i "error\|exception\|fail" | tee errors.log
 
-# Extract timing info
-CLI_AUDIT_TRACE=1 make update 2>&1 | grep "slow\|ms)" | tee timing.log
+# Capture debug output while collecting
+make update-debug 2>&1 | tee timing.log
 ```
 
 ### Interactive Python Testing
 
 ```python
 # Launch Python REPL
-python3
+uv run python
 
 # Import and test functions
 from cli_audit import *
+from cli_audit import audit_tool_installation, detect_install_method
 
 # Test version extraction
 extract_version_number("ripgrep 14.1.1 (rev abc123)")
 
-# Test tool audit
-tool = Tool("ripgrep", ("rg",), "gh", ("BurntSushi", "ripgrep"))
-result = audit_tool(tool)
+# Test tool detection (version, version line, path, install method)
+result = audit_tool_installation("ripgrep", ("rg",))
 print(result)
 
 # Test classification
 detect_install_method("/home/user/.cargo/bin/rg", "ripgrep")
 
 # Test upstream lookup
-latest_github("BurntSushi", "ripgrep")
+collect_github("BurntSushi", "ripgrep")
 ```
 
 ## Environment Variable Reference
@@ -843,10 +747,6 @@ latest_github("BurntSushi", "ripgrep")
 | Variable | Purpose | Example |
 |----------|---------|---------|
 | `CLI_AUDIT_DEBUG` | Print debug messages | `CLI_AUDIT_DEBUG=1` |
-| `CLI_AUDIT_TRACE` | Detailed execution trace | `CLI_AUDIT_TRACE=1` |
-| `CLI_AUDIT_TRACE_NET` | Network call tracing | `CLI_AUDIT_TRACE_NET=1` |
-| `CLI_AUDIT_PROGRESS` | Show progress updates | `CLI_AUDIT_PROGRESS=1` |
-| `CLI_AUDIT_SLOW_MS` | Slow operation threshold | `CLI_AUDIT_SLOW_MS=1000` |
 
 ### Performance Variables
 
@@ -854,29 +754,15 @@ latest_github("BurntSushi", "ripgrep")
 |----------|---------|---------|-------|
 | `CLI_AUDIT_MAX_WORKERS` | Thread pool size | 16 | 1-32 |
 | `CLI_AUDIT_TIMEOUT_SECONDS` | Operation timeout | 3 | 1-30 |
-| `CLI_AUDIT_HTTP_RETRIES` | Retry attempts | 2 | 0-5 |
-| `CLI_AUDIT_BACKOFF_BASE` | Retry backoff base | 0.2 | 0.1-2.0 |
-| `CLI_AUDIT_FAST` | Skip slow operations | 0 | 0-1 |
 
 ### Network Variables
 
 | Variable | Purpose | Default |
 |----------|---------|---------|
 | `CLI_AUDIT_OFFLINE` | Force offline mode | 0 |
-| `CLI_AUDIT_MANUAL_FIRST` | Try cache first | 0 |
 | `GITHUB_TOKEN` | GitHub API token | "" |
 | `HTTP_PROXY` | HTTP proxy URL | "" |
 | `HTTPS_PROXY` | HTTPS proxy URL | "" |
-
-### Host Concurrency Caps
-
-| Variable | Purpose | Default |
-|----------|---------|---------|
-| `CLI_AUDIT_HOST_CAP_GITHUB` | github.com cap | 4 |
-| `CLI_AUDIT_HOST_CAP_GITHUB_API` | api.github.com cap | 4 |
-| `CLI_AUDIT_HOST_CAP_NPM` | registry.npmjs.org cap | 4 |
-| `CLI_AUDIT_HOST_CAP_CRATES` | crates.io cap | 4 |
-| `CLI_AUDIT_HOST_CAP_GNU` | GNU FTP cap | 2 |
 
 ## Getting Help
 
@@ -908,13 +794,13 @@ env | grep CLI_AUDIT
 2. **Command:**
 ```bash
 # Exact command that failed
-CLI_AUDIT_DEBUG=1 python3 cli_audit.py --only tool
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py tool
 ```
 
 3. **Output:**
 ```bash
 # Full debug output
-CLI_AUDIT_DEBUG=1 CLI_AUDIT_TRACE=1 python3 cli_audit.py --only tool 2>&1 | tee debug.log
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py tool 2>&1 | tee debug.log
 ```
 
 4. **Cache State:**

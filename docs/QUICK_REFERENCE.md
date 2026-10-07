@@ -29,42 +29,41 @@ make upgrade-all-dry-run
 make check-path
 
 # Single tool check
-python3 cli_audit.py --only ripgrep | python3 smart_column.py -s "|" -t
+uv run python audit.py ripgrep | python3 smart_column.py -s "|" -t
 ```
 
 ### Role-Based Audits
 
-```bash
-# AI agent essentials
-make audit-offline-agent-core
+There are no role presets; filter the JSON output by catalog category:
 
+```bash
 # Python development
-make audit-offline-python-core
+CLI_AUDIT_JSON=1 uv run python audit.py | jq '.[] | select(.category == "python")'
 
 # Node.js development
-make audit-offline-node-core
+CLI_AUDIT_JSON=1 uv run python audit.py | jq '.[] | select(.category == "node")'
 
 # Security tools
-make audit-offline-security-core
+CLI_AUDIT_JSON=1 uv run python audit.py | jq '.[] | select(.category == "security")'
 
 # Infrastructure/DevOps
-make audit-offline-infra-core
+CLI_AUDIT_JSON=1 uv run python audit.py | jq '.[] | select(.category == "devops")'
 ```
 
 ### JSON Output
 
 ```bash
 # All tools as JSON
-CLI_AUDIT_JSON=1 python3 cli_audit.py | jq '.'
+CLI_AUDIT_JSON=1 uv run python audit.py | jq '.'
 
 # Filter outdated tools
-CLI_AUDIT_JSON=1 python3 cli_audit.py | jq '.[] | select(.status == "OUTDATED")'
+CLI_AUDIT_JSON=1 uv run python audit.py | jq '.[] | select(.status == "OUTDATED")'
 
 # Count by status
-CLI_AUDIT_JSON=1 python3 cli_audit.py | jq 'group_by(.status) | map({status: .[0].status, count: length})'
+CLI_AUDIT_JSON=1 uv run python audit.py | jq 'group_by(.status) | map({status: .[0].status, count: length})'
 
 # Tools by installation method
-CLI_AUDIT_JSON=1 python3 cli_audit.py | jq 'group_by(.installed_method) | map({method: .[0].installed_method, count: length})'
+CLI_AUDIT_JSON=1 uv run python audit.py | jq 'group_by(.installed_method) | map({method: .[0].installed_method, count: length})'
 ```
 
 ## Environment Variables Cheat Sheet
@@ -73,64 +72,46 @@ CLI_AUDIT_JSON=1 python3 cli_audit.py | jq 'group_by(.installed_method) | map({m
 
 ```bash
 # Collect-only (write snapshot, no output)
-CLI_AUDIT_COLLECT=1 python3 cli_audit.py
+CLI_AUDIT_COLLECT=1 uv run python audit.py
 
 # Render-only (read snapshot, no network)
-CLI_AUDIT_RENDER=1 python3 cli_audit.py
+CLI_AUDIT_RENDER=1 uv run python audit.py
 
 # Offline mode (manual cache only)
-CLI_AUDIT_OFFLINE=1 python3 cli_audit.py
-
-# Fast mode (skip slow operations)
-CLI_AUDIT_FAST=1 python3 cli_audit.py
+CLI_AUDIT_OFFLINE=1 uv run python audit.py
 ```
 
 ### Debug & Trace
 
 ```bash
 # Basic debug output
-CLI_AUDIT_DEBUG=1 python3 cli_audit.py
+CLI_AUDIT_DEBUG=1 uv run python audit.py
 
-# Detailed trace
-CLI_AUDIT_TRACE=1 python3 cli_audit.py
-
-# Network trace
-CLI_AUDIT_TRACE_NET=1 python3 cli_audit.py
-
-# Progress messages
-CLI_AUDIT_PROGRESS=1 python3 cli_audit.py
-
-# All debugging
-CLI_AUDIT_DEBUG=1 CLI_AUDIT_TRACE=1 CLI_AUDIT_TRACE_NET=1 CLI_AUDIT_PROGRESS=1 python3 cli_audit.py
+# Debug output while collecting (shows network calls)
+CLI_AUDIT_DEBUG=1 uv run python audit.py --update --verbose
 ```
 
 ### Performance Tuning
 
 ```bash
 # Increase workers (default: 16)
-CLI_AUDIT_MAX_WORKERS=32 python3 cli_audit.py
+CLI_AUDIT_MAX_WORKERS=32 uv run python audit.py --update
 
-# Adjust timeout (default: 3s)
-CLI_AUDIT_TIMEOUT_SECONDS=5 python3 cli_audit.py
-
-# More HTTP retries (default: 2)
-CLI_AUDIT_HTTP_RETRIES=5 python3 cli_audit.py
+# Adjust version-probe timeout (default: 3s)
+CLI_AUDIT_TIMEOUT_SECONDS=5 uv run python audit.py --update
 ```
 
 ### Output Format
 
 ```bash
 # JSON output
-CLI_AUDIT_JSON=1 python3 cli_audit.py
+CLI_AUDIT_JSON=1 uv run python audit.py
 
 # Disable emoji icons
-CLI_AUDIT_EMOJI=0 python3 cli_audit.py
+CLI_AUDIT_EMOJI=0 uv run python audit.py
 
 # Disable hyperlinks
-CLI_AUDIT_LINKS=0 python3 cli_audit.py
-
-# Hide timing info
-CLI_AUDIT_TIMINGS=0 python3 cli_audit.py
+CLI_AUDIT_LINKS=0 uv run python audit.py
 ```
 
 ## Common Workflows
@@ -139,10 +120,10 @@ CLI_AUDIT_TIMINGS=0 python3 cli_audit.py
 
 ```bash
 # 1. Check current state
-python3 cli_audit.py | python3 smart_column.py -s "|" -t --right 3,5 --header
+uv run python audit.py | python3 smart_column.py -s "|" -t --right 3,4 --header
 
 # 2. Review outdated/missing tools
-CLI_AUDIT_JSON=1 python3 cli_audit.py | jq '.[] | select(.status != "UP-TO-DATE")'
+CLI_AUDIT_JSON=1 uv run python audit.py | jq '.[] | select(.status != "UP-TO-DATE")'
 
 # 3. Use interactive upgrade guide
 make upgrade
@@ -166,20 +147,20 @@ make audit
 make update
 
 # Check single tool after install
-python3 cli_audit.py --only new-tool
+uv run python audit.py new-tool
 ```
 
 ### CI/CD Pipeline
 
 ```bash
 # Collect snapshot (verbose for logs)
-CLI_AUDIT_COLLECT=1 CLI_AUDIT_PROGRESS=1 python3 cli_audit.py
+uv run python audit.py --update --verbose
 
 # Cache snapshot artifact
 # (upload tools_snapshot.json)
 
 # Render in subsequent jobs
-CLI_AUDIT_RENDER=1 python3 cli_audit.py
+CLI_AUDIT_RENDER=1 uv run python audit.py
 ```
 
 ### Offline Environment Preparation
@@ -199,21 +180,16 @@ make audit-offline
 ### Troubleshooting a Tool
 
 ```bash
-# Debug single tool
-CLI_AUDIT_DEBUG=1 python3 cli_audit.py --only problematic-tool
-
-# Check version detection
-CLI_AUDIT_TRACE=1 python3 cli_audit.py --only problematic-tool 2>&1 | grep "version"
-
-# Test upstream fetch
-CLI_AUDIT_TRACE_NET=1 python3 cli_audit.py --only problematic-tool 2>&1 | grep -A5 "http_fetch"
+# Debug single tool (fresh local and upstream check, JSON output, snapshot unchanged)
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py problematic-tool
 ```
 
 ## File Locations
 
 ```bash
 # Main audit script
-cli_audit.py                    # 2,375 lines, audit engine
+audit.py                        # CLI entry point
+cli_audit/                      # Audit engine package
 
 # Helper scripts
 smart_column.py                 # Column formatting with emoji support
@@ -225,12 +201,10 @@ tools_snapshot.json            # Audit results snapshot
 
 # Build system
 Makefile                       # Make targets
-package.json                   # Claude Code dependency
 
 # Documentation
 README.md                      # User guide
 docs/                          # Technical documentation (7 files)
-claudedocs/                    # AI agent context (2 files)
 ```
 
 ## Makefile Targets Quick Reference
@@ -241,13 +215,6 @@ make audit                     # Render from snapshot
 make audit-offline             # Offline render with hints
 make audit-auto                # Auto-update if snapshot missing
 make update                    # Collect fresh data
-
-# Role-specific
-make audit-offline-agent-core  # AI agent essentials
-make audit-offline-python-core # Python tools
-make audit-offline-node-core   # Node.js tools
-make audit-offline-go-core     # Go tools
-make audit-offline-security-core # Security tools
 
 # Single tool
 make audit-ripgrep             # Audit specific tool
@@ -265,9 +232,9 @@ make install-docker            # Docker
 make install-ansible           # Ansible
 
 # Upgrades
-make update-python             # Update Python toolchain
-make update-node               # Update Node.js
-make update-go                 # Update Go
+make upgrade-python            # Update Python toolchain
+make upgrade-node              # Update Node.js
+make upgrade-go                # Update Go
 make upgrade                   # Interactive upgrade guide
 
 # Reconciliation
@@ -332,22 +299,22 @@ make scripts-perms             # Fix script permissions
 
 ```bash
 # List all tools
-CLI_AUDIT_JSON=1 python3 cli_audit.py | jq '.[].tool'
+CLI_AUDIT_JSON=1 uv run python audit.py | jq '.[].tool'
 
 # Outdated tools with versions
-CLI_AUDIT_JSON=1 python3 cli_audit.py | jq '.[] | select(.status == "OUTDATED") | {tool, installed: .installed_version, latest: .latest_version}'
+CLI_AUDIT_JSON=1 uv run python audit.py | jq '.[] | select(.status == "OUTDATED") | {tool, installed: .installed_version, latest: .latest_version}'
 
 # Tools by category
-CLI_AUDIT_JSON=1 python3 cli_audit.py | jq 'group_by(.category) | map({category: .[0].category, tools: map(.tool)})'
+CLI_AUDIT_JSON=1 uv run python audit.py | jq 'group_by(.category) | map({category: .[0].category, tools: map(.tool)})'
 
 # Installation methods used
-CLI_AUDIT_JSON=1 python3 cli_audit.py | jq '[.[].installed_method] | unique'
+CLI_AUDIT_JSON=1 uv run python audit.py | jq '[.[].installed_method] | unique'
 
 # Count by installation method
-CLI_AUDIT_JSON=1 python3 cli_audit.py | jq 'group_by(.installed_method) | map({method: .[0].installed_method, count: length})'
+CLI_AUDIT_JSON=1 uv run python audit.py | jq 'group_by(.installed_method) | map({method: .[0].installed_method, count: length})'
 
 # Security tools only
-CLI_AUDIT_JSON=1 python3 cli_audit.py | jq '.[] | select(.category == "security")'
+CLI_AUDIT_JSON=1 uv run python audit.py | jq '.[] | select(.category == "security")'
 ```
 
 ## Debugging Commands
@@ -367,24 +334,21 @@ jq '.__meta__' tools_snapshot.json
 git status
 git log --oneline -5
 
-# Test single upstream fetch
-CLI_AUDIT_TRACE_NET=1 python3 cli_audit.py --only ripgrep 2>&1 | grep "github"
-
-# Check classification
-CLI_AUDIT_DEBUG=1 python3 cli_audit.py --only python 2>&1 | grep "classify"
+# Test single upstream fetch and classification (JSON output, snapshot unchanged)
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py ripgrep
 ```
 
 ## Performance Benchmarks
 
 ```bash
 # Measure collection time
-time CLI_AUDIT_COLLECT=1 python3 cli_audit.py
+time CLI_AUDIT_COLLECT=1 uv run python audit.py
 
 # Measure render time
-time CLI_AUDIT_RENDER=1 python3 cli_audit.py
+time CLI_AUDIT_RENDER=1 uv run python audit.py
 
 # Profile single tool
-time python3 cli_audit.py --only ripgrep
+time CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 uv run python audit.py ripgrep
 ```
 
 ## Quick Fixes
@@ -393,13 +357,10 @@ time python3 cli_audit.py --only ripgrep
 
 ```bash
 # Increase timeout
-CLI_AUDIT_TIMEOUT_SECONDS=10 python3 cli_audit.py
-
-# More retries
-CLI_AUDIT_HTTP_RETRIES=5 python3 cli_audit.py
+CLI_AUDIT_TIMEOUT_SECONDS=10 uv run python audit.py --update
 
 # Use offline mode
-CLI_AUDIT_OFFLINE=1 python3 cli_audit.py
+CLI_AUDIT_OFFLINE=1 uv run python audit.py
 ```
 
 ### GitHub Rate Limiting
@@ -407,14 +368,14 @@ CLI_AUDIT_OFFLINE=1 python3 cli_audit.py
 ```bash
 # Set GitHub token
 export GITHUB_TOKEN=ghp_your_token_here
-python3 cli_audit.py
+uv run python audit.py --update
 ```
 
 ### Version Detection Failures
 
 ```bash
 # Debug detection
-CLI_AUDIT_DEBUG=1 python3 cli_audit.py --only tool-name
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py tool-name
 
 # Check PATH
 echo $PATH | tr ':' '\n'

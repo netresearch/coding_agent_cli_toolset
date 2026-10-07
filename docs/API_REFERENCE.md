@@ -1462,24 +1462,6 @@ The API respects these environment variables:
 ```bash
 # Logging
 CLI_AUDIT_DEBUG=1              # Enable debug logging
-CLI_AUDIT_LOG_FILE=audit.log   # Log file path
-
-# Installation
-CLI_AUDIT_INSTALL_TIMEOUT=600  # Install timeout (seconds)
-CLI_AUDIT_MAX_RETRIES=3        # Max retry attempts
-CLI_AUDIT_PARALLEL_INSTALLS=4  # Parallel installation limit
-
-# Upgrade
-CLI_AUDIT_AUTO_UPGRADE=0       # Disable auto-upgrade prompts
-CLI_AUDIT_SKIP_BREAKING=1      # Skip breaking changes
-
-# Reconciliation
-CLI_AUDIT_KEEP_SYSTEM=1        # Keep system installations
-CLI_AUDIT_PREFER_METHOD=nvm    # Global preference
-
-# Cache
-CLI_AUDIT_CACHE_DIR=~/.cache/cli-audit  # Cache directory
-CLI_AUDIT_CLEAR_CACHE=1        # Clear cache on startup
 ```
 
 ---

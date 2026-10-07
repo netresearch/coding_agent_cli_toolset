@@ -587,19 +587,19 @@ The `auto-update` feature automatically detects all installed package managers a
 
 ```bash
 # Detect all installed package managers
-make auto-update-detect
+make detect-managers
 
 # Update all package managers and their packages
-make auto-update
+make upgrade-managed
 
 # Preview what would be updated (dry-run)
-make auto-update-dry-run
+make upgrade-dry-run
 
 # Update only system package managers (apt, brew, snap, flatpak)
-make auto-update-system-only
+make upgrade-managed-system-only
 
 # Update all except system package managers
-make auto-update-skip-system
+make upgrade-managed-skip-system
 ```
 
 ### Advanced Usage
@@ -694,13 +694,13 @@ gem cleanup
 **Daily Development Workflow:**
 ```bash
 # Quick check what's available
-make auto-update-detect
+make detect-managers
 
 # Preview updates without making changes
-make auto-update-dry-run
+make upgrade-dry-run
 
 # Apply updates to everything
-make auto-update
+make upgrade-managed
 ```
 
 **CI/CD or Scripting:**
@@ -742,7 +742,7 @@ make audit
 make upgrade
 
 # 4. Auto-update all package managers and their packages
-make auto-update
+make upgrade-managed
 
 # 5. Verify everything is up-to-date
 make audit

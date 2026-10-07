@@ -21,7 +21,7 @@ git clone git@github.com:netresearch/coding_agent_cli_toolset.git
 cd coding_agent_cli_toolset
 
 # Check your environment
-python3 cli_audit.py | python3 smart_column.py -s "|" -t --right 3,5 --header
+uv run python audit.py | python3 smart_column.py -s "|" -t --right 3,4 --header
 
 # Install optional dependencies for better emoji support
 pip install wcwidth  # For smart_column.py
@@ -41,8 +41,8 @@ Follow patterns in existing code (see sections below).
 ### 4. Test Your Changes
 
 ```bash
-# Manual testing
-CLI_AUDIT_DEBUG=1 python3 cli_audit.py --only your-new-tool
+# Manual testing (fresh check, JSON output, snapshot unchanged)
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py your-new-tool
 
 # Smoke test
 bash scripts/test_smoke.sh
@@ -54,7 +54,7 @@ make update && make audit
 ### 5. Commit and Push
 
 ```bash
-git add cli_audit.py upstream_versions.json
+git add catalog/new-tool.json upstream_versions.json
 git commit -m "feat(tools): add support for new-tool"
 git push -u origin feature/add-new-tool
 ```
@@ -69,20 +69,19 @@ gh pr create --title "Add support for new-tool" --body "Description of changes"
 
 ### Step 1: Define the Tool
 
-Add to the `TOOLS` tuple in `cli_audit.py`:
+Create `catalog/tool-name.json` (tools are loaded from the catalog; see [CATALOG_GUIDE.md](CATALOG_GUIDE.md) for all fields):
 
-```python
-TOOLS: tuple[Tool, ...] = (
-    # ... existing tools ...
-
-    # Your new tool
-    Tool(
-        "tool-name",           # Display name
-        ("executable",),       # Executable name(s) on PATH
-        "gh",                  # Source kind: gh|pypi|crates|npm|gnu|skip
-        ("owner", "repo")      # Source args (depends on kind)
-    ),
-)
+```json
+{
+  "name": "tool-name",
+  "install_method": "github_release_binary",
+  "category": "general",
+  "description": "What the tool does",
+  "homepage": "https://github.com/owner/repo",
+  "github_repo": "owner/repo",
+  "binary_name": "executable",
+  "candidates": ["executable"]
+}
 ```
 
 **Placement Considerations:**
@@ -105,10 +104,11 @@ TOOLS: tuple[Tool, ...] = (
 
 If a tool has different names across distributions:
 
-```python
-Tool("fd", ("fd", "fdfind"), "gh", ("sharkdp", "fd"))
-#           ^^^^^^^^^^^^^^^ Check both names, prefer first match
+```json
+"candidates": ["fd", "fdfind"]
 ```
+
+Both names are checked; the first match is preferred.
 
 **Common Cases:**
 - Debian renames: `bat` → `batcat`, `fd` → `fdfind`
@@ -118,27 +118,20 @@ Tool("fd", ("fd", "fdfind"), "gh", ("sharkdp", "fd"))
 
 Most tools work with `--version`, but some need custom handling:
 
-```python
-# In get_version_line() function around line 1037
-def get_version_line(path: str, tool_name: str) -> str:
-    # Special cases for non-standard version flags
-    if tool_name == "your-tool":
-        return run_with_timeout([path, "version"])  # Custom flag
-    # ... rest of function
+Set `version_flag` or `version_command` in the catalog entry; `get_version_line()` in `cli_audit/detection.py` uses them:
+
+```json
+"version_flag": "version"
 ```
 
 ### Step 5: Test Your Addition
 
 ```bash
-# Test single tool
-CLI_AUDIT_DEBUG=1 python3 cli_audit.py --only your-tool | python3 smart_column.py -s "|" -t
+# Test single tool (fresh check with debug output, JSON, snapshot unchanged)
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py your-tool
 
-# Expected output:
-# state|tool|installed|installed_method|latest_upstream|upstream_method
-# ✓|your-tool|1.2.3 (150ms)|apt/dpkg|1.2.3 (220ms)|github
-
-# Test in JSON mode
-CLI_AUDIT_JSON=1 python3 cli_audit.py --only your-tool | jq '.'
+# Table view (renders from the snapshot written by make update)
+make update && make audit-your-tool
 ```
 
 ### Step 6: Update Manual Cache
@@ -165,15 +158,23 @@ Update `TOOL_ECOSYSTEM.md` with:
 
 Let's add `deno` (JavaScript/TypeScript runtime):
 
-**1. Add to TOOLS:**
-```python
-# In cli_audit.py, in runtimes section:
-Tool("deno", ("deno",), "gh", ("denoland", "deno")),
+**1. Add a catalog entry:**
+```json
+{
+  "name": "deno",
+  "install_method": "github_release_binary",
+  "category": "node",
+  "description": "JavaScript/TypeScript runtime",
+  "homepage": "https://github.com/denoland/deno",
+  "github_repo": "denoland/deno",
+  "binary_name": "deno",
+  "candidates": ["deno"]
+}
 ```
 
 **2. Test it:**
 ```bash
-python3 cli_audit.py --only deno | python3 smart_column.py -s "|" -t
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 uv run python audit.py deno | jq '.'
 ```
 
 **3. Add to manual cache:**
@@ -185,7 +186,7 @@ python3 cli_audit.py --only deno | python3 smart_column.py -s "|" -t
 
 **4. Commit:**
 ```bash
-git add cli_audit.py upstream_versions.json
+git add catalog/deno.json upstream_versions.json
 git commit -m "feat(tools): add Deno runtime support"
 ```
 
@@ -254,19 +255,19 @@ File writes use atomic operations (write to temp, then rename) to prevent corrup
 
 ```bash
 # Test single tool
-python3 cli_audit.py --only ripgrep
+uv run python audit.py ripgrep
 
 # Test category
-python3 cli_audit.py --only python-core
+CLI_AUDIT_JSON=1 uv run python audit.py | jq '.[] | select(.category == "python")'
 
 # Test with debug output
-CLI_AUDIT_DEBUG=1 python3 cli_audit.py --only ripgrep
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py ripgrep
 
 # Test offline mode
-CLI_AUDIT_OFFLINE=1 python3 cli_audit.py --only ripgrep
+CLI_AUDIT_OFFLINE=1 uv run python audit.py ripgrep
 
 # Test JSON output
-CLI_AUDIT_JSON=1 python3 cli_audit.py --only ripgrep | jq '.'
+CLI_AUDIT_JSON=1 uv run python audit.py ripgrep | jq '.'
 ```
 
 ### Smoke Testing
@@ -278,22 +279,20 @@ bash scripts/test_smoke.sh
 ```
 
 **What it tests:**
-- 6-column table output format
+- 5-column table header (last column `notes`)
 - JSON mode with expected fields
-- Tool filtering with `--only`
-- Basic sanity checks
 
 ### Performance Testing
 
 ```bash
 # Measure collection time
-time CLI_AUDIT_COLLECT=1 CLI_AUDIT_PROGRESS=1 python3 cli_audit.py
+time uv run python audit.py --update
 
 # Measure render time (should be <100ms)
-time CLI_AUDIT_RENDER=1 python3 cli_audit.py > /dev/null
+time CLI_AUDIT_RENDER=1 uv run python audit.py > /dev/null
 
-# Find slow tools
-CLI_AUDIT_DEBUG=1 CLI_AUDIT_TRACE=1 python3 cli_audit.py 2>&1 | grep "slow"
+# Find slow tools (debug output while collecting)
+make update-debug
 ```
 
 ### Validation Testing
@@ -306,7 +305,7 @@ jq '.' upstream_versions.json > /dev/null
 jq '.__meta__.schema_version' tools_snapshot.json
 
 # Check for version parsing issues
-CLI_AUDIT_JSON=1 python3 cli_audit.py | jq '.[] | select(.installed_version == null)'
+CLI_AUDIT_JSON=1 uv run python audit.py | jq '.[] | select(.installed_version == null)'
 ```
 
 ## Common Patterns and Idioms
@@ -365,7 +364,7 @@ def compare_versions(v1: str, v2: str) -> int:
 ### Enable Debug Output
 
 ```bash
-CLI_AUDIT_DEBUG=1 python3 cli_audit.py
+CLI_AUDIT_DEBUG=1 uv run python audit.py
 ```
 
 **Shows:**
@@ -373,32 +372,16 @@ CLI_AUDIT_DEBUG=1 python3 cli_audit.py
 - Cache read/write operations
 - Classification decisions
 
-### Enable Trace Output
+### Debug Output During Collection
 
 ```bash
-CLI_AUDIT_TRACE=1 python3 cli_audit.py
+CLI_AUDIT_DEBUG=1 uv run python audit.py --update --verbose
 ```
-
-**Shows:**
-- Detailed execution flow
-- Function entry/exit
-- Timing breakdowns
-
-### Network Tracing
-
-```bash
-CLI_AUDIT_TRACE_NET=1 python3 cli_audit.py
-```
-
-**Shows:**
-- HTTP requests (URL, headers)
-- Response codes and sizes
-- Retry attempts
 
 ### Isolate Single Tool
 
 ```bash
-CLI_AUDIT_DEBUG=1 python3 cli_audit.py --only problematic-tool 2>&1 | tee debug.log
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py problematic-tool 2>&1 | tee debug.log
 ```
 
 ### Check Cache State
@@ -450,14 +433,13 @@ test(smoke): verify JSON output schema
 ### Reduce Network Calls
 
 1. **Use Hints:** Let successful methods guide future runs
-2. **Enable Manual-First:** `CLI_AUDIT_MANUAL_FIRST=1` tries cache before network
-3. **Offline Mode:** `CLI_AUDIT_OFFLINE=1` for local-only audits
+2. **Offline Mode:** `CLI_AUDIT_OFFLINE=1` for local-only audits
 
 ### Improve Concurrency
 
 ```bash
 # Increase workers (default: 16)
-CLI_AUDIT_MAX_WORKERS=32 python3 cli_audit.py
+CLI_AUDIT_MAX_WORKERS=32 uv run python audit.py --update
 
 # Note: Diminishing returns above ~20 workers
 ```
@@ -466,14 +448,7 @@ CLI_AUDIT_MAX_WORKERS=32 python3 cli_audit.py
 
 ```bash
 # Faster but may miss slow tools
-CLI_AUDIT_TIMEOUT_SECONDS=1 python3 cli_audit.py
-```
-
-### Fast Mode
-
-```bash
-# Skip expensive operations
-CLI_AUDIT_FAST=1 python3 cli_audit.py
+CLI_AUDIT_TIMEOUT_SECONDS=1 uv run python audit.py --update
 ```
 
 ## Common Pitfalls

@@ -1,6 +1,6 @@
 # Function Reference
 
-Quick lookup reference for functions in `cli_audit.py`, organized by category.
+Quick lookup reference for functions of the former monolithic `cli_audit.py`, organized by category. That file was replaced by `audit.py` and the `cli_audit/` package; many of the functions below were removed or renamed in that split.
 
 ## Quick Lookup Table
 
@@ -478,7 +478,7 @@ Fetch URL with retries and backoff.
 - `url` (`str`) - Target URL
 - `timeout` (`float | int`) - Timeout per attempt in seconds (default: 3)
 - `headers` (`dict[str, str] | None`) - HTTP headers (default: User-Agent only)
-- `retries` (`int`) - Retry attempts (default: 2, via `CLI_AUDIT_HTTP_RETRIES`)
+- `retries` (`int`) - Retry attempts (default: 2)
 - `backoff_base` (`float`) - Exponential backoff base (default: 0.2s)
 - `jitter` (`float`) - Random jitter range (default: 0.1s)
 - `method` (`str | None`) - HTTP method (default: GET)
@@ -691,7 +691,7 @@ CLI entry point and mode router.
 **Flow:**
 ```
 main()
-  ├─ Parse arguments (--only, --json, --alpha)
+  ├─ Parse arguments
   ├─ Detect mode (COLLECT_ONLY | RENDER_ONLY | NORMAL)
   │
   ├─ COLLECT_ONLY:
@@ -1054,8 +1054,6 @@ See [API_REFERENCE.md#environment-variables](API_REFERENCE.md#environment-variab
 | `CLI_AUDIT_OFFLINE` | `0` | Force offline (use cache only) |
 | `CLI_AUDIT_MAX_WORKERS` | `16` | ThreadPoolExecutor concurrency |
 | `CLI_AUDIT_TIMEOUT_SECONDS` | `3` | Timeout per tool audit |
-| `CLI_AUDIT_HTTP_RETRIES` | `2` | HTTP retry attempts |
-| `CLI_AUDIT_TIMINGS` | `1` | Show timing info |
 | `CLI_AUDIT_EMOJI` | `1` | Use emoji icons |
 | `CLI_AUDIT_LINKS` | `1` | Include OSC 8 hyperlinks |
 | `GITHUB_TOKEN` | `""` | GitHub API token |

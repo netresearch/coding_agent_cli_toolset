@@ -22,29 +22,23 @@ AI CLI Preparation tracks **69 developer tools** across 11 categories, optimized
 
 ## Role-Based Presets
 
-Quick audit subsets for specific roles:
+There are no preset targets; filter the JSON output by catalog category:
 
 ```bash
-# AI agent essentials
-make audit-offline-agent-core
-
 # Python development
-make audit-offline-python-core
+CLI_AUDIT_JSON=1 uv run python audit.py | jq '.[] | select(.category == "python")'
 
 # Node.js development
-make audit-offline-node-core
+CLI_AUDIT_JSON=1 uv run python audit.py | jq '.[] | select(.category == "node")'
 
 # Go development
-make audit-offline-go-core
+CLI_AUDIT_JSON=1 uv run python audit.py | jq '.[] | select(.category == "go")'
 
 # Infrastructure/DevOps
-make audit-offline-infra-core
+CLI_AUDIT_JSON=1 uv run python audit.py | jq '.[] | select(.category == "devops")'
 
 # Security auditing
-make audit-offline-security-core
-
-# Data processing
-make audit-offline-data-core
+CLI_AUDIT_JSON=1 uv run python audit.py | jq '.[] | select(.category == "security")'
 ```
 
 ---
@@ -416,7 +410,7 @@ make audit-offline-data-core
 - **Executable:** `tfsec`
 - **Upstream:** GitHub (aquasecurity/tfsec)
 - **Use Case:** Finding security issues in Terraform/IaC configurations
-- **Install:** `scripts/install_core.sh reconcile tfsec` or download from releases
+- **Install:** `scripts/install_tool.sh tfsec reconcile` or download from releases
 - **Upgrade:** Re-download latest release
 
 ---
@@ -492,7 +486,7 @@ make audit-offline-data-core
 - **Executable:** `git-lfs`
 - **Upstream:** GitHub (git-lfs/git-lfs)
 - **Use Case:** Version control for large files (models, datasets, media)
-- **Install:** `scripts/install_core.sh reconcile git-lfs` or `apt install git-lfs`
+- **Install:** `scripts/install_tool.sh git-lfs reconcile` or `apt install git-lfs`
 - **Upgrade:** Re-download latest release or update system package
 
 ---
@@ -612,24 +606,24 @@ make audit-offline-data-core
 - **Executable:** `aws`
 - **Upstream:** GitHub (aws/aws-cli)
 - **Use Case:** AWS cloud management
-- **Install:** `scripts/install_aws.sh` or vendor installer
-- **Upgrade:** `pip install --upgrade awscli` or `scripts/install_aws.sh update`
+- **Install:** `scripts/install_tool.sh aws install` or vendor installer
+- **Upgrade:** `pip install --upgrade awscli` or `scripts/install_tool.sh aws update`
 
 ### kubectl
 - **Purpose:** Kubernetes command-line tool
 - **Executable:** `kubectl`
 - **Upstream:** GitHub (kubernetes/kubernetes)
 - **Use Case:** Kubernetes cluster management
-- **Install:** `scripts/install_kubectl.sh` or vendor installer
-- **Upgrade:** Download new binary or `scripts/install_kubectl.sh update`
+- **Install:** `scripts/install_tool.sh kubectl install` or vendor installer
+- **Upgrade:** Download new binary or `scripts/install_tool.sh kubectl update`
 
 ### terraform
 - **Purpose:** Infrastructure as Code tool
 - **Executable:** `terraform`
 - **Upstream:** GitHub (hashicorp/terraform)
 - **Use Case:** Infrastructure provisioning
-- **Install:** `scripts/install_terraform.sh` or download binary
-- **Upgrade:** Download new binary or `scripts/install_terraform.sh update`
+- **Install:** `scripts/install_tool.sh terraform install` or download binary
+- **Upgrade:** Download new binary or `scripts/install_tool.sh terraform update`
 
 ### docker
 - **Purpose:** Container platform CLI
@@ -664,7 +658,7 @@ make audit-offline-data-core
 - **Executable:** `ninja`
 - **Upstream:** GitHub (ninja-build/ninja)
 - **Use Case:** Fast incremental builds, used by CMake and Meson
-- **Install:** `scripts/install_core.sh reconcile ninja` or `apt install ninja-build`
+- **Install:** `scripts/install_tool.sh ninja reconcile` or `apt install ninja-build`
 - **Upgrade:** Re-download latest release or update system package
 
 ---
@@ -706,7 +700,7 @@ go install <module>@latest
 make update
 
 # Review outdated tools
-CLI_AUDIT_JSON=1 python3 cli_audit.py | jq '.[] | select(.status == "OUTDATED")'
+CLI_AUDIT_JSON=1 uv run python audit.py | jq '.[] | select(.status == "OUTDATED")'
 
 # Use interactive upgrade guide
 make upgrade

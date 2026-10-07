@@ -42,7 +42,8 @@ jobs:
 
       - name: Run CLI Audit
         run: |
-          python cli_audit.py --format json --output tools.json
+          uv run python audit.py --update
+          CLI_AUDIT_JSON=1 uv run python audit.py > tools.json
 
       - name: Upload Audit Results
         uses: actions/upload-artifact@v4
@@ -150,12 +151,11 @@ audit-tools:
   stage: audit
   image: python:3.11-slim
   script:
-    - python cli_audit.py --format json --output audit.json
-    - python cli_audit.py --format markdown > audit.md
+    - uv run python audit.py --update
+    - CLI_AUDIT_JSON=1 uv run python audit.py > audit.json
   artifacts:
     paths:
       - audit.json
-      - audit.md
     reports:
       dotenv: audit.env
 
@@ -188,7 +188,8 @@ verify-tools:
   stage: test
   image: python:3.11-slim
   script:
-    - python cli_audit.py --verify-only
+    - uv run python audit.py --update
+    - CLI_AUDIT_FILTER_STATUS="NOT INSTALLED" CLI_AUDIT_JSON=1 uv run python audit.py | jq -e 'length == 0'
 ```
 
 **Parallel Tool Installation:**
@@ -241,7 +242,7 @@ set -euo pipefail
 echo "🚀 Setting up development environment..."
 
 # 1. Audit current tools
-python3 cli_audit.py --format compact
+uv run python audit.py
 
 # 2. Install missing tools
 python3 -c "
@@ -336,7 +337,7 @@ missing_critical = [
 
 if missing_critical:
     print(f'❌ Critical tools missing: {missing_critical}')
-    print('Run: python cli_audit.py --install')
+    print('Run: make install-<tool>')
     exit(1)
 
 # Check for outdated tools
@@ -362,7 +363,7 @@ if outdated:
 
 # Audit current tool state
 audit:
-	@python3 cli_audit.py --format compact
+	@uv run python audit.py
 
 # Install missing tools
 install:
@@ -380,7 +381,7 @@ upgrade:
 
 # Verify tool installation
 verify:
-	@python3 cli_audit.py --verify-only || \
+	@CLI_AUDIT_FILTER_STATUS="NOT INSTALLED" CLI_AUDIT_JSON=1 uv run python audit.py | jq -e 'length == 0' || \
 	(echo "❌ Verification failed. Run 'make install'"; exit 1)
 
 # Full development setup
