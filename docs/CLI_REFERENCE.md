@@ -505,10 +505,10 @@ CLI_AUDIT_JSON=1 uv run python audit.py \
 make update
 
 # Offline: render from snapshot
-CLI_AUDIT_OFFLINE=1 make audit
+make audit CLI_AUDIT_OFFLINE=1
 
 # Or combined
-CLI_AUDIT_OFFLINE=1 make audit-auto
+make audit-auto CLI_AUDIT_OFFLINE=1
 ```
 
 ### CI/CD Integration

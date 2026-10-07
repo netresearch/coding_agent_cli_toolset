@@ -843,10 +843,10 @@ make update-debug
 
 ```bash
 # For powerful machines
-CLI_AUDIT_MAX_WORKERS=32 make update
+make update CLI_AUDIT_MAX_WORKERS=32
 
 # For resource-constrained environments
-CLI_AUDIT_MAX_WORKERS=4 make update
+make update CLI_AUDIT_MAX_WORKERS=4
 ```
 
 **Recommendation:** 16-20 workers optimal, diminishing returns above.
@@ -857,10 +857,10 @@ CLI_AUDIT_MAX_WORKERS=4 make update
 
 ```bash
 # Faster but may miss slow tools
-CLI_AUDIT_TIMEOUT_SECONDS=1 make update
+make update CLI_AUDIT_TIMEOUT_SECONDS=1
 
 # More patient for slow networks
-CLI_AUDIT_TIMEOUT_SECONDS=10 make update
+make update CLI_AUDIT_TIMEOUT_SECONDS=10
 ```
 
 #### 3. Snapshot-Based Rendering

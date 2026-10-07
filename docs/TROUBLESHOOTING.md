@@ -481,19 +481,19 @@ time make audit
 **Optimize Worker Count:**
 ```bash
 # Too many workers cause contention
-CLI_AUDIT_MAX_WORKERS=12 make update
+make update CLI_AUDIT_MAX_WORKERS=12
 
 # Find optimal value for your system
 for workers in 4 8 12 16 20 24; do
   echo "Testing $workers workers:"
-  time CLI_AUDIT_MAX_WORKERS=$workers make update
+  time make update CLI_AUDIT_MAX_WORKERS=$workers
 done
 ```
 
 **Reduce Timeout:**
 ```bash
 # Fail fast on slow tools
-CLI_AUDIT_TIMEOUT_SECONDS=2 make update
+make update CLI_AUDIT_TIMEOUT_SECONDS=2
 ```
 
 **Use Snapshot Rendering:**
@@ -659,11 +659,11 @@ make update-debug
 # 3. Test different worker counts
 for workers in 8 12 16 20; do
   echo "Testing $workers workers:"
-  time CLI_AUDIT_MAX_WORKERS=$workers make update
+  time make update CLI_AUDIT_MAX_WORKERS=$workers
 done
 
 # 4. Test with a shorter version-probe timeout
-time CLI_AUDIT_TIMEOUT_SECONDS=2 make update
+time make update CLI_AUDIT_TIMEOUT_SECONDS=2
 ```
 
 ### Workflow 4: Diagnose Cache Issues
@@ -682,7 +682,7 @@ git checkout upstream_versions.json
 python audit.py --update-baseline
 
 # 4. Verify consistency
-CLI_AUDIT_OFFLINE=1 make audit
+make audit CLI_AUDIT_OFFLINE=1
 ```
 
 ## Advanced Debugging
