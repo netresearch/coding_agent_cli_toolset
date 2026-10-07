@@ -75,9 +75,10 @@ fi
 # Docker Compose uses: docker-compose-{os}-{arch}
 DOWNLOAD_URL="https://github.com/$GITHUB_REPO/releases/download/$LATEST/docker-$PLUGIN_NAME-$OS-$ARCH"
 
-# Download
-tmpfile="/tmp/docker-$PLUGIN_NAME.$$"
-rm -f "$tmpfile"
+# Download into a directory that mktemp creates for this run only (mode 0700)
+WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/cli-audit-${TOOL}.XXXXXX")"
+trap 'rm -rf "$WORK_DIR"' EXIT
+tmpfile="$WORK_DIR/docker-$PLUGIN_NAME"
 
 echo "[$TOOL] Downloading $DOWNLOAD_URL"
 if ! curl -fL --retry 3 --retry-delay 1 --connect-timeout 10 -o "$tmpfile" "$DOWNLOAD_URL" 2>/dev/null; then

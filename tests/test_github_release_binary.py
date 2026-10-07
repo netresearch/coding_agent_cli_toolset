@@ -46,7 +46,10 @@ def _curl_stub(log: Path, serve_download: bool, failing_writeout: bool = False) 
     """
     download = (
         f"""    */releases/download/*)
-      [ -n "$out" ] && printf '#!/usr/bin/env bash\\necho "fx {NEW_VERSION}"\\n' > "$out"
+      if [ -n "$out" ]; then
+        printf 'OUT %s %s\\n' "$out" "$(stat -c %a "$(dirname "$out")")" >> "{log}"
+        printf '#!/usr/bin/env bash\\necho "fx {NEW_VERSION}"\\n' > "$out"
+      fi
       exit 0 ;;"""
         if serve_download
         else ""
@@ -191,3 +194,60 @@ esac
 
     requested = log.read_text() if log.exists() else ""
     assert f"/releases/download/{NEW_VERSION}/" in requested, requested + "\n" + proc.stderr
+
+
+@pytest.mark.skipif(
+    not sys.platform.startswith("linux"),
+    reason="the installer is Linux-only (OS=linux, GNU `install -T`); this case runs the install to completion",
+)
+def test_download_goes_to_a_private_directory_created_for_the_run(sandbox, tmp_path):
+    home, stubs, prefix, log = sandbox
+    _write_exe(
+        stubs / "gh",
+        f"""case "$*" in
+  *"repos/antonmedv/fx/releases/latest"*) printf '{{"tag_name":"{NEW_VERSION}"}}' ;;
+  *) exit 1 ;;
+esac
+""",
+    )
+    _write_exe(stubs / "curl", _curl_stub(log, serve_download=True))
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+
+    proc = _run(home, stubs, prefix, extra_env={"TMPDIR": str(scratch)})
+
+    outs = [line.split() for line in log.read_text().splitlines() if line.startswith("OUT ")]
+    assert outs, proc.stdout + proc.stderr
+    for _, path, mode in outs:
+        assert Path(path).parent.parent == scratch, f"download target {path} is not in a directory of its own under TMPDIR"
+        assert mode == "700", f"download directory mode is {mode}"
+    assert (prefix / "bin" / "fx").exists(), proc.stdout + proc.stderr
+    assert list(scratch.iterdir()) == [], "the run left its working directory behind"
+
+
+@pytest.mark.skipif(
+    not sys.platform.startswith("linux"),
+    reason="the installer is Linux-only (OS=linux, GNU `install -T`); this case runs the install to completion",
+)
+def test_already_current_marker_is_written_under_the_users_cache(sandbox):
+    home, stubs, prefix, log = sandbox
+    _write_exe(
+        stubs / "gh",
+        f"""case "$*" in
+  *"repos/antonmedv/fx/releases/latest"*) printf '{{"tag_name":"{NEW_VERSION}"}}' ;;
+  *) exit 1 ;;
+esac
+""",
+    )
+    _write_exe(stubs / "curl", _curl_stub(log, serve_download=True))
+    # The installed copy is byte-identical to the download, so the installer
+    # reports the release as already current and leaves a marker for guide.sh.
+    installed = prefix / "bin" / "fx"
+    installed.parent.mkdir(parents=True)
+    installed.write_text(f'#!/usr/bin/env bash\necho "fx {NEW_VERSION}"\n')
+    installed.chmod(0o755)
+
+    proc = _run(home, stubs, prefix, extra_env={"CLI_AUDIT_MARKER_DIR": "", "XDG_CACHE_HOME": ""})
+
+    marker = home / ".cache" / "cli-audit" / "markers" / "fx.already-current"
+    assert marker.read_text().strip() == NEW_VERSION, proc.stdout + proc.stderr

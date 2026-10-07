@@ -213,7 +213,7 @@ if $pm_ok && [ -n "$before" ] && [ -n "$after" ] && [ "$before" = "$after" ]; th
   printf "[%s] Note: Package manager has no newer version available\n" "$DISPLAY_NAME" >&2
   # Signal held-back status to callers (guide.sh), so the run is not counted
   # as an upgrade
-  marker_dir="${CLI_AUDIT_MARKER_DIR:-/tmp/.cli-audit}"
+  marker_dir="${CLI_AUDIT_MARKER_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/cli-audit/markers}"
   mkdir -p "$marker_dir"
   echo "$after" > "$marker_dir/${TOOL}.held-back"
 fi

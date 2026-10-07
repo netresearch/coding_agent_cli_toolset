@@ -9,11 +9,13 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$DIR/lib/common.sh"
 . "$DIR/lib/install_strategy.sh"
 
-# Cleanup temp files on interrupt
+# Download and extraction happen in a directory that mktemp creates for this
+# run only (mode 0700), removed on every exit path.
+WORK_DIR=""
 _grb_cleanup() {
-  rm -f "/tmp/${BINARY_NAME:-tool}.$$" 2>/dev/null || true
-  rm -rf "/tmp/${BINARY_NAME:-tool}-extract.$$" 2>/dev/null || true
+  if [ -n "$WORK_DIR" ]; then rm -rf "$WORK_DIR" 2>/dev/null || true; fi
 }
+trap _grb_cleanup EXIT
 trap '_grb_cleanup; exit 130' INT TERM
 
 TOOL="${1:-}"
@@ -167,8 +169,8 @@ DOWNLOAD_URL="${DOWNLOAD_URL//\{arch\}/$ARCH}"
 DOWNLOAD_URL="${DOWNLOAD_URL//\{arch_suffix\}/$ARCH}"
 
 # Download with retry and fallback
-tmpfile="/tmp/$BINARY_NAME.$$"
-rm -f "$tmpfile"
+WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/cli-audit-${TOOL}.XXXXXX")"
+tmpfile="$WORK_DIR/download"
 
 if ! curl --proto '=https' --proto-redir '=https' -fL --retry 3 --retry-delay 1 --connect-timeout 10 -o "$tmpfile" "$DOWNLOAD_URL" 2>/dev/null; then
   if [ -n "$FALLBACK_URL_TEMPLATE" ]; then
@@ -195,8 +197,8 @@ EXTRACT_DIR=""
 
 if [[ "$DOWNLOAD_URL" == *.tar.gz ]] || [[ "$DOWNLOAD_URL" == *.tgz ]]; then
   # Extract tar.gz
-  EXTRACT_DIR="/tmp/${BINARY_NAME}-extract.$$"
-  mkdir -p "$EXTRACT_DIR"
+  EXTRACT_DIR="$WORK_DIR/extract"
+  mkdir "$EXTRACT_DIR"
 
   if ! tar -xzf "$tmpfile" -C "$EXTRACT_DIR" 2>/dev/null; then
     echo "[$TOOL] Error: Failed to extract tar.gz archive" >&2
@@ -223,8 +225,8 @@ if [[ "$DOWNLOAD_URL" == *.tar.gz ]] || [[ "$DOWNLOAD_URL" == *.tgz ]]; then
   rm -f "$tmpfile"
 elif [[ "$DOWNLOAD_URL" == *.tar.xz ]]; then
   # Extract tar.xz
-  EXTRACT_DIR="/tmp/${BINARY_NAME}-extract.$$"
-  mkdir -p "$EXTRACT_DIR"
+  EXTRACT_DIR="$WORK_DIR/extract"
+  mkdir "$EXTRACT_DIR"
 
   if ! tar -xJf "$tmpfile" -C "$EXTRACT_DIR" 2>/dev/null; then
     echo "[$TOOL] Error: Failed to extract tar.xz archive" >&2
@@ -251,8 +253,8 @@ elif [[ "$DOWNLOAD_URL" == *.tar.xz ]]; then
   rm -f "$tmpfile"
 elif [[ "$DOWNLOAD_URL" == *.zip ]]; then
   # Extract zip
-  EXTRACT_DIR="/tmp/${BINARY_NAME}-extract.$$"
-  mkdir -p "$EXTRACT_DIR"
+  EXTRACT_DIR="$WORK_DIR/extract"
+  mkdir "$EXTRACT_DIR"
 
   if ! unzip -q "$tmpfile" -d "$EXTRACT_DIR" 2>/dev/null; then
     echo "[$TOOL] Error: Failed to extract zip archive" >&2
@@ -338,7 +340,7 @@ if [ -n "$path" ]; then printf "[%s] path:   %s\n" "$TOOL" "$path"; fi
 if [ "$BINARY_ALREADY_CURRENT" = "true" ]; then
   printf "[%s] note:   binary already matches target release %s (upstream version string may be stale)\n" "$TOOL" "$LATEST"
   # Signal already-current status to callers (e.g., guide.sh)
-  marker_dir="${CLI_AUDIT_MARKER_DIR:-/tmp/.cli-audit}"
+  marker_dir="${CLI_AUDIT_MARKER_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/cli-audit/markers}"
   mkdir -p "$marker_dir"
   echo "$LATEST" > "$marker_dir/${TOOL}.already-current"
 fi

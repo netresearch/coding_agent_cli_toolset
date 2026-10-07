@@ -26,8 +26,8 @@ LAST_MULTI_COUNT=0
 # summary hint); de-duplicated when counted.
 GUIDE_DUP_LIST=""
 
-# Installers leave <tool>.already-current / <tool>.held-back here
-MARKER_DIR="${CLI_AUDIT_MARKER_DIR:-/tmp/.cli-audit}"
+# Installers leave <tool>.already-current / <tool>.held-back here (per user)
+MARKER_DIR="${CLI_AUDIT_MARKER_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/cli-audit/markers}"
 
 # Summary counters
 SUMMARY_UPDATED=0
