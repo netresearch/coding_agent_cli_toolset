@@ -26,7 +26,7 @@ install_docker() {
       # lives in a directory that mktemp creates for this run only (mode 0700).
       local work_dir
       work_dir="$(mktemp -d "${TMPDIR:-/tmp}/cli-audit-docker.XXXXXX")"
-      if curl -fsSL https://get.docker.com -o "$work_dir/get-docker.sh" &&
+      if curl --proto '=https' --proto-redir '=https' -fsSL https://get.docker.com -o "$work_dir/get-docker.sh" &&
         sed -i 's/sleep 20/sleep 0/' "$work_dir/get-docker.sh"; then
         sudo sh "$work_dir/get-docker.sh" || { rm -rf "$work_dir"; return 1; }
       else

@@ -31,9 +31,9 @@ install_native() {
 
     # Download installer script
     if command -v curl >/dev/null 2>&1; then
-      curl -fsSL https://claude.ai/install.sh -o "$installer_script" || { rm -rf "$work_dir"; return 1; }
+      curl --proto '=https' --proto-redir '=https' -fsSL https://claude.ai/install.sh -o "$installer_script" || { rm -rf "$work_dir"; return 1; }
     elif command -v wget >/dev/null 2>&1; then
-      wget -qO "$installer_script" https://claude.ai/install.sh || { rm -rf "$work_dir"; return 1; }
+      wget --https-only -qO "$installer_script" https://claude.ai/install.sh || { rm -rf "$work_dir"; return 1; }
     else
       rm -rf "$work_dir"
       return 1
