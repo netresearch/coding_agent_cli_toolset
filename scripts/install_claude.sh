@@ -226,6 +226,12 @@ cleanup_npm_versions() {
 
 # Migrate from npm to native installer
 migrate_npm_to_native() {
+  # The native installer needs curl; check before removing the npm packages,
+  # so a host without curl keeps the installation it has.
+  if ! command -v curl >/dev/null 2>&1; then
+    echo "[claude] curl is required for the native installer; keeping the npm installation" >&2
+    return 1
+  fi
   echo "[claude] Migrating from npm to native installer..." >&2
   echo "[claude] Removing npm packages..." >&2
 

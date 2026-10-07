@@ -8,6 +8,7 @@ a file was downloaded to, or run from, together with the mode of its directory.
 """
 
 import os
+import shutil
 import stat
 import subprocess
 import sys
@@ -125,3 +126,32 @@ def test_claude_native_installer_runs_from_a_private_directory(box):
 
     assert proc.returncode == 0, proc.stdout + proc.stderr
     _assert_private(_recorded(log), scratch, proc.stdout + proc.stderr)
+
+
+def test_claude_upgrade_keeps_an_npm_install_when_curl_is_missing(box, tmp_path):
+    env, stubs, scratch, log = box
+    home = Path(env["HOME"])
+    # A PATH without curl: the commands the script needs, and the stubs.
+    tools = tmp_path / "tools"
+    tools.mkdir()
+    for name in ("bash", "readlink", "grep", "head", "sed", "sort", "timeout", "dirname", "rm", "mktemp", "uname", "cat"):
+        found = shutil.which(name)
+        if found:
+            (tools / name).symlink_to(found)
+    npm_log = tmp_path / "npm.log"
+    _write_exe(stubs / "npm", f'echo "$*" >> "{npm_log}"\n')
+    nvm_bin = home / ".nvm" / "versions" / "node" / "v22" / "bin"
+    _write_exe(nvm_bin / "claude", 'echo "1.0.0 (Claude Code)"\n')
+    env = {**env, "PATH": os.pathsep.join([str(stubs), str(nvm_bin), str(tools)])}
+
+    proc = subprocess.run(
+        [str(tools / "bash"), str(SCRIPTS / "install_claude.sh"), "upgrade"],
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=60,
+    )
+
+    assert proc.returncode != 0, proc.stdout + proc.stderr
+    assert (nvm_bin / "claude").exists(), "the existing installation was removed"
+    assert "uninstall" not in (npm_log.read_text() if npm_log.exists() else "")
