@@ -37,7 +37,7 @@ install_docker() {
       # Start service manually (no systemd in WSL)
       sudo service docker start || echo "[docker] Run 'sudo service docker start' to start Docker"
     else
-      curl -fsSL https://get.docker.com | sh
+      curl --proto '=https' --proto-redir '=https' -fsSL https://get.docker.com | sh
     fi
 
     sudo usermod -aG docker "$USER" || true

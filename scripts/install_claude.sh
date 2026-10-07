@@ -29,12 +29,12 @@ install_native() {
     work_dir="$(mktemp -d "${TMPDIR:-/tmp}/cli-audit-claude.XXXXXX")" || return 1
     installer_script="$work_dir/install.sh"
 
-    # Download installer script
+    # Download installer script. curl only: the URL redirects, and curl can
+    # hold every hop to HTTPS (--proto-redir); wget cannot.
     if command -v curl >/dev/null 2>&1; then
       curl --proto '=https' --proto-redir '=https' -fsSL https://claude.ai/install.sh -o "$installer_script" || { rm -rf "$work_dir"; return 1; }
-    elif command -v wget >/dev/null 2>&1; then
-      wget --https-only -qO "$installer_script" https://claude.ai/install.sh || { rm -rf "$work_dir"; return 1; }
     else
+      echo "[claude] curl is required for the native installer" >&2
       rm -rf "$work_dir"
       return 1
     fi
