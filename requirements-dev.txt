@@ -14,7 +14,7 @@ mypy>=1.19.0
 bandit>=1.9.0  # Security linting
 
 # Code Quality
-black==26.5.1  # Code formatting; same version as the pre-commit hook
+black==26.10.0  # Code formatting; same version as the pre-commit hook
 isort==8.0.1  # Import sorting; same version as the pre-commit hook
 
 # Build and Distribution
