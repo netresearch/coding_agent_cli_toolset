@@ -611,6 +611,17 @@ def is_wsl() -> bool:
         return False
 
 
+# A release cycle as endoflife.date publishes it for the runtimes in the
+# catalog: "3.13", "24", "1.23". The cycle becomes part of tool keys, binary
+# names and environment values downstream, so anything else is dropped.
+_CYCLE_RE = re.compile(r"^[0-9]+(?:\.[0-9]+)*$")
+
+
+def _valid_cycle_entries(entries: list[Any]) -> list[dict[str, Any]]:
+    """Keep only entries whose cycle has the shape of a release number."""
+    return [e for e in entries if isinstance(e, dict) and _CYCLE_RE.match(str(e.get("cycle", "")))]
+
+
 def collect_endoflife(
     product: str,
     max_versions: int = 4,
@@ -660,7 +671,10 @@ def collect_endoflife(
             logger.warning(f"endoflife.date {product}: Unexpected response format")
         else:
             for entry in data:
-                cycle = entry.get("cycle", "")
+                cycle = entry.get("cycle", "") if isinstance(entry, dict) else ""
+                if not _CYCLE_RE.match(str(cycle)):
+                    logger.debug(f"endoflife.date {product}: skipping malformed cycle {cycle!r}")
+                    continue
                 eol = entry.get("eol")
                 support = entry.get("support")
                 latest = entry.get("latest", "")
@@ -720,15 +734,16 @@ def collect_endoflife(
     if isinstance(cached, dict) and isinstance(cached.get("entries"), list):
         age = int(time.time()) - int(cached.get("at", 0))
         logger.debug(f"endoflife.date {product}: using file cache (age {age}s)")
-        entries: list[dict[str, Any]] = cached["entries"]
+        entries: list[dict[str, Any]] = _valid_cycle_entries(cached["entries"])
         _endoflife_memo[memo_key] = entries
         return entries
 
     # Legacy offline_cache argument (from write_upstream_cache dumps).
     if offline_cache and product in offline_cache:
         logger.debug(f"endoflife.date {product}: Using offline cache")
-        _endoflife_memo[memo_key] = offline_cache[product]
-        return offline_cache[product]
+        offline_entries = _valid_cycle_entries(offline_cache[product])
+        _endoflife_memo[memo_key] = offline_entries
+        return offline_entries
 
     logger.warning(f"endoflife.date {product}: No versions found")
     _endoflife_memo[memo_key] = []
