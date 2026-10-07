@@ -294,7 +294,7 @@ time uv run python audit.py --update
 # Measure render time (should be <100ms)
 time CLI_AUDIT_RENDER=1 uv run python audit.py > /dev/null
 
-# Find slow tools (debug output while collecting)
+# Debug log of a collection run (it records no per-tool timing)
 make update-debug
 ```
 
@@ -307,7 +307,7 @@ jq '.' upstream_versions.json > /dev/null
 # Ensure snapshot is valid
 jq '.__meta__.schema_version' tools_snapshot.json
 
-# Check for version parsing issues
+# List tools without a detected version (not installed, or version not parsed)
 CLI_AUDIT_JSON=1 uv run python audit.py | jq '.[] | select(.installed_version == "")'
 ```
 

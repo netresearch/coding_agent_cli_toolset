@@ -600,7 +600,8 @@ echo $PATH
 # Check whether the shell finds the tool on PATH
 command -v mytool
 
-# Tools are found via PATH: add the tool's directory to PATH
+# The audit searches PATH, skipping virtualenv and conda bin directories,
+# and also checks ~/.cargo/bin: add the tool's directory to PATH
 export PATH="/custom/path/to/tool:$PATH"
 ```
 
@@ -648,7 +649,7 @@ make update
 **Problem:** Slow audit execution
 
 ```bash
-# Check slow operations (debug output while collecting)
+# Debug log of a collection run (it records no per-tool timing)
 make update-debug
 
 # Use snapshot workflow

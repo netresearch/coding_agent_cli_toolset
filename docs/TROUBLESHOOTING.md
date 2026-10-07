@@ -466,7 +466,7 @@ if tool.name == "parallel":
 # Profile execution
 time make update
 
-# Identify slow tools (debug output while collecting)
+# Debug log of a collection run (it records no per-tool timing)
 make update-debug
 
 # Monitor resources
@@ -602,7 +602,7 @@ env | grep CLI_AUDIT
 **Debug Variable Precedence:**
 ```bash
 # Print debug output for one tool
-CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py --verbose python 2>&1 | head -20
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 CLI_AUDIT_DEBUG=1 uv run python audit.py --verbose python 2>&1 | grep -v 'Loaded catalog entry'
 ```
 
 ## Debugging Workflows
@@ -653,7 +653,7 @@ jq '.versions.ripgrep' upstream_versions.json
 # 1. Baseline timing
 time CLI_AUDIT_COLLECT=1 uv run python audit.py
 
-# 2. Identify slow tools (debug output while collecting)
+# 2. Debug log of a collection run (it records no per-tool timing)
 make update-debug
 
 # 3. Test different worker counts
@@ -716,7 +716,7 @@ make update 2>&1 | tee update.log
 make update 2>&1 | grep -i "error\|exception\|fail" | tee errors.log
 
 # Capture debug output while collecting
-make update-debug 2>&1 | tee timing.log
+make update-debug 2>&1 | tee update-debug.log
 ```
 
 ### Interactive Python Testing

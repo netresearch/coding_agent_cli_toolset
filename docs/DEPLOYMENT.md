@@ -532,7 +532,7 @@ git commit -m "chore: update manual version cache"
 
 3. **Verify offline operation:**
 ```bash
-CLI_AUDIT_OFFLINE=1 uv run python audit.py python
+CLI_AUDIT_OFFLINE=1 uv run python audit.py ripgrep
 ```
 
 ### Offline Cache Management
@@ -831,7 +831,7 @@ time make update
 # Measure render time
 time make audit
 
-# Identify slow tools (debug output while collecting)
+# Debug log of a collection run (it records no per-tool timing)
 make update-debug
 ```
 
