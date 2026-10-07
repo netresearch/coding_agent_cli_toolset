@@ -33,6 +33,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 ### Changed
 - Upgraded 23 locked Python dev-dependencies to latest compatible versions (bandit 1.9.4, mypy 1.20.1, isort 8.0.1, rich 15.0, coverage 7.13.5, …).
 
+### Security
+- The shell helpers that call Python (`config_get_auto_update`, `config_get_global_auto_upgrade`, `check_manager_outdated`) pass tool names and paths as arguments instead of placing them in the program text. Release cycles from endoflife.date are accepted only in the form of a release number (`3.13`, `24`).
+- `github_release_binary.sh`, `docker_plugin.sh`, `install_docker.sh` and `install_claude.sh` download into a directory that `mktemp -d` creates for each run (mode 0700) instead of fixed or PID-derived names in `/tmp`. Installer markers for `make upgrade` default to `~/.cache/cli-audit/markers` instead of `/tmp/.cli-audit`.
+- `generate_rollback_script` writes the script into a private directory with owner-only permissions and quotes tool names.
+
 ## Prior history
 
 See [git log](https://github.com/netresearch/coding_agent_cli_toolset/commits/main) for commits prior to this changelog. Tagged releases: [Releases page](https://github.com/netresearch/coding_agent_cli_toolset/releases).
