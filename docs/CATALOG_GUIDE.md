@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # Catalog Guide: JSON Tool Definitions
 
 **Last Updated:** 2025-11-03
@@ -251,7 +254,7 @@ for name, entry in catalog.items():
   "homepage": "https://github.com/universal-ctags/ctags",
   "github_repo": "universal-ctags/ctags",
   "binary_name": "ctags",
-  "notes": "Users typically pin this via `make pin-ctags 5.9.0` for compatibility"
+  "notes": "Users typically pin this via `./scripts/pin_version.sh ctags 5.9.0` for compatibility"
 }
 ```
 
@@ -312,8 +315,8 @@ jq . catalog/my-tool.json
 
 ```bash
 # Install your tool manually first
-# Then test detection:
-python3 audit.py --only my-tool
+# Then test detection (fresh check, JSON output, snapshot unchanged):
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 python3 audit.py my-tool
 
 # Or use ToolCatalog API:
 python3 -c "
@@ -669,7 +672,7 @@ my-tool version
 3. **Validate**
    ```bash
    jq . catalog/new-tool.json
-   python3 audit.py --only new-tool
+   CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 python3 audit.py new-tool
    ```
 4. **Test**
    ```bash

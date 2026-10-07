@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # ADR-010: Reconcile Engine as Single Source of Truth for Duplicate-Install Cleanup
 
 **Status:** Accepted

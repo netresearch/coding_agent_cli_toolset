@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # Logging Framework Documentation
 
 **Version:** 2.0.0-alpha.6
@@ -332,12 +335,6 @@ Control logging via environment variables:
 ```bash
 # Enable debug output
 export CLI_AUDIT_DEBUG=1
-
-# Specify log file
-export CLI_AUDIT_LOG_FILE=~/.cli-audit/debug.log
-
-# Set log level
-export CLI_AUDIT_LOG_LEVEL=WARNING
 ```
 
 ### CLI Flags (Future)

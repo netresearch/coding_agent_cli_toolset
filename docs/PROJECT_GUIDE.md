@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # AI CLI Preparation - Complete Project Guide
 
 **Version:** 2.0.0-alpha.6
@@ -23,14 +26,14 @@
 
 AI CLI Preparation is a **dual-phase** tool for managing CLI tool versions in AI coding agent environments:
 
-**Phase 1:** Fast, offline-first version auditing (cli_audit.py, 2,375 lines)
+**Phase 1:** Fast, offline-first version auditing (`audit.py` entry point)
 **Phase 2:** Complete installation management system (cli_audit/ package, 5,338 lines)
 
 ### Architecture
 
 ```
 ai_cli_preparation/
-├── cli_audit.py              # Phase 1: Fast audit CLI
+├── audit.py                  # Phase 1: Fast audit CLI
 ├── cli_audit/                # Phase 2: Installation package
 │   ├── environment.py        # Environment detection
 │   ├── config.py             # Configuration management
@@ -71,13 +74,13 @@ ai_cli_preparation/
 
 ```bash
 # Quick audit
-python3 cli_audit.py | column -s '|' -t
+uv run python audit.py | column -s '|' -t
 
 # JSON output
-CLI_AUDIT_JSON=1 python3 cli_audit.py | jq '.'
+CLI_AUDIT_JSON=1 uv run python audit.py | jq '.'
 
-# Role-specific preset
-python3 cli_audit.py --only agent-core | python3 smart_column.py -s "|" -t --right 3,5 --header
+# Specific tools (positional names)
+uv run python audit.py ripgrep fd | python3 smart_column.py -s "|" -t --right 3,4 --header
 ```
 
 → See [README.md](README.md) for complete user guide
@@ -241,7 +244,7 @@ from cli_audit import setup_logging, get_logger
 
 ## Phase 1: Audit Tool
 
-**File:** `cli_audit.py` (2,375 lines)
+**File:** `audit.py` (entry point; implementation in `cli_audit/`)
 
 ### Purpose
 
@@ -276,10 +279,10 @@ make audit
 make audit-auto
 
 # JSON mode
-CLI_AUDIT_JSON=1 python3 cli_audit.py | jq '.'
+CLI_AUDIT_JSON=1 uv run python audit.py | jq '.'
 
 # Offline mode
-CLI_AUDIT_OFFLINE=1 python3 cli_audit.py
+CLI_AUDIT_OFFLINE=1 uv run python audit.py
 ```
 
 ---

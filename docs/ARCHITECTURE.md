@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # Architecture Documentation
 
 ## Overview
@@ -89,7 +92,7 @@ AI CLI Preparation is designed as a **fast, reliable, offline-first tool version
 
 ### 1. CLI Entry Point & Mode Router
 
-**Location:** `cli_audit.py::main()`
+**Location:** `audit.py::main()`
 
 The entry point determines operating mode based on environment variables:
 
@@ -238,7 +241,7 @@ with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
 ### Collection Mode (COLLECT_ONLY)
 
 ```
-User: CLI_AUDIT_COLLECT=1 python3 cli_audit.py
+User: CLI_AUDIT_COLLECT=1 uv run python audit.py
   ↓
 main() detects COLLECT_ONLY mode
   ↓
@@ -263,7 +266,7 @@ Exit (no output rendering)
 ### Render Mode (RENDER_ONLY)
 
 ```
-User: CLI_AUDIT_RENDER=1 python3 cli_audit.py
+User: CLI_AUDIT_RENDER=1 uv run python audit.py
   ↓
 main() detects RENDER_ONLY mode
   ↓
@@ -271,7 +274,7 @@ load_snapshot() → read tools_snapshot.json
   ↓
 render_from_snapshot(doc) → extract tool records
   ↓
-Apply filters (--only flag)
+Apply filters (positional tool names)
   ↓
 Sort (by order or alpha)
   ↓
@@ -285,7 +288,7 @@ Output to stdout (no network, fast)
 ### Normal Mode (Full Audit)
 
 ```
-User: python3 cli_audit.py
+User: uv run python audit.py
   ↓
 main() detects NORMAL mode
   ↓

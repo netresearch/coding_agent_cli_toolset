@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # Migration Guide: v1.x → v2.0 Modular Architecture
 
 **Last Updated:** 2025-11-03
@@ -92,8 +95,8 @@ cli_audit/
 - `cli_audit/` package (18 Python modules)
 - `audit.py` entry point
 
-**Renamed:**
-- `cli_audit.py` → `cli_audit_legacy.py` (backup, may be removed later)
+**Removed:**
+- `cli_audit.py` (replaced by `audit.py` and the `cli_audit/` package; no legacy copy remains)
 
 ## API Compatibility
 
@@ -152,9 +155,9 @@ from cli_audit.reconcile import reconcile_installations
 python3 cli_audit.py --only ripgrep
 ```
 
-**After:**
+**After** (tool names are positional arguments):
 ```bash
-python3 audit.py --only ripgrep
+python3 audit.py ripgrep
 ```
 
 **Migration:**
@@ -253,18 +256,20 @@ make upgrade    # Uses scripts/guide.sh
 
 **After:**
 ```yaml
-# GitHub Actions
-- run: python3 audit.py --only python-core
+# GitHub Actions (presets were removed; filter by catalog category)
+- run: python3 audit.py --update
+- run: CLI_AUDIT_JSON=1 python3 audit.py | jq '.[] | select(.category == "python")'
 # OR use Makefile abstraction:
-- run: make audit-python-core
+- run: make update && make audit
 ```
 
 **GitLab CI:**
 ```yaml
 audit:
   script:
-    - python3 audit.py --only agent-core
-    # OR: make audit-agent-core
+    - python3 audit.py --update
+    - python3 audit.py
+    # OR: make update && make audit
 ```
 
 ### Use Case 3: Python API Integration
@@ -367,7 +372,7 @@ from cli_audit.collectors import collect_github, collect_pypi
 
 ```bash
 # Test basic audit
-python3 audit.py --only ripgrep
+python3 audit.py ripgrep
 
 # Test collection
 CLI_AUDIT_COLLECT=1 python3 audit.py --update

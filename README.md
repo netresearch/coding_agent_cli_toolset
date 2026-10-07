@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # AI CLI Preparation
 
 [![CI](https://github.com/netresearch/coding_agent_cli_toolset/actions/workflows/ci.yml/badge.svg)](https://github.com/netresearch/coding_agent_cli_toolset/actions/workflows/ci.yml)
@@ -587,19 +590,19 @@ The `auto-update` feature automatically detects all installed package managers a
 
 ```bash
 # Detect all installed package managers
-make auto-update-detect
+make detect-managers
 
 # Update all package managers and their packages
-make auto-update
+make upgrade-managed
 
 # Preview what would be updated (dry-run)
-make auto-update-dry-run
+make upgrade-dry-run
 
 # Update only system package managers (apt, brew, snap, flatpak)
-make auto-update-system-only
+make upgrade-managed-system-only
 
 # Update all except system package managers
-make auto-update-skip-system
+make upgrade-managed-skip-system
 ```
 
 ### Advanced Usage
@@ -694,13 +697,13 @@ gem cleanup
 **Daily Development Workflow:**
 ```bash
 # Quick check what's available
-make auto-update-detect
+make detect-managers
 
 # Preview updates without making changes
-make auto-update-dry-run
+make upgrade-dry-run
 
 # Apply updates to everything
-make auto-update
+make upgrade-managed
 ```
 
 **CI/CD or Scripting:**
@@ -742,7 +745,7 @@ make audit
 make upgrade
 
 # 4. Auto-update all package managers and their packages
-make auto-update
+make upgrade-managed
 
 # 5. Verify everything is up-to-date
 make audit
@@ -772,5 +775,5 @@ The audit system uses two JSON files:
 
 Split licensing:
 
-- **Code** (scripts, Python package, workflows, configuration): [MIT](LICENSE-MIT)
-- **Content** (the skill in `skills/`: SKILL.md and its references): [CC-BY-SA-4.0](LICENSE-CC-BY-SA-4.0)
+- **Content**: the skill in `skills/` (SKILL.md and its references), this `README.md` and the documentation under `docs/` are licensed under [CC-BY-SA-4.0](LICENSE-CC-BY-SA-4.0).
+- **Code**: everything else — the Python package, `audit.py`, scripts, tests, the tool catalog, workflows and configuration — is licensed under [MIT](LICENSE-MIT).

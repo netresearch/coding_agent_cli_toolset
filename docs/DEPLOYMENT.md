@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # Deployment Guide
 
 ## Overview
@@ -73,8 +76,7 @@ Collect-only mode: fetch upstream data, write snapshot, no output rendering.
 
 **Environment:**
 - `CLI_AUDIT_COLLECT=1` - Collect-only mode
-- `CLI_AUDIT_DEBUG=1` - Debug messages
-- `CLI_AUDIT_PROGRESS=1` - Progress updates
+- `CLI_AUDIT_DEBUG=1` - Debug messages (set by `make update-debug`)
 
 **Use Case:** Refresh snapshot with latest data, troubleshoot network issues.
 
@@ -166,16 +168,14 @@ Log: logs/upgrade-20251018-073045.log
 
 **Environment Variables:**
 - `DRY_RUN=1` - Preview mode without making changes
-- `SKIP_SYSTEM=1` - Skip system package managers (apt, brew, snap, flatpak)
-- `VERBOSE=1` - Detailed output for debugging
 
 **Advanced:**
 ```bash
 # Direct script execution with options
-DRY_RUN=1 VERBOSE=1 bash scripts/upgrade_all.sh
+DRY_RUN=1 bash scripts/upgrade_all.sh
 
-# Skip system package managers
-SKIP_SYSTEM=1 make upgrade-all
+# Upgrade package managers but skip system ones (apt, brew, snap, flatpak)
+make upgrade-managed-skip-system
 
 # Check PATH configuration before upgrading
 make check-path
@@ -208,23 +208,13 @@ make audit-ripgrep
 make audit-docker
 ```
 
-#### `make audit-offline-CATEGORY`
-Audit category subset in offline mode.
-
-**Available Categories:**
-- `agent-core` - Core tools for AI agents
-- `python-core` - Python runtime and package managers
-- `node-core` - Node.js runtime and package managers
-- `go-core` - Go runtime and tools
-- `infra-core` - Cloud/infrastructure tools
-- `security-core` - Security scanning tools
-- `data-core` - Data processing tools
+#### `make audit-offline-TOOLNAME`
+Audit a single tool in offline mode. There are no category targets; filter the JSON output by `category` instead.
 
 ```bash
 # Examples
-make audit-offline-python-core
-make audit-offline-security-core
-make audit-offline-infra-core
+make audit-offline-ripgrep
+CLI_AUDIT_JSON=1 uv run python audit.py | jq '.[] | select(.category == "security")'
 ```
 
 ### Installation Script Targets
@@ -258,12 +248,12 @@ make install-brew       # Homebrew (Linux/macOS)
 All install scripts support `update` action:
 
 ```bash
-make update-core
-make update-python
-make update-node
-make update-go
-make update-aws
-make update-rust
+./scripts/install_group.sh core update
+make upgrade-python
+make upgrade-node
+make upgrade-go
+make upgrade-aws
+make upgrade-rust
 ```
 
 #### Uninstall Tools
@@ -295,11 +285,11 @@ Run basic lint checks with pyflakes (optional).
 make lint
 ```
 
-#### `make fmt`
-Placeholder for formatting (no-op currently).
+#### `make format`
+Format code with black and isort.
 
 ```bash
-make fmt
+make format
 ```
 
 #### `make help`
@@ -316,7 +306,9 @@ make help
 All scripts under `scripts/` follow consistent patterns:
 
 ```bash
-./scripts/install_COMPONENT.sh [ACTION] [TOOL]
+./scripts/install_<runtime>.sh [ACTION]      # e.g. install_python.sh, install_node.sh
+./scripts/install_tool.sh TOOL [ACTION]      # any catalog tool
+./scripts/install_group.sh TAG [ACTION]      # all catalog tools with a tag, e.g. core
 ```
 
 **Actions:**
@@ -324,8 +316,6 @@ All scripts under `scripts/` follow consistent patterns:
 - `update` - Update existing tools
 - `uninstall` - Remove tools
 - `reconcile` - Switch installation methods
-
-**Tool:** Optional, install/update specific tool only
 
 ### Script Behavior
 
@@ -340,10 +330,10 @@ All scripts under `scripts/` follow consistent patterns:
 
 **Example:**
 ```bash
-./scripts/install_core.sh install
+./scripts/install_group.sh core install
 # Installs all core tools
 
-./scripts/install_core.sh install fd
+./scripts/install_tool.sh fd install
 # Installs only fd
 ```
 
@@ -397,17 +387,17 @@ The tool separates data collection (network) from rendering (local) for efficien
 ### Workflow Modes
 
 #### Normal Mode (Default)
-Full audit: collect + render in single command.
+Render from the snapshot (run `make update` first).
 
 ```bash
-python3 cli_audit.py
+uv run python audit.py
 ```
 
 #### Collect-Only Mode
 Fetch data, write snapshot, no output.
 
 ```bash
-CLI_AUDIT_COLLECT=1 python3 cli_audit.py
+CLI_AUDIT_COLLECT=1 uv run python audit.py
 ```
 
 **Output:** Writes `tools_snapshot.json`
@@ -418,7 +408,7 @@ CLI_AUDIT_COLLECT=1 python3 cli_audit.py
 Read snapshot, format output, no network.
 
 ```bash
-CLI_AUDIT_RENDER=1 python3 cli_audit.py
+CLI_AUDIT_RENDER=1 uv run python audit.py
 ```
 
 **Use Case:** Repeated local checks, offline environments, fast queries.
@@ -504,7 +494,7 @@ Store snapshot as CI artifact, update weekly.
 
 **Environment Variable:**
 ```bash
-CLI_AUDIT_OFFLINE=1 python3 cli_audit.py
+CLI_AUDIT_OFFLINE=1 uv run python audit.py
 ```
 
 **Makefile:**
@@ -542,7 +532,7 @@ git commit -m "chore: update manual version cache"
 
 3. **Verify offline operation:**
 ```bash
-CLI_AUDIT_OFFLINE=1 python3 cli_audit.py --only python
+CLI_AUDIT_OFFLINE=1 uv run python audit.py ripgrep
 ```
 
 ### Offline Cache Management
@@ -571,33 +561,21 @@ CLI_AUDIT_RENDER=0
 CLI_AUDIT_JSON=0
 CLI_AUDIT_LINKS=1
 CLI_AUDIT_EMOJI=1
-CLI_AUDIT_TIMINGS=1
 CLI_AUDIT_GROUP=1
 
 # Performance
 CLI_AUDIT_MAX_WORKERS=16
 CLI_AUDIT_TIMEOUT_SECONDS=3
-CLI_AUDIT_FAST=0
 
 # Network
-CLI_AUDIT_HTTP_RETRIES=2
-CLI_AUDIT_BACKOFF_BASE=0.2
-CLI_AUDIT_BACKOFF_JITTER=0.1
 GITHUB_TOKEN=ghp_your_token_here
 
 # Debugging (disable in production)
 CLI_AUDIT_DEBUG=0
-CLI_AUDIT_TRACE=0
-CLI_AUDIT_TRACE_NET=0
-CLI_AUDIT_PROGRESS=0
 
 # Paths
 CLI_AUDIT_SNAPSHOT_FILE=tools_snapshot.json
-CLI_AUDIT_MANUAL_FILE=upstream_versions.json
-
-# Cache
-CLI_AUDIT_WRITE_MANUAL=1
-CLI_AUDIT_MANUAL_FIRST=0
+CLI_AUDIT_UPSTREAM_FILE=upstream_versions.json
 ```
 
 ### Environment Profiles
@@ -608,8 +586,6 @@ CLI_AUDIT_MANUAL_FIRST=0
 
 ```bash
 CLI_AUDIT_DEBUG=1
-CLI_AUDIT_PROGRESS=1
-CLI_AUDIT_TRACE=1
 CLI_AUDIT_MAX_WORKERS=8
 CLI_AUDIT_TIMEOUT_SECONDS=5
 ```
@@ -627,7 +603,6 @@ make audit
 ```bash
 CLI_AUDIT_OFFLINE=0
 CLI_AUDIT_JSON=1
-CLI_AUDIT_TIMINGS=0
 CLI_AUDIT_EMOJI=0
 CLI_AUDIT_LINKS=0
 CLI_AUDIT_MAX_WORKERS=4
@@ -644,7 +619,6 @@ CLI_AUDIT_RENDER=1
 CLI_AUDIT_OFFLINE=1
 CLI_AUDIT_JSON=1
 CLI_AUDIT_DEBUG=0
-CLI_AUDIT_FAST=1
 ```
 
 ## CI/CD Integration
@@ -667,17 +641,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.2.0
         with:
-          python-version: '3.11'
+          python-version: '3.14'
 
       - name: Run audit
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CLI_AUDIT_JSON: 1
         run: |
-          python3 cli_audit.py > audit_results.json
+          uv run python audit.py --update
+          uv run python audit.py > audit_results.json
 
       - name: Check for outdated tools
         run: |
@@ -747,11 +722,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: '3.14'
+
       - name: Run audit
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CLI_AUDIT_JSON: 1
-        run: python3 cli_audit.py > audit.json
+        run: |
+          uv run python audit.py --update
+          uv run python audit.py > audit.json
 
       - name: Generate summary
         id: summary
@@ -779,18 +761,21 @@ jobs:
 ```yaml
 tool_audit:
   stage: test
-  image: python:3.11
+  image: ghcr.io/astral-sh/uv:python3.14-trixie-slim
   script:
-    - python3 cli_audit.py --only agent-core | python3 smart_column.py -s "|" -t
+    - uv run python audit.py --update
+    - uv run python audit.py | python3 smart_column.py -s "|" -t
   only:
     - main
     - merge_requests
 
 tool_audit_json:
   stage: test
-  image: python:3.11
+  image: ghcr.io/astral-sh/uv:python3.14-trixie-slim
   script:
-    - CLI_AUDIT_JSON=1 python3 cli_audit.py > audit.json
+    - apt-get update && apt-get install -y --no-install-recommends jq
+    - uv run python audit.py --update
+    - CLI_AUDIT_JSON=1 uv run python audit.py > audit.json
     - jq '.[] | select(.status != "UP-TO-DATE")' audit.json
   artifacts:
     paths:
@@ -811,8 +796,10 @@ pipeline {
     stages {
         stage('Audit Tools') {
             steps {
+                // The agent needs uv and jq on its PATH.
                 sh '''
-                    CLI_AUDIT_JSON=1 python3 cli_audit.py > audit.json
+                    uv run python audit.py --update
+                    CLI_AUDIT_JSON=1 uv run python audit.py > audit.json
                     jq -r '.[] | select(.status == "OUTDATED") | .tool' audit.json > outdated.txt
                 '''
                 archiveArtifacts artifacts: 'audit.json,outdated.txt', fingerprint: true
@@ -844,8 +831,8 @@ time make update
 # Measure render time
 time make audit
 
-# Identify slow tools
-CLI_AUDIT_TRACE=1 CLI_AUDIT_SLOW_MS=1000 make update 2>&1 | grep "slow"
+# Debug log of a collection run (it records no per-tool timing)
+make update-debug
 ```
 
 ### Optimization Strategies
@@ -856,10 +843,10 @@ CLI_AUDIT_TRACE=1 CLI_AUDIT_SLOW_MS=1000 make update 2>&1 | grep "slow"
 
 ```bash
 # For powerful machines
-CLI_AUDIT_MAX_WORKERS=32 make update
+make update CLI_AUDIT_MAX_WORKERS=32
 
 # For resource-constrained environments
-CLI_AUDIT_MAX_WORKERS=4 make update
+make update CLI_AUDIT_MAX_WORKERS=4
 ```
 
 **Recommendation:** 16-20 workers optimal, diminishing returns above.
@@ -870,67 +857,13 @@ CLI_AUDIT_MAX_WORKERS=4 make update
 
 ```bash
 # Faster but may miss slow tools
-CLI_AUDIT_TIMEOUT_SECONDS=1 make update
+make update CLI_AUDIT_TIMEOUT_SECONDS=1
 
 # More patient for slow networks
-CLI_AUDIT_TIMEOUT_SECONDS=10 make update
+make update CLI_AUDIT_TIMEOUT_SECONDS=10
 ```
 
-#### 3. HTTP Retry Tuning
-
-**Default:** 2 retries with exponential backoff
-
-```bash
-# Aggressive (faster failure)
-CLI_AUDIT_HTTP_RETRIES=1 CLI_AUDIT_BACKOFF_BASE=0.1 make update
-
-# Conservative (better success rate)
-CLI_AUDIT_HTTP_RETRIES=5 CLI_AUDIT_BACKOFF_BASE=0.5 make update
-```
-
-#### 4. Manual-First Mode
-
-Try cache before network (cache-first strategy):
-
-```bash
-CLI_AUDIT_MANUAL_FIRST=1 make update
-```
-
-**Effect:** Reduces API calls, faster when cache is current.
-
-#### 5. Fast Mode
-
-Skip expensive operations:
-
-```bash
-CLI_AUDIT_FAST=1 make update
-```
-
-**Skips:**
-- Docker image inspection (if enabled)
-- Slow upstream APIs (GNU FTP)
-- Deep path searches
-
-#### 6. Host Concurrency Caps
-
-Prevent rate limiting by limiting per-host requests:
-
-```bash
-# Default: 4 concurrent GitHub API requests
-CLI_AUDIT_HOST_CAP_GITHUB_API=2 make update
-
-# Default: 4 concurrent npm registry requests
-CLI_AUDIT_HOST_CAP_NPM=8 make update
-```
-
-**Available Caps:**
-- `CLI_AUDIT_HOST_CAP_GITHUB` - github.com (releases)
-- `CLI_AUDIT_HOST_CAP_GITHUB_API` - api.github.com
-- `CLI_AUDIT_HOST_CAP_NPM` - registry.npmjs.org
-- `CLI_AUDIT_HOST_CAP_CRATES` - crates.io
-- `CLI_AUDIT_HOST_CAP_GNU` - GNU FTP mirrors
-
-#### 7. Snapshot-Based Rendering
+#### 3. Snapshot-Based Rendering
 
 **Fastest:** Render from snapshot (no collection)
 
@@ -959,16 +892,13 @@ make audit  # <100ms
    - **Effect:** 5000 req/hour authenticated
 
 2. **Network Latency:** Upstream APIs may be slow
-   - **Fix:** Use manual-first mode, increase timeout
+   - **Fix:** Increase timeout
    - **Effect:** Better success rate, slightly slower
 
 3. **Subprocess Execution:** 50+ version checks add up
    - **Fix:** Increase workers, reduce timeout
    - **Effect:** Faster completion, potential misses
 
-4. **Docker Inspection:** Slow if many images
-   - **Fix:** `CLI_AUDIT_DOCKER_INFO=0`
-   - **Effect:** Skip docker image details
 
 ### Production Tuning Recommendations
 
@@ -976,7 +906,6 @@ make audit  # <100ms
 ```bash
 CLI_AUDIT_MAX_WORKERS=8
 CLI_AUDIT_TIMEOUT_SECONDS=10
-CLI_AUDIT_HTTP_RETRIES=5
 GITHUB_TOKEN=<token>
 ```
 
@@ -984,15 +913,12 @@ GITHUB_TOKEN=<token>
 ```bash
 CLI_AUDIT_MAX_WORKERS=20
 CLI_AUDIT_TIMEOUT_SECONDS=2
-CLI_AUDIT_HTTP_RETRIES=1
-CLI_AUDIT_MANUAL_FIRST=1
 ```
 
 **Offline/Air-Gapped:**
 ```bash
 CLI_AUDIT_OFFLINE=1
 CLI_AUDIT_RENDER=1
-CLI_AUDIT_MANUAL_FIRST=1
 ```
 
 ## Monitoring and Alerting
@@ -1005,8 +931,8 @@ CLI_AUDIT_MANUAL_FIRST=1
 
 set -euo pipefail
 
-OUTDATED_COUNT=$(CLI_AUDIT_JSON=1 python3 cli_audit.py | jq '[.[] | select(.status == "OUTDATED")] | length')
-MISSING_COUNT=$(CLI_AUDIT_JSON=1 python3 cli_audit.py | jq '[.[] | select(.status == "NOT INSTALLED")] | length')
+OUTDATED_COUNT=$(CLI_AUDIT_JSON=1 uv run python audit.py | jq '[.[] | select(.status == "OUTDATED")] | length')
+MISSING_COUNT=$(CLI_AUDIT_JSON=1 uv run python audit.py | jq '[.[] | select(.status == "NOT INSTALLED")] | length')
 
 if [ "$OUTDATED_COUNT" -gt 5 ] || [ "$MISSING_COUNT" -gt 2 ]; then
   echo "WARN: $OUTDATED_COUNT outdated, $MISSING_COUNT missing tools"
@@ -1025,7 +951,7 @@ exit 0
 
 set -euo pipefail
 
-CLI_AUDIT_JSON=1 python3 cli_audit.py > audit.json
+CLI_AUDIT_JSON=1 uv run python audit.py > audit.json
 
 cat <<EOF
 # HELP cli_audit_tools_total Total number of tools audited

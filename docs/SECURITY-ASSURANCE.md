@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # Security Assurance Case
 
 This document states what users can and cannot expect from AI CLI Preparation (`audit.py`, the `cli_audit` package and the installers under `scripts/`) in terms of security, and argues why the stated requirements are met. Every claim names the file that implements it. The component architecture is described in [ARCHITECTURE.md](ARCHITECTURE.md). Vulnerabilities are reported privately as described in the organisation [security policy](https://github.com/netresearch/.github/blob/main/SECURITY.md).

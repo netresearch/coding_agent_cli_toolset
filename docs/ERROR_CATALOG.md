@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # Error Catalog
 
 **Version:** 2.0.0-alpha.6
@@ -604,7 +607,7 @@ Permission denied
    ```
 2. Or use sudo:
    ```bash
-   sudo python3 cli_audit.py
+   sudo uv run python audit.py
    ```
 3. Fix directory permissions:
    ```bash
@@ -681,7 +684,7 @@ FileNotFoundError: [Errno 2] No such file or directory
 
 1. **Enable Debug Mode:**
    ```bash
-   CLI_AUDIT_DEBUG=1 python3 cli_audit.py
+   CLI_AUDIT_DEBUG=1 uv run python audit.py --verbose
    ```
 
 2. **Enable Verbose Logging:**
@@ -738,9 +741,9 @@ FileNotFoundError: [Errno 2] No such file or directory
    - [PHASE2_API_REFERENCE.md](PHASE2_API_REFERENCE.md) - API documentation
    - [TESTING.md](TESTING.md) - Testing and debugging
 
-2. **Enable Tracing:**
+2. **Enable Debug Output:**
    ```bash
-   CLI_AUDIT_TRACE=1 CLI_AUDIT_TRACE_NET=1 python3 cli_audit.py 2> trace.log
+   CLI_AUDIT_DEBUG=1 uv run python audit.py --update --verbose 2> trace.log
    ```
 
 3. **Report Issue:**

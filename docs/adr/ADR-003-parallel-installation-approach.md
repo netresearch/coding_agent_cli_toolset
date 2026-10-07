@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # ADR-003: Parallel Installation Approach (Reconciliation)
 
 **Status:** Accepted

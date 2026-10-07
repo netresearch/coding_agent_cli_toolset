@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # Architecture Decision Records (ADRs)
 
 **Purpose:** Document significant architectural decisions for AI CLI Preparation Phase 2
