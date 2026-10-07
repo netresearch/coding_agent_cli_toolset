@@ -597,8 +597,8 @@ CLI_AUDIT_OFFLINE=1 uv run python audit.py
 # Check PATH
 echo $PATH
 
-# Check extra search paths
-CLI_AUDIT_DEBUG=1 uv run python audit.py --verbose 2>&1 | grep -i "search"
+# Check whether the shell finds the tool on PATH
+command -v mytool
 
 # Tools are found via PATH: add the tool's directory to PATH
 export PATH="/custom/path/to/tool:$PATH"
@@ -609,8 +609,9 @@ export PATH="/custom/path/to/tool:$PATH"
 **Problem:** Installed version shows as "X" or "unknown"
 
 ```bash
-# Debug version detection
-CLI_AUDIT_DEBUG=1 uv run python audit.py --verbose mytool 2> debug.log
+# Fresh detection for one tool: the JSON shows installed_version,
+# installed_path_selected and installed_method
+CLI_AUDIT_JSON=1 CLI_AUDIT_COLLECT=1 uv run python audit.py mytool
 
 # Check tool's version flag manually
 mytool --version
