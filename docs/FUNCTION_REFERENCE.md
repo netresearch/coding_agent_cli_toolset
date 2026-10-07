@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # Function Reference
 
 Quick lookup reference for functions of the former monolithic `cli_audit.py`, organized by category. That file was replaced by `audit.py` and the `cli_audit/` package; many of the functions below were removed or renamed in that split.

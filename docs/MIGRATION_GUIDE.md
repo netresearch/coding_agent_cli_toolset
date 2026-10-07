@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # Migration Guide: v1.x → v2.0 Modular Architecture
 
 **Last Updated:** 2025-11-03

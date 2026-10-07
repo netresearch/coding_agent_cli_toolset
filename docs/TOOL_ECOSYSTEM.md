@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # Tool Ecosystem
 
 Complete catalog of all tools tracked by AI CLI Preparation, organized by category with purpose, installation methods, and upgrade strategies.

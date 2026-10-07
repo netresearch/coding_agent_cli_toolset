@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-FileCopyrightText: Netresearch DTT GmbH -->
+
 # AI CLI Preparation
 
 [![CI](https://github.com/netresearch/coding_agent_cli_toolset/actions/workflows/ci.yml/badge.svg)](https://github.com/netresearch/coding_agent_cli_toolset/actions/workflows/ci.yml)
@@ -772,5 +775,5 @@ The audit system uses two JSON files:
 
 Split licensing:
 
-- **Code** (scripts, Python package, workflows, configuration): [MIT](LICENSE-MIT)
-- **Content** (the skill in `skills/`: SKILL.md and its references): [CC-BY-SA-4.0](LICENSE-CC-BY-SA-4.0)
+- **Content**: the skill in `skills/` (SKILL.md and its references), this `README.md` and the documentation under `docs/` are licensed under [CC-BY-SA-4.0](LICENSE-CC-BY-SA-4.0).
+- **Code**: everything else — the Python package, `audit.py`, scripts, tests, the tool catalog, workflows and configuration — is licensed under [MIT](LICENSE-MIT).
