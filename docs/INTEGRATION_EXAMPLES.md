@@ -38,10 +38,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.2.0
         with:
-          python-version: '3.11'
+          python-version: '3.14'
 
       - name: Run CLI Audit
         run: |
@@ -152,7 +152,7 @@ stages:
 
 audit-tools:
   stage: audit
-  image: python:3.11-slim
+  image: ghcr.io/astral-sh/uv:python3.14-trixie-slim
   script:
     - uv run python audit.py --update
     - CLI_AUDIT_JSON=1 uv run python audit.py > audit.json
@@ -189,8 +189,9 @@ install-missing:
 
 verify-tools:
   stage: test
-  image: python:3.11-slim
+  image: ghcr.io/astral-sh/uv:python3.14-trixie-slim
   script:
+    - apt-get update && apt-get install -y --no-install-recommends jq
     - uv run python audit.py --update
     - CLI_AUDIT_FILTER_STATUS="NOT INSTALLED" CLI_AUDIT_JSON=1 uv run python audit.py | jq -e 'length == 0'
 ```

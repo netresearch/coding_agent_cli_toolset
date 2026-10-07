@@ -111,7 +111,7 @@ If a tool has different names across distributions:
 "candidates": ["fd", "fdfind"]
 ```
 
-Both names are checked; the first match is preferred.
+Every name is checked; when several are installed, the one whose version string sorts highest (compared as text) is reported.
 
 **Common Cases:**
 - Debian renames: `bat` → `batcat`, `fd` → `fdfind`
@@ -308,7 +308,7 @@ jq '.' upstream_versions.json > /dev/null
 jq '.__meta__.schema_version' tools_snapshot.json
 
 # Check for version parsing issues
-CLI_AUDIT_JSON=1 uv run python audit.py | jq '.[] | select(.installed_version == null)'
+CLI_AUDIT_JSON=1 uv run python audit.py | jq '.[] | select(.installed_version == "")'
 ```
 
 ## Common Patterns and Idioms

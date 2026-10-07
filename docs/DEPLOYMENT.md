@@ -641,10 +641,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.2.0
         with:
-          python-version: '3.11'
+          python-version: '3.14'
 
       - name: Run audit
         env:
@@ -722,6 +722,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: '3.14'
+
       - name: Run audit
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -756,7 +761,7 @@ jobs:
 ```yaml
 tool_audit:
   stage: test
-  image: python:3.11
+  image: ghcr.io/astral-sh/uv:python3.14-trixie-slim
   script:
     - uv run python audit.py --update
     - uv run python audit.py | python3 smart_column.py -s "|" -t
@@ -766,8 +771,9 @@ tool_audit:
 
 tool_audit_json:
   stage: test
-  image: python:3.11
+  image: ghcr.io/astral-sh/uv:python3.14-trixie-slim
   script:
+    - apt-get update && apt-get install -y --no-install-recommends jq
     - uv run python audit.py --update
     - CLI_AUDIT_JSON=1 uv run python audit.py > audit.json
     - jq '.[] | select(.status != "UP-TO-DATE")' audit.json
@@ -790,6 +796,7 @@ pipeline {
     stages {
         stage('Audit Tools') {
             steps {
+                // The agent needs uv and jq on its PATH.
                 sh '''
                     uv run python audit.py --update
                     CLI_AUDIT_JSON=1 uv run python audit.py > audit.json
