@@ -28,6 +28,12 @@ from cli_audit import (  # noqa: E402  (imported after the skip marker)
 )
 
 
+@pytest.fixture(autouse=True)
+def private_tempdir(tmp_path, monkeypatch):
+    """Keep rollback scripts that bulk_install generates out of the shared temp directory."""
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
+
+
 class TestSingleToolInstallation:
     """Integration tests for single tool installation."""
 

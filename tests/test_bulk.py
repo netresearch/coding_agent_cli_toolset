@@ -38,6 +38,12 @@ from cli_audit.installer import InstallResult, StepResult
 skip_on_windows = pytest.mark.skipif(sys.platform == "win32", reason="Rollback scripts use Unix shell syntax")
 
 
+@pytest.fixture(autouse=True)
+def private_tempdir(tmp_path, monkeypatch):
+    """Keep rollback scripts that bulk_install generates out of the shared temp directory."""
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
+
+
 class TestToolSpec:
     """Tests for ToolSpec dataclass."""
 
