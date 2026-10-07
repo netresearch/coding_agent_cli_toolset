@@ -35,7 +35,7 @@ def test_release_number_cycles_are_returned(monkeypatch):
 
 
 def test_cycles_of_another_shape_are_dropped(monkeypatch):
-    payload = [_entry("3.14"), _entry("3.13'; x"), _entry("../3"), _entry("3.12")]
+    payload = [_entry("3.14"), _entry("3.13'; x"), _entry("../3"), _entry("3.13\n"), _entry("3.12")]
     monkeypatch.setattr(collectors, "http_get", lambda url, timeout=5: json.dumps(payload).encode())
 
     cycles = [e["cycle"] for e in collectors.collect_endoflife("python", max_versions=10)]

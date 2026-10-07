@@ -614,12 +614,12 @@ def is_wsl() -> bool:
 # A release cycle as endoflife.date publishes it for the runtimes in the
 # catalog: "3.13", "24", "1.23". The cycle becomes part of tool keys, binary
 # names and environment values downstream, so anything else is dropped.
-_CYCLE_RE = re.compile(r"^[0-9]+(?:\.[0-9]+)*$")
+_CYCLE_RE = re.compile(r"[0-9]+(?:\.[0-9]+)*")
 
 
 def _valid_cycle_entries(entries: list[Any]) -> list[dict[str, Any]]:
     """Keep only entries whose cycle has the shape of a release number."""
-    return [e for e in entries if isinstance(e, dict) and _CYCLE_RE.match(str(e.get("cycle", "")))]
+    return [e for e in entries if isinstance(e, dict) and _CYCLE_RE.fullmatch(str(e.get("cycle", "")))]
 
 
 def collect_endoflife(
@@ -672,7 +672,7 @@ def collect_endoflife(
         else:
             for entry in data:
                 cycle = entry.get("cycle", "") if isinstance(entry, dict) else ""
-                if not _CYCLE_RE.match(str(cycle)):
+                if not _CYCLE_RE.fullmatch(str(cycle)):
                     logger.debug(f"endoflife.date {product}: skipping malformed cycle {cycle!r}")
                     continue
                 eol = entry.get("eol")
