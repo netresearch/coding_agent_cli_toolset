@@ -59,7 +59,7 @@ bash tests/test_reconcile_dryrun.sh
 
 | Job | What it runs |
 | --- | --- |
-| App CI / CI | flake8, mypy, and the unit and integration tests with coverage (uploaded to Codecov), on Python 3.14 on Ubuntu, macOS and Windows |
+| App CI / CI | flake8, black and isort checks, mypy, and the unit and integration tests with coverage (uploaded to Codecov), on Python 3.14 on Ubuntu, macOS and Windows |
 | App CI / Build | `python -m build` and `twine check dist/*` |
 | App CI / Audit | pip-audit, bandit and a CycloneDX SBOM (see "Security checks on pull requests") |
 | App CI / Secret Scanning | Betterleaks |
@@ -83,13 +83,15 @@ CI runs these commands (`.github/workflows/ci.yml`, job App CI / CI). Run them b
 
 ```bash
 uv run flake8 cli_audit tests --count --show-source --statistics
+uv run black --check --diff cli_audit tests audit.py
+uv run isort --check-only --diff cli_audit tests audit.py
 uv run mypy cli_audit --ignore-missing-imports
 ```
 
 - **flake8** (`.flake8`, maximum line length 127) fails CI on any finding.
 - **McCabe complexity** is the documented exception: CI reports functions above complexity 10 (`flake8 --select=C901 --max-complexity=10 --exit-zero`) without failing. 23 existing functions in ten modules of `cli_audit/` exceed the threshold, seven of them in `reconcile.py`; reducing them is a refactor of that logic. New code should stay below 10.
 - **mypy** (`[tool.mypy]` in `pyproject.toml`) fails CI on any finding.
-- **black** and **isort** (`[tool.black]`, `[tool.isort]` in `pyproject.toml`) run as pre-commit hooks for `cli_audit/`, `tests/` and `audit.py`. CI does not run them yet, because the existing tree is not formatted with them.
+- **black** and **isort** (`[tool.black]`, `[tool.isort]` in `pyproject.toml`) run as pre-commit hooks for `cli_audit/`, `tests/` and `audit.py`, and CI fails when a file there is not formatted (`black --check --diff cli_audit tests audit.py`, `isort --check-only --diff cli_audit tests audit.py`). `uv run black cli_audit tests audit.py` and `uv run isort cli_audit tests audit.py` format them.
 - **ShellCheck** runs as a pre-commit hook for the shell scripts under `scripts/` at severity `warning`. CI does not run it.
 
 ## Governance and policies

@@ -13,7 +13,7 @@ from typing import Any
 import pytest
 
 from cli_audit import pins as pins_module
-from cli_audit.render import render_table, print_summary
+from cli_audit.render import print_summary, render_table
 
 
 @pytest.fixture(autouse=True)
@@ -282,9 +282,7 @@ class TestAutoMarker:
 
         return Config(tools={k: ToolConfig(auto_update=v) for k, v in tools.items()})
 
-    def test_auto_marker_shown_when_explicit_true(
-        self, empty_pins, monkeypatch: pytest.MonkeyPatch
-    ):
+    def test_auto_marker_shown_when_explicit_true(self, empty_pins, monkeypatch: pytest.MonkeyPatch):
         import cli_audit.render as render_mod
 
         cfg = self._config({"ripgrep": True})
@@ -302,9 +300,7 @@ class TestAutoMarker:
         )
         assert rows == ["✓|ripgrep|14.1.0 [AUTO]|14.1.0|cargo"]
 
-    def test_auto_marker_hidden_when_pin_is_never(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-    ):
+    def test_auto_marker_hidden_when_pin_is_never(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
         """AUTO and PIN:never contradict each other — don't show both."""
         import json
 
@@ -332,9 +328,7 @@ class TestAutoMarker:
         # [AUTO] must NOT appear; the row is a ⚠️ conflict only.
         assert rows == ["⚠|ruby@3.3|3.3.6 [PIN:never]|3.3.11|manual"]
 
-    def test_auto_marker_inherits_from_base_tool(
-        self, empty_pins, monkeypatch: pytest.MonkeyPatch
-    ):
+    def test_auto_marker_inherits_from_base_tool(self, empty_pins, monkeypatch: pytest.MonkeyPatch):
         """``python: auto_update: true`` should surface as [AUTO] on
         ``python@3.14`` rows (base-tool fallback)."""
         import cli_audit.render as render_mod

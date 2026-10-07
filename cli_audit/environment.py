@@ -14,7 +14,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-from .common import is_ci_environment, get_active_user_count, get_system_uptime_days, vlog
+from .common import get_active_user_count, get_system_uptime_days, is_ci_environment, vlog
 
 
 @dataclass(frozen=True)
@@ -28,6 +28,7 @@ class Environment:
         indicators: Evidence for the detection decision
         override: Whether mode was explicitly overridden by user
     """
+
     mode: str
     confidence: float
     indicators: tuple[str, ...] = ()
@@ -64,10 +65,7 @@ def detect_environment(override: str | None = None, verbose: bool = False) -> En
     # Handle explicit override
     if override and override != "auto":
         if override not in valid_modes:
-            raise ValueError(
-                f"Invalid environment override: {override}. "
-                f"Must be one of: {', '.join(sorted(valid_modes))}"
-            )
+            raise ValueError(f"Invalid environment override: {override}. " f"Must be one of: {', '.join(sorted(valid_modes))}")
         vlog(f"Environment explicitly set to: {override}", verbose)
         return Environment(
             mode=override,
@@ -80,8 +78,15 @@ def detect_environment(override: str | None = None, verbose: bool = False) -> En
     if is_ci_environment():
         indicators = []
         ci_env_vars = [
-            "CI", "GITHUB_ACTIONS", "GITLAB_CI", "CIRCLECI", "TRAVIS",
-            "JENKINS_HOME", "BUILDKITE", "DRONE", "SEMAPHORE"
+            "CI",
+            "GITHUB_ACTIONS",
+            "GITLAB_CI",
+            "CIRCLECI",
+            "TRAVIS",
+            "JENKINS_HOME",
+            "BUILDKITE",
+            "DRONE",
+            "SEMAPHORE",
         ]
         for var in ci_env_vars:
             if os.environ.get(var):

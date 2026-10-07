@@ -35,7 +35,6 @@ from .environment import Environment
 from .installer import InstallResult, install_tool, validate_installation
 from .package_managers import select_package_manager
 
-
 # Version cache with configurable TTL
 _version_cache: dict[tuple[str, str], tuple[str, float]] = {}
 
@@ -55,6 +54,7 @@ class UpgradeBackup:
         package_manager: Package manager used
         checksum: SHA256 checksum of backed up binary
     """
+
     tool_name: str
     version: str
     binary_path: str
@@ -97,6 +97,7 @@ class UpgradeResult:
         duration_seconds: Total upgrade time
         error_message: Human-readable error message if failed
     """
+
     tool_name: str
     success: bool
     previous_version: str | None
@@ -139,6 +140,7 @@ class UpgradeCandidate:
         breaking_change: Whether upgrade is a major version bump
         package_manager: Package manager to use for upgrade
     """
+
     tool_name: str
     current_version: str
     available_version: str
@@ -167,6 +169,7 @@ class BulkUpgradeResult:
         breaking_changes_count: Number of breaking changes encountered
         rollbacks_executed: Number of automatic rollbacks performed
     """
+
     tools_attempted: tuple[str, ...]
     upgrades: tuple[UpgradeResult, ...]
     skipped: tuple[str, ...]
@@ -213,6 +216,7 @@ def compare_versions(v1: str, v2: str) -> int:
     """
     try:
         from packaging import version
+
         ver1 = version.parse(v1)
         ver2 = version.parse(v2)
 
@@ -283,6 +287,7 @@ def get_available_version(
             # Use PyPI JSON API for reliability
             import json
             import urllib.request
+
             try:
                 url = f"https://pypi.org/pypi/{tool_name}/json"
                 with urllib.request.urlopen(url, timeout=10) as response:
@@ -311,6 +316,7 @@ def get_available_version(
 
         elif package_manager == "apt":
             from .catalog import resolve_apt_package_name
+
             apt_pkg = resolve_apt_package_name(tool_name)
             result = subprocess.run(
                 ["apt-cache", "policy", apt_pkg],
@@ -321,9 +327,9 @@ def get_available_version(
             )
             if result.returncode == 0:
                 # Parse: "  Candidate: 14.1.1-1"
-                match = re.search(r'Candidate:\s+([^\s]+)', result.stdout)
+                match = re.search(r"Candidate:\s+([^\s]+)", result.stdout)
                 if match:
-                    version_str = match.group(1).split('-')[0]  # Remove Debian revision
+                    version_str = match.group(1).split("-")[0]  # Remove Debian revision
                     _version_cache[cache_key] = (version_str, time.time())
                     return version_str
 
@@ -337,6 +343,7 @@ def get_available_version(
             )
             if result.returncode == 0:
                 import json
+
                 data = json.loads(result.stdout)
                 if data and len(data) > 0:
                     go_version: str | None = data[0].get("versions", {}).get("stable")
@@ -416,12 +423,14 @@ def get_config_paths(tool_name: str) -> list[str]:
     ]
 
     # Project config (if in project directory)
-    potential_paths.extend([
-        f".{tool_name}.yml",
-        f".{tool_name}.yaml",
-        f".{tool_name}.json",
-        f".{tool_name}rc",
-    ])
+    potential_paths.extend(
+        [
+            f".{tool_name}.yml",
+            f".{tool_name}.yaml",
+            f".{tool_name}.json",
+            f".{tool_name}rc",
+        ]
+    )
 
     # Validate paths stay within safe boundaries
     for path in potential_paths:
@@ -462,7 +471,7 @@ def create_upgrade_backup(
     vlog(f"Creating backup in: {backup_dir}", verbose)
 
     # Calculate checksum of binary
-    with open(binary_path, 'rb') as f:
+    with open(binary_path, "rb") as f:
         checksum = hashlib.sha256(f.read()).hexdigest()
 
     # Backup binary
@@ -512,7 +521,7 @@ def restore_from_backup(backup: UpgradeBackup, verbose: bool = False) -> bool:
 
         # Verify backup integrity
         binary_backup = os.path.join(backup.backup_path, os.path.basename(backup.binary_path))
-        with open(binary_backup, 'rb') as f:
+        with open(binary_backup, "rb") as f:
             actual_checksum = hashlib.sha256(f.read()).hexdigest()
 
         if actual_checksum != backup.checksum:
@@ -844,13 +853,15 @@ def get_upgrade_candidates(
 
         if upgrade_available and current and available:
             is_breaking = is_major_upgrade(current, available)
-            candidates.append(UpgradeCandidate(
-                tool_name=tool,
-                current_version=current,
-                available_version=available,
-                breaking_change=is_breaking,
-                package_manager=pm_name,
-            ))
+            candidates.append(
+                UpgradeCandidate(
+                    tool_name=tool,
+                    current_version=current,
+                    available_version=available,
+                    breaking_change=is_breaking,
+                    package_manager=pm_name,
+                )
+            )
             vlog(f"{tool}: {current} → {available} {'(BREAKING)' if is_breaking else ''}", verbose)
         else:
             vlog(f"{tool}: up-to-date at {current}", verbose)
@@ -946,9 +957,9 @@ def bulk_upgrade(
     if interactive and not dry_run:
         from .catalog import ToolCatalog
         from .prerequisites import (
-            resolve_prerequisites,
             check_prerequisites,
             prompt_install_all_prerequisites,
+            resolve_prerequisites,
         )
 
         catalog = ToolCatalog()
@@ -1013,6 +1024,7 @@ def bulk_upgrade(
     # Determine max workers
     if max_workers is None:
         import os
+
         max_workers = min(16, os.cpu_count() or 4 + 4)
 
     vlog(f"Upgrading {len(allowed)} tools with {max_workers} workers...", verbose)
@@ -1048,14 +1060,16 @@ def bulk_upgrade(
             except Exception as e:
                 vlog(f"Unexpected error upgrading {candidate.tool_name}: {e}", verbose)
                 # Create failure result
-                failures.append(UpgradeResult(
-                    tool_name=candidate.tool_name,
-                    success=False,
-                    previous_version=candidate.current_version,
-                    new_version=None,
-                    backup=None,
-                    error_message=str(e),
-                ))
+                failures.append(
+                    UpgradeResult(
+                        tool_name=candidate.tool_name,
+                        success=False,
+                        previous_version=candidate.current_version,
+                        new_version=None,
+                        backup=None,
+                        error_message=str(e),
+                    )
+                )
 
     duration = time.time() - start_time
 

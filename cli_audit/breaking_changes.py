@@ -28,16 +28,17 @@ def is_major_upgrade(v1: str, v2: str) -> bool:
     """
     try:
         from packaging import version
+
         ver1 = version.parse(v1)
         ver2 = version.parse(v2)
 
         # For PEP 440 versions with major attribute
-        if hasattr(ver1, 'major') and hasattr(ver2, 'major'):
+        if hasattr(ver1, "major") and hasattr(ver2, "major"):
             return ver2.major > ver1.major
 
         # Fallback: parse major from string
-        parts1 = str(ver1.base_version if hasattr(ver1, 'base_version') else ver1).split('.')
-        parts2 = str(ver2.base_version if hasattr(ver2, 'base_version') else ver2).split('.')
+        parts1 = str(ver1.base_version if hasattr(ver1, "base_version") else ver1).split(".")
+        parts2 = str(ver2.base_version if hasattr(ver2, "base_version") else ver2).split(".")
 
         if parts1 and parts2:
             major1 = int(parts1[0]) if parts1[0].isdigit() else 0
@@ -125,7 +126,7 @@ def confirm_breaking_change(warning_message: str) -> bool:
 
     print(warning_message, end="")
     response = input().strip().lower()
-    return response in ('y', 'yes')
+    return response in ("y", "yes")
 
 
 def confirm_bulk_breaking_changes(candidates: Sequence) -> bool:
@@ -155,7 +156,7 @@ def confirm_bulk_breaking_changes(candidates: Sequence) -> bool:
     print("Continue with upgrades? [y/N]: ", end="")
 
     response = input().strip().lower()
-    return response in ('y', 'yes')
+    return response in ("y", "yes")
 
 
 def filter_by_breaking_changes(

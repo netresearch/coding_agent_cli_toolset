@@ -6,12 +6,13 @@
 - release URLs use the RAW tag (``v1.7.12``) so GitHub/GitLab links resolve
 - the Python-package-manager health check knows about poetry
 """
+
 import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from cli_audit.catalog import ToolCatalog, ToolCatalogEntry
-from cli_audit.collectors import collect_gitlab, collect_github
+from cli_audit.collectors import collect_github, collect_gitlab
 from cli_audit.tools import Tool, latest_target_url
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -55,11 +56,13 @@ class TestRawTagUrls:
         opener = MagicMock()
         opener.open.side_effect = Exception("no redirect in test")
         api_body = json.dumps({"tag_name": "v3.4.5"}).encode()
-        with patch("cli_audit.collectors.urllib.request.build_opener", return_value=opener), \
-                patch("cli_audit.collectors.http_get", return_value=api_body):
+        with (
+            patch("cli_audit.collectors.urllib.request.build_opener", return_value=opener),
+            patch("cli_audit.collectors.http_get", return_value=api_body),
+        ):
             raw_tag, version = collect_github("owner", "repo")
-        assert raw_tag == "v3.4.5"       # raw tag preserved for the URL
-        assert version == "3.4.5"        # version normalized for display/compare
+        assert raw_tag == "v3.4.5"  # raw tag preserved for the URL
+        assert version == "3.4.5"  # version normalized for display/compare
 
     def test_collect_gitlab_returns_raw_tag(self):
         body = json.dumps([{"tag_name": "v9.9.9"}]).encode()
@@ -76,9 +79,11 @@ class TestReviewFixes:
         from cli_audit.local_state import LocalState, merge_for_display
         from cli_audit.upstream_cache import UpstreamCache, UpstreamVersion
 
-        up = UpstreamCache(versions={
-            "demo": UpstreamVersion(latest_tag="v1.7.12", latest_version="1.7.12"),
-        })
+        up = UpstreamCache(
+            versions={
+                "demo": UpstreamVersion(latest_tag="v1.7.12", latest_version="1.7.12"),
+            }
+        )
         merged = merge_for_display(up, LocalState())
         entry = next(t for t in merged if t["tool"] == "demo")
         assert entry["latest_upstream"] == "1.7.12"
@@ -89,14 +94,14 @@ class TestReviewFixes:
         assert "\x1b" not in url and "\x07" not in url
 
     def test_source_args_string_not_split(self):
-        entry = ToolCatalogEntry(
-            name="d", _raw_data={"source_kind": "pypi", "source_args": "demo-pkg"}
-        )
+        entry = ToolCatalogEntry(name="d", _raw_data={"source_kind": "pypi", "source_args": "demo-pkg"})
         assert entry._derive_source() == ("pypi", ("demo-pkg",))
 
     def test_collect_github_handles_non_dict_json(self):
-        with patch("cli_audit.collectors.urllib.request.build_opener") as bo, \
-                patch("cli_audit.collectors.http_get", return_value=b'["unexpected"]'):
+        with (
+            patch("cli_audit.collectors.urllib.request.build_opener") as bo,
+            patch("cli_audit.collectors.http_get", return_value=b'["unexpected"]'),
+        ):
             bo.return_value.open.side_effect = Exception("no redirect")
             # Must not raise AttributeError on the list response
             collect_github("owner", "repo")

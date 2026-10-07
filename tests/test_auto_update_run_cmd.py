@@ -18,9 +18,7 @@ from pathlib import Path
 
 import pytest
 
-skip_on_windows = pytest.mark.skipif(
-    sys.platform == "win32", reason="Shell script tests require POSIX shell"
-)
+skip_on_windows = pytest.mark.skipif(sys.platform == "win32", reason="Shell script tests require POSIX shell")
 
 SCRIPT = Path(__file__).parent.parent / "scripts" / "auto_update.sh"
 
@@ -40,7 +38,9 @@ eval "$(sed -n '/^run_cmd()/,/^}}/p' "{SCRIPT}")"
 """
     return subprocess.run(
         ["bash", "-c", full_code],
-        capture_output=True, text=True, timeout=timeout,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
         stdin=subprocess.PIPE,  # a held-open stdin, like an attached terminal
     )
 
@@ -62,7 +62,8 @@ eval "$(sed -n '/^run_cmd()/,/^}}/p' "{SCRIPT}")"
 """
         proc = subprocess.Popen(
             ["bash", "-c", full_code],
-            stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
         try:
@@ -79,15 +80,10 @@ eval "$(sed -n '/^run_cmd()/,/^}}/p' "{SCRIPT}")"
     def test_command_reading_stdin_does_not_hang(self):
         """A hidden interactive prompt must hit EOF instead of blocking on the
         caller's terminal (the composer hang)."""
-        self._assert_completes_with_held_stdin(
-            'run_cmd "Prompting tool" bash -c \'read -r answer; echo done\''
-        )
+        self._assert_completes_with_held_stdin("run_cmd \"Prompting tool\" bash -c 'read -r answer; echo done'")
 
     def test_verbose_mode_also_detaches_stdin(self):
-        self._assert_completes_with_held_stdin(
-            'VERBOSE=1\n'
-            'run_cmd "Prompting tool" bash -c \'read -r answer\' || true'
-        )
+        self._assert_completes_with_held_stdin("VERBOSE=1\n" "run_cmd \"Prompting tool\" bash -c 'read -r answer' || true")
 
 
 @skip_on_windows
@@ -97,21 +93,15 @@ class TestRunCmdSlowNotice:
 SLOW_SECS=1
 run_cmd "Slow step" sleep 3
 """)
-        assert "sleep 3" in result.stderr, (
-            f"slow-command notice must show the real command: {result.stderr}"
-        )
+        assert "sleep 3" in result.stderr, f"slow-command notice must show the real command: {result.stderr}"
 
     def test_fast_command_stays_quiet(self):
         result = _run_cmd("""
 SLOW_SECS=2
 run_cmd "Fast step" true
 """)
-        assert "running" not in result.stderr.lower().replace(
-            "[auto-update]", ""
-        ).replace("fast step", "")
-        assert "true" not in [
-            line.strip() for line in result.stderr.splitlines()
-        ]
+        assert "running" not in result.stderr.lower().replace("[auto-update]", "").replace("fast step", "")
+        assert "true" not in [line.strip() for line in result.stderr.splitlines()]
 
 
 @skip_on_windows

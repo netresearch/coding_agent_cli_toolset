@@ -18,9 +18,7 @@ from pathlib import Path
 
 import pytest
 
-skip_on_windows = pytest.mark.skipif(
-    sys.platform == "win32", reason="Shell script tests require POSIX shell"
-)
+skip_on_windows = pytest.mark.skipif(sys.platform == "win32", reason="Shell script tests require POSIX shell")
 
 SCRIPT = Path(__file__).parent.parent / "scripts" / "install_go.sh"
 
@@ -98,7 +96,10 @@ class TestGoMultiVersionInstall:
     def _run(self, env: dict) -> subprocess.CompletedProcess:
         return subprocess.run(
             ["bash", str(SCRIPT), "install"],
-            capture_output=True, text=True, timeout=60, env=env,
+            capture_output=True,
+            text=True,
+            timeout=60,
+            env=env,
         )
 
     def test_sdk_download_and_symlink_despite_gobin_off_path(self, tmp_path):
@@ -106,9 +107,7 @@ class TestGoMultiVersionInstall:
         result = self._run(env)
         assert result.returncode == 0, result.stderr
 
-        assert "go1.26.5 download" in log.read_text(), (
-            "SDK download must run even when GOPATH/bin is off PATH"
-        )
+        assert "go1.26.5 download" in log.read_text(), "SDK download must run even when GOPATH/bin is off PATH"
         cycle_link = gopath / "bin" / "go1.26"
         assert cycle_link.is_symlink(), "go1.26 cycle symlink must be created"
         assert os.readlink(cycle_link) == "go1.26.5"
@@ -119,9 +118,7 @@ class TestGoMultiVersionInstall:
         out = result.stdout + result.stderr
         # "before: <none>" is correct on a fresh install — the bug was the
         # after-probe returning <none> because GOPATH/bin is off PATH
-        assert "[go@1.26] after:  go version go1.26.5" in out, (
-            f"after-version must probe GOPATH/bin, got: {out}"
-        )
+        assert "[go@1.26] after:  go version go1.26.5" in out, f"after-version must probe GOPATH/bin, got: {out}"
 
     def test_superseded_wrappers_of_same_cycle_are_removed(self, tmp_path):
         env, gopath, _ = self._setup(tmp_path)
@@ -143,6 +140,4 @@ class TestGoMultiVersionInstall:
         assert not (gopath / "bin" / "go1.26.2").exists()
         assert not (Path(env["HOME"]) / "sdk" / "go1.26.0").exists()
         assert (gopath / "bin" / "go1.26.5").exists()
-        assert (gopath / "bin" / "go1.25.11").exists(), (
-            "other cycles must not be touched"
-        )
+        assert (gopath / "bin" / "go1.25.11").exists(), "other cycles must not be touched"

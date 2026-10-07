@@ -7,13 +7,14 @@ Target coverage: 85%+
 """
 
 import json
+
 import pytest
 
 from cli_audit.install_plan import (
-    InstallStep,
     InstallPlan,
-    generate_install_plan,
+    InstallStep,
     dry_run_install,
+    generate_install_plan,
 )
 
 
@@ -114,9 +115,7 @@ class TestInstallPlan:
 
     def test_install_plan_explicit_total_time(self):
         """Test InstallPlan with explicit total time."""
-        steps = (
-            InstallStep("Step 1", ("cmd1",), estimated_time_seconds=10),
-        )
+        steps = (InstallStep("Step 1", ("cmd1",), estimated_time_seconds=10),)
         plan = InstallPlan(
             tool_name="test",
             target_version="1.0.0",
@@ -128,9 +127,7 @@ class TestInstallPlan:
 
     def test_install_plan_to_dict(self):
         """Test InstallPlan to_dict method."""
-        steps = (
-            InstallStep("Install", ("cargo", "install", "tool"), estimated_time_seconds=60),
-        )
+        steps = (InstallStep("Install", ("cargo", "install", "tool"), estimated_time_seconds=60),)
         plan = InstallPlan(
             tool_name="tool",
             target_version="1.0.0",
@@ -149,9 +146,7 @@ class TestInstallPlan:
 
     def test_install_plan_to_json(self):
         """Test InstallPlan to_json method."""
-        steps = (
-            InstallStep("Install", ("cargo", "install", "tool"), estimated_time_seconds=60),
-        )
+        steps = (InstallStep("Install", ("cargo", "install", "tool"), estimated_time_seconds=60),)
         plan = InstallPlan(
             tool_name="tool",
             target_version="1.0.0",
@@ -184,9 +179,7 @@ class TestInstallPlan:
 
     def test_install_plan_to_script_with_sudo(self):
         """Test InstallPlan to_script with sudo steps."""
-        steps = (
-            InstallStep("Install via apt", ("apt", "install", "tool"), requires_sudo=True, estimated_time_seconds=60),
-        )
+        steps = (InstallStep("Install via apt", ("apt", "install", "tool"), requires_sudo=True, estimated_time_seconds=60),)
         plan = InstallPlan(
             tool_name="tool",
             target_version="1.0.0",
@@ -198,9 +191,7 @@ class TestInstallPlan:
 
     def test_install_plan_to_script_with_warnings(self):
         """Test InstallPlan to_script includes warnings."""
-        steps = (
-            InstallStep("Install", ("cargo", "install", "tool"), estimated_time_seconds=60),
-        )
+        steps = (InstallStep("Install", ("cargo", "install", "tool"), estimated_time_seconds=60),)
         plan = InstallPlan(
             tool_name="tool",
             target_version="1.0.0",
@@ -240,9 +231,7 @@ class TestInstallPlan:
 
     def test_install_plan_to_table_with_warnings(self):
         """Test InstallPlan to_table includes warnings."""
-        steps = (
-            InstallStep("Install", ("cargo", "install", "tool"), estimated_time_seconds=60),
-        )
+        steps = (InstallStep("Install", ("cargo", "install", "tool"), estimated_time_seconds=60),)
         plan = InstallPlan(
             tool_name="tool",
             target_version="1.0.0",

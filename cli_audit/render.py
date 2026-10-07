@@ -13,7 +13,6 @@ from typing import Any
 from .config import load_config
 from .pins import apply_pin_to_status, load_pins, lookup_pin, pin_label
 
-
 # Environment options
 USE_EMOJI = os.environ.get("CLI_AUDIT_EMOJI", "1") == "1"
 ENABLE_LINKS = os.environ.get("CLI_AUDIT_LINKS", "1") == "1"
@@ -100,12 +99,32 @@ GROUP_BY_CATEGORY = os.environ.get("CLI_AUDIT_GROUP", "1") == "1"
 
 # Category display info
 CATEGORY_ORDER = {
-    "python": 1, "node": 2, "go": 3, "rust": 4, "ruby": 5, "php": 6, "shell": 7,
-    "git": 10, "devops": 11, "platform": 12, "ai": 13, "general": 20,
+    "python": 1,
+    "node": 2,
+    "go": 3,
+    "rust": 4,
+    "ruby": 5,
+    "php": 6,
+    "shell": 7,
+    "git": 10,
+    "devops": 11,
+    "platform": 12,
+    "ai": 13,
+    "general": 20,
 }
 CATEGORY_ICON = {
-    "python": "🐍", "node": "📦", "go": "🔵", "rust": "🦀", "ruby": "💎", "php": "🐘", "shell": "🐚",
-    "git": "📝", "devops": "🔧", "platform": "☁️", "ai": "🤖", "general": "🔨",
+    "python": "🐍",
+    "node": "📦",
+    "go": "🔵",
+    "rust": "🦀",
+    "ruby": "💎",
+    "php": "🐘",
+    "shell": "🐚",
+    "git": "📝",
+    "devops": "🔧",
+    "platform": "☁️",
+    "ai": "🤖",
+    "general": "🔨",
 }
 CATEGORY_DESC = {
     "python": "Python Development",
@@ -277,7 +296,7 @@ def _render_tool_row(
     # conflicts), so check it first.
     installed_clean = installed
     if installed_clean.startswith("CONFLICT: "):
-        installed_clean = installed_clean[len("CONFLICT: "):]
+        installed_clean = installed_clean[len("CONFLICT: ") :]
 
     # Apply colors to installed and latest
     installed_display = colorize(installed_clean, inst_color)
@@ -339,8 +358,7 @@ def print_summary(snapshot: dict[str, Any], tools: list[dict[str, Any]]) -> None
     # Discoverability hints (only when relevant)
     if conflicts > 0:
         print(
-            f"  → {conflicts} tool(s) with duplicate installs: "
-            "'make reconcile-all' (keeps preferred, removes the rest)",
+            f"  → {conflicts} tool(s) with duplicate installs: " "'make reconcile-all' (keeps preferred, removes the rest)",
             file=sys.stderr,
         )
     if outdated > 0:

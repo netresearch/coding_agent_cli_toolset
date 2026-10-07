@@ -160,9 +160,7 @@ class TestShouldSkip:
 
 
 class TestApplyPinToStatus:
-    @pytest.mark.parametrize(
-        "status", ["UP-TO-DATE", "OUTDATED", "NOT INSTALLED", "CONFLICT", "UNKNOWN"]
-    )
+    @pytest.mark.parametrize("status", ["UP-TO-DATE", "OUTDATED", "NOT INSTALLED", "CONFLICT", "UNKNOWN"])
     def test_no_pin_passes_through(self, status: str):
         assert apply_pin_to_status(status, "1.0", pin="") == status
 

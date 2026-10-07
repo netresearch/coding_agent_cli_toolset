@@ -16,14 +16,13 @@ from typing import Any
 
 from .common import vlog
 
-
 # Configuration file locations (in priority order)
 CONFIG_LOCATIONS = [
-    ".cli-audit.yml",                              # Project root (highest priority)
-    ".cli-audit.yaml",                             # Alternative extension
+    ".cli-audit.yml",  # Project root (highest priority)
+    ".cli-audit.yaml",  # Alternative extension
     os.path.expanduser("~/.config/cli-audit/config.yml"),  # User global
     os.path.expanduser("~/.config/cli-audit/config.yaml"),
-    "/etc/cli-audit/config.yml",                   # System global
+    "/etc/cli-audit/config.yml",  # System global
     "/etc/cli-audit/config.yaml",
 ]
 
@@ -39,6 +38,7 @@ class ToolConfig:
         fallback: Fallback installation method if primary fails
         auto_update: Whether to auto-update this tool (None = use global preference)
     """
+
     version: str = "latest"
     method: str | None = None
     fallback: str | None = None
@@ -65,6 +65,7 @@ class BulkPreferences:
         auto_rollback: Automatically rollback on any failure
         generate_rollback_script: Generate rollback script for successful installations
     """
+
     fail_fast: bool = False
     auto_rollback: bool = False
     generate_rollback_script: bool = True
@@ -94,6 +95,7 @@ class Preferences:
         package_managers: Custom package manager hierarchy per language
         bulk: Bulk installation preferences
     """
+
     reconciliation: str = "parallel"
     breaking_changes: str = "warn"
     auto_upgrade: bool = True
@@ -107,37 +109,26 @@ class Preferences:
         """Validate preferences after initialization."""
         # Validate reconciliation
         if self.reconciliation not in {"parallel", "aggressive"}:
-            raise ValueError(
-                f"Invalid reconciliation strategy: {self.reconciliation}. "
-                "Must be 'parallel' or 'aggressive'"
-            )
+            raise ValueError(f"Invalid reconciliation strategy: {self.reconciliation}. " "Must be 'parallel' or 'aggressive'")
 
         # Validate breaking_changes
         if self.breaking_changes not in {"accept", "warn", "reject"}:
             raise ValueError(
-                f"Invalid breaking_changes setting: {self.breaking_changes}. "
-                "Must be 'accept', 'warn', or 'reject'"
+                f"Invalid breaking_changes setting: {self.breaking_changes}. " "Must be 'accept', 'warn', or 'reject'"
             )
 
         # Validate timeout_seconds
         if self.timeout_seconds < 1 or self.timeout_seconds > 60:
-            raise ValueError(
-                f"Invalid timeout_seconds: {self.timeout_seconds}. "
-                "Must be between 1 and 60"
-            )
+            raise ValueError(f"Invalid timeout_seconds: {self.timeout_seconds}. " "Must be between 1 and 60")
 
         # Validate max_workers
         if self.max_workers < 1 or self.max_workers > 32:
-            raise ValueError(
-                f"Invalid max_workers: {self.max_workers}. "
-                "Must be between 1 and 32"
-            )
+            raise ValueError(f"Invalid max_workers: {self.max_workers}. " "Must be between 1 and 32")
 
         # Validate cache_ttl_seconds
         if self.cache_ttl_seconds < 60 or self.cache_ttl_seconds > 86400:
             raise ValueError(
-                f"Invalid cache_ttl_seconds: {self.cache_ttl_seconds}. "
-                "Must be between 60 and 86400 (1 minute to 1 day)"
+                f"Invalid cache_ttl_seconds: {self.cache_ttl_seconds}. " "Must be between 60 and 86400 (1 minute to 1 day)"
             )
 
     @staticmethod
@@ -172,6 +163,7 @@ class Config:
         presets: Predefined sets of tools for bulk installation
         source: Path to the configuration file that was loaded
     """
+
     version: int = 1
     environment_mode: str = "auto"
     tools: dict[str, ToolConfig] = field(default_factory=dict)
@@ -189,8 +181,7 @@ class Config:
         valid_modes = {"auto", "ci", "server", "workstation"}
         if self.environment_mode not in valid_modes:
             raise ValueError(
-                f"Invalid environment_mode: {self.environment_mode}. "
-                f"Must be one of: {', '.join(sorted(valid_modes))}"
+                f"Invalid environment_mode: {self.environment_mode}. " f"Must be one of: {', '.join(sorted(valid_modes))}"
             )
 
     @staticmethod
@@ -198,10 +189,7 @@ class Config:
         """Create Config from dictionary."""
         # Parse tools
         tools_data = data.get("tools", {})
-        tools = {
-            tool_name: ToolConfig.from_dict(tool_config)
-            for tool_name, tool_config in tools_data.items()
-        }
+        tools = {tool_name: ToolConfig.from_dict(tool_config) for tool_name, tool_config in tools_data.items()}
 
         # Parse preferences
         preferences_data = data.get("preferences", {})
@@ -209,10 +197,7 @@ class Config:
 
         # Parse presets
         presets_data = data.get("presets", {})
-        presets = {
-            preset_name: list(tool_list)
-            for preset_name, tool_list in presets_data.items()
-        }
+        presets = {preset_name: list(tool_list) for preset_name, tool_list in presets_data.items()}
 
         # Parse environment
         environment_data = data.get("environment", {})
@@ -288,26 +273,14 @@ class Config:
         other_prefs = other.preferences
         merged_preferences = Preferences(
             reconciliation=(
-                self_prefs.reconciliation
-                if self_prefs.reconciliation != "parallel"
-                else other_prefs.reconciliation
+                self_prefs.reconciliation if self_prefs.reconciliation != "parallel" else other_prefs.reconciliation
             ),
             breaking_changes=(
-                self_prefs.breaking_changes
-                if self_prefs.breaking_changes != "warn"
-                else other_prefs.breaking_changes
+                self_prefs.breaking_changes if self_prefs.breaking_changes != "warn" else other_prefs.breaking_changes
             ),
             auto_upgrade=self_prefs.auto_upgrade,
-            timeout_seconds=(
-                self_prefs.timeout_seconds
-                if self_prefs.timeout_seconds != 5
-                else other_prefs.timeout_seconds
-            ),
-            max_workers=(
-                self_prefs.max_workers
-                if self_prefs.max_workers != 16
-                else other_prefs.max_workers
-            ),
+            timeout_seconds=(self_prefs.timeout_seconds if self_prefs.timeout_seconds != 5 else other_prefs.timeout_seconds),
+            max_workers=(self_prefs.max_workers if self_prefs.max_workers != 16 else other_prefs.max_workers),
             package_managers=merged_pkg_mgrs,
             bulk=merged_bulk,
         )
@@ -341,12 +314,13 @@ def _load_yaml(file_path: str) -> dict[str, Any] | None:
     """
     try:
         import yaml
+
         with open(file_path, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
             return data if isinstance(data, dict) else {}
     except ImportError:
         return None  # PyYAML not installed
-    except (OSError, yaml.YAMLError):
+    except OSError, yaml.YAMLError:
         return None  # File not found or invalid YAML
 
 
@@ -364,7 +338,7 @@ def _load_json(file_path: str) -> dict[str, Any] | None:
         with open(file_path, "r", encoding="utf-8") as f:
             data = json.load(f)
             return data if isinstance(data, dict) else {}
-    except (OSError, json.JSONDecodeError):
+    except OSError, json.JSONDecodeError:
         return None
 
 
@@ -491,8 +465,6 @@ def validate_config(config: Config) -> list[str]:
     # Validate tool version specifications
     for tool_name, tool_config in config.tools.items():
         if tool_config.method == tool_config.fallback:
-            warnings.append(
-                f"Tool '{tool_name}': method and fallback are the same ({tool_config.method})"
-            )
+            warnings.append(f"Tool '{tool_name}': method and fallback are the same ({tool_config.method})")
 
     return warnings

@@ -21,7 +21,6 @@ from .common import vlog
 from .config import Config
 from .environment import Environment
 
-
 # Cache for package manager availability checks
 _PM_CACHE: dict[str, bool] = {}
 _PM_CACHE_LOCK = threading.Lock()
@@ -40,6 +39,7 @@ class PackageManager:
         category: Package manager category ("vendor", "github", "system")
         languages: Languages/ecosystems this manager supports
     """
+
     name: str
     display_name: str
     check_command: tuple[str, ...]
@@ -70,7 +70,7 @@ class PackageManager:
                 text=True,
             )
             available = result.returncode == 0
-        except (FileNotFoundError, subprocess.TimeoutExpired, Exception):
+        except FileNotFoundError, subprocess.TimeoutExpired, Exception:
             available = False
 
         # Cache result
@@ -129,7 +129,6 @@ PACKAGE_MANAGERS = (
         category="vendor",
         languages=("python",),
     ),
-
     # Rust package managers (vendor tools)
     PackageManager(
         name="rustup",
@@ -147,7 +146,6 @@ PACKAGE_MANAGERS = (
         category="vendor",
         languages=("rust",),
     ),
-
     # Node.js package managers (vendor tools)
     PackageManager(
         name="nvm",
@@ -181,7 +179,6 @@ PACKAGE_MANAGERS = (
         category="vendor",
         languages=("node", "javascript"),
     ),
-
     # Go package managers
     PackageManager(
         name="gup",
@@ -199,7 +196,6 @@ PACKAGE_MANAGERS = (
         category="vendor",
         languages=("go",),
     ),
-
     # GitHub releases (for standalone binaries)
     PackageManager(
         name="github",
@@ -209,7 +205,6 @@ PACKAGE_MANAGERS = (
         category="github",
         languages=(),
     ),
-
     # System package managers
     PackageManager(
         name="apt",
@@ -284,17 +279,13 @@ def get_available_package_managers(
     if languages:
         lang_set = set(languages)
         managers_to_check = tuple(  # type: ignore[assignment]
-            pm for pm in PACKAGE_MANAGERS
-            if not pm.languages or lang_set.intersection(pm.languages)
+            pm for pm in PACKAGE_MANAGERS if not pm.languages or lang_set.intersection(pm.languages)
         )
 
     # Check availability in parallel
     available = []
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {
-            executor.submit(pm.is_available, timeout): pm
-            for pm in managers_to_check
-        }
+        futures = {executor.submit(pm.is_available, timeout): pm for pm in managers_to_check}
         for future in as_completed(futures):
             pm = futures[future]
             try:
@@ -389,8 +380,7 @@ def select_package_manager(
         # Server prefers stability: favor system packages
         # Move system managers to front
         system_managers = ["apt", "brew", "pacman", "dnf"]
-        hierarchy = [pm for pm in system_managers if pm in hierarchy] + \
-                    [pm for pm in hierarchy if pm not in system_managers]
+        hierarchy = [pm for pm in system_managers if pm in hierarchy] + [pm for pm in hierarchy if pm not in system_managers]
     # Workstation uses default hierarchy (vendor tools preferred)
 
     # Try hierarchy in order

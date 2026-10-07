@@ -12,21 +12,18 @@ from pathlib import Path
 import pytest
 
 from cli_audit.logging_config import (
-    setup_logging,
-    get_logger,
     ColoredFormatter,
-    debug,
-    info,
-    warning,
-    error,
     critical,
+    debug,
+    error,
+    get_logger,
+    info,
+    setup_logging,
+    warning,
 )
 
 # Skip marker for Windows (file locking issues with temp files)
-skip_on_windows = pytest.mark.skipif(
-    sys.platform == "win32",
-    reason="Windows file locking prevents temp file cleanup"
-)
+skip_on_windows = pytest.mark.skipif(sys.platform == "win32", reason="Windows file locking prevents temp file cleanup")
 
 
 class TestSetupLogging:
@@ -50,8 +47,7 @@ class TestSetupLogging:
         assert logger.level == logging.WARNING
         # Should have no console handlers (only file handler if specified)
         console_handlers = [
-            h for h in logger.handlers
-            if isinstance(h, logging.StreamHandler) and not isinstance(h, logging.FileHandler)
+            h for h in logger.handlers if isinstance(h, logging.StreamHandler) and not isinstance(h, logging.FileHandler)
         ]
         assert len(console_handlers) == 0
 

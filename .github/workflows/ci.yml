@@ -42,9 +42,13 @@ jobs:
       # but does not block. 23 existing functions in ten cli_audit modules
       # exceed it; splitting them is a refactor of that logic, not a lint
       # fix. See CONTRIBUTING.md "Code quality checks".
+      # Third and fourth: black and isort formatting, on the paths the
+      # pre-commit hooks cover, at the versions requirements-dev.txt pins.
       lint-cmd: >-
         flake8 cli_audit tests --count --show-source --statistics &&
-        flake8 cli_audit tests --count --exit-zero --select=C901 --max-complexity=10 --statistics
+        flake8 cli_audit tests --count --exit-zero --select=C901 --max-complexity=10 --statistics &&
+        black --check --diff cli_audit tests audit.py &&
+        isort --check-only --diff cli_audit tests audit.py
       run-type-check: true
       # mypy blocks. Its configuration is [tool.mypy] in pyproject.toml.
       type-check-cmd: "mypy cli_audit --ignore-missing-imports"

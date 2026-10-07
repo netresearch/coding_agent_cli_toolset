@@ -4,19 +4,20 @@
 
 from __future__ import annotations
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from cli_audit.prerequisites import (
     INSTALL_METHOD_PREREQUISITES,
-    RUNTIME_PREREQUISITES,
     RUNTIME_BINARIES,
-    is_tool_installed,
-    resolve_prerequisites,
+    RUNTIME_PREREQUISITES,
+    PrerequisiteResult,
     check_prerequisites,
     ensure_prerequisites,
     format_prerequisite_error,
-    PrerequisiteResult,
+    is_tool_installed,
+    resolve_prerequisites,
 )
 
 
@@ -177,6 +178,7 @@ class TestCheckPrerequisites:
 
     def test_mixed_installed_and_missing(self):
         """Mixed prerequisites should be correctly categorized."""
+
         def mock_is_installed(tool, verbose=False):
             return tool == "python"
 

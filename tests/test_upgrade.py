@@ -10,10 +10,14 @@ import os
 import tempfile
 import time
 from pathlib import Path
-from unittest.mock import MagicMock, patch, mock_open
+from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 
+from cli_audit.config import Config, Preferences, ToolConfig
+from cli_audit.environment import Environment
+from cli_audit.install_plan import InstallStep
+from cli_audit.installer import InstallResult, StepResult
 from cli_audit.upgrade import (
     BulkUpgradeResult,
     UpgradeBackup,
@@ -34,10 +38,6 @@ from cli_audit.upgrade import (
     restore_from_backup,
     upgrade_tool,
 )
-from cli_audit.config import Config, Preferences, ToolConfig
-from cli_audit.environment import Environment
-from cli_audit.installer import InstallResult, StepResult
-from cli_audit.install_plan import InstallStep
 
 
 class TestCompareVersions:
@@ -123,10 +123,9 @@ class TestGetAvailableVersion:
     def test_get_available_version_pypi(self, mock_urlopen):
         """Test PyPI JSON API query."""
         import json
+
         mock_response = MagicMock()
-        mock_response.read.return_value = json.dumps({
-            "info": {"version": "24.10.0"}
-        }).encode()
+        mock_response.read.return_value = json.dumps({"info": {"version": "24.10.0"}}).encode()
         mock_urlopen.return_value.__enter__.return_value = mock_response
 
         version = get_available_version("black", "pip")
@@ -365,7 +364,7 @@ class TestBackupAndRestore:
 
         # Corrupt backup
         backup_binary = os.path.join(backup.backup_path, "test_tool")
-        with open(backup_binary, 'w') as f:
+        with open(backup_binary, "w") as f:
             f.write("corrupted content")
 
         # Restore should fail
@@ -622,10 +621,12 @@ class TestGetUpgradeCandidates:
         mock_select_pm.return_value = ("cargo", "hierarchy")
         mock_check_upgrade.return_value = (True, "1.0.0", "2.0.0")
 
-        config = Config(tools={
-            "tool1": ToolConfig(),
-            "tool2": ToolConfig(),
-        })
+        config = Config(
+            tools={
+                "tool1": ToolConfig(),
+                "tool2": ToolConfig(),
+            }
+        )
         env = Environment(mode="workstation", confidence=1.0)
 
         candidates = get_upgrade_candidates("all", None, config, env)
@@ -795,37 +796,45 @@ class TestAptPackageNameResolver:
     def test_resolve_apt_package_name_fd(self):
         """resolve_apt_package_name('fd') should return 'fd-find'."""
         from cli_audit.catalog import resolve_apt_package_name
+
         assert resolve_apt_package_name("fd") == "fd-find"
 
     def test_resolve_apt_package_name_bat(self):
         """resolve_apt_package_name('bat') should return 'bat'."""
         from cli_audit.catalog import resolve_apt_package_name
+
         assert resolve_apt_package_name("bat") == "bat"
 
     def test_resolve_apt_package_name_delta(self):
         """resolve_apt_package_name('delta') should return 'git-delta'."""
         from cli_audit.catalog import resolve_apt_package_name
+
         assert resolve_apt_package_name("delta") == "git-delta"
 
     def test_resolve_apt_package_name_unknown_returns_tool_name(self):
         """Tools without apt mapping should fall back to tool name."""
         from cli_audit.catalog import resolve_apt_package_name
+
         assert resolve_apt_package_name("nonexistent_tool_xyz") == "nonexistent_tool_xyz"
 
     def test_resolve_apt_package_name_ripgrep(self):
         """ripgrep has apt config with package 'ripgrep'."""
         from cli_audit.catalog import resolve_apt_package_name
+
         assert resolve_apt_package_name("ripgrep") == "ripgrep"
 
     def test_resolve_apt_package_name_with_legacy_packages_field(self):
         """Tools using legacy 'packages' field should resolve correctly."""
         import json
+
         from cli_audit.catalog import resolve_apt_package_name
 
-        fake_json = json.dumps({
-            "name": "legacy_tool",
-            "packages": {"apt": "legacy-apt-pkg"},
-        })
+        fake_json = json.dumps(
+            {
+                "name": "legacy_tool",
+                "packages": {"apt": "legacy-apt-pkg"},
+            }
+        )
         with patch("builtins.open", mock_open(read_data=fake_json)):
             with patch("pathlib.Path.exists", return_value=True):
                 result = resolve_apt_package_name("legacy_tool")
@@ -834,6 +843,7 @@ class TestAptPackageNameResolver:
     def test_resolve_apt_package_name_tool_without_apt_method(self):
         """Tools with available_methods but no apt method should fall back."""
         from cli_audit.catalog import resolve_apt_package_name
+
         # tokei has cargo method but no apt method
         result = resolve_apt_package_name("tokei")
         # Should fall back - check it doesn't crash at minimum
@@ -867,9 +877,11 @@ class TestCheckUpgradeAvailableAptResolved:
         # Verify subprocess was called with the resolved package name
         mock_run.assert_called_once()
         call_args = mock_run.call_args[0][0]
-        assert call_args == ["apt-cache", "policy", "fd-find"], (
-            f"apt-cache policy should use resolved name 'fd-find', got: {call_args}"
-        )
+        assert call_args == [
+            "apt-cache",
+            "policy",
+            "fd-find",
+        ], f"apt-cache policy should use resolved name 'fd-find', got: {call_args}"
         assert version == "9.0.0"
 
         clear_version_cache()
@@ -887,9 +899,11 @@ class TestCheckUpgradeAvailableAptResolved:
         version = get_available_version("delta", "apt")
 
         call_args = mock_run.call_args[0][0]
-        assert call_args == ["apt-cache", "policy", "git-delta"], (
-            f"apt-cache policy should use resolved name 'git-delta', got: {call_args}"
-        )
+        assert call_args == [
+            "apt-cache",
+            "policy",
+            "git-delta",
+        ], f"apt-cache policy should use resolved name 'git-delta', got: {call_args}"
         assert version == "0.16.5"
 
         clear_version_cache()
@@ -907,8 +921,6 @@ class TestCheckUpgradeAvailableAptResolved:
         get_available_version("ripgrep", "apt")
 
         call_args = mock_run.call_args[0][0]
-        assert call_args == ["apt-cache", "policy", "ripgrep"], (
-            f"apt-cache policy should use 'ripgrep', got: {call_args}"
-        )
+        assert call_args == ["apt-cache", "policy", "ripgrep"], f"apt-cache policy should use 'ripgrep', got: {call_args}"
 
         clear_version_cache()

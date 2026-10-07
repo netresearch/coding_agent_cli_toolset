@@ -12,7 +12,6 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-
 # Global logger instance
 _logger: Optional[logging.Logger] = None
 
@@ -60,10 +59,7 @@ def setup_logging(
         console_handler.setLevel(getattr(logging, effective_level))
 
         # Format with colors for console
-        console_formatter = ColoredFormatter(
-            "%(levelname_colored)s %(message)s",
-            use_colors=sys.stdout.isatty()
-        )
+        console_formatter = ColoredFormatter("%(levelname_colored)s %(message)s", use_colors=sys.stdout.isatty())
         console_handler.setFormatter(console_formatter)
         logger.addHandler(console_handler)
 
@@ -72,14 +68,11 @@ def setup_logging(
         log_path = Path(log_file)
         log_path.parent.mkdir(parents=True, exist_ok=True)
 
-        file_handler = logging.FileHandler(log_file, encoding='utf-8')
+        file_handler = logging.FileHandler(log_file, encoding="utf-8")
         file_handler.setLevel(logging.DEBUG)  # Always log everything to file
 
         # Format without colors for file
-        file_formatter = logging.Formatter(
-            "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S"
-        )
+        file_formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
         file_handler.setFormatter(file_formatter)
         logger.addHandler(file_handler)
 
@@ -112,21 +105,21 @@ class ColoredFormatter(logging.Formatter):
 
     # ANSI color codes
     COLORS = {
-        'DEBUG': '\033[36m',      # Cyan
-        'INFO': '\033[32m',       # Green
-        'WARNING': '\033[33m',    # Yellow
-        'ERROR': '\033[31m',      # Red
-        'CRITICAL': '\033[1;31m',  # Bold Red
+        "DEBUG": "\033[36m",  # Cyan
+        "INFO": "\033[32m",  # Green
+        "WARNING": "\033[33m",  # Yellow
+        "ERROR": "\033[31m",  # Red
+        "CRITICAL": "\033[1;31m",  # Bold Red
     }
-    RESET = '\033[0m'
+    RESET = "\033[0m"
 
     # Emoji/symbols for log levels
     SYMBOLS = {
-        'DEBUG': '🔍',
-        'INFO': '✓',
-        'WARNING': '⚠️',
-        'ERROR': '✗',
-        'CRITICAL': '🚨',
+        "DEBUG": "🔍",
+        "INFO": "✓",
+        "WARNING": "⚠️",
+        "ERROR": "✗",
+        "CRITICAL": "🚨",
     }
 
     def __init__(self, fmt: str, use_colors: bool = True):
@@ -138,8 +131,8 @@ class ColoredFormatter(logging.Formatter):
         if self.use_colors:
             # Add colored level name
             levelname = record.levelname
-            color = self.COLORS.get(levelname, '')
-            symbol = self.SYMBOLS.get(levelname, '')
+            color = self.COLORS.get(levelname, "")
+            symbol = self.SYMBOLS.get(levelname, "")
 
             record.levelname_colored = f"{color}{symbol} {levelname}{self.RESET}"
         else:

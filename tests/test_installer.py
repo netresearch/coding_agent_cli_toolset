@@ -7,26 +7,27 @@ Target coverage: 85%+
 """
 
 import hashlib
-import pytest
 import tempfile
-from unittest.mock import patch, MagicMock, call
 from pathlib import Path
+from unittest.mock import MagicMock, call, patch
 
+import pytest
+
+from cli_audit.config import Config
+from cli_audit.environment import Environment
+from cli_audit.install_plan import InstallStep
 from cli_audit.installer import (
-    StepResult,
-    InstallResult,
     InstallError,
-    is_retryable_error,
+    InstallResult,
+    StepResult,
     calculate_backoff_delay,
     execute_step,
     execute_step_with_retry,
-    verify_checksum,
-    validate_installation,
     install_tool,
+    is_retryable_error,
+    validate_installation,
+    verify_checksum,
 )
-from cli_audit.install_plan import InstallStep
-from cli_audit.config import Config
-from cli_audit.environment import Environment
 
 
 class TestStepResult:
@@ -281,6 +282,7 @@ class TestExecuteStep:
     def test_execute_step_timeout(self, mock_run):
         """Test step execution timeout."""
         import subprocess
+
         mock_run.side_effect = subprocess.TimeoutExpired(
             cmd=["sleep", "100"],
             timeout=5,
