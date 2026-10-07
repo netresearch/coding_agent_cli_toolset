@@ -43,7 +43,7 @@ def _load_endoflife_cache() -> dict[str, Any]:
         with open(_ENDOFLIFE_CACHE_PATH, "r", encoding="utf-8") as f:
             data = json.load(f)
         return data if isinstance(data, dict) else {}
-    except (OSError, json.JSONDecodeError):
+    except OSError, json.JSONDecodeError:
         return {}
 
 
@@ -60,16 +60,19 @@ def _save_endoflife_cache(data: dict[str, Any]) -> None:
 
 class CollectionError(Exception):
     """Raised when version collection fails."""
+
     pass
 
 
 class NetworkError(CollectionError):
     """Raised when network requests fail."""
+
     pass
 
 
 class ParseError(CollectionError):
     """Raised when response parsing fails."""
+
     pass
 
 
@@ -86,7 +89,7 @@ def normalize_version_tag(tag: str) -> str:
     # Remove common prefixes
     for prefix in ("release-", "version-", "ver-", "go", "v"):
         if tag.lower().startswith(prefix):
-            tag = tag[len(prefix):]
+            tag = tag[len(prefix) :]
     # Replace underscores with periods in version numbers (e.g., ruby "3_4_7" -> "3.4.7")
     tag = tag.replace("_", ".")
     return tag
@@ -201,7 +204,7 @@ def collect_github(owner: str, repo: str, offline_cache: dict[str, tuple[str, st
                         tup = (nums, raw_tag, ver)
                         if best is None or tup[0] > best[0]:
                             best = tup
-                    except (ValueError, AttributeError):
+                    except ValueError, AttributeError:
                         continue
 
         if best is not None:
@@ -370,7 +373,7 @@ def collect_gnu(tool_name: str, ftp_url: str, offline_cache: dict[str, tuple[str
         # Example patterns:
         #   parallel-20251022.tar.gz
         #   make-4.4.1.tar.gz
-        pattern = re.compile(rf'{re.escape(tool_name)}-(\d{{8}}|\d+(?:\.\d+)+)\.tar\.')
+        pattern = re.compile(rf"{re.escape(tool_name)}-(\d{{8}}|\d+(?:\.\d+)+)\.tar\.")
         versions = []
 
         for match in pattern.finditer(response):
@@ -395,7 +398,7 @@ def collect_gnu(tool_name: str, ftp_url: str, offline_cache: dict[str, tuple[str
             # Semantic versions - sort by version components
             def version_key(v: str) -> tuple:
                 try:
-                    return tuple(int(x) for x in v.split('.'))
+                    return tuple(int(x) for x in v.split("."))
                 except ValueError:
                     return (0,)
 
@@ -555,10 +558,10 @@ def get_gitlab_rate_limit(host: str = "gitlab.com") -> dict[str, Any]:
         # Try glab CLI if no token in environment
         if not token:
             import subprocess
+
             try:
                 result = subprocess.run(
-                    ["glab", "auth", "token", "--hostname", host],
-                    capture_output=True, text=True, timeout=5
+                    ["glab", "auth", "token", "--hostname", host], capture_output=True, text=True, timeout=5
                 )
                 if result.returncode == 0 and result.stdout.strip():
                     token = result.stdout.strip()
@@ -572,6 +575,7 @@ def get_gitlab_rate_limit(host: str = "gitlab.com") -> dict[str, Any]:
         # GitLab returns rate limit info in response headers
         # We make a simple API call and check the headers
         import urllib.request
+
         url = f"https://{host}/api/v4/user"
         req = urllib.request.Request(url, headers=headers)
 
@@ -681,15 +685,17 @@ def collect_endoflife(
                 else:
                     status = "security"
 
-                supported_versions.append({
-                    "cycle": str(cycle),
-                    "latest": latest,
-                    "status": status,
-                    "eol": eol,
-                    "support": support,
-                    "release_date": entry.get("releaseDate"),
-                    "lts": entry.get("lts", False),
-                })
+                supported_versions.append(
+                    {
+                        "cycle": str(cycle),
+                        "latest": latest,
+                        "status": status,
+                        "eol": eol,
+                        "support": support,
+                        "release_date": entry.get("releaseDate"),
+                        "lts": entry.get("lts", False),
+                    }
+                )
 
                 if len(supported_versions) >= max_versions:
                     break

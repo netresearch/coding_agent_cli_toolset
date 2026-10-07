@@ -18,6 +18,7 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class Tool:
     """Tool definition with source and detection metadata."""
+
     name: str
     candidates: tuple[str, ...]  # Binary names to search for
     source_kind: str  # "gh" | "gitlab" | "pypi" | "crates" | "npm" | "gnu" | "skip"

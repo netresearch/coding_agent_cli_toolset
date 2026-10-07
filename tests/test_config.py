@@ -6,23 +6,23 @@ Tests for configuration parsing (cli_audit/config.py).
 Target coverage: 85%+
 """
 
-import os
 import json
-import pytest
+import os
 from pathlib import Path
-from unittest.mock import patch, mock_open
+from unittest.mock import mock_open, patch
+
+import pytest
 
 from cli_audit.config import (
-    ToolConfig,
-    Preferences,
     Config,
-    load_config_file,
-    load_config,
-    validate_config,
-    _load_yaml,
+    Preferences,
+    ToolConfig,
     _load_json,
+    _load_yaml,
+    load_config,
+    load_config_file,
+    validate_config,
 )
-
 
 # Fixture paths
 FIXTURES_DIR = Path(__file__).parent / "fixtures"

@@ -73,9 +73,7 @@ class UpstreamCache:
                 "baseline_updated_at": self.baseline_updated_at,
                 "source": self.source,
             },
-            "versions": {
-                name: ver.to_dict() for name, ver in self.versions.items()
-            },
+            "versions": {name: ver.to_dict() for name, ver in self.versions.items()},
         }
 
     @classmethod
@@ -84,10 +82,7 @@ class UpstreamCache:
         meta = data.get("__meta__", {})
         versions_raw = data.get("versions", {})
 
-        versions = {
-            name: UpstreamVersion.from_dict(ver_data)
-            for name, ver_data in versions_raw.items()
-        }
+        versions = {name: UpstreamVersion.from_dict(ver_data) for name, ver_data in versions_raw.items()}
 
         return cls(
             versions=versions,
@@ -149,10 +144,7 @@ def write_upstream_cache(
 
     # Update timestamp
     cache.baseline_updated_at = (
-        datetime.datetime.now(datetime.timezone.utc)
-        .replace(microsecond=0)
-        .isoformat()
-        .replace("+00:00", "Z")
+        datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     )
 
     # Atomic write: write to temp file then rename
@@ -208,9 +200,7 @@ def is_cache_stale(cache: UpstreamCache, max_age_hours: int = DEFAULT_MAX_AGE_HO
 
     try:
         # Parse ISO timestamp
-        updated_at = datetime.datetime.fromisoformat(
-            cache.baseline_updated_at.replace("Z", "+00:00")
-        )
+        updated_at = datetime.datetime.fromisoformat(cache.baseline_updated_at.replace("Z", "+00:00"))
         now = datetime.datetime.now(datetime.timezone.utc)
         age = now - updated_at
         return age.total_seconds() > (max_age_hours * 3600)

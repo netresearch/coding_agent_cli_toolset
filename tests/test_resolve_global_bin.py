@@ -16,9 +16,7 @@ from pathlib import Path
 
 import pytest
 
-skip_on_windows = pytest.mark.skipif(
-    sys.platform == "win32", reason="Shell script tests require POSIX shell"
-)
+skip_on_windows = pytest.mark.skipif(sys.platform == "win32", reason="Shell script tests require POSIX shell")
 
 SCRIPTS_DIR = Path(__file__).parent.parent / "scripts"
 
@@ -34,7 +32,9 @@ resolve_global_bin "{binary}"
 """
         result = subprocess.run(
             ["bash", "-c", full_code],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         assert result.returncode == 0, result.stderr
         return result.stdout.strip()

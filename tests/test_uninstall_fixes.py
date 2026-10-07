@@ -20,9 +20,7 @@ from pathlib import Path
 
 import pytest
 
-skip_on_windows = pytest.mark.skipif(
-    sys.platform == "win32", reason="Shell script tests require POSIX shell"
-)
+skip_on_windows = pytest.mark.skipif(sys.platform == "win32", reason="Shell script tests require POSIX shell")
 
 SCRIPTS_DIR = Path(__file__).parent.parent / "scripts"
 
@@ -47,7 +45,9 @@ source "{SCRIPTS_DIR}/lib/reconcile.sh"
 """
         return subprocess.run(
             ["bash", "-c", full_code],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
 
     def test_uv_method_calls_uv_tool_uninstall(self):
@@ -84,33 +84,26 @@ classify_install_path "{tool}" "{path}"
 """
         result = subprocess.run(
             ["bash", "-c", full_code],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         assert result.returncode == 0, result.stderr
         return result.stdout.strip()
 
     def test_pnpm_in_nvm_dir_classifies_as_npm(self):
         home = os.environ["HOME"]
-        assert (
-            self._classify("pnpm", f"{home}/.nvm/versions/node/v26.3.1/bin/pnpm")
-            == "npm(v26.3.1)"
-        )
+        assert self._classify("pnpm", f"{home}/.nvm/versions/node/v26.3.1/bin/pnpm") == "npm(v26.3.1)"
 
     def test_eslint_in_nvm_dir_classifies_as_npm(self):
         home = os.environ["HOME"]
-        assert (
-            self._classify("eslint", f"{home}/.nvm/versions/node/v20.11.0/bin/eslint")
-            == "npm(v20.11.0)"
-        )
+        assert self._classify("eslint", f"{home}/.nvm/versions/node/v20.11.0/bin/eslint") == "npm(v20.11.0)"
 
     def test_node_runtime_binaries_stay_nvm(self):
         home = os.environ["HOME"]
         for runtime_bin in ("node", "npm", "npx", "corepack"):
             assert (
-                self._classify(
-                    runtime_bin, f"{home}/.nvm/versions/node/v26.3.1/bin/{runtime_bin}"
-                )
-                == "nvm(v26.3.1)"
+                self._classify(runtime_bin, f"{home}/.nvm/versions/node/v26.3.1/bin/{runtime_bin}") == "nvm(v26.3.1)"
             ), f"{runtime_bin} must stay nvm-managed"
 
     def test_detect_install_method_npm_package_under_nvm(self):
@@ -132,7 +125,9 @@ echo "node=$(detect_install_method node node)"
 """
             result = subprocess.run(
                 ["bash", "-c", full_code],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
             assert result.returncode == 0, result.stderr
             assert "pnpm=npm" in result.stdout
@@ -159,7 +154,9 @@ echo "LOOP_COMPLETED"
 """
         result = subprocess.run(
             ["bash", "-c", full_code],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         assert result.returncode == 0, result.stderr
         assert "LOOP_COMPLETED" in result.stdout
@@ -171,8 +168,7 @@ echo "LOOP_COMPLETED"
             stripped = line.strip()
             if stripped.startswith("remove_installation "):
                 assert stripped.endswith("|| true"), (
-                    "remove_installation in the uninstall loop must not abort "
-                    f"the loop under set -e: {stripped!r}"
+                    "remove_installation in the uninstall loop must not abort " f"the loop under set -e: {stripped!r}"
                 )
                 break
         else:
@@ -193,12 +189,17 @@ hash -r
 """
         return subprocess.run(
             ["bash", "-c", full_code],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
 
     def _apt_stubs(self, stub_dir: Path, log_file: Path) -> None:
         # dpkg knows only /usr/bin/poetry, owned by python3-poetry
-        _write_stub(stub_dir, "dpkg", f"""
+        _write_stub(
+            stub_dir,
+            "dpkg",
+            f"""
 echo "dpkg $*" >> "{log_file}"
 case "$1" in
   -S)
@@ -214,7 +215,8 @@ case "$1" in
     ;;
 esac
 exit 1
-""")
+""",
+        )
         _write_stub(stub_dir, "sudo", f'echo "sudo $*" >> "{log_file}"')
         _write_stub(stub_dir, "apt-get", f'echo "apt-get $*" >> "{log_file}"')
 
@@ -228,9 +230,12 @@ exit 1
             # which dpkg does NOT know. Only the passed path works.
             _write_stub(stub_dir, "poetry", "echo decoy")
 
-            result = self._run_with_stubs(stub_dir, """
+            result = self._run_with_stubs(
+                stub_dir,
+                """
 remove_installation "poetry" "apt" "poetry" "/usr/bin/poetry"
-""")
+""",
+            )
             assert result.returncode == 0, result.stderr
             log = log_file.read_text()
             assert "dpkg -S /usr/bin/poetry" in log
@@ -243,7 +248,9 @@ remove_installation "poetry" "apt" "poetry" "/usr/bin/poetry"
             log_file.touch()
             self._apt_stubs(stub_dir, log_file)
 
-            result = self._run_with_stubs(stub_dir, f"""
+            result = self._run_with_stubs(
+                stub_dir,
+                f"""
 cat > "{stub_dir}/poetry" <<'EOF'
 #!/usr/bin/env bash
 echo decoy
@@ -251,7 +258,8 @@ EOF
 chmod +x "{stub_dir}/poetry"
 hash -r
 remove_installation "poetry" "apt" "poetry"
-""")
+""",
+            )
             # Falls back to command -v; the decoy path is unknown to dpkg,
             # so nothing is removed — but it must not crash.
             assert result.returncode == 0, result.stderr
@@ -264,9 +272,12 @@ remove_installation "poetry" "apt" "poetry"
             decoy = _write_stub(stub_dir, "sometool", "echo decoy")
             target = _write_stub(target_dir, "sometool", "echo real")
 
-            result = self._run_with_stubs(stub_dir, f"""
+            result = self._run_with_stubs(
+                stub_dir,
+                f"""
 remove_installation "sometool" "manual" "sometool" "{target}"
-""")
+""",
+            )
             assert result.returncode == 0, result.stderr
             assert not target.exists(), "passed-path binary should be removed"
             assert decoy.exists(), "PATH decoy must be untouched"

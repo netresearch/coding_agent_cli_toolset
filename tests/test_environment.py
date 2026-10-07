@@ -7,8 +7,9 @@ Target coverage: 90%+
 """
 
 import os
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 from cli_audit.environment import (
     Environment,
@@ -116,8 +117,10 @@ class TestDetectEnvironmentServer:
     @patch("os.path.exists")
     def test_detect_server_with_shared_filesystem(self, mock_exists, mock_uptime, mock_users):
         """Test server detection with shared filesystem."""
+
         def exists_side_effect(path):
             return path == "/shared"
+
         mock_exists.side_effect = exists_side_effect
 
         env = detect_environment()

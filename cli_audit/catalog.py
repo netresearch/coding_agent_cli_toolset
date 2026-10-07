@@ -275,11 +275,7 @@ class ToolCatalog:
         Returns:
             List of ToolCatalogEntry instances with install_method=package_manager
         """
-        return [
-            entry
-            for entry in self._entries.values()
-            if entry.install_method == "package_manager"
-        ]
+        return [entry for entry in self._entries.values() if entry.install_method == "package_manager"]
 
 
 def resolve_apt_package_name(tool_name: str) -> str:
@@ -366,11 +362,7 @@ def suggest_package_manager_upgrades(catalog: ToolCatalog | None = None) -> None
         return  # No package-manager tools in catalog
 
     # Check which tools have package_name or github_repo (these check upstream separately)
-    os_only_tools = [
-        t.name
-        for t in pm_tools
-        if not t.github_repo and not t.package_name
-    ]
+    os_only_tools = [t.name for t in pm_tools if not t.github_repo and not t.package_name]
 
     if not os_only_tools:
         return  # All package_manager tools check upstream separately

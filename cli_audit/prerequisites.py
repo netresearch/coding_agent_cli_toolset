@@ -233,7 +233,7 @@ def prompt_install_prerequisite(
     try:
         response = input(f"Install {prereq} now? [Y/n] ").strip().lower()
         return response in ("", "y", "yes")
-    except (EOFError, KeyboardInterrupt):
+    except EOFError, KeyboardInterrupt:
         print("\nInstallation cancelled.", file=sys.stderr)
         return False
 
@@ -262,7 +262,7 @@ def prompt_install_all_prerequisites(
     try:
         response = input("\nInstall all prerequisites? [Y/n] ").strip().lower()
         return response in ("", "y", "yes")
-    except (EOFError, KeyboardInterrupt):
+    except EOFError, KeyboardInterrupt:
         print("\nInstallation cancelled.", file=sys.stderr)
         return False
 

@@ -82,9 +82,7 @@ def write_snapshot(
         "collected_at": datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         "offline": offline,
         "count": len(tools),
-        "partial_failures": sum(
-            1 for t in tools if (t.get("status") == "UNKNOWN" and not t.get("installed"))
-        ),
+        "partial_failures": sum(1 for t in tools if (t.get("status") == "UNKNOWN" and not t.get("installed"))),
     }
 
     if extra_meta:
@@ -105,9 +103,7 @@ def write_snapshot(
     return meta
 
 
-def render_from_snapshot(
-    snapshot: dict[str, Any], selected: set[str] | None = None
-) -> list[dict[str, Any]]:
+def render_from_snapshot(snapshot: dict[str, Any], selected: set[str] | None = None) -> list[dict[str, Any]]:
     """Render tools from snapshot, optionally filtering.
 
     Args:

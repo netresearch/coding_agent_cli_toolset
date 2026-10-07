@@ -27,6 +27,7 @@ class InstallStep:
         requires_sudo: Whether this step requires sudo/root privileges
         estimated_time_seconds: Estimated time for this step
     """
+
     description: str
     command: tuple[str, ...]
     requires_sudo: bool = False
@@ -57,6 +58,7 @@ class InstallPlan:
         estimated_total_time: Total estimated time (seconds)
         warnings: List of warning messages
     """
+
     tool_name: str
     target_version: str
     package_manager: str

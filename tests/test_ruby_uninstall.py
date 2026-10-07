@@ -16,9 +16,7 @@ from pathlib import Path
 
 import pytest
 
-skip_on_windows = pytest.mark.skipif(
-    sys.platform == "win32", reason="Shell script tests require POSIX shell"
-)
+skip_on_windows = pytest.mark.skipif(sys.platform == "win32", reason="Shell script tests require POSIX shell")
 
 SCRIPT = Path(__file__).parent.parent / "scripts" / "install_ruby.sh"
 
@@ -38,8 +36,9 @@ exit 0
 
 @skip_on_windows
 class TestRubyPerCycleUninstall:
-    def _run(self, tmpdir: str, env_extra: dict, versions: str, global_ver: str,
-             args: list[str]) -> tuple[subprocess.CompletedProcess, str, Path]:
+    def _run(
+        self, tmpdir: str, env_extra: dict, versions: str, global_ver: str, args: list[str]
+    ) -> tuple[subprocess.CompletedProcess, str, Path]:
         stub_dir = Path(tmpdir) / "stubs"
         stub_dir.mkdir(exist_ok=True)
         log = Path(tmpdir) / "rbenv.log"
@@ -71,15 +70,20 @@ class TestRubyPerCycleUninstall:
         env.update({k: v for k, v in env_extra.items()})
         result = subprocess.run(
             ["bash", str(SCRIPT), *args],
-            capture_output=True, text=True, timeout=30, env=env,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            env=env,
         )
         return result, log.read_text(), home
 
     def test_removes_only_requested_cycle(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             result, log, home = self._run(
-                tmpdir, {"RUBY_VERSION": "3.3"},
-                versions="3.3.6 4.0.1 4.0.5", global_ver="4.0.5",
+                tmpdir,
+                {"RUBY_VERSION": "3.3"},
+                versions="3.3.6 4.0.1 4.0.5",
+                global_ver="4.0.5",
                 args=["uninstall"],
             )
             assert result.returncode == 0, result.stderr
@@ -92,8 +96,10 @@ class TestRubyPerCycleUninstall:
     def test_full_version_spec_removes_its_cycle(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             result, log, _ = self._run(
-                tmpdir, {"RUBY_VERSION": "3.3.6"},
-                versions="3.3.6 4.0.5", global_ver="4.0.5",
+                tmpdir,
+                {"RUBY_VERSION": "3.3.6"},
+                versions="3.3.6 4.0.5",
+                global_ver="4.0.5",
                 args=["uninstall"],
             )
             assert result.returncode == 0, result.stderr
@@ -102,22 +108,24 @@ class TestRubyPerCycleUninstall:
     def test_switches_global_before_removing_it(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             result, log, _ = self._run(
-                tmpdir, {"RUBY_VERSION": "3.3"},
-                versions="3.3.6 4.0.5", global_ver="3.3.6",
+                tmpdir,
+                {"RUBY_VERSION": "3.3"},
+                versions="3.3.6 4.0.5",
+                global_ver="3.3.6",
                 args=["uninstall"],
             )
             assert result.returncode == 0, result.stderr
             lines = [line for line in log.splitlines() if line]
             assert "rbenv global 4.0.5" in lines
-            assert lines.index("rbenv global 4.0.5") < lines.index(
-                "rbenv uninstall -f 3.3.6"
-            )
+            assert lines.index("rbenv global 4.0.5") < lines.index("rbenv uninstall -f 3.3.6")
 
     def test_missing_cycle_is_a_noop(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             result, log, home = self._run(
-                tmpdir, {"RUBY_VERSION": "3.1"},
-                versions="3.3.6 4.0.5", global_ver="4.0.5",
+                tmpdir,
+                {"RUBY_VERSION": "3.1"},
+                versions="3.3.6 4.0.5",
+                global_ver="4.0.5",
                 args=["uninstall"],
             )
             assert result.returncode == 0, result.stderr
@@ -128,11 +136,11 @@ class TestRubyPerCycleUninstall:
     def test_full_uninstall_without_ruby_version_still_removes_rbenv(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             result, _, home = self._run(
-                tmpdir, {},
-                versions="3.3.6 4.0.5", global_ver="4.0.5",
+                tmpdir,
+                {},
+                versions="3.3.6 4.0.5",
+                global_ver="4.0.5",
                 args=["uninstall"],
             )
             assert result.returncode == 0, result.stderr
-            assert not (home / ".rbenv").exists(), (
-                "full uninstall must keep removing ~/.rbenv entirely"
-            )
+            assert not (home / ".rbenv").exists(), "full uninstall must keep removing ~/.rbenv entirely"

@@ -8,23 +8,24 @@ Target coverage: 85%+
 
 import json
 import os
-import pytest
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from cli_audit.upstream_cache import (
-    UpstreamVersion,
-    UpstreamCache,
-    get_upstream_cache_path,
-    load_upstream_cache,
-    write_upstream_cache,
-    get_cached_upstream,
-    update_cached_upstream,
-    is_cache_stale,
-    migrate_from_snapshot,
-    DEFAULT_UPSTREAM_FILE,
     DEFAULT_MAX_AGE_HOURS,
+    DEFAULT_UPSTREAM_FILE,
+    UpstreamCache,
+    UpstreamVersion,
+    get_cached_upstream,
+    get_upstream_cache_path,
+    is_cache_stale,
+    load_upstream_cache,
+    migrate_from_snapshot,
+    update_cached_upstream,
+    write_upstream_cache,
 )
 
 
@@ -256,9 +257,7 @@ class TestWriteUpstreamCache:
     def test_write_upstream_cache_basic(self, tmp_path):
         """Test writing cache file."""
         path = tmp_path / "upstream.json"
-        cache = UpstreamCache(
-            versions={"fd": UpstreamVersion(latest_version="10.0.0")}
-        )
+        cache = UpstreamCache(versions={"fd": UpstreamVersion(latest_version="10.0.0")})
         write_upstream_cache(cache, path)
 
         assert path.exists()
@@ -319,9 +318,7 @@ class TestCacheHelpers:
 
     def test_update_cached_upstream_overwrite(self):
         """Test overwriting existing tool in cache."""
-        cache = UpstreamCache(
-            versions={"tool": UpstreamVersion(latest_version="1.0.0")}
-        )
+        cache = UpstreamCache(versions={"tool": UpstreamVersion(latest_version="1.0.0")})
         new_version = UpstreamVersion(latest_version="2.0.0")
         update_cached_upstream("tool", new_version, cache)
 

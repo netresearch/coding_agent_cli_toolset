@@ -24,10 +24,7 @@ from unittest.mock import patch
 
 import pytest
 
-skip_on_windows = pytest.mark.skipif(
-    sys.platform == "win32",
-    reason="Uses Unix-style paths and PATH separator (:)"
-)
+skip_on_windows = pytest.mark.skipif(sys.platform == "win32", reason="Uses Unix-style paths and PATH separator (:)")
 
 from cli_audit.reconcile import (  # noqa: E402
     _confirm_removal,
@@ -61,9 +58,7 @@ class TestDetectSkipsVirtualenvs:
         installs = self._detect(monkeypatch, [venv_bin, plain_bin], "faketool_venv_a")
         paths = [i.path for i in installs]
         assert str(plain) in paths
-        assert not any(".venv" in p for p in paths), (
-            "virtualenv binaries are environments, not installations"
-        )
+        assert not any(".venv" in p for p in paths), "virtualenv binaries are environments, not installations"
 
     def test_pyvenv_cfg_detected_regardless_of_dir_name(self, tmp_path, monkeypatch):
         # A venv named anything (not just venv/.venv) carries pyvenv.cfg
@@ -126,16 +121,22 @@ class TestConfirmRemovalSerialized:
             return "n"
 
         inst = Installation(
-            tool="faketool", version="1.0", method="uv",
-            path="/opt/faketool", active=False, valid=True,
+            tool="faketool",
+            version="1.0",
+            method="uv",
+            path="/opt/faketool",
+            active=False,
+            valid=True,
         )
 
         def worker():
             _confirm_removal("faketool", [inst])
 
-        with patch("cli_audit.reconcile.sys.stdin") as stdin_mock, \
-                patch("builtins.print", side_effect=fake_print), \
-                patch("builtins.input", side_effect=fake_input):
+        with (
+            patch("cli_audit.reconcile.sys.stdin") as stdin_mock,
+            patch("builtins.print", side_effect=fake_print),
+            patch("builtins.input", side_effect=fake_input),
+        ):
             stdin_mock.isatty.return_value = True
             t1 = threading.Thread(target=worker, name="w1")
             t2 = threading.Thread(target=worker, name="w2")
@@ -150,9 +151,7 @@ class TestConfirmRemovalSerialized:
             t1.join(timeout=5)
             t2.join(timeout=5)
 
-        assert len(interleaved) == 1, (
-            f"second prompt appeared while first awaited input: {events}"
-        )
+        assert len(interleaved) == 1, f"second prompt appeared while first awaited input: {events}"
         # both prompts eventually happened, strictly prompt->input->prompt->input
         kinds = [e.split(":")[0] for e in events]
         assert kinds == ["prompt", "input", "prompt", "input"], events

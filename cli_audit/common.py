@@ -45,6 +45,7 @@ def get_active_user_count() -> int:
     try:
         # Try using 'who' command to count unique logged-in users
         import subprocess
+
         result = subprocess.run(
             ["who"],
             capture_output=True,
@@ -60,7 +61,7 @@ def get_active_user_count() -> int:
                     if parts:
                         users.add(parts[0])
             return len(users)
-    except (FileNotFoundError, subprocess.TimeoutExpired, Exception):
+    except FileNotFoundError, subprocess.TimeoutExpired, Exception:
         pass
 
     return -1
@@ -85,6 +86,7 @@ def get_system_uptime_days() -> int:
     try:
         # Try using 'uptime' command
         import subprocess
+
         result = subprocess.run(
             ["uptime", "-s"],
             capture_output=True,
@@ -94,10 +96,11 @@ def get_system_uptime_days() -> int:
         if result.returncode == 0:
             # Parse boot time and calculate days
             from datetime import datetime
+
             boot_time = datetime.fromisoformat(result.stdout.strip())
             uptime = datetime.now() - boot_time
             return uptime.days
-    except (FileNotFoundError, subprocess.TimeoutExpired, ValueError, Exception):
+    except FileNotFoundError, subprocess.TimeoutExpired, ValueError, Exception:
         pass
 
     return -1
@@ -118,6 +121,7 @@ def vlog(msg: str, verbose: bool = False) -> None:
         try:
             # Use new logging framework
             from .logging_config import get_logger
+
             logger = get_logger()
             logger.info(msg)
         except Exception:

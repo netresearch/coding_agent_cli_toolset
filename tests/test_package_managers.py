@@ -6,21 +6,22 @@ Tests for package manager selection (cli_audit/package_managers.py).
 Target coverage: 90%+
 """
 
-import pytest
-from unittest.mock import patch, MagicMock
 import subprocess
+from unittest.mock import MagicMock, patch
 
+import pytest
+
+from cli_audit.config import Config, Preferences, ToolConfig
+from cli_audit.environment import Environment
 from cli_audit.package_managers import (
-    PackageManager,
     PACKAGE_MANAGERS,
-    get_package_manager,
+    PackageManager,
+    clear_cache,
     get_available_package_managers,
     get_default_hierarchy,
+    get_package_manager,
     select_package_manager,
-    clear_cache,
 )
-from cli_audit.config import Config, ToolConfig, Preferences
-from cli_audit.environment import Environment
 
 
 class TestPackageManager:
