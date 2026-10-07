@@ -2,5 +2,18 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
+  ],
+  "pre-commit": {
+    "enabled": true
+  },
+  "packageRules": [
+    {
+      "description": "black and isort run twice: as pre-commit hooks (.pre-commit-config.yaml) and in CI from requirements-dev.txt. Update every copy in one pull request so the hook and CI format alike.",
+      "matchPackageNames": [
+        "/^(psf\\/)?black$/i",
+        "/^(pycqa\\/)?isort$/i"
+      ],
+      "groupName": "black and isort"
+    }
   ]
 }
