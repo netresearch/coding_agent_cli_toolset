@@ -59,8 +59,10 @@ else
   PY="${PYTHON:-python3}"
 fi
 
-# Update user config using Python
-"$PY" << EOF
+# Update user config using Python. The values reach Python as arguments, never
+# as part of the program text: a multi-version key carries a cycle taken from
+# endoflife.date data.
+"$PY" - "$CONFIG_FILE" "$TOOL" "$VALUE" << 'EOF'
 import os
 import sys
 
@@ -71,9 +73,9 @@ except ImportError:
     print("Error: PyYAML required. Install with: pip install pyyaml", file=sys.stderr)
     sys.exit(1)
 
-config_file = "$CONFIG_FILE"
-tool = "$TOOL"
-value = $VALUE  # Python bool
+config_file = sys.argv[1]
+tool = sys.argv[2]
+value = sys.argv[3] == "True"
 
 # Ensure config directory exists
 os.makedirs(os.path.dirname(config_file), exist_ok=True)

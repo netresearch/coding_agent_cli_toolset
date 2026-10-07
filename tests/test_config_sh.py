@@ -64,3 +64,44 @@ def test_key_with_quotes_and_parentheses_is_treated_as_a_name(tmp_path):
 def test_global_auto_upgrade_is_read(tmp_path):
     _write_config(tmp_path, "preferences:\n  auto_upgrade: false\n")
     assert _ask(tmp_path, "config_get_global_auto_upgrade") == "false"
+
+
+SET_AUTO_UPDATE = PROJECT_ROOT / "scripts" / "set_auto_update.sh"
+
+
+def _set(tmp_path: Path, *args: str) -> subprocess.CompletedProcess:
+    home = tmp_path / "home"
+    home.mkdir(exist_ok=True)
+    return subprocess.run(
+        ["bash", str(SET_AUTO_UPDATE), *args],
+        capture_output=True,
+        text=True,
+        cwd=tmp_path,
+        env={"HOME": str(home), "PATH": os.environ["PATH"]},
+        timeout=60,
+    )
+
+
+def test_set_auto_update_writes_the_key_and_the_reader_finds_it(tmp_path):
+    _write_config(tmp_path, "preferences:\n  auto_upgrade: false\n")
+    proc = _set(tmp_path, "python@3.13", "true")
+    assert proc.returncode == 0, proc.stderr
+    assert _ask(tmp_path, "config_get_auto_update", "python@3.13") == "true"
+
+    proc = _set(tmp_path, "python@3.13", "false")
+    assert proc.returncode == 0, proc.stderr
+    assert _ask(tmp_path, "config_get_auto_update", "python@3.13") == "false"
+
+
+def test_set_auto_update_stores_a_key_with_quotes_as_written(tmp_path):
+    import yaml
+
+    marker = tmp_path / "marker"
+    key = f"python@3\"+__import__('os').system('touch {marker}')+\""
+
+    proc = _set(tmp_path, key, "true")
+
+    assert proc.returncode == 0, proc.stderr
+    assert not marker.exists(), "the key was evaluated as Python instead of being stored"
+    cfg = yaml.safe_load((tmp_path / "home" / ".config" / "cli-audit" / "config.yml").read_text())
+    assert cfg["tools"][key] == {"auto_update": True}
