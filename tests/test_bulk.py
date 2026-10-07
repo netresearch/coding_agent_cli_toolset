@@ -7,6 +7,8 @@ Tests for bulk installation operations.
 from __future__ import annotations
 
 import os
+import shutil
+import stat
 import sys
 import tempfile
 import threading
@@ -469,6 +471,20 @@ class TestGroupByPackageManager:
         assert len(groups["uv"]) == 2
 
 
+def _remove_rollback(script_path):
+    """Remove a generated rollback script and, if it has one, its own directory.
+
+    Only a directory named like the ones generate_rollback_script creates is
+    removed as a whole; anything else (for example the shared temp directory
+    itself) keeps its other contents.
+    """
+    script_dir = os.path.dirname(script_path)
+    if os.path.basename(script_dir).startswith("cli-audit-rollback-"):
+        shutil.rmtree(script_dir)
+    elif os.path.exists(script_path):
+        os.remove(script_path)
+
+
 @skip_on_windows
 class TestGenerateRollbackScript:
     """Tests for generate_rollback_script function."""
@@ -501,8 +517,10 @@ class TestGenerateRollbackScript:
 
         assert os.path.exists(script_path)
         # Use tempfile.gettempdir() — on macOS this is /var/folders/..., not /tmp.
-        expected_prefix = os.path.join(tempfile.gettempdir(), "rollback_")
-        assert script_path.startswith(expected_prefix)
+        script_dir = os.path.dirname(script_path)
+        assert os.path.dirname(script_dir) == tempfile.gettempdir()
+        assert os.path.basename(script_dir).startswith("cli-audit-rollback-")
+        assert os.path.basename(script_path).startswith("rollback_")
         assert script_path.endswith(".sh")
 
         # Check script content
@@ -512,7 +530,7 @@ class TestGenerateRollbackScript:
             assert "cargo uninstall ripgrep" in content
 
         # Cleanup
-        os.remove(script_path)
+        _remove_rollback(script_path)
 
     def test_generate_rollback_script_pip(self):
         """Test rollback script generation for pip."""
@@ -544,7 +562,7 @@ class TestGenerateRollbackScript:
             content = f.read()
             assert "pip uninstall -y black" in content
 
-        os.remove(script_path)
+        _remove_rollback(script_path)
 
     def test_generate_rollback_script_multiple(self):
         """Test rollback script with multiple tools."""
@@ -581,7 +599,56 @@ class TestGenerateRollbackScript:
             assert "pip uninstall -y black" in content
             assert "cargo uninstall fd" in content
 
-        os.remove(script_path)
+        _remove_rollback(script_path)
+
+    def _cargo_result(self, tool_name):
+        from cli_audit.install_plan import InstallStep
+
+        step_result = StepResult(
+            step=InstallStep("test", ("cargo", "install", tool_name)),
+            success=True,
+            stdout="",
+            stderr="",
+            exit_code=0,
+            duration_seconds=1.0,
+        )
+        return InstallResult(
+            tool_name=tool_name,
+            success=True,
+            installed_version="1.0.0",
+            package_manager_used="cargo",
+            steps_completed=(step_result,),
+            duration_seconds=1.0,
+            validation_passed=True,
+            binary_path=f"/usr/bin/{tool_name}",
+        )
+
+    def test_rollback_script_is_private_to_the_user(self):
+        script_path = generate_rollback_script([self._cargo_result("ripgrep")])
+        try:
+            dir_mode = stat.S_IMODE(os.stat(os.path.dirname(script_path)).st_mode)
+            file_mode = stat.S_IMODE(os.stat(script_path).st_mode)
+            assert dir_mode == 0o700
+            assert file_mode == 0o700
+        finally:
+            _remove_rollback(script_path)
+
+    def test_each_rollback_script_gets_its_own_directory(self):
+        first = generate_rollback_script([self._cargo_result("ripgrep")])
+        second = generate_rollback_script([self._cargo_result("ripgrep")])
+        try:
+            assert os.path.dirname(first) != os.path.dirname(second)
+        finally:
+            _remove_rollback(first)
+            _remove_rollback(second)
+
+    def test_tool_name_is_written_as_one_shell_word(self):
+        script_path = generate_rollback_script([self._cargo_result("rg; touch x")])
+        try:
+            with open(script_path) as f:
+                assert "cargo uninstall 'rg; touch x'" in f.read()
+        finally:
+            _remove_rollback(script_path)
 
 
 class TestExecuteRollback:
