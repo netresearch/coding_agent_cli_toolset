@@ -5,12 +5,10 @@
 
 set -euo pipefail
 
-PATH_CHECK_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
 # Detect user's shell RC file
 detect_shell_rc() {
   local shell_name="${SHELL##*/}"
-  
+
   case "$shell_name" in
     bash)
       # Prefer .bashrc for interactive shells
@@ -52,12 +50,12 @@ path_contains() {
 path_order_ok() {
   local earlier="$1"
   local later="$2"
-  
+
   # Get positions
   local pos_earlier=-1
   local pos_later=-1
   local pos=0
-  
+
   IFS=':' read -ra PATHS <<< "$PATH"
   for p in "${PATHS[@]}"; do
     if [ "$p" = "$earlier" ]; then
@@ -68,13 +66,13 @@ path_order_ok() {
     fi
     pos=$((pos + 1))
   done
-  
+
   # If earlier not found, bad
   [ $pos_earlier -eq -1 ] && return 1
-  
+
   # If later not found, order is OK (nothing to conflict with)
   [ $pos_later -eq -1 ] && return 0
-  
+
   # Earlier should have lower position number
   [ $pos_earlier -lt $pos_later ]
 }
@@ -255,7 +253,7 @@ check_path_requirement() {
   local name="$1"
   local requirement="${PATH_REQUIREMENTS[$name]}"
 
-  IFS='|' read -r dir init_cmd description priority <<< "$requirement"
+  IFS='|' read -r dir init_cmd description _ <<< "$requirement"
 
   # Expand home directory
   dir="${dir/#\~/$HOME}"
@@ -455,7 +453,7 @@ fix_all_paths() {
     IFS='|' read -r result warning fix <<< "$check_result"
 
     if [ "$result" = "missing" ] || [ "$result" = "wrong_order" ]; then
-      IFS='|' read -r fix_type fix_name fix_dir fix_init_cmd <<< "$fix"
+      IFS='|' read -r _ fix_name _ fix_init_cmd <<< "$fix"
 
       if [ -n "$fix_init_cmd" ]; then
         add_to_shell_rc "$fix_name" "$fix_init_cmd"
@@ -472,7 +470,7 @@ fix_all_paths() {
     IFS='|' read -r result warning fix <<< "$check_result"
 
     if [ "$result" = "missing" ]; then
-      IFS='|' read -r fix_type fix_name fix_hook_cmd <<< "$fix"
+      IFS='|' read -r _ fix_name fix_hook_cmd <<< "$fix"
 
       if [ -n "$fix_hook_cmd" ]; then
         add_shell_hook "$fix_name" "$fix_hook_cmd"

@@ -38,7 +38,7 @@ install_composer() {
 
   # Download to temp file
   TMP_FILE="$(mktemp)"
-  trap "rm -f '$TMP_FILE'" EXIT
+  trap 'rm -f "$TMP_FILE"' EXIT
 
   if ! curl -fsSL "$COMPOSER_URL" -o "$TMP_FILE"; then
     echo "[composer] Error: Failed to download from $COMPOSER_URL" >&2

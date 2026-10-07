@@ -52,7 +52,7 @@ else
       fi
     done
   else
-    if have python3; then python3 -m pip install --user -U ansible || true; else if have apt-get; then sudo apt-get update && sudo apt-get install -y ansible; fi; fi
+    if have python3; then python3 -m pip install --user -U ansible || true; elif have apt-get; then sudo apt-get update && sudo apt-get install -y ansible; fi
   fi
 fi
 after="$(command -v ansible >/dev/null 2>&1 && ansible --version | head -n1 || true)"
@@ -60,5 +60,3 @@ path="$(command -v ansible 2>/dev/null || true)"
 printf "[%s] before: %s\n" "$TOOL" "${before:-<none>}"
 printf "[%s] after:  %s\n"  "$TOOL" "${after:-<none>}"
 if [ -n "$path" ]; then printf "[%s] path:   %s\n" "$TOOL" "$path"; fi
-
-

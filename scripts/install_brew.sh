@@ -32,5 +32,3 @@ case "$ACTION" in
 esac
 
 echo "brew: $ACTION complete (or attempted)."
-
-

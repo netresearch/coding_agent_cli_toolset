@@ -44,5 +44,3 @@ case "$ACTION" in
 esac
 
 echo "rust: $ACTION complete (or attempted)."
-
-

@@ -146,7 +146,7 @@ topological_sort() {
     echo "Error: Circular dependency detected" >&2
     # Find tools not in sorted (they're part of cycle)
     for tool in "${all_tools[@]}"; do
-      if [[ ! " ${sorted[*]} " =~ " ${tool} " ]]; then
+      if [[ " ${sorted[*]} " != *" ${tool} "* ]]; then
         echo "  Tool in cycle: $tool (depends on: ${deps[$tool]})" >&2
       fi
     done
