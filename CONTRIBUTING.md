@@ -59,7 +59,7 @@ bash tests/test_reconcile_dryrun.sh
 
 | Job | What it runs |
 | --- | --- |
-| App CI / CI | flake8, mypy, and the unit and integration tests with coverage (uploaded to Codecov), on Python 3.14 on Ubuntu, macOS and Windows |
+| App CI / CI | flake8, black and isort checks, mypy, and the unit and integration tests with coverage (uploaded to Codecov), on Python 3.14 on Ubuntu, macOS and Windows |
 | App CI / Build | `python -m build` and `twine check dist/*` |
 | App CI / Audit | pip-audit, bandit and a CycloneDX SBOM (see "Security checks on pull requests") |
 | App CI / Secret Scanning | Betterleaks |
