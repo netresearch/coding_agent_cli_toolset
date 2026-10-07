@@ -91,7 +91,7 @@ uv run mypy cli_audit --ignore-missing-imports
 - **flake8** (`.flake8`, maximum line length 127) fails CI on any finding.
 - **McCabe complexity** is the documented exception: CI reports functions above complexity 10 (`flake8 --select=C901 --max-complexity=10 --exit-zero`) without failing. 23 existing functions in ten modules of `cli_audit/` exceed the threshold, seven of them in `reconcile.py`; reducing them is a refactor of that logic. New code should stay below 10.
 - **mypy** (`[tool.mypy]` in `pyproject.toml`) fails CI on any finding.
-- **black** and **isort** (`[tool.black]`, `[tool.isort]` in `pyproject.toml`) run as pre-commit hooks for `cli_audit/`, `tests/` and `audit.py`, and CI fails when a file there is not formatted (`black --check --diff cli_audit tests audit.py`, `isort --check-only --diff cli_audit tests audit.py`). `uv run pre-commit run --all-files` formats the tree.
+- **black** and **isort** (`[tool.black]`, `[tool.isort]` in `pyproject.toml`) run as pre-commit hooks for `cli_audit/`, `tests/` and `audit.py`, and CI fails when a file there is not formatted (`black --check --diff cli_audit tests audit.py`, `isort --check-only --diff cli_audit tests audit.py`). `uv run black cli_audit tests audit.py` and `uv run isort cli_audit tests audit.py` format them.
 - **ShellCheck** runs as a pre-commit hook for the shell scripts under `scripts/` at severity `warning`. CI does not run it.
 
 ## Governance and policies
