@@ -32,7 +32,7 @@ repos:
         args: ['--profile=black']
 
   - repo: https://github.com/psf/black
-    rev: 26.10.0
+    rev: 26.10.1
     hooks:
       - id: black
         files: ^(cli_audit/|tests/|audit\.py$)
