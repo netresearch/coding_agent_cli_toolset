@@ -98,6 +98,7 @@ The system supports 9 installation methods:
 ### github_release_binary
 Downloads pre-compiled binaries from GitHub releases. Handles:
 - Architecture mapping (x86_64 → amd64, aarch64 → arm64)
+- Download verification against the sha256 `digest` GitHub records per release asset (mismatch: nothing installed; no digest: installs with an "unverified" warning)
 - Archive extraction (.tar.gz, .zip)
 - Binary renaming and permission setting
 - Version detection from GitHub API

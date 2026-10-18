@@ -14,9 +14,16 @@ Three failure shapes, each observed in the field:
 * The report probed whichever copy of the binary came first on PATH, so with
   more than one installation it could print the version of a different copy
   than the one just written.
+
+The download is checked against the sha256 ``digest`` GitHub records per
+release asset: a match installs, a mismatch installs nothing, and a release
+without a digest installs with one "unverified" warning.
 """
 
+import hashlib
+import json
 import os
+import platform
 import stat
 import subprocess
 import sys
@@ -251,3 +258,113 @@ esac
 
     marker = home / ".cache" / "cli-audit" / "markers" / "fx.already-current"
     assert marker.read_text().strip() == NEW_VERSION, proc.stdout + proc.stderr
+
+
+# The file _curl_stub serves for the fx download, byte for byte.
+SERVED_DOWNLOAD = f'#!/usr/bin/env bash\necho "fx {NEW_VERSION}"\n'.encode()
+SERVED_DIGEST = "sha256:" + hashlib.sha256(SERVED_DOWNLOAD).hexdigest()
+WRONG_DIGEST = "sha256:" + "0" * 64
+
+
+def _fx_asset_name() -> str:
+    """The asset name the installer requests on this machine (fx_linux_<arch>)."""
+    arch_map = json.loads((PROJECT_ROOT / "catalog" / "fx.json").read_text())["arch_map"]
+    machine = platform.machine()
+    return f"fx_linux_{arch_map.get(machine, machine)}"
+
+
+def _gh_release_stub(stubs: Path, log: Path, latest: dict, by_tag: dict | None = None) -> None:
+    """A gh that answers releases/latest (and optionally releases/tags/<NEW_VERSION>) from JSON files.
+
+    It records each API path it is asked for, so a test can see which lookups ran.
+    """
+    (stubs / "latest.json").write_text(json.dumps(latest))
+    tag_case = ""
+    if by_tag is not None:
+        (stubs / "by_tag.json").write_text(json.dumps(by_tag))
+        tag_case = f"""  *"repos/antonmedv/fx/releases/tags/{NEW_VERSION}"*) cat "{stubs / 'by_tag.json'}" ;;\n"""
+    _write_exe(
+        stubs / "gh",
+        f"""echo "GH $*" >> "{log}"
+case "$*" in
+  *"repos/antonmedv/fx/releases/latest"*) cat "{stubs / 'latest.json'}" ;;
+{tag_case}  *) exit 1 ;;
+esac
+""",
+    )
+
+
+def _release(digest: str | None) -> dict:
+    asset: dict = {"name": _fx_asset_name()}
+    if digest is not None:
+        asset["digest"] = digest
+    return {"tag_name": NEW_VERSION, "assets": [{"name": "fx_darwin_amd64", "digest": WRONG_DIGEST}, asset]}
+
+
+linux_only = pytest.mark.skipif(
+    not sys.platform.startswith("linux"),
+    reason="the installer is Linux-only (OS=linux, GNU `install -T`); this case runs the install to completion",
+)
+
+
+@linux_only
+def test_download_matching_the_release_digest_is_installed(sandbox):
+    home, stubs, prefix, log = sandbox
+    _gh_release_stub(stubs, log, latest=_release(SERVED_DIGEST))
+    _write_exe(stubs / "curl", _curl_stub(log, serve_download=True))
+
+    proc = _run(home, stubs, prefix)
+
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert (prefix / "bin" / "fx").read_bytes() == SERVED_DOWNLOAD
+    assert "[fx] verified: sha256 matches the GitHub release digest" in proc.stderr, proc.stderr
+    assert "unverified" not in proc.stderr, proc.stderr
+    # The release JSON that resolved the version already lists the assets;
+    # a second API call for the same release would only spend rate limit.
+    assert "releases/tags/" not in log.read_text(), log.read_text()
+
+
+@linux_only
+def test_download_not_matching_the_release_digest_installs_nothing(sandbox, tmp_path):
+    home, stubs, prefix, log = sandbox
+    _gh_release_stub(stubs, log, latest=_release(WRONG_DIGEST))
+    _write_exe(stubs / "curl", _curl_stub(log, serve_download=True))
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+
+    proc = _run(home, stubs, prefix, extra_env={"TMPDIR": str(scratch)})
+
+    assert proc.returncode != 0, proc.stdout + proc.stderr
+    assert "does not match the digest GitHub records" in proc.stderr, proc.stderr
+    assert not (prefix / "bin" / "fx").exists(), "a download that failed verification was installed"
+    assert list(scratch.iterdir()) == [], "the rejected download was left behind"
+
+
+@linux_only
+def test_release_without_a_digest_warns_and_installs(sandbox):
+    home, stubs, prefix, log = sandbox
+    _gh_release_stub(stubs, log, latest=_release(None))
+    _write_exe(stubs / "curl", _curl_stub(log, serve_download=True))
+
+    proc = _run(home, stubs, prefix)
+
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert (prefix / "bin" / "fx").exists(), proc.stdout + proc.stderr
+    warnings = [line for line in proc.stderr.splitlines() if "unverified" in line]
+    assert len(warnings) == 1 and warnings[0].startswith("[fx] Warning:"), proc.stderr
+
+
+@linux_only
+def test_digest_is_looked_up_by_tag_when_the_version_came_without_assets(sandbox):
+    # Here the version lookup returns no asset list, so the installer has to
+    # ask for the release by its tag; the mismatching digest it finds there
+    # must stop the install just as one in the first response would.
+    home, stubs, prefix, log = sandbox
+    _gh_release_stub(stubs, log, latest={"tag_name": NEW_VERSION}, by_tag=_release(WRONG_DIGEST))
+    _write_exe(stubs / "curl", _curl_stub(log, serve_download=True))
+
+    proc = _run(home, stubs, prefix)
+
+    assert f"repos/antonmedv/fx/releases/tags/{NEW_VERSION}" in log.read_text(), log.read_text()
+    assert proc.returncode != 0, proc.stdout + proc.stderr
+    assert not (prefix / "bin" / "fx").exists(), "a download that failed verification was installed"
