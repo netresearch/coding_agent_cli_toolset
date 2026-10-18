@@ -129,9 +129,12 @@ fi
 # Every lookup ends in `|| true`: under `set -euo pipefail` a failing curl
 # inside the assignment would otherwise end the script right here with no
 # output at all, never reaching the error message below.
+# The release JSON is kept: it lists the assets with their digests, which
+# saves a second API call when verifying the download below.
+LATEST_RELEASE_JSON=""
 if [ -z "$LATEST" ] && [ -n "$GITHUB_REPO" ]; then
-  LATEST="$(github_api_get "repos/$GITHUB_REPO/releases/latest" 2>/dev/null | \
-    jq -r '.tag_name // empty' 2>/dev/null || true)"
+  LATEST_RELEASE_JSON="$(github_api_get "repos/$GITHUB_REPO/releases/latest" 2>/dev/null || true)"
+  LATEST="$(jq -r '.tag_name // empty' <<<"$LATEST_RELEASE_JSON" 2>/dev/null || true)"
 fi
 if [ -z "$LATEST" ] && [ -n "$GITHUB_REPO" ]; then
   # curl -f still prints its -w write-out on an HTTP error, and that URL ends
@@ -171,6 +174,7 @@ DOWNLOAD_URL="${DOWNLOAD_URL//\{arch_suffix\}/$ARCH}"
 # Download with retry and fallback
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/cli-audit-${TOOL}.XXXXXX")"
 tmpfile="$WORK_DIR/download"
+USED_URL="$DOWNLOAD_URL"
 
 if ! curl --proto '=https' --proto-redir '=https' -fL --retry 3 --retry-delay 1 --connect-timeout 10 -o "$tmpfile" "$DOWNLOAD_URL" 2>/dev/null; then
   if [ -n "$FALLBACK_URL_TEMPLATE" ]; then
@@ -178,6 +182,7 @@ if ! curl --proto '=https' --proto-redir '=https' -fL --retry 3 --retry-delay 1 
     FALLBACK_URL="${FALLBACK_URL//\{os\}/$OS}"
     FALLBACK_URL="${FALLBACK_URL//\{arch\}/$ARCH}"
     curl --proto '=https' --proto-redir '=https' -fL --retry 3 --retry-delay 1 --connect-timeout 10 -o "$tmpfile" "$FALLBACK_URL"
+    USED_URL="$FALLBACK_URL"
   else
     echo "[$TOOL] Error: Download failed" >&2
     exit 1
@@ -190,6 +195,45 @@ if ! [ -s "$tmpfile" ]; then
   rm -f "$tmpfile"
   exit 1
 fi
+
+# Print the digest GitHub records for the release asset behind URL
+# ("sha256:<hex>", the `digest` field of the releases API), or nothing.
+# Only a github.com release-download URL names a release asset. Releases
+# published before GitHub recorded digests have none, and a failed API lookup
+# yields none either.
+release_asset_digest() {
+  local url="$1" tag asset json=""
+  [[ "$url" =~ ^https://github\.com/([^/]+)/([^/]+)/releases/download/([^/]+)/([^/?#]+)$ ]] || return 0
+  tag="${BASH_REMATCH[3]}"
+  asset="${BASH_REMATCH[4]}"
+  if [ -n "$LATEST_RELEASE_JSON" ] &&
+    jq -e --arg t "$tag" '.tag_name == $t and (.assets | type) == "array"' <<<"$LATEST_RELEASE_JSON" >/dev/null 2>&1; then
+    json="$LATEST_RELEASE_JSON"
+  else
+    json="$(github_api_get "repos/${BASH_REMATCH[1]}/${BASH_REMATCH[2]}/releases/tags/$tag" 2>/dev/null || true)"
+  fi
+  jq -r --arg n "$asset" 'first(.assets[]? | select(.name == $n) | .digest // empty) // empty' <<<"$json" 2>/dev/null || true
+}
+
+# Verify the download before anything is extracted or installed. A recorded
+# digest that does not match ends the run; the EXIT trap removes the download.
+# Without a sha256 digest the install goes ahead, with a warning.
+ASSET_DIGEST="$(release_asset_digest "$USED_URL")"
+case "$ASSET_DIGEST" in
+  sha256:*)
+    # The hex check keeps the checksum line to exactly this one file; a
+    # malformed value counts as a mismatch.
+    if ! [[ "${ASSET_DIGEST#sha256:}" =~ ^[0-9a-fA-F]{64}$ ]] ||
+      ! printf '%s  %s\n' "${ASSET_DIGEST#sha256:}" "$tmpfile" | sha256sum -c --status - 2>/dev/null; then
+      echo "[$TOOL] Error: the download does not match the digest GitHub records for ${USED_URL##*/} ($ASSET_DIGEST); nothing installed" >&2
+      exit 1
+    fi
+    echo "[$TOOL] verified: sha256 matches the GitHub release digest" >&2
+    ;;
+  *)
+    echo "[$TOOL] Warning: no sha256 digest available for ${USED_URL##*/}; the download is unverified" >&2
+    ;;
+esac
 
 # Extract if archive, otherwise use directly
 BINARY_PATH="$tmpfile"
