@@ -119,14 +119,30 @@ class TestFilesInPlace:
         assert proc.returncode == 0
         assert target.read_text() == "hello\n"
 
-    @pytest.mark.skipif(shutil.which("setfacl") is None, reason="needs setfacl(1)")
+    @pytest.mark.skipif(
+        shutil.which("setfacl") is None or shutil.which("getfacl") is None,
+        reason="needs setfacl(1) and getfacl(1)",
+    )
     def test_default_acl_overrides_umask(self, tmp_path):
-        acl = subprocess.run(["setfacl", "-d", "-m", "u::rw,g::rw,o::r", str(tmp_path)], capture_output=True, text=True)
+        # A named entry, so that inheriting it and removing it are both visible.
+        default = "u::rw,g::rw,o::r,m::rw,u:12345:r"
+        acl = subprocess.run(["setfacl", "-d", "-m", default, str(tmp_path)], capture_output=True, text=True)
         if acl.returncode != 0:
             pytest.skip(f"filesystem without ACL support: {acl.stderr.strip()}")
-        assert bash(f'umask 077; : >"{tmp_path}/a"; stat -c %a "{tmp_path}/a"').stdout == "664\n"
-        proc = bash(f'install -m 600 /dev/null "{tmp_path}/b" && setfacl -b "{tmp_path}/b"; stat -c %a "{tmp_path}/b"')
-        assert proc.stdout == "600\n"
+
+        def mode_and_acl(name: str, create: str) -> tuple:
+            proc = bash(f'f="{tmp_path / name}"; {create} && stat -c %a "$f" && getfacl -cpn "$f"')
+            assert proc.returncode == 0, proc.stderr
+            mode, _, acl_text = proc.stdout.partition("\n")
+            return mode, "user:12345" in acl_text
+
+        # A redirect under umask 077 takes the default ACL: group-readable, entry inherited.
+        assert mode_and_acl("a", 'umask 077; : >"$f"') == ("664", True)
+        # install copies the (empty) ACL of /dev/null: private, nothing inherited.
+        assert mode_and_acl("b", 'install -m 600 /dev/null "$f"') == ("600", False)
+        # chmod after the fact only masks the inherited entry; setfacl -b removes it.
+        assert mode_and_acl("c", 'touch "$f" && chmod 600 "$f"') == ("600", True)
+        assert mode_and_acl("c", 'setfacl -b "$f"') == ("600", False)
 
 
 def _has_gnu_timeout() -> bool:

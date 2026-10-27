@@ -158,11 +158,14 @@ indentation leaves the file unchanged and reports success. Read the result
 
 **A default ACL on the directory overrides `umask`.** In a directory with a
 default ACL (a `+` after the mode in `ls -ld`), a file created under
-`umask 077` takes its mode from the ACL instead: `-rw-rw-r--+`, readable by
-the group, with a freshly generated password in it. For a file that will hold
-a secret, create it with the mode first and drop the inherited entries, then
-write: `install -m 600 /dev/null "$f" && setfacl -b "$f"`. Confirm with
-`stat -c %A "$f"`, not by trusting the umask.
+`umask 077` takes its mode and named entries from the ACL instead:
+`-rw-rw-r--`, readable by the group, with a freshly generated password in it.
+For a file that will hold a secret, create it empty and private first, then
+write: `install -m 600 /dev/null "$f"` (GNU coreutils copies the empty ACL of
+`/dev/null`, so nothing is inherited). A `chmod 600` on a file that already
+exists only masks the inherited entries; `setfacl -b "$f"` removes them.
+Confirm with `stat -c %A "$f"` and `getfacl -cpn "$f"`, not by trusting the
+umask.
 
 ## grep in the agent shell is ugrep
 
