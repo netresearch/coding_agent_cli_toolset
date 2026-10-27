@@ -119,6 +119,15 @@ class TestFilesInPlace:
         assert proc.returncode == 0
         assert target.read_text() == "hello\n"
 
+    @pytest.mark.skipif(shutil.which("setfacl") is None, reason="needs setfacl(1)")
+    def test_default_acl_overrides_umask(self, tmp_path):
+        acl = subprocess.run(["setfacl", "-d", "-m", "u::rw,g::rw,o::r", str(tmp_path)], capture_output=True, text=True)
+        if acl.returncode != 0:
+            pytest.skip(f"filesystem without ACL support: {acl.stderr.strip()}")
+        assert bash(f'umask 077; : >"{tmp_path}/a"; stat -c %a "{tmp_path}/a"').stdout == "664\n"
+        proc = bash(f'install -m 600 /dev/null "{tmp_path}/b" && setfacl -b "{tmp_path}/b"; stat -c %a "{tmp_path}/b"')
+        assert proc.stdout == "600\n"
+
 
 def _has_gnu_timeout() -> bool:
     # BusyBox timeout has no --foreground and keeps the caller's group.

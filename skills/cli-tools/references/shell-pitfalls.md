@@ -156,6 +156,14 @@ content, then move it into place.
 indentation leaves the file unchanged and reports success. Read the result
 (`grep -n`, `git diff`), never the exit code.
 
+**A default ACL on the directory overrides `umask`.** In a directory with a
+default ACL (a `+` after the mode in `ls -ld`), a file created under
+`umask 077` takes its mode from the ACL instead: `-rw-rw-r--+`, readable by
+the group, with a freshly generated password in it. For a file that will hold
+a secret, create it with the mode first and drop the inherited entries, then
+write: `install -m 600 /dev/null "$f" && setfacl -b "$f"`. Confirm with
+`stat -c %A "$f"`, not by trusting the umask.
+
 ## grep in the agent shell is ugrep
 
 In Claude Code's Bash tool, `grep` is a shell function that runs the bundled
