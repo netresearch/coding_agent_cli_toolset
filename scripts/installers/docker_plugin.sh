@@ -61,7 +61,7 @@ esac
 # Resolve latest version from GitHub
 LATEST=""
 if [ -n "$GITHUB_REPO" ]; then
-  LATEST="$(curl -fsSIL -H "User-Agent: cli-audit" -o /dev/null -w '%{url_effective}' \
+  LATEST="$(curl --proto '=https' -fsSIL -H "User-Agent: cli-audit" -o /dev/null -w '%{url_effective}' \
     "https://github.com/$GITHUB_REPO/releases/latest" 2>/dev/null | awk -F'/' '{print $NF}')"
 fi
 
@@ -81,7 +81,7 @@ trap 'rm -rf "$WORK_DIR"' EXIT
 tmpfile="$WORK_DIR/docker-$PLUGIN_NAME"
 
 echo "[$TOOL] Downloading $DOWNLOAD_URL"
-if ! curl -fL --retry 3 --retry-delay 1 --connect-timeout 10 -o "$tmpfile" "$DOWNLOAD_URL" 2>/dev/null; then
+if ! curl --proto '=https' -fL --retry 3 --retry-delay 1 --connect-timeout 10 -o "$tmpfile" "$DOWNLOAD_URL" 2>/dev/null; then
   echo "[$TOOL] Error: Download failed from $DOWNLOAD_URL" >&2
   rm -f "$tmpfile"
   exit 1

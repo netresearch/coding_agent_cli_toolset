@@ -10,7 +10,7 @@ ACTION="${1:-install}"
 
 install_rust() {
   if have cargo; then log "cargo already present"; return 0; fi
-  curl -fsSL https://sh.rustup.rs | sh -s -- -y
+  curl --proto '=https' -fsSL https://sh.rustup.rs | sh -s -- -y
   # shellcheck disable=SC1090
   [ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
 }

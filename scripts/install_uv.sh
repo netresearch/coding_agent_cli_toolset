@@ -40,7 +40,14 @@ cleanup_other_uv() {
 install_official_uv() {
   mkdir -p "$HOME/.local/bin" >/dev/null 2>&1 || true
   if command -v curl >/dev/null 2>&1; then
-    sh -c "$(curl -LsSf https://astral.sh/uv/install.sh)" || true
+    # Capture the script first: inside "$(...)" a failed download would hand
+    # `sh -c` an empty string, which exits 0 and reports a failed install as done.
+    local installer
+    if ! installer="$(curl --proto '=https' -LsSf https://astral.sh/uv/install.sh)" || [[ -z "$installer" ]]; then
+      echo "Failed to download the uv installer" >&2
+      return 1
+    fi
+    sh -c "$installer" || return 1
   else
     echo "curl is required to install uv" >&2
     return 1

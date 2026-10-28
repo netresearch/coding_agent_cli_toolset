@@ -670,7 +670,7 @@ class TestExecuteRollback:
             f.write("exit 0\n")
             script_path = f.name
 
-        os.chmod(script_path, 0o755)
+        os.chmod(script_path, 0o700)
 
         success = execute_rollback(script_path)
 
@@ -687,7 +687,7 @@ class TestExecuteRollback:
             f.write("exit 1\n")
             script_path = f.name
 
-        os.chmod(script_path, 0o755)
+        os.chmod(script_path, 0o700)
 
         success = execute_rollback(script_path)
 

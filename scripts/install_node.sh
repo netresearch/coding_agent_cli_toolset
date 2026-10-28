@@ -28,7 +28,7 @@ ensure_nvm() {
   if ! have nvm; then
     # nvm genuinely missing -- bootstrap it. Clear NODE_VERSION so the nvm
     # installer does not additionally install a node for our channel variable.
-    curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | NODE_VERSION="" bash
+    curl --proto '=https' -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | NODE_VERSION="" bash
     ensure_nvm_loaded
     # Guard against an endless re-bootstrap loop: if nvm.sh exists but sourcing
     # it still does not define `nvm` (e.g. a truncated/corrupt install), stop
@@ -119,10 +119,10 @@ install_node() {
       nvm use default || true
     fi
     corepack enable 2>/dev/null || true
-    npm install -g npm@latest || true
+    npm install -g --ignore-scripts npm@latest || true
     corepack prepare pnpm@latest --activate 2>/dev/null || true
     corepack prepare yarn@1 --activate 2>/dev/null || true
-    npm install -g eslint prettier || true
+    npm install -g --ignore-scripts eslint prettier || true
   else
     follow_default_within_major
     prune_older_patches
@@ -157,7 +157,7 @@ update_node() {
       nvm alias default "$NODE_CHANNEL" || true
       nvm use default || true
     fi
-    npm install -g npm@latest || true
+    npm install -g --ignore-scripts npm@latest || true
     # Only restore/update package managers that were installed before the
     # Node.js update. Explicit installs still enable both in install_node().
     if [ "$had_pnpm" -eq 1 ]; then

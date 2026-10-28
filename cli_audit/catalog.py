@@ -14,11 +14,21 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
+from urllib.parse import urlparse
 
 if TYPE_CHECKING:
     from cli_audit.tools import Tool
 
 logger = logging.getLogger(__name__)
+
+
+def _homepage_on(homepage: str, *domains: str) -> bool:
+    """Return True if the homepage URL's host is one of ``domains`` or a subdomain of one."""
+    try:
+        host = urlparse(homepage).hostname or ""
+    except ValueError:  # e.g. "https://[broken" — treat as no match, not a crash at import
+        return False
+    return any(host == d or host.endswith("." + d) for d in domains)
 
 
 @dataclass
@@ -113,13 +123,12 @@ class ToolCatalogEntry:
 
         # Priority 3: Package name + homepage hints
         if self.package_name:
-            homepage_lower = self.homepage.lower()
             # Check homepage for package source hints
-            if "npmjs.com" in homepage_lower or "yarnpkg.com" in homepage_lower or "pnpm.io" in homepage_lower:
+            if _homepage_on(self.homepage, "npmjs.com", "yarnpkg.com", "pnpm.io"):
                 return ("npm", (self.package_name,))
-            elif "pypi.org" in homepage_lower or "python.org" in homepage_lower or "pypa.io" in homepage_lower:
+            elif _homepage_on(self.homepage, "pypi.org", "python.org", "pypa.io"):
                 return ("pypi", (self.package_name,))
-            elif "crates.io" in homepage_lower:
+            elif _homepage_on(self.homepage, "crates.io"):
                 return ("crates", (self.package_name,))
             # Fallback: check install_method
             elif "npm" in self.install_method:
@@ -134,7 +143,7 @@ class ToolCatalogEntry:
             return ("gnu", (self.name, self._raw_data["ftp_url"]))
 
         # Priority 5: Detect GNU tools from homepage
-        if "gnu.org" in self.homepage:
+        if _homepage_on(self.homepage, "gnu.org"):
             # Construct default FTP URL
             return ("gnu", (self.name, f"https://ftp.gnu.org/gnu/{self.name}/"))
 

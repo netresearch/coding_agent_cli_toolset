@@ -339,9 +339,9 @@ stage_2_managers() {
 			local upgrade_success=0
 			# Check if in virtualenv - skip --user flag if so
 			if [ -n "${VIRTUAL_ENV:-}" ]; then
-				python3 -m pip install --upgrade pip >> "$LOG_FILE" 2>&1 && upgrade_success=1
+				python3 -m pip install --only-binary :all: --upgrade pip >> "$LOG_FILE" 2>&1 && upgrade_success=1
 			else
-				python3 -m pip install --user --upgrade pip >> "$LOG_FILE" 2>&1 && upgrade_success=1
+				python3 -m pip install --only-binary :all: --user --upgrade pip >> "$LOG_FILE" 2>&1 && upgrade_success=1
 			fi
 
 			if [ "$upgrade_success" = "1" ]; then
@@ -389,9 +389,9 @@ stage_2_managers() {
 			# Check if in virtualenv - skip --user flag if so
 			local upgrade_success=0
 			if [ -n "${VIRTUAL_ENV:-}" ]; then
-				pip3 install --upgrade pipx >> "$LOG_FILE" 2>&1 && upgrade_success=1
+				pip3 install --only-binary :all: --upgrade pipx >> "$LOG_FILE" 2>&1 && upgrade_success=1
 			else
-				pip3 install --user --upgrade pipx >> "$LOG_FILE" 2>&1 && upgrade_success=1
+				pip3 install --only-binary :all: --user --upgrade pipx >> "$LOG_FILE" 2>&1 && upgrade_success=1
 			fi
 
 			if [ "$upgrade_success" = "1" ]; then
@@ -416,7 +416,7 @@ stage_2_managers() {
 			else
 				local before_version
 				before_version="$(get_version "npm --version")"
-				if npm install -g npm@latest >> "$LOG_FILE" 2>&1; then
+				if npm install -g --ignore-scripts npm@latest >> "$LOG_FILE" 2>&1; then
 					log_success_with_info "npm" "npm" "npm --version" "$before_version"
 				else
 					log_fail "npm (see $LOG_FILE for details)"

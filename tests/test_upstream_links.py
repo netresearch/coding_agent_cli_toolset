@@ -11,6 +11,8 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from cli_audit.catalog import ToolCatalog, ToolCatalogEntry
 from cli_audit.collectors import collect_github, collect_gitlab
 from cli_audit.tools import Tool, latest_target_url
@@ -38,6 +40,46 @@ class TestExplicitSourceKind:
             _raw_data={"source_kind": "gh", "source_args": ["owner", "repo"]},
         )
         assert entry._derive_source() == ("gh", ("owner", "repo"))
+
+
+class TestHomepageHostMatching:
+    @pytest.mark.parametrize(
+        "homepage,expected",
+        [
+            ("https://www.npmjs.com/", ("npm", ("demo-pkg",))),
+            ("https://pip.pypa.io/", ("pypi", ("demo-pkg",))),
+            ("https://www.python.org", ("pypi", ("demo-pkg",))),
+            ("https://crates.io/crates/demo", ("crates", ("demo-pkg",))),
+        ],
+    )
+    def test_package_registry_homepage_is_recognised(self, homepage, expected):
+        entry = ToolCatalogEntry(name="demo", package_name="demo-pkg", homepage=homepage)
+        assert entry._derive_source() == expected
+
+    @pytest.mark.parametrize(
+        "homepage",
+        [
+            "https://evil.com/npmjs.com",
+            "https://pypi.org.evil.com/",
+            "https://notcrates.io/",
+        ],
+    )
+    def test_lookalike_package_registry_host_is_rejected(self, homepage):
+        entry = ToolCatalogEntry(name="demo", package_name="demo-pkg", homepage=homepage)
+        assert entry._derive_source() == ("skip", ())
+
+    def test_gnu_homepage_is_recognised(self):
+        entry = ToolCatalogEntry(name="parallel", homepage="https://www.gnu.org/software/parallel/")
+        assert entry._derive_source() == ("gnu", ("parallel", "https://ftp.gnu.org/gnu/parallel/"))
+
+    @pytest.mark.parametrize("homepage", ["https://evil.com/gnu.org", "https://gnu.org.evil.com/"])
+    def test_lookalike_gnu_host_is_rejected(self, homepage):
+        entry = ToolCatalogEntry(name="parallel", homepage=homepage)
+        assert entry._derive_source() == ("skip", ())
+
+    def test_malformed_homepage_falls_through_to_install_method(self):
+        entry = ToolCatalogEntry(name="demo", package_name="demo-pkg", homepage="https://[broken", install_method="npm")
+        assert entry._derive_source() == ("npm", ("demo-pkg",))
 
 
 class TestRawTagUrls:

@@ -10,7 +10,7 @@ ACTION="${1:-install}"
 
 install_brew() {
   if have brew; then log "brew already installed"; return 0; fi
-  NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+  NONINTERACTIVE=1 /bin/bash -c "$(curl --proto '=https' -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
   if [ -d "/home/linuxbrew/.linuxbrew" ]; then
     echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> "$HOME/.bash_profile" || true
     eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
@@ -20,7 +20,7 @@ install_brew() {
 update_brew() { have brew && brew update && brew upgrade || true; }
 
 uninstall_brew() {
-  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/uninstall.sh)" || true
+  /bin/bash -c "$(curl --proto '=https' -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/uninstall.sh)" || true
 }
 
 case "$ACTION" in

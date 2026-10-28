@@ -45,7 +45,7 @@ brew_install() { brew install "$@"; }
 brew_upgrade() { brew upgrade "$@" || true; }
 brew_uninstall() { brew uninstall -f "$@" || true; }
 
-pipx_install() { have pipx || python3 -m pip install --user pipx; pipx install "$1" || true; }
+pipx_install() { have pipx || python3 -m pip install --only-binary :all: --user pipx; pipx install "$1" || true; }
 pipx_upgrade() { have pipx && pipx upgrade "$1" || true; }
 pipx_uninstall() { have pipx && pipx uninstall "$1" || true; }
 

@@ -137,8 +137,8 @@ install_or_update_py_cli() {
     done
   else
     ensure_python_distro
-    python3 -m pip install --user -U pip >/dev/null 2>&1 || true
-    python3 -m pip install --user -U pipx >/dev/null 2>&1 || true
+    python3 -m pip install --only-binary :all: --user -U pip >/dev/null 2>&1 || true
+    python3 -m pip install --only-binary :all: --user -U pipx >/dev/null 2>&1 || true
     python3 -m pipx ensurepath >/dev/null 2>&1 || true
     for p in "${tools[@]}"; do
       if [ "$cmd" = install ]; then
