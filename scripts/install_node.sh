@@ -28,7 +28,7 @@ ensure_nvm() {
   if ! have nvm; then
     # nvm genuinely missing -- bootstrap it. Clear NODE_VERSION so the nvm
     # installer does not additionally install a node for our channel variable.
-    curl --proto '=https' --proto-redir '=https' -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | NODE_VERSION="" bash
+    curl --proto '=https' -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | NODE_VERSION="" bash
     ensure_nvm_loaded
     # Guard against an endless re-bootstrap loop: if nvm.sh exists but sourcing
     # it still does not define `nvm` (e.g. a truncated/corrupt install), stop

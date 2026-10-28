@@ -12,7 +12,7 @@ INSTALL_DIR="${HOME}/.local/bin"
 FTP_URL="https://ftp.gnu.org/gnu/parallel/"
 
 get_latest_version() {
-  curl --proto '=https' --proto-redir '=https' -sL "$FTP_URL" | \
+  curl --proto '=https' -sL "$FTP_URL" | \
     grep -oE 'parallel-[0-9]+\.tar\.' | \
     sed 's/parallel-//; s/\.tar\.//' | \
     sort -rn | head -1
@@ -50,7 +50,7 @@ install_parallel() {
 
   mkdir -p "$INSTALL_DIR"
 
-  if ! curl --proto '=https' --proto-redir '=https' -sL "$url" -o "$tmpdir/$tarball"; then
+  if ! curl --proto '=https' -sL "$url" -o "$tmpdir/$tarball"; then
     echo "[$TOOL] Error: Failed to download $url" >&2
     rm -rf "$tmpdir"
     return 1

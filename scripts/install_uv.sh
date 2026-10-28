@@ -43,7 +43,7 @@ install_official_uv() {
     # Capture the script first: inside "$(...)" a failed download would hand
     # `sh -c` an empty string, which exits 0 and reports a failed install as done.
     local installer
-    if ! installer="$(curl --proto '=https' --proto-redir '=https' -LsSf https://astral.sh/uv/install.sh)" || [ -z "$installer" ]; then
+    if ! installer="$(curl --proto '=https' -LsSf https://astral.sh/uv/install.sh)" || [[ -z "$installer" ]]; then
       echo "Failed to download the uv installer" >&2
       return 1
     fi

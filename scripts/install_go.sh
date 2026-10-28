@@ -135,7 +135,7 @@ install_go() {
     # Get latest version from Go download page
     TMP="$(mktemp -d)"
     VERSION_URL="https://go.dev/VERSION?m=text"
-    if curl --proto '=https' --proto-redir '=https' -fsSL "$VERSION_URL" -o "$TMP/version.txt" 2>/dev/null; then
+    if curl --proto '=https' -fsSL "$VERSION_URL" -o "$TMP/version.txt" 2>/dev/null; then
       # VERSION file contains lines like "go1.25.2" - take first line
       TARGET_VERSION="$(head -n1 "$TMP/version.txt" | tr -d '\n\r')"
       if [ -n "$TARGET_VERSION" ]; then
@@ -144,7 +144,7 @@ install_go() {
         DOWNLOAD_URL="https://go.dev/dl/${ARCHIVE}"
 
         echo "Downloading ${ARCHIVE}..."
-        if curl --proto '=https' --proto-redir '=https' -fsSL "$DOWNLOAD_URL" -o "$TMP/${ARCHIVE}"; then
+        if curl --proto '=https' -fsSL "$DOWNLOAD_URL" -o "$TMP/${ARCHIVE}"; then
           # Remove existing installation
           if [ -d "/usr/local/go" ]; then
             echo "Removing existing /usr/local/go..."

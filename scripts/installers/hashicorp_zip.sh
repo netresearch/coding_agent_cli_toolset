@@ -65,7 +65,7 @@ fi
 # Get latest version from GitHub releases
 LATEST_TAG=""
 if [ -n "$GITHUB_REPO" ]; then
-  LATEST_TAG="$(curl --proto '=https' --proto-redir '=https' -fsSIL -H "User-Agent: cli-audit" -o /dev/null -w '%{url_effective}' \
+  LATEST_TAG="$(curl --proto '=https' -fsSIL -H "User-Agent: cli-audit" -o /dev/null -w '%{url_effective}' \
     "https://github.com/$GITHUB_REPO/releases/latest" 2>/dev/null | awk -F'/' '{print $NF}')"
 fi
 
@@ -80,7 +80,7 @@ fi
 TMP="$(mktemp -d)"
 URL="https://releases.hashicorp.com/${PRODUCT_NAME}/${VER}/${PRODUCT_NAME}_${VER}_${OS}_${ARCH}.zip"
 
-if curl --proto '=https' --proto-redir '=https' -fsSL "$URL" -o "$TMP/${PRODUCT_NAME}.zip"; then
+if curl --proto '=https' -fsSL "$URL" -o "$TMP/${PRODUCT_NAME}.zip"; then
   unzip -q "$TMP/${PRODUCT_NAME}.zip" -d "$TMP" || true
   if [ -f "$TMP/$BINARY_NAME" ]; then
     $INSTALL "$TMP/$BINARY_NAME" "$BIN_DIR/$BINARY_NAME"

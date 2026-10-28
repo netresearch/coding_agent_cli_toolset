@@ -7,6 +7,8 @@ set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ACTION="${1:-install}"
+# curl may only use https, including on redirects
+CURL_HTTPS_ONLY=(--proto '=https')
 
 # Get current version
 get_current_version() {
@@ -32,7 +34,7 @@ install_native() {
     # Download installer script. curl only: the URL redirects, and curl can
     # hold every hop to HTTPS (--proto-redir); wget cannot.
     if command -v curl >/dev/null 2>&1; then
-      curl --proto '=https' --proto-redir '=https' -fsSL https://claude.ai/install.sh -o "$installer_script" || { rm -rf "$work_dir"; return 1; }
+      curl "${CURL_HTTPS_ONLY[@]}" -fsSL https://claude.ai/install.sh -o "$installer_script" || { rm -rf "$work_dir"; return 1; }
     else
       echo "[claude] curl is required for the native installer" >&2
       rm -rf "$work_dir"
@@ -103,7 +105,7 @@ install_npm() {
 
 # Get latest version from GitHub
 get_latest_version() {
-  curl --proto '=https' --proto-redir '=https' -fsSIL -H "User-Agent: cli-audit" -o /dev/null -w '%{url_effective}' \
+  curl "${CURL_HTTPS_ONLY[@]}" -fsSIL -H "User-Agent: cli-audit" -o /dev/null -w '%{url_effective}' \
     "https://github.com/anthropics/claude-code/releases/latest" 2>/dev/null | awk -F'/' '{print $NF}' | sed 's/^v//'
 }
 
@@ -155,7 +157,7 @@ install_direct() {
   mkdir -p ~/.local/bin
   local tmp_bin
   tmp_bin="$(mktemp ~/.local/bin/.claude.XXXXXX)" || return 1
-  if ! curl --proto '=https' --proto-redir '=https' -fsSL "$GCS_BUCKET/$version/$platform/claude" -o "$tmp_bin"; then
+  if ! curl "${CURL_HTTPS_ONLY[@]}" -fsSL "$GCS_BUCKET/$version/$platform/claude" -o "$tmp_bin"; then
     echo "[claude] Download failed" >&2
     rm -f "$tmp_bin"
     return 1

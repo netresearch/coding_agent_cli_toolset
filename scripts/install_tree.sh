@@ -39,7 +39,7 @@ install_tree() {
   tmpdir="$(mktemp -d)"
 
   echo "[$TOOL] Downloading $url..." >&2
-  if ! curl --proto '=https' --proto-redir '=https' -sL "$url" -o "$tmpdir/tree.tar.gz"; then
+  if ! curl --proto '=https' -sL "$url" -o "$tmpdir/tree.tar.gz"; then
     echo "[$TOOL] Error: Failed to download $url" >&2
     rm -rf "$tmpdir"
     return 1
