@@ -77,6 +77,10 @@ class TestHomepageHostMatching:
         entry = ToolCatalogEntry(name="parallel", homepage=homepage)
         assert entry._derive_source() == ("skip", ())
 
+    def test_malformed_homepage_falls_through_to_install_method(self):
+        entry = ToolCatalogEntry(name="demo", package_name="demo-pkg", homepage="https://[broken", install_method="npm")
+        assert entry._derive_source() == ("npm", ("demo-pkg",))
+
 
 class TestRawTagUrls:
     def test_github_url_keeps_v_prefix(self):

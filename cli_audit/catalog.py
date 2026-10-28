@@ -24,7 +24,10 @@ logger = logging.getLogger(__name__)
 
 def _homepage_on(homepage: str, *domains: str) -> bool:
     """Return True if the homepage URL's host is one of ``domains`` or a subdomain of one."""
-    host = urlparse(homepage).hostname or ""
+    try:
+        host = urlparse(homepage).hostname or ""
+    except ValueError:  # e.g. "https://[broken" — treat as no match, not a crash at import
+        return False
     return any(host == d or host.endswith("." + d) for d in domains)
 
 

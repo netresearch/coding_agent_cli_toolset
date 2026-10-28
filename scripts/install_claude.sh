@@ -150,19 +150,29 @@ install_direct() {
 
   echo "[claude] Downloading v${version} for ${platform}..." >&2
 
-  # Download to ~/.local/bin
+  # Download next to the target and move it into place only after it runs,
+  # so a failed transfer never replaces a working binary
   mkdir -p ~/.local/bin
-  if ! curl --proto '=https' --proto-redir '=https' -fsSL "$GCS_BUCKET/$version/$platform/claude" -o ~/.local/bin/claude; then
+  local tmp_bin
+  tmp_bin="$(mktemp ~/.local/bin/.claude.XXXXXX)" || return 1
+  if ! curl --proto '=https' --proto-redir '=https' -fsSL "$GCS_BUCKET/$version/$platform/claude" -o "$tmp_bin"; then
     echo "[claude] Download failed" >&2
+    rm -f "$tmp_bin"
     return 1
   fi
 
-  chmod +x ~/.local/bin/claude
+  chmod +x "$tmp_bin"
 
   # Verify it works
-  if ! ~/.local/bin/claude --version >/dev/null 2>&1; then
+  if ! "$tmp_bin" --version >/dev/null 2>&1; then
     echo "[claude] Binary verification failed" >&2
-    rm -f ~/.local/bin/claude
+    rm -f "$tmp_bin"
+    return 1
+  fi
+
+  if ! mv -f "$tmp_bin" ~/.local/bin/claude; then
+    echo "[claude] Could not move the binary into place" >&2
+    rm -f "$tmp_bin"
     return 1
   fi
 
