@@ -47,7 +47,7 @@ install_pip() {
     echo "[pip] pip is managed by the Python distribution (uv/brew). Skipping standalone upgrade." >&2
   else
     # Only attempt pip upgrade if not in an externally-managed environment
-    python3 -m pip install --upgrade pip 2>&1 | grep -v "externally-managed-environment" || true
+    python3 -m pip install --only-binary :all: --upgrade pip 2>&1 | grep -v "externally-managed-environment" || true
   fi
 
   after="$(get_pip_version)"

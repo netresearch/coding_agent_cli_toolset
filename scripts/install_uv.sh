@@ -40,7 +40,7 @@ cleanup_other_uv() {
 install_official_uv() {
   mkdir -p "$HOME/.local/bin" >/dev/null 2>&1 || true
   if command -v curl >/dev/null 2>&1; then
-    sh -c "$(curl -LsSf https://astral.sh/uv/install.sh)" || true
+    sh -c "$(curl --proto '=https' --proto-redir '=https' -LsSf https://astral.sh/uv/install.sh)" || true
   else
     echo "curl is required to install uv" >&2
     return 1

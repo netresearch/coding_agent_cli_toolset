@@ -30,7 +30,7 @@ mkdir -p "$BIN_DIR" 2>/dev/null || true
 # Download and install
 TMP="$(mktemp -d)"
 cd "$TMP"
-curl -fsSL "$INSTALLER_URL" -o awscliv2.zip
+curl --proto '=https' --proto-redir '=https' -fsSL "$INSTALLER_URL" -o awscliv2.zip
 unzip -q awscliv2.zip
 
 # AWS installer supports --bin-dir and --install-dir options

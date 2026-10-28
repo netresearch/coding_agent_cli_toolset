@@ -40,7 +40,7 @@ install_composer() {
   TMP_FILE="$(mktemp)"
   trap 'rm -f "$TMP_FILE"' EXIT
 
-  if ! curl -fsSL "$COMPOSER_URL" -o "$TMP_FILE"; then
+  if ! curl --proto '=https' --proto-redir '=https' -fsSL "$COMPOSER_URL" -o "$TMP_FILE"; then
     echo "[composer] Error: Failed to download from $COMPOSER_URL" >&2
     exit 1
   fi

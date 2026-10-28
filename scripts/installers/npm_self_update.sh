@@ -47,7 +47,7 @@ fi
 # Upgrade npm to latest version
 # npm can be upgraded independently from Node.js
 echo "[$TOOL] Upgrading npm to latest version..."
-npm install -g npm@latest 2>&1 | grep -v "^npm " || true
+npm install -g --ignore-scripts npm@latest 2>&1 | grep -v "^npm " || true
 
 # Get new version
 after="$(timeout 2 npm --version </dev/null 2>/dev/null || echo '<none>')"

@@ -103,7 +103,7 @@ install_npm() {
 
 # Get latest version from GitHub
 get_latest_version() {
-  curl -fsSIL -H "User-Agent: cli-audit" -o /dev/null -w '%{url_effective}' \
+  curl --proto '=https' --proto-redir '=https' -fsSIL -H "User-Agent: cli-audit" -o /dev/null -w '%{url_effective}' \
     "https://github.com/anthropics/claude-code/releases/latest" 2>/dev/null | awk -F'/' '{print $NF}' | sed 's/^v//'
 }
 
@@ -152,7 +152,7 @@ install_direct() {
 
   # Download to ~/.local/bin
   mkdir -p ~/.local/bin
-  if ! curl -fsSL "$GCS_BUCKET/$version/$platform/claude" -o ~/.local/bin/claude; then
+  if ! curl --proto '=https' --proto-redir '=https' -fsSL "$GCS_BUCKET/$version/$platform/claude" -o ~/.local/bin/claude; then
     echo "[claude] Download failed" >&2
     return 1
   fi

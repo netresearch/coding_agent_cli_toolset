@@ -62,7 +62,7 @@ else
   TMP="$(mktemp -d)"
   INSTALLER_URL="https://dl.google.com/dl/cloudsdk/channels/rapid/google-cloud-sdk.tar.gz"
   echo "[$TOOL] Downloading Google Cloud SDK..."
-  curl -fsSL "$INSTALLER_URL" -o "$TMP/google-cloud-sdk.tar.gz"
+  curl --proto '=https' --proto-redir '=https' -fsSL "$INSTALLER_URL" -o "$TMP/google-cloud-sdk.tar.gz"
   tar -xzf "$TMP/google-cloud-sdk.tar.gz" -C "$HOME"
   rm -rf "$TMP"
 
