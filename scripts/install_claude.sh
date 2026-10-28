@@ -152,11 +152,15 @@ install_direct() {
 
   echo "[claude] Downloading v${version} for ${platform}..." >&2
 
-  # Download next to the target and move it into place only after it runs,
-  # so a failed transfer never replaces a working binary
-  mkdir -p ~/.local/bin
+  # Same layout as the native installer: the binary lives in versions/<version>
+  # and ~/.local/bin/claude is a symlink to it, so later native updates keep
+  # working. The download is moved into place only after it runs, so a failed
+  # transfer never replaces a working binary.
+  local versions_dir="$HOME/.local/share/claude/versions"
+  local launcher="$HOME/.local/bin/claude"
+  mkdir -p ~/.local/bin "$versions_dir"
   local tmp_bin
-  tmp_bin="$(mktemp ~/.local/bin/.claude.XXXXXX)" || return 1
+  tmp_bin="$(mktemp "$versions_dir/.claude.XXXXXX")" || return 1
   if ! curl "${CURL_HTTPS_ONLY[@]}" -fsSL "$GCS_BUCKET/$version/$platform/claude" -o "$tmp_bin"; then
     echo "[claude] Download failed" >&2
     rm -f "$tmp_bin"
@@ -172,13 +176,25 @@ install_direct() {
     return 1
   fi
 
-  if ! mv -f "$tmp_bin" ~/.local/bin/claude; then
+  if ! mv -f "$tmp_bin" "$versions_dir/$version"; then
     echo "[claude] Could not move the binary into place" >&2
     rm -f "$tmp_bin"
     return 1
   fi
 
-  echo "[claude] Installed to ~/.local/bin/claude" >&2
+  # A symlink that points somewhere else is a custom launcher: leave it alone
+  if [[ -L "$launcher" ]] && [[ "$(readlink "$launcher")" != "$versions_dir/"* ]]; then
+    echo "[claude] Installed to $versions_dir/$version; $launcher is a custom launcher and was not changed" >&2
+  else
+    # Repoint the launcher atomically: rename(2) replaces the old link or file
+    local tmp_link="$HOME/.local/bin/.claude.link.$$"
+    if ! ln -sfn "$versions_dir/$version" "$tmp_link" || ! mv -f "$tmp_link" "$launcher"; then
+      echo "[claude] Could not point $launcher at $versions_dir/$version" >&2
+      rm -f "$tmp_link"
+      return 1
+    fi
+    echo "[claude] Installed to $versions_dir/$version, linked from $launcher" >&2
+  fi
 
   # Check if PATH has ~/.local/bin
   case ":$PATH:" in
