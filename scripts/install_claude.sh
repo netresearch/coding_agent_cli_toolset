@@ -32,7 +32,7 @@ install_native() {
     installer_script="$work_dir/install.sh"
 
     # Download installer script. curl only: the URL redirects, and curl can
-    # hold every hop to HTTPS (--proto-redir); wget cannot.
+    # hold every hop to HTTPS (--proto); wget cannot.
     if command -v curl >/dev/null 2>&1; then
       curl "${CURL_HTTPS_ONLY[@]}" -fsSL https://claude.ai/install.sh -o "$installer_script" || { rm -rf "$work_dir"; return 1; }
     else
@@ -152,54 +152,23 @@ install_direct() {
 
   echo "[claude] Downloading v${version} for ${platform}..." >&2
 
-  # Same layout as the native installer: the binary lives in versions/<version>
-  # and ~/.local/bin/claude is a symlink to it, so later native updates keep
-  # working. The download is moved into place only after it runs, so a failed
-  # transfer never replaces a working binary.
-  local versions_dir="$HOME/.local/share/claude/versions"
-  local launcher="$HOME/.local/bin/claude"
-  mkdir -p ~/.local/bin "$versions_dir"
-  local tmp_bin
-  tmp_bin="$(mktemp "$versions_dir/.claude.XXXXXX")" || return 1
-  if ! curl "${CURL_HTTPS_ONLY[@]}" -fsSL "$GCS_BUCKET/$version/$platform/claude" -o "$tmp_bin"; then
+  # Download to ~/.local/bin
+  mkdir -p ~/.local/bin
+  if ! curl "${CURL_HTTPS_ONLY[@]}" -fsSL "$GCS_BUCKET/$version/$platform/claude" -o ~/.local/bin/claude; then
     echo "[claude] Download failed" >&2
-    rm -f "$tmp_bin"
     return 1
   fi
 
-  chmod +x "$tmp_bin"
+  chmod +x ~/.local/bin/claude
 
   # Verify it works
-  if ! "$tmp_bin" --version >/dev/null 2>&1; then
+  if ! ~/.local/bin/claude --version >/dev/null 2>&1; then
     echo "[claude] Binary verification failed" >&2
-    rm -f "$tmp_bin"
+    rm -f ~/.local/bin/claude
     return 1
   fi
 
-  if ! mv -f "$tmp_bin" "$versions_dir/$version"; then
-    echo "[claude] Could not move the binary into place" >&2
-    rm -f "$tmp_bin"
-    return 1
-  fi
-
-  # Clean up any stale nvm versions that might shadow this installation. This
-  # runs before the launcher check, so a launcher that pointed into one of
-  # them is dangling below and gets repointed instead of kept.
-  cleanup_npm_versions 2>/dev/null || true
-
-  # A working symlink that points somewhere else is a custom launcher: leave it alone
-  if [[ -L "$launcher" ]] && [[ -x "$launcher" ]] && [[ "$(readlink "$launcher")" != "$versions_dir/"* ]]; then
-    echo "[claude] Installed to $versions_dir/$version; $launcher is a custom launcher and was not changed" >&2
-  else
-    # Repoint the launcher atomically: rename(2) replaces the old link or file
-    local tmp_link="$HOME/.local/bin/.claude.link.$$"
-    if ! ln -sfn "$versions_dir/$version" "$tmp_link" || ! mv -f "$tmp_link" "$launcher"; then
-      echo "[claude] Could not point $launcher at $versions_dir/$version" >&2
-      rm -f "$tmp_link"
-      return 1
-    fi
-    echo "[claude] Installed to $versions_dir/$version, linked from $launcher" >&2
-  fi
+  echo "[claude] Installed to ~/.local/bin/claude" >&2
 
   # Check if PATH has ~/.local/bin
   case ":$PATH:" in
@@ -209,6 +178,9 @@ install_direct() {
       echo "[claude] Add to your shell config: export PATH=\"\$HOME/.local/bin:\$PATH\"" >&2
       ;;
   esac
+
+  # Clean up any stale nvm versions that might shadow this installation
+  cleanup_npm_versions 2>/dev/null || true
 
   # Verify we're now finding the native version
   hash -r 2>/dev/null || true
