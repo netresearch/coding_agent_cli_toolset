@@ -18,6 +18,8 @@ import tomllib
 from functools import lru_cache
 from typing import Sequence
 
+from cli_audit.collectors import _CYCLE_RE
+
 # Constants
 TIMEOUT_SECONDS = int(os.environ.get("CLI_AUDIT_TIMEOUT_SECONDS", "3"))
 HOME = os.path.expanduser("~")
@@ -783,6 +785,11 @@ def detect_multi_versions(
         for version_info in supported_versions:
             cycle = version_info.get("cycle", "")
             if not cycle:
+                continue
+            # The cycle becomes part of a path that is executed below; callers
+            # also pass cycles read back from the snapshot file, so check here.
+            if not _CYCLE_RE.fullmatch(str(cycle)):
+                logging.getLogger(__name__).debug("%s: skipping malformed cycle %r", tool_name, cycle)
                 continue
 
             # Try each candidate pattern

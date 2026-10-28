@@ -11,10 +11,15 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
+
+import pytest
 
 from cli_audit.catalog import ToolCatalog
 from cli_audit.detection import detect_multi_versions
+
+skip_on_windows = pytest.mark.skipif(sys.platform == "win32", reason="Shell script tests require POSIX shell")
 
 
 def _fake_nvm(tmp_path, versions):
@@ -46,6 +51,29 @@ class TestMultiVersionPicksNumericallyHighest:
             [{"cycle": "26", "latest": "26.0.0", "status": "active"}],
         )
         assert rows[0]["installed"] == "26.0.0"
+
+
+class TestMultiVersionCycleIsValidated:
+    """A cycle read back from the snapshot file must not steer the binary path."""
+
+    def _fake_go(self, tmp_path, rel):
+        go = tmp_path / rel / "bin" / "go"
+        go.parent.mkdir(parents=True)
+        go.write_text("#!/bin/sh\n")
+        os.chmod(go, 0o700)
+        return go
+
+    @skip_on_windows
+    def test_release_cycle_is_found(self, tmp_path):
+        go = self._fake_go(tmp_path, "go1.25")
+        rows = detect_multi_versions("demo", {"candidates": [f"{tmp_path}/go{{cycle}}/bin/go"]}, [{"cycle": "1.25"}])
+        assert rows[0]["path"] == str(go)
+
+    def test_cycle_with_path_traversal_is_skipped(self, tmp_path):
+        (tmp_path / "go").mkdir()
+        self._fake_go(tmp_path, "planted")
+        rows = detect_multi_versions("demo", {"candidates": [f"{tmp_path}/go{{cycle}}/bin/go"]}, [{"cycle": "/../planted"}])
+        assert rows == []
 
 
 class TestBitwardenUpstreamIsNpm:
