@@ -182,8 +182,13 @@ install_direct() {
     return 1
   fi
 
-  # A symlink that points somewhere else is a custom launcher: leave it alone
-  if [[ -L "$launcher" ]] && [[ "$(readlink "$launcher")" != "$versions_dir/"* ]]; then
+  # Clean up any stale nvm versions that might shadow this installation. This
+  # runs before the launcher check, so a launcher that pointed into one of
+  # them is dangling below and gets repointed instead of kept.
+  cleanup_npm_versions 2>/dev/null || true
+
+  # A working symlink that points somewhere else is a custom launcher: leave it alone
+  if [[ -L "$launcher" ]] && [[ -x "$launcher" ]] && [[ "$(readlink "$launcher")" != "$versions_dir/"* ]]; then
     echo "[claude] Installed to $versions_dir/$version; $launcher is a custom launcher and was not changed" >&2
   else
     # Repoint the launcher atomically: rename(2) replaces the old link or file
@@ -204,9 +209,6 @@ install_direct() {
       echo "[claude] Add to your shell config: export PATH=\"\$HOME/.local/bin:\$PATH\"" >&2
       ;;
   esac
-
-  # Clean up any stale nvm versions that might shadow this installation
-  cleanup_npm_versions 2>/dev/null || true
 
   # Verify we're now finding the native version
   hash -r 2>/dev/null || true
