@@ -17,9 +17,10 @@ ensure_python_distro() {
 
 # Reduce a version spec to major.minor: "3.14.10" -> "3.14", "3.14" -> "3.14".
 python_minor() {
-  case "$1" in
-    *.*.*) echo "${1%.*}" ;;
-    *) echo "$1" ;;
+  local spec="$1"
+  case "$spec" in
+    *.*.*) echo "${spec%.*}" ;;
+    *) echo "$spec" ;;
   esac
 }
 
@@ -117,7 +118,7 @@ uv_install_python() {
     done
   fi
 
-  if [ -n "$installed" ]; then
+  if [[ -n "$installed" ]]; then
     echo "[python] No patch between installed $installed and target $PY_SPEC is available via uv; a newer uv may have it (make upgrade-uv)" >&2
   else
     echo "[python] Warning: Could not install Python $PY_SPEC via uv" >&2

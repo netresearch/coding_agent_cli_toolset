@@ -803,7 +803,13 @@ def detect_multi_versions(
 
                 # Absolute or home-relative path; may hold a glob ("cpython-3.13-*")
                 if binary_name.startswith(("/", "~")):
-                    for path in sorted(glob.glob(os.path.expanduser(binary_name))):
+                    # The pattern must stay under the catalog's own directory
+                    # (the text before "{cycle}"), whatever the cycle holds.
+                    base_dir = os.path.abspath(os.path.dirname(os.path.expanduser(pattern.split("{cycle}")[0])))
+                    search = os.path.abspath(os.path.expanduser(binary_name))
+                    if not search.startswith(base_dir + os.sep):
+                        continue
+                    for path in sorted(glob.glob(search)):
                         if os.path.isfile(path) and os.access(path, os.X_OK):
                             found_path = path
                             break
