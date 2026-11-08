@@ -8,6 +8,7 @@ Phase 2.0: Detection and Auditing - Local Detection
 
 from __future__ import annotations
 
+import glob
 import json
 import logging
 import os
@@ -800,10 +801,12 @@ def detect_multi_versions(
                 # Replace {cycle} with actual version cycle
                 binary_name = pattern.replace("{cycle}", str(cycle))
 
-                # Check if absolute path
-                if binary_name.startswith("/"):
-                    if os.path.isfile(binary_name) and os.access(binary_name, os.X_OK):
-                        found_path = binary_name
+                # Absolute or home-relative path; may hold a glob ("cpython-3.13-*")
+                if binary_name.startswith(("/", "~")):
+                    for path in sorted(glob.glob(os.path.expanduser(binary_name))):
+                        if os.path.isfile(path) and os.access(path, os.X_OK):
+                            found_path = path
+                            break
                 else:
                     # Search in PATH
                     which_path = _which(binary_name)

@@ -125,30 +125,24 @@ uv_install_python() {
   return 1
 }
 
-# Create/update a default dev venv using uv if available
+# Create the default dev venv (~/.venvs/dev) when it is missing or broken.
+# A working venv is left alone: it can hold packages the user installed, and a
+# run for one series (UV_PYTHON_SPEC=3.15) must not move it to that series.
+# uv builds it on the series link (cpython-3.14-...), so patch upgrades reach
+# it without a rebuild. It is rebuilt only when its interpreter no longer runs.
 uv_setup_default_venv() {
+  local venv="$HOME/.venvs/dev"
+  if "$venv/bin/python" -c '' >/dev/null 2>&1; then
+    return 0
+  fi
+  mkdir -p "$HOME/.venvs" || true
   if command -v uv >/dev/null 2>&1; then
-    local PY_SPEC="${UV_PYTHON_SPEC:-3}"
-    local ALT_SPEC="$PY_SPEC"
-    case "$PY_SPEC" in
-      *.*.*) ALT_SPEC="${PY_SPEC%.*}" ;;
-    esac
-
-    # Find the interpreter
-    local PY_PATH
-    PY_PATH="$(uv python find "$PY_SPEC" 2>/dev/null || uv python find "$ALT_SPEC" 2>/dev/null || true)"
-
-    mkdir -p "$HOME/.venvs" || true
-    if [ -n "$PY_PATH" ] && [ -x "$PY_PATH" ]; then
-      uv venv --python "$PY_PATH" --clear "$HOME/.venvs/dev" >/dev/null 2>&1 || true
-    else
-      uv venv -p "$PY_SPEC" --clear "$HOME/.venvs/dev" >/dev/null 2>&1 || \
-        uv venv -p "$ALT_SPEC" --clear "$HOME/.venvs/dev" >/dev/null 2>&1 || \
-        { rm -rf "$HOME/.venvs/dev" >/dev/null 2>&1 || true; uv venv "$HOME/.venvs/dev" >/dev/null 2>&1 || true; }
-    fi
+    local series
+    series="$(python_minor "$(get_uv_python_version)")"
+    uv venv --clear --managed-python --python "${series:-3}" "$venv" >/dev/null 2>&1 || true
   else
     ensure_python_distro
-    python3 -m venv "$HOME/.venvs/dev" >/dev/null 2>&1 || true
+    python3 -m venv --clear "$venv" >/dev/null 2>&1 || true
   fi
 }
 

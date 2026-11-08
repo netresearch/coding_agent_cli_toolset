@@ -21,7 +21,8 @@
     "binary_pattern": "python{cycle}",
     "candidates": [
       "python{cycle}",
-      "/usr/bin/python{cycle}"
+      "/usr/bin/python{cycle}",
+      "~/.local/share/uv/python/cpython-{cycle}-*/bin/python{cycle}"
     ],
     "version_files": [
       ".python-version",

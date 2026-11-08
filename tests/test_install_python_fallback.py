@@ -53,6 +53,12 @@ case "$1 $2" in
       echo "cpython-$v+freethreaded-linux-x86_64-gnu    /store/cpython-$v-ft/bin/python${mm}t"
     done < "$state"
     ;;
+  "venv "*)
+    venv="${!#}"
+    mkdir -p "$venv/bin"
+    printf '#!/bin/sh\nexit 0\n' > "$venv/bin/python"
+    chmod +x "$venv/bin/python"
+    ;;
   *) exit 0 ;;
 esac
 """
@@ -103,8 +109,18 @@ def run(env: dict, *, spec: str, installed: list[str], available: list[str], pat
         timeout=60,
     )
     assert proc.returncode == 0, proc.stderr
-    installs = [line for line in env["log"].read_text().splitlines() if line.startswith("python install")]
+    calls = env["log"].read_text().splitlines()
+    env["venv_calls"] = [line for line in calls if line.startswith("venv ")]
+    installs = [line for line in calls if line.startswith("python install")]
     return proc.stdout + proc.stderr, installs
+
+
+def make_dev_venv(env: dict, *, working: bool) -> Path:
+    python = env["home"] / ".venvs" / "dev" / "bin" / "python"
+    python.parent.mkdir(parents=True)
+    python.write_text(f"#!/bin/sh\nexit {0 if working else 1}\n")
+    python.chmod(0o755)
+    return python
 
 
 @skip_on_windows
@@ -165,3 +181,61 @@ class TestVersionDetection:
         out, _ = run(env, spec="3.14.10", installed=["3.15.2", "3.14.8"], available=["3.14.10"])
         assert "[python] before: 3.14.8" in out
         assert "[python] after:  3.14.10" in out
+
+
+@skip_on_windows
+class TestDevVenv:
+    def test_working_dev_venv_is_not_rebuilt(self, env):
+        """A run for another series must not clear or move ~/.venvs/dev."""
+        make_dev_venv(env, working=True)
+        run(env, spec="3.15", installed=["3.14.8", "3.15.0"], available=["3.15.2"])
+        assert env["venv_calls"] == []
+
+    def test_missing_dev_venv_uses_newest_series(self, env):
+        run(env, spec="3.14.10", installed=["3.14.8", "3.15.2"], available=["3.14.10"])
+        dev = env["home"] / ".venvs" / "dev"
+        assert env["venv_calls"] == [f"venv --clear --managed-python --python 3.15 {dev}"]
+
+    def test_broken_dev_venv_is_rebuilt(self, env):
+        """The interpreter it was built from is gone: rebuild."""
+        make_dev_venv(env, working=False)
+        run(env, spec="3.14.10", installed=["3.14.8"], available=["3.14.10"])
+        dev = env["home"] / ".venvs" / "dev"
+        assert env["venv_calls"] == [f"venv --clear --managed-python --python 3.14 {dev}"]
+
+
+@skip_on_windows
+class TestUvStoreDetection:
+    """A uv-managed series without a pythonX.Y link on PATH is still installed."""
+
+    def test_series_found_in_uv_store(self, tmp_path, monkeypatch):
+        import json
+
+        from cli_audit.detection import detect_multi_versions
+
+        catalog = json.loads((SCRIPTS_DIR.parent / "catalog" / "python.json").read_text())
+        uv_candidates = [c for c in catalog["multi_version"]["candidates"] if "/uv/python/" in c]
+        assert uv_candidates, "catalog/python.json must list the uv install dir as a candidate"
+
+        home = tmp_path / "home"
+        store = home / ".local" / "share" / "uv" / "python"
+        for name, version in [
+            ("cpython-3.13-linux-x86_64-gnu", "3.13.15"),
+            ("cpython-3.13+freethreaded-linux-x86_64-gnu", "3.13.0"),
+        ]:
+            binary = store / name / "bin" / "python3.13"
+            binary.parent.mkdir(parents=True)
+            binary.write_text(f"#!/bin/sh\necho 'Python {version}'\n")
+            binary.chmod(0o755)
+        empty = tmp_path / "empty"
+        empty.mkdir()
+        monkeypatch.setenv("HOME", str(home))
+        monkeypatch.setenv("PATH", str(empty))
+
+        result = detect_multi_versions(
+            "python",
+            {"candidates": ["python{cycle}", *uv_candidates]},
+            [{"cycle": "3.13", "latest": "3.13.15", "status": "security"}],
+        )
+        assert result[0]["installed"] == "3.13.15"
+        assert result[0]["path"] == str(store / "cpython-3.13-linux-x86_64-gnu" / "bin" / "python3.13")
