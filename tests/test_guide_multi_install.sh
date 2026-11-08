@@ -315,8 +315,10 @@ L1="$(sha256sum "$tmpdir/large1" | awk '{print $1}')"
 L2="$(sha256sum "$tmpdir/large2" | awk '{print $1}')"
 assert_eq "1MB identical files match" "$L1" "$L2"
 
-# Flip one byte in the copy and confirm mismatch
-printf '\xff' | dd of="$tmpdir/large2" bs=1 seek=512 count=1 conv=notrunc 2>/dev/null
+# Flip one byte in the copy and confirm mismatch. Write the complement of the
+# byte that is there: a fixed value is a no-op when the random byte already has it.
+orig_byte="$(od -An -tu1 -j512 -N1 "$tmpdir/large2" | tr -d ' ')"
+printf '%b' "\\0$(printf '%03o' $((255 - orig_byte)))" | dd of="$tmpdir/large2" bs=1 seek=512 count=1 conv=notrunc 2>/dev/null
 L2_MODIFIED="$(sha256sum "$tmpdir/large2" | awk '{print $1}')"
 assert_ne "1MB files differ after single-byte flip" "$L1" "$L2_MODIFIED"
 
