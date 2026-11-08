@@ -15,51 +15,57 @@ ensure_python_distro() {
   if ! have python3 && have apt-get; then sudo apt-get update && sudo apt-get install -y python3 python3-pip; fi
 }
 
-# Get current Python version managed by uv
+# Reduce a version spec to major.minor: "3.14.10" -> "3.14", "3.14" -> "3.14".
+python_minor() {
+  case "$1" in
+    *.*.*) echo "${1%.*}" ;;
+    *) echo "$1" ;;
+  esac
+}
+
+# Print "<version> <path>" for each uv-managed CPython of one series ("3.14",
+# or "" for all), highest version first. The path prefers uv's executable link
+# (~/.local/bin/python3.14) over the install directory. Free-threaded builds
+# and pre-releases are skipped. PATH is not consulted: an activated virtualenv
+# shadows python3.14 there and reports the interpreter it was created from.
+uv_managed_pythons() {
+  local minor="$1"
+  command -v uv >/dev/null 2>&1 || return 0
+  uv python list --only-installed --managed-python 2>/dev/null \
+    | awk -v pre="cpython-${minor:+$minor.}" '
+        index($1, pre) == 1 && $1 ~ /^cpython-[0-9]+\.[0-9]+\.[0-9]+-/ {
+          v = $1; sub(/^cpython-/, "", v); sub(/-.*/, "", v)
+          if (!(v in path) || $3 == "->") path[v] = $2
+        }
+        END { for (v in path) print v, path[v] }' \
+    | sort -k1,1Vr || true
+}
+
+# Get the highest Python version managed by uv
 get_uv_python_version() {
-  if command -v uv >/dev/null 2>&1; then
-    # Get the highest installed Python version
-    uv python list --only-installed 2>/dev/null | grep -E "^cpython-[0-9]" | head -1 | sed 's/cpython-\([0-9.]*\).*/\1/' || true
-  fi
+  uv_managed_pythons "" | head -1 | cut -d' ' -f1
 }
 
-# Get version of a specific Python (e.g., python3.13)
+# Get the installed version of one Python series (spec "3.13" or "3.13.11")
 get_specific_python_version() {
-  local major_minor="$1"  # e.g., "3.13" or "3.13.11"
-  local short_ver="${major_minor%.*}"  # e.g., "3.13" from "3.13.11"
-
-  # If it's a full version like "3.13.11", extract major.minor
-  if [[ "$short_ver" == *.* ]]; then
-    : # Already major.minor
-  else
-    short_ver="$major_minor"
-  fi
-
-  local binary="python${short_ver}"
-
-  # Try to find and run the specific binary
-  if command -v "$binary" >/dev/null 2>&1; then
-    "$binary" --version 2>&1 | sed 's/Python //' || true
-  else
-    # Try via uv python list
-    if command -v uv >/dev/null 2>&1; then
-      uv python list --only-installed 2>/dev/null | grep -E "^cpython-${short_ver}" | head -1 | sed 's/cpython-\([0-9.]*\).*/\1/' || true
-    fi
+  local short_ver
+  short_ver="$(python_minor "$1")"
+  if command -v uv >/dev/null 2>&1; then
+    uv_managed_pythons "$short_ver" | head -1 | cut -d' ' -f1
+  elif command -v "python${short_ver}" >/dev/null 2>&1; then
+    "python${short_ver}" --version 2>&1 | sed 's/Python //' || true
   fi
 }
 
-# Get the binary path for a specific Python version
+# Get the binary path for one Python series (spec "3.13" or "3.13.11")
 get_specific_python_path() {
-  local major_minor="$1"
-  local short_ver="${major_minor%.*}"
-  if [[ "$short_ver" == *.* ]]; then
-    : # Already major.minor
+  local short_ver
+  short_ver="$(python_minor "$1")"
+  if command -v uv >/dev/null 2>&1; then
+    uv_managed_pythons "$short_ver" | head -1 | cut -d' ' -f2
   else
-    short_ver="$major_minor"
+    command -v "python${short_ver}" 2>/dev/null || true
   fi
-
-  local binary="python${short_ver}"
-  command -v "$binary" 2>/dev/null || true
 }
 
 # Install or upgrade Python via uv
@@ -68,27 +74,54 @@ uv_install_python() {
 
   echo "[python] Installing Python $PY_SPEC via uv..." >&2
 
-  # Install the requested Python version
+  case "$PY_SPEC" in
+    *.*.*) ;;
+    *.*)
+      # Any installed 3.14.x satisfies "3.14", so a plain install keeps the old
+      # patch. --upgrade moves the series to the newest patch uv can download.
+      if uv python install --upgrade "$PY_SPEC" 2>&1; then
+        return 0
+      fi
+      echo "[python] Warning: Could not install Python $PY_SPEC via uv" >&2
+      return 1
+      ;;
+    *)
+      if uv python install "$PY_SPEC" 2>&1; then
+        return 0
+      fi
+      echo "[python] Warning: Could not install Python $PY_SPEC via uv" >&2
+      return 1
+      ;;
+  esac
+
   if uv python install "$PY_SPEC" 2>&1; then
     return 0
   fi
 
-  # Exact version not available - try without patch version
-  local ALT_SPEC="${PY_SPEC%.*}"
-  if [ "$ALT_SPEC" != "$PY_SPEC" ]; then
-    echo "[python] Version $PY_SPEC not available via uv, trying $ALT_SPEC..." >&2
-    if uv python install "$ALT_SPEC" 2>&1; then
-      # Report what was actually installed
-      local actual
-      actual="$(uv python list --only-installed 2>/dev/null | grep -E "^cpython-${ALT_SPEC}" | head -1 | sed 's/cpython-\([0-9.]*\).*/\1/' || true)"
-      if [ -n "$actual" ]; then
-        echo "[python] Note: Installed $actual (target $PY_SPEC not yet available in uv)" >&2
+  # uv cannot download this exact patch (its download list ships inside the uv
+  # binary). Install the newest lower patch it can download instead, and stop
+  # before reaching the patch that is already installed.
+  local minor="${PY_SPEC%.*}" patch="${PY_SPEC##*.}"
+  local installed installed_patch=-1 p
+  installed="$(get_specific_python_version "$minor")"
+  if [[ "$installed" =~ ^[0-9]+\.[0-9]+\.([0-9]+)$ ]]; then
+    installed_patch="${BASH_REMATCH[1]}"
+  fi
+  if [[ "$patch" =~ ^[0-9]+$ ]]; then
+    for ((p = patch - 1; p > installed_patch; p--)); do
+      echo "[python] Version $minor.$((p + 1)) not available via uv, trying $minor.$p..." >&2
+      if uv python install "$minor.$p" 2>&1; then
+        echo "[python] Note: Installed $minor.$p (target $PY_SPEC not yet available in uv)" >&2
+        return 0
       fi
-      return 0
-    fi
+    done
   fi
 
-  echo "[python] Warning: Could not install Python $PY_SPEC via uv" >&2
+  if [ -n "$installed" ]; then
+    echo "[python] No patch between installed $installed and target $PY_SPEC is available via uv; a newer uv may have it (make upgrade-uv)" >&2
+  else
+    echo "[python] Warning: Could not install Python $PY_SPEC via uv" >&2
+  fi
   return 1
 }
 
@@ -172,7 +205,7 @@ install_py_stack() {
     path="$(get_specific_python_path "$PY_SPEC")"
   else
     after="$(get_uv_python_version)"
-    path="$(command -v python3 2>/dev/null || true)"
+    path="$(uv_managed_pythons "" | head -1 | cut -d' ' -f2)"
   fi
 
   printf "[%s] before: %s\n" "python" "${before:-<none>}"
@@ -204,7 +237,7 @@ update_py_stack() {
     path="$(get_specific_python_path "$PY_SPEC")"
   else
     after="$(get_uv_python_version)"
-    path="$(command -v python3 2>/dev/null || true)"
+    path="$(uv_managed_pythons "" | head -1 | cut -d' ' -f2)"
   fi
 
   printf "[%s] before: %s\n" "python" "${before:-<none>}"
