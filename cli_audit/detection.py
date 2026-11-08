@@ -8,6 +8,7 @@ Phase 2.0: Detection and Auditing - Local Detection
 
 from __future__ import annotations
 
+import glob
 import json
 import logging
 import os
@@ -511,6 +512,10 @@ def detect_install_method(path: str, tool_name: str) -> str:
     if ".local/share/uv/tools" in real_path or "uv/tools" in real_path:
         return "uv"
 
+    # UV-managed Python (~/.local/share/uv/python/cpython-3.14-*/bin/python3.14)
+    if "uv/python/" in real_path:
+        return "uv"
+
     # Pipx
     if ".local/pipx" in real_path or ".local/share/pipx" in real_path:
         return "pipx"
@@ -800,10 +805,18 @@ def detect_multi_versions(
                 # Replace {cycle} with actual version cycle
                 binary_name = pattern.replace("{cycle}", str(cycle))
 
-                # Check if absolute path
-                if binary_name.startswith("/"):
-                    if os.path.isfile(binary_name) and os.access(binary_name, os.X_OK):
-                        found_path = binary_name
+                # Absolute or home-relative path; may hold a glob ("cpython-3.13-*")
+                if binary_name.startswith(("/", "~")):
+                    # The pattern must stay under the catalog's own directory
+                    # (the text before "{cycle}"), whatever the cycle holds.
+                    base_dir = os.path.abspath(os.path.dirname(os.path.expanduser(pattern.split("{cycle}")[0])))
+                    search = os.path.abspath(os.path.expanduser(binary_name))
+                    if not search.startswith(base_dir + os.sep):
+                        continue
+                    for path in sorted(glob.glob(search)):
+                        if os.path.isfile(path) and os.access(path, os.X_OK):
+                            found_path = path
+                            break
                 else:
                     # Search in PATH
                     which_path = _which(binary_name)
