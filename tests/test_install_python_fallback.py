@@ -239,3 +239,4 @@ class TestUvStoreDetection:
         )
         assert result[0]["installed"] == "3.13.15"
         assert result[0]["path"] == str(store / "cpython-3.13-linux-x86_64-gnu" / "bin" / "python3.13")
+        assert result[0]["install_method"] == "uv"

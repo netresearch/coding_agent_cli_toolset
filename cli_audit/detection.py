@@ -512,6 +512,10 @@ def detect_install_method(path: str, tool_name: str) -> str:
     if ".local/share/uv/tools" in real_path or "uv/tools" in real_path:
         return "uv"
 
+    # UV-managed Python (~/.local/share/uv/python/cpython-3.14-*/bin/python3.14)
+    if "uv/python/" in real_path:
+        return "uv"
+
     # Pipx
     if ".local/pipx" in real_path or ".local/share/pipx" in real_path:
         return "pipx"
