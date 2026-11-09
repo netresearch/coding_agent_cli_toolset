@@ -79,28 +79,78 @@ remove_installation() {
       fi
       ;;
     npm)
-      if command -v npm >/dev/null 2>&1; then
-        # The package name can differ from the tool name (pi is
-        # @earendil-works/pi-coding-agent, and an unrelated package `pi`
-        # exists), so read it from the bin symlink: node_modules/<pkg>/...
-        # One level only: `npm link` and folder installs make the package
-        # directory a symlink too, and readlink -f would resolve past it.
-        local npm_pkg="$tool" npm_path npm_target npm_rest
-        npm_path="${known_path:-$(command -v "$binary" 2>/dev/null || echo "")}"
-        npm_target="$(readlink "$npm_path" 2>/dev/null || echo "")"
-        case "$npm_target" in
-          */node_modules/*|node_modules/*)
-            # First node_modules = the global prefix; a later one would be
-            # a bundled dependency of the package
-            npm_rest="${npm_target#*node_modules/}"
-            case "$npm_rest" in
-              @*/*) npm_pkg="$(echo "$npm_rest" | cut -d/ -f1-2)" ;;
-              *) npm_pkg="${npm_rest%%/*}" ;;
-            esac
-            ;;
+      # The package name can differ from the tool name (pi is
+      # @earendil-works/pi-coding-agent, and an unrelated package `pi`
+      # exists), so read it from the bin symlink: node_modules/<pkg>/...
+      # One level only: `npm link` and folder installs make the package
+      # directory a symlink too, and readlink -f would resolve past it.
+      local npm_pkg="" npm_path npm_target npm_rest npm_prefix="" npm_via_pnpm=""
+      npm_path="${known_path:-$(command -v "$binary" 2>/dev/null || echo "")}"
+      npm_target="$(readlink "$npm_path" 2>/dev/null || echo "")"
+      case "$npm_target" in
+        */node_modules/*|node_modules/*)
+          # First node_modules = the global prefix; a later one would be
+          # a bundled dependency of the package
+          npm_rest="${npm_target#*node_modules/}"
+          ;;
+        *)
+          # pnpm writes its global bins as shell shims, not symlinks; they
+          # exec .../.pnpm/<name>@<version>.../node_modules/<pkg>/<bin>
+          if [[ -f "$npm_path" ]] && grep -q '/\.pnpm/' "$npm_path" 2>/dev/null; then
+            npm_via_pnpm=1
+            npm_rest="$(grep -o -m1 '/\.pnpm/[^/"]*/node_modules/[^"]*' "$npm_path" 2>/dev/null || true)"
+            npm_rest="${npm_rest#/.pnpm/*/node_modules/}"
+          fi
+          ;;
+      esac
+      if [[ -n "${npm_rest:-}" ]]; then
+        case "$npm_rest" in
+          @*/*) npm_pkg="$(echo "$npm_rest" | cut -d/ -f1-2)" ;;
+          *) npm_pkg="${npm_rest%%/*}" ;;
         esac
-        echo "[$tool] Uninstalling npm global package: $npm_pkg" >&2
-        npm uninstall -g "$npm_pkg" 2>/dev/null || true
+      fi
+      # Without a package in the path, the catalog's package_name names the
+      # npm package better than the tool name does
+      if [[ -z "$npm_pkg" ]] && command -v jq >/dev/null 2>&1; then
+        npm_pkg="$(jq -r '.package_name // ""' "$RECONCILE_LIB_DIR/../../catalog/$tool.json" 2>/dev/null || true)"
+      fi
+      npm_pkg="${npm_pkg:-$tool}"
+
+      # A failed removal returns 1 with the manager's last output lines, so a
+      # caller does not install a second copy over a package that stayed
+      # (a root-owned /usr/local prefix answers EACCES)
+      local -a npm_cmd=()
+      if [[ -n "$npm_via_pnpm" ]]; then
+        if ! command -v pnpm >/dev/null 2>&1; then
+          echo "[$tool] Error: $npm_path is a pnpm package, but pnpm is not available" >&2
+          return 1
+        fi
+        echo "[$tool] Uninstalling pnpm global package: $npm_pkg" >&2
+        npm_cmd=(pnpm remove -g "$npm_pkg")
+      elif command -v npm >/dev/null 2>&1; then
+        # npm acts on the prefix of the active node (nvm) or its config, not
+        # on the one the binary lives in: name the binary's prefix.
+        # <prefix>/bin/<tool> -> ../lib/node_modules/<pkg>/...
+        case "$npm_target" in
+          ../lib/node_modules/*) npm_prefix="$(dirname "$(dirname "$npm_path")")" ;;
+          /*/lib/node_modules/*) npm_prefix="${npm_target%%/lib/node_modules/*}" ;;
+          *) ;;
+        esac
+        if [[ -n "$npm_prefix" ]]; then
+          echo "[$tool] Uninstalling npm global package: $npm_pkg (prefix $npm_prefix)" >&2
+          npm_cmd=(npm uninstall -g --prefix "$npm_prefix" "$npm_pkg")
+        else
+          echo "[$tool] Uninstalling npm global package: $npm_pkg" >&2
+          npm_cmd=(npm uninstall -g "$npm_pkg")
+        fi
+      fi
+      if [[ ${#npm_cmd[@]} -gt 0 ]]; then
+        local npm_out
+        if ! npm_out="$("${npm_cmd[@]}" </dev/null 2>&1)"; then
+          echo "[$tool] Error: ${npm_cmd[*]} failed:" >&2
+          printf '%s\n' "$npm_out" | tail -n 3 >&2
+          return 1
+        fi
       fi
       ;;
     nvm)
@@ -326,8 +376,11 @@ reconcile_tool() {
   binary_name="$(jq -r '.binary_name // ""' "$catalog_file" 2>/dev/null || echo "$tool")"
 
   # Detect current installation
-  local current_method
+  local current_method current_path
   current_method="$(detect_install_method "$tool" "$binary_name")"
+  # The path detect_install_method classified, handed to the removal so it
+  # acts on that installation and never re-resolves
+  current_path="$(command -v "$binary_name" 2>/dev/null || true)"
 
   # Resolve best method via policy
   local best_method
@@ -366,7 +419,7 @@ reconcile_tool() {
     echo "[$tool] Reconciliation needed: current=$current_method, best=$best_method" >&2
 
     # Remove current installation before installing via best method
-    if ! remove_installation "$tool" "$current_method" "$binary_name"; then
+    if ! remove_installation "$tool" "$current_method" "$binary_name" "$current_path"; then
       # If removal fails for unknown/system methods, proceed with install anyway
       # The new installation via best method will take PATH precedence
       if [ "$current_method" = "unknown" ] || [ "$current_method" = "system" ]; then
