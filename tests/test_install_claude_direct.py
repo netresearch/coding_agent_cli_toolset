@@ -28,7 +28,7 @@ while [ $# -gt 0 ]; do
   if [ "$1" = "-o" ]; then out="$2"; shift; fi
   shift
 done
-cp "$CURL_PAYLOAD" "$out"
+cat "$CURL_PAYLOAD" > "$out"
 exit "$CURL_EXIT"
 """
 
@@ -41,9 +41,13 @@ def _write_exe(path: Path, body: str) -> None:
 
 @skip_on_windows
 class TestInstallDirect:
-    def _run(self, home: Path, payload: str, curl_exit: int) -> subprocess.CompletedProcess[str]:
+    def _run(self, home: Path, payload: str, curl_exit: int, failing_cp: bool = False) -> subprocess.CompletedProcess[str]:
         stubs = home / "stubs"
         _write_exe(stubs / "curl", CURL_STUB)
+        if failing_cp:
+            # A copy that dies midway (disk full): a few bytes land in the
+            # destination, then it fails
+            _write_exe(stubs / "cp", '#!/bin/sh\nfor last; do :; done\nprintf partial > "$last"\nexit 1\n')
         # cleanup_npm_versions runs after a successful download: keep it off
         # the real npm and pnpm of the machine running the tests
         _write_exe(stubs / "npm", "#!/bin/sh\nexit 0\n")
@@ -111,3 +115,49 @@ class TestInstallDirect:
         assert launcher.read_text() == NEW_BINARY
         assert launcher.stat().st_mode & 0o111
         self._no_leftovers(tmp_path)
+
+    def test_failed_copy_keeps_the_working_binary(self, tmp_path: Path):
+        launcher, target = self._native_layout(tmp_path)
+        result = self._run(tmp_path, NEW_BINARY, curl_exit=0, failing_cp=True)
+        assert result.returncode == 1, result.stderr
+        assert launcher.is_symlink()
+        assert target.read_text() == OLD_BINARY
+        assert sorted(p.name for p in target.parent.iterdir()) == ["1.0.0"]
+        self._no_leftovers(tmp_path)
+
+    def test_custom_launcher_target_is_replaced_and_link_kept(self, tmp_path: Path):
+        target = tmp_path / "opt" / "claude-custom"
+        _write_exe(target, OLD_BINARY)
+        launcher = tmp_path / ".local" / "bin" / "claude"
+        launcher.parent.mkdir(parents=True)
+        launcher.symlink_to(target)
+        result = self._run(tmp_path, NEW_BINARY, curl_exit=0)
+        assert result.returncode == 0, result.stderr
+        assert launcher.is_symlink()
+        assert launcher.resolve() == target
+        assert target.read_text() == NEW_BINARY
+        assert target.stat().st_mode & 0o111
+
+    def test_launcher_into_a_missing_directory_is_kept(self, tmp_path: Path):
+        # e.g. a custom launcher on a filesystem that is not mounted
+        launcher = tmp_path / ".local" / "bin" / "claude"
+        launcher.parent.mkdir(parents=True)
+        launcher.symlink_to(tmp_path / "unmounted" / "claude")
+        result = self._run(tmp_path, NEW_BINARY, curl_exit=0)
+        assert result.returncode == 1, result.stderr
+        assert launcher.is_symlink()
+        assert not (tmp_path / "unmounted").exists()
+        self._no_leftovers(tmp_path)
+
+    def test_dangling_launcher_with_existing_directory_gets_its_target(self, tmp_path: Path):
+        # As the direct download did, a link whose target file is missing is
+        # written through, not refused
+        target = tmp_path / "opt" / "claude-custom"
+        target.parent.mkdir()
+        launcher = tmp_path / ".local" / "bin" / "claude"
+        launcher.parent.mkdir(parents=True)
+        launcher.symlink_to(target)
+        result = self._run(tmp_path, NEW_BINARY, curl_exit=0)
+        assert result.returncode == 0, result.stderr
+        assert launcher.is_symlink()
+        assert target.read_text() == NEW_BINARY

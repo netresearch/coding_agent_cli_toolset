@@ -174,10 +174,24 @@ install_direct() {
     return 1
   fi
 
-  # cp writes through a symlink the same way the direct download did, so the
-  # layout of ~/.local/bin/claude (native symlink, custom launcher) is kept
-  if ! cp "$work_dir/claude" ~/.local/bin/claude; then
-    echo "[claude] Could not copy the binary to ~/.local/bin/claude" >&2
+  # Replace the file ~/.local/bin/claude resolves to, as the direct download
+  # wrote through it, so the layout (native symlink, custom launcher) is kept.
+  # The binary is staged next to that file and renamed over it: a copy that
+  # fails midway (disk full) leaves the old binary whole, and a running
+  # binary can be replaced.
+  local dest="$HOME/.local/bin/claude" staged=""
+  if [[ -L "$dest" ]]; then
+    # A link that cannot be resolved (its directory is missing, e.g. an
+    # unmounted filesystem) is left alone
+    dest="$(readlink -f "$dest" 2>/dev/null || true)"
+  fi
+  if [[ -z "$dest" ]] \
+    || ! staged="$(mktemp "$(dirname "$dest")/.claude-new.XXXXXX")" \
+    || ! cp "$work_dir/claude" "$staged" \
+    || ! chmod 755 "$staged" \
+    || ! mv -f "$staged" "$dest"; then
+    echo "[claude] Could not install the binary to ${dest:-the target of ~/.local/bin/claude}" >&2
+    [[ -n "$staged" ]] && rm -f "$staged"
     rm -rf "$work_dir"
     return 1
   fi
