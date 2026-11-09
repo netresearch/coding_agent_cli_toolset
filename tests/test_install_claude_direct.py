@@ -173,3 +173,38 @@ class TestInstallDirect:
         assert launcher.is_symlink()
         assert target.read_text() == NEW_BINARY
         self._no_leftovers(tmp_path)
+
+    def _assert_regular_runnable_launcher(self, home: Path) -> None:
+        launcher = home / ".local" / "bin" / "claude"
+        assert not launcher.is_symlink()
+        assert launcher.read_text() == NEW_BINARY
+        run = subprocess.run([str(launcher)], capture_output=True, text=True, timeout=5)
+        assert run.stdout.startswith("2.0.0")
+
+    def test_launcher_into_an_nvm_install_is_replaced_not_left_dangling(self, tmp_path: Path):
+        # cleanup_npm_versions removes the npm package after the download; a
+        # launcher pointing into it must not be kept
+        node_dir = tmp_path / ".nvm" / "versions" / "node" / "v22.0.0"
+        cli = node_dir / "lib" / "node_modules" / "@anthropic-ai" / "claude-code" / "cli.js"
+        _write_exe(cli, OLD_BINARY)
+        nvm_bin = node_dir / "bin" / "claude"
+        nvm_bin.parent.mkdir(parents=True)
+        nvm_bin.symlink_to(Path("..") / "lib" / "node_modules" / "@anthropic-ai" / "claude-code" / "cli.js")
+        launcher = tmp_path / ".local" / "bin" / "claude"
+        launcher.parent.mkdir(parents=True)
+        launcher.symlink_to(nvm_bin)
+        result = self._run(tmp_path, NEW_BINARY, curl_exit=0)
+        assert result.returncode == 0, result.stderr
+        assert not cli.exists()
+        self._assert_regular_runnable_launcher(tmp_path)
+        self._no_leftovers(tmp_path)
+
+    def test_launcher_into_a_removed_nvm_install_is_replaced(self, tmp_path: Path):
+        # Left dangling by an earlier cleanup (upgrade_claude runs it first)
+        launcher = tmp_path / ".local" / "bin" / "claude"
+        launcher.parent.mkdir(parents=True)
+        launcher.symlink_to(tmp_path / ".nvm" / "versions" / "node" / "v22.0.0" / "bin" / "claude")
+        result = self._run(tmp_path, NEW_BINARY, curl_exit=0)
+        assert result.returncode == 0, result.stderr
+        self._assert_regular_runnable_launcher(tmp_path)
+        self._no_leftovers(tmp_path)

@@ -190,8 +190,19 @@ install_direct() {
     esac
     hops=$((hops + 1))
   done
+  # A launcher into an npm install of claude would dangle once
+  # cleanup_npm_versions below removes that install (or already dangles from
+  # an earlier cleanup): replace the launcher itself instead of its target
+  local replace_launcher=""
+  case "$dest" in
+    */node_modules/@anthropic-ai/claude-code/*|"$HOME"/.nvm/versions/node/*/bin/claude)
+      dest="$HOME/.local/bin/claude"
+      replace_launcher=1
+      ;;
+    *) ;;
+  esac
   # A link whose directory is missing (e.g. an unmounted filesystem) is left alone
-  if [[ -L "$dest" ]] || [[ ! -d "$(dirname "$dest")" ]] \
+  if { [[ -z "$replace_launcher" ]] && [[ -L "$dest" ]]; } || [[ ! -d "$(dirname "$dest")" ]] \
     || ! staged="$(mktemp "$(dirname "$dest")/.claude-new.XXXXXX")" \
     || ! cp "$work_dir/claude" "$staged" \
     || ! chmod 755 "$staged" \
