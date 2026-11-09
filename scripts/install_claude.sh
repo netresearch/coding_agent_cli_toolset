@@ -179,18 +179,24 @@ install_direct() {
   # The binary is staged next to that file and renamed over it: a copy that
   # fails midway (disk full) leaves the old binary whole, and a running
   # binary can be replaced.
-  local dest="$HOME/.local/bin/claude" staged=""
-  if [[ -L "$dest" ]]; then
-    # A link that cannot be resolved (its directory is missing, e.g. an
-    # unmounted filesystem) is left alone
-    dest="$(readlink -f "$dest" 2>/dev/null || true)"
-  fi
-  if [[ -z "$dest" ]] \
+  # Follow the link chain one readlink at a time: readlink -f differs between
+  # GNU and BSD for targets that do not exist.
+  local dest="$HOME/.local/bin/claude" link staged="" hops=0
+  while [[ -L "$dest" ]] && [[ $hops -lt 40 ]]; do
+    link="$(readlink "$dest")" || break
+    case "$link" in
+      /*) dest="$link" ;;
+      *) dest="$(dirname "$dest")/$link" ;;
+    esac
+    hops=$((hops + 1))
+  done
+  # A link whose directory is missing (e.g. an unmounted filesystem) is left alone
+  if [[ -L "$dest" ]] || [[ ! -d "$(dirname "$dest")" ]] \
     || ! staged="$(mktemp "$(dirname "$dest")/.claude-new.XXXXXX")" \
     || ! cp "$work_dir/claude" "$staged" \
     || ! chmod 755 "$staged" \
     || ! mv -f "$staged" "$dest"; then
-    echo "[claude] Could not install the binary to ${dest:-the target of ~/.local/bin/claude}" >&2
+    echo "[claude] Could not install the binary to $dest" >&2
     [[ -n "$staged" ]] && rm -f "$staged"
     rm -rf "$work_dir"
     return 1

@@ -161,3 +161,15 @@ class TestInstallDirect:
         assert result.returncode == 0, result.stderr
         assert launcher.is_symlink()
         assert target.read_text() == NEW_BINARY
+
+    def test_relative_launcher_link_is_followed(self, tmp_path: Path):
+        target = tmp_path / ".local" / "share" / "claude" / "versions" / "1.0.0"
+        _write_exe(target, OLD_BINARY)
+        launcher = tmp_path / ".local" / "bin" / "claude"
+        launcher.parent.mkdir(parents=True)
+        launcher.symlink_to(Path("..") / "share" / "claude" / "versions" / "1.0.0")
+        result = self._run(tmp_path, NEW_BINARY, curl_exit=0)
+        assert result.returncode == 0, result.stderr
+        assert launcher.is_symlink()
+        assert target.read_text() == NEW_BINARY
+        self._no_leftovers(tmp_path)
