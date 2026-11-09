@@ -293,3 +293,41 @@ reconcile_tool "{catalog}" reconcile || true
             env={**os.environ, "HOME": str(tmp_path)},
         )
         assert f"remove sometool manual sometool {binary}" in result.stdout, result.stderr
+
+
+@skip_on_windows
+class TestRemoveInstallationNpmFailure:
+    """A failed npm removal is reported, not swallowed."""
+
+    def test_failed_npm_uninstall_returns_an_error_with_its_output(self, tmp_path: Path):
+        # A root-owned /usr/local prefix answers EACCES; reconcile_tool must
+        # not take that for a removal and install a second copy
+        prefix = tmp_path / "prefix"
+        target = prefix / "lib" / "node_modules" / "typescript" / "bin" / "tsc"
+        target.parent.mkdir(parents=True)
+        target.write_text("#!/usr/bin/env node\n")
+        (prefix / "bin").mkdir()
+        link = prefix / "bin" / "tsc"
+        link.symlink_to(Path("..") / "lib" / "node_modules" / "typescript" / "bin" / "tsc")
+        stub_dir = tmp_path / "stubs"
+        stub_dir.mkdir()
+        _write_stub(stub_dir, "npm", 'echo "npm error code EACCES"; exit 243')
+        result = subprocess.run(
+            [
+                "bash",
+                "-c",
+                f"""
+set -euo pipefail
+source "{SCRIPTS_DIR}/lib/reconcile.sh"
+export PATH="{stub_dir}:/usr/bin:/bin"
+hash -r
+remove_installation tsc npm tsc "{link}"
+""",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            env={**os.environ, "HOME": str(tmp_path)},
+        )
+        assert result.returncode == 1
+        assert "npm error code EACCES" in result.stderr

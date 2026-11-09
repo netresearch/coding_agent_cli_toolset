@@ -116,14 +116,17 @@ remove_installation() {
       fi
       npm_pkg="${npm_pkg:-$tool}"
 
+      # A failed removal returns 1 with the manager's last output lines, so a
+      # caller does not install a second copy over a package that stayed
+      # (a root-owned /usr/local prefix answers EACCES)
+      local -a npm_cmd=()
       if [[ -n "$npm_via_pnpm" ]]; then
-        if command -v pnpm >/dev/null 2>&1; then
-          echo "[$tool] Uninstalling pnpm global package: $npm_pkg" >&2
-          pnpm remove -g "$npm_pkg" </dev/null >/dev/null 2>&1 \
-            || echo "[$tool] Warning: pnpm remove -g $npm_pkg failed" >&2
-        else
-          echo "[$tool] Warning: $npm_path is a pnpm package, but pnpm is not available" >&2
+        if ! command -v pnpm >/dev/null 2>&1; then
+          echo "[$tool] Error: $npm_path is a pnpm package, but pnpm is not available" >&2
+          return 1
         fi
+        echo "[$tool] Uninstalling pnpm global package: $npm_pkg" >&2
+        npm_cmd=(pnpm remove -g "$npm_pkg")
       elif command -v npm >/dev/null 2>&1; then
         # npm acts on the prefix of the active node (nvm) or its config, not
         # on the one the binary lives in: name the binary's prefix.
@@ -131,13 +134,22 @@ remove_installation() {
         case "$npm_target" in
           ../lib/node_modules/*) npm_prefix="$(dirname "$(dirname "$npm_path")")" ;;
           /*/lib/node_modules/*) npm_prefix="${npm_target%%/lib/node_modules/*}" ;;
+          *) ;;
         esac
         if [[ -n "$npm_prefix" ]]; then
           echo "[$tool] Uninstalling npm global package: $npm_pkg (prefix $npm_prefix)" >&2
-          npm uninstall -g --prefix "$npm_prefix" "$npm_pkg" </dev/null 2>/dev/null || true
+          npm_cmd=(npm uninstall -g --prefix "$npm_prefix" "$npm_pkg")
         else
           echo "[$tool] Uninstalling npm global package: $npm_pkg" >&2
-          npm uninstall -g "$npm_pkg" </dev/null 2>/dev/null || true
+          npm_cmd=(npm uninstall -g "$npm_pkg")
+        fi
+      fi
+      if [[ ${#npm_cmd[@]} -gt 0 ]]; then
+        local npm_out
+        if ! npm_out="$("${npm_cmd[@]}" </dev/null 2>&1)"; then
+          echo "[$tool] Error: ${npm_cmd[*]} failed:" >&2
+          printf '%s\n' "$npm_out" | tail -n 3 >&2
+          return 1
         fi
       fi
       ;;
