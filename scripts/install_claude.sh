@@ -152,21 +152,36 @@ install_direct() {
 
   echo "[claude] Downloading v${version} for ${platform}..." >&2
 
-  # Download to ~/.local/bin
+  # Download and verify in a private directory next to the target, so a
+  # failed transfer or a binary that does not run never touches the existing
+  # ~/.local/bin/claude (often a symlink into the native installer's
+  # versions/ directory, which a direct write would overwrite)
   mkdir -p ~/.local/bin
-  if ! curl "${CURL_HTTPS_ONLY[@]}" -fsSL "$GCS_BUCKET/$version/$platform/claude" -o ~/.local/bin/claude; then
+  local work_dir
+  work_dir="$(mktemp -d "$HOME/.local/bin/.claude-download.XXXXXX")" || return 1
+  if ! curl "${CURL_HTTPS_ONLY[@]}" -fsSL "$GCS_BUCKET/$version/$platform/claude" -o "$work_dir/claude"; then
     echo "[claude] Download failed" >&2
+    rm -rf "$work_dir"
     return 1
   fi
 
-  chmod +x ~/.local/bin/claude
+  chmod +x "$work_dir/claude"
 
   # Verify it works
-  if ! ~/.local/bin/claude --version >/dev/null 2>&1; then
+  if ! "$work_dir/claude" --version >/dev/null 2>&1; then
     echo "[claude] Binary verification failed" >&2
-    rm -f ~/.local/bin/claude
+    rm -rf "$work_dir"
     return 1
   fi
+
+  # cp writes through a symlink the same way the direct download did, so the
+  # layout of ~/.local/bin/claude (native symlink, custom launcher) is kept
+  if ! cp "$work_dir/claude" ~/.local/bin/claude; then
+    echo "[claude] Could not copy the binary to ~/.local/bin/claude" >&2
+    rm -rf "$work_dir"
+    return 1
+  fi
+  rm -rf "$work_dir"
 
   echo "[claude] Installed to ~/.local/bin/claude" >&2
 
