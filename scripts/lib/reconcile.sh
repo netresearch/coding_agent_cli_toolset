@@ -364,8 +364,11 @@ reconcile_tool() {
   binary_name="$(jq -r '.binary_name // ""' "$catalog_file" 2>/dev/null || echo "$tool")"
 
   # Detect current installation
-  local current_method
+  local current_method current_path
   current_method="$(detect_install_method "$tool" "$binary_name")"
+  # The path detect_install_method classified, handed to the removal so it
+  # acts on that installation and never re-resolves
+  current_path="$(command -v "$binary_name" 2>/dev/null || true)"
 
   # Resolve best method via policy
   local best_method
@@ -404,7 +407,7 @@ reconcile_tool() {
     echo "[$tool] Reconciliation needed: current=$current_method, best=$best_method" >&2
 
     # Remove current installation before installing via best method
-    if ! remove_installation "$tool" "$current_method" "$binary_name"; then
+    if ! remove_installation "$tool" "$current_method" "$binary_name" "$current_path"; then
       # If removal fails for unknown/system methods, proceed with install anyway
       # The new installation via best method will take PATH precedence
       if [ "$current_method" = "unknown" ] || [ "$current_method" = "system" ]; then

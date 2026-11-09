@@ -252,3 +252,44 @@ fi
         with tempfile.TemporaryDirectory() as tmpdir:
             link = self._layout(tmpdir, ".npm-global", "other/sometool")
             assert self._classify(tmpdir, func, link) == "unknown"
+
+
+@skip_on_windows
+class TestReconcileToolPassesPath:
+    """reconcile_tool hands the classified path to remove_installation."""
+
+    def test_detected_path_is_passed_to_the_removal(self, tmp_path: Path):
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        binary = bin_dir / "sometool"
+        binary.write_text("#!/bin/sh\n")
+        binary.chmod(0o755)
+        catalog = tmp_path / "sometool.json"
+        catalog.write_text('{"install_method": "auto", "binary_name": "sometool"}')
+        jq = shutil.which("jq")
+        if jq is None:
+            pytest.skip("reconcile_tool needs jq")
+        result = subprocess.run(
+            [
+                "bash",
+                "-c",
+                f"""
+set -euo pipefail
+source "{SCRIPTS_DIR}/lib/reconcile.sh"
+export PATH="{bin_dir}:{Path(jq).parent}:/usr/bin:/bin"
+hash -r
+detect_install_method() {{ echo manual; }}
+resolve_best_method() {{ echo cargo; }}
+get_method_config() {{ echo '{{}}'; }}
+install_via_method() {{ return 0; }}
+resolve_global_bin() {{ echo ""; }}
+remove_installation() {{ echo "remove $*"; }}
+reconcile_tool "{catalog}" reconcile || true
+""",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            env={**os.environ, "HOME": str(tmp_path)},
+        )
+        assert f"remove sometool manual sometool {binary}" in result.stdout, result.stderr
