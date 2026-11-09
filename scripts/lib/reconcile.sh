@@ -79,28 +79,66 @@ remove_installation() {
       fi
       ;;
     npm)
-      if command -v npm >/dev/null 2>&1; then
-        # The package name can differ from the tool name (pi is
-        # @earendil-works/pi-coding-agent, and an unrelated package `pi`
-        # exists), so read it from the bin symlink: node_modules/<pkg>/...
-        # One level only: `npm link` and folder installs make the package
-        # directory a symlink too, and readlink -f would resolve past it.
-        local npm_pkg="$tool" npm_path npm_target npm_rest
-        npm_path="${known_path:-$(command -v "$binary" 2>/dev/null || echo "")}"
-        npm_target="$(readlink "$npm_path" 2>/dev/null || echo "")"
-        case "$npm_target" in
-          */node_modules/*|node_modules/*)
-            # First node_modules = the global prefix; a later one would be
-            # a bundled dependency of the package
-            npm_rest="${npm_target#*node_modules/}"
-            case "$npm_rest" in
-              @*/*) npm_pkg="$(echo "$npm_rest" | cut -d/ -f1-2)" ;;
-              *) npm_pkg="${npm_rest%%/*}" ;;
-            esac
-            ;;
+      # The package name can differ from the tool name (pi is
+      # @earendil-works/pi-coding-agent, and an unrelated package `pi`
+      # exists), so read it from the bin symlink: node_modules/<pkg>/...
+      # One level only: `npm link` and folder installs make the package
+      # directory a symlink too, and readlink -f would resolve past it.
+      local npm_pkg="" npm_path npm_target npm_rest npm_prefix="" npm_via_pnpm=""
+      npm_path="${known_path:-$(command -v "$binary" 2>/dev/null || echo "")}"
+      npm_target="$(readlink "$npm_path" 2>/dev/null || echo "")"
+      case "$npm_target" in
+        */node_modules/*|node_modules/*)
+          # First node_modules = the global prefix; a later one would be
+          # a bundled dependency of the package
+          npm_rest="${npm_target#*node_modules/}"
+          ;;
+        *)
+          # pnpm writes its global bins as shell shims, not symlinks; they
+          # exec .../.pnpm/<name>@<version>.../node_modules/<pkg>/<bin>
+          if [[ -f "$npm_path" ]] && grep -q '/\.pnpm/' "$npm_path" 2>/dev/null; then
+            npm_via_pnpm=1
+            npm_rest="$(grep -o -m1 '/\.pnpm/[^/"]*/node_modules/[^"]*' "$npm_path" 2>/dev/null || true)"
+            npm_rest="${npm_rest#/.pnpm/*/node_modules/}"
+          fi
+          ;;
+      esac
+      if [[ -n "${npm_rest:-}" ]]; then
+        case "$npm_rest" in
+          @*/*) npm_pkg="$(echo "$npm_rest" | cut -d/ -f1-2)" ;;
+          *) npm_pkg="${npm_rest%%/*}" ;;
         esac
-        echo "[$tool] Uninstalling npm global package: $npm_pkg" >&2
-        npm uninstall -g "$npm_pkg" 2>/dev/null || true
+      fi
+      # Without a package in the path, the catalog's package_name names the
+      # npm package better than the tool name does
+      if [[ -z "$npm_pkg" ]] && command -v jq >/dev/null 2>&1; then
+        npm_pkg="$(jq -r '.package_name // ""' "$RECONCILE_LIB_DIR/../../catalog/$tool.json" 2>/dev/null || true)"
+      fi
+      npm_pkg="${npm_pkg:-$tool}"
+
+      if [[ -n "$npm_via_pnpm" ]]; then
+        if command -v pnpm >/dev/null 2>&1; then
+          echo "[$tool] Uninstalling pnpm global package: $npm_pkg" >&2
+          pnpm remove -g "$npm_pkg" </dev/null >/dev/null 2>&1 \
+            || echo "[$tool] Warning: pnpm remove -g $npm_pkg failed" >&2
+        else
+          echo "[$tool] Warning: $npm_path is a pnpm package, but pnpm is not available" >&2
+        fi
+      elif command -v npm >/dev/null 2>&1; then
+        # npm acts on the prefix of the active node (nvm) or its config, not
+        # on the one the binary lives in: name the binary's prefix.
+        # <prefix>/bin/<tool> -> ../lib/node_modules/<pkg>/...
+        case "$npm_target" in
+          ../lib/node_modules/*) npm_prefix="$(dirname "$(dirname "$npm_path")")" ;;
+          /*/lib/node_modules/*) npm_prefix="${npm_target%%/lib/node_modules/*}" ;;
+        esac
+        if [[ -n "$npm_prefix" ]]; then
+          echo "[$tool] Uninstalling npm global package: $npm_pkg (prefix $npm_prefix)" >&2
+          npm uninstall -g --prefix "$npm_prefix" "$npm_pkg" </dev/null 2>/dev/null || true
+        else
+          echo "[$tool] Uninstalling npm global package: $npm_pkg" >&2
+          npm uninstall -g "$npm_pkg" </dev/null 2>/dev/null || true
+        fi
       fi
       ;;
     nvm)

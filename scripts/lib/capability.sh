@@ -41,6 +41,9 @@ detect_install_method() {
       # Check if pipx knows about it
       if command -v pipx >/dev/null 2>&1 && pipx list 2>/dev/null | grep -q "package $tool"; then
         echo "pipx"
+      elif is_npm_global_bin "$binary_path"; then
+        # npm prefix ~/.local
+        echo "npm"
       else
         echo "github_release_binary"
       fi
@@ -60,8 +63,10 @@ detect_install_method() {
       return 0
       ;;
     "/usr/local/bin/"*)
-      # Could be brew or manual install
-      if command -v brew >/dev/null 2>&1 && brew list --formula 2>/dev/null | grep -q "^${tool}\$"; then
+      # Could be an npm global package (npm prefix /usr/local), brew or manual install
+      if is_npm_global_bin "$binary_path"; then
+        echo "npm"
+      elif command -v brew >/dev/null 2>&1 && brew list --formula 2>/dev/null | grep -q "^${tool}\$"; then
         echo "brew"
       else
         echo "unknown"
@@ -115,9 +120,26 @@ detect_install_method() {
       return 0
       ;;
     *)
-      echo "unknown"
+      # Any other npm prefix (~/.npm-global, a custom prefix)
+      if is_npm_global_bin "$binary_path"; then
+        echo "npm"
+      else
+        echo "unknown"
+      fi
       return 0
       ;;
+  esac
+}
+
+# Is PATH a bin of an npm global package? npm links <prefix>/bin/<name> to
+# ../lib/node_modules/<package>/..., whatever the prefix is. One readlink
+# level only: the package directory itself can be a symlink (npm link).
+is_npm_global_bin() {
+  local target
+  target="$(readlink "$1" 2>/dev/null || true)"
+  case "$target" in
+    */node_modules/*|node_modules/*) return 0 ;;
+    *) return 1 ;;
   esac
 }
 
@@ -184,6 +206,9 @@ classify_install_path() {
         echo "pipx"
       elif command -v uv >/dev/null 2>&1 && uv tool list 2>/dev/null | grep -q "^$tool\b"; then
         echo "uv"
+      elif is_npm_global_bin "$path"; then
+        # npm prefix ~/.local
+        echo "npm"
       else
         echo "manual"
       fi
@@ -218,7 +243,10 @@ classify_install_path() {
       fi
       ;;
     "/usr/local/bin/"*)
-      if command -v brew >/dev/null 2>&1 && brew list --formula 2>/dev/null | grep -q "^${tool}\$"; then
+      # npm prefix /usr/local links its bins into lib/node_modules
+      if is_npm_global_bin "$path"; then
+        echo "npm"
+      elif command -v brew >/dev/null 2>&1 && brew list --formula 2>/dev/null | grep -q "^${tool}\$"; then
         echo "brew"
       else
         echo "manual"
@@ -243,7 +271,12 @@ classify_install_path() {
       echo "npm"
       ;;
     *)
-      echo "unknown"
+      # Any other npm prefix (~/.npm-global, a custom prefix)
+      if is_npm_global_bin "$path"; then
+        echo "npm"
+      else
+        echo "unknown"
+      fi
       ;;
   esac
 }
