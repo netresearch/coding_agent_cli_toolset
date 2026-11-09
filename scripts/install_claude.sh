@@ -152,21 +152,67 @@ install_direct() {
 
   echo "[claude] Downloading v${version} for ${platform}..." >&2
 
-  # Download to ~/.local/bin
+  # Download and verify in a private directory next to the target, so a
+  # failed transfer or a binary that does not run never touches the existing
+  # ~/.local/bin/claude (often a symlink into the native installer's
+  # versions/ directory, which a direct write would overwrite)
   mkdir -p ~/.local/bin
-  if ! curl "${CURL_HTTPS_ONLY[@]}" -fsSL "$GCS_BUCKET/$version/$platform/claude" -o ~/.local/bin/claude; then
+  local work_dir
+  work_dir="$(mktemp -d "$HOME/.local/bin/.claude-download.XXXXXX")" || return 1
+  if ! curl "${CURL_HTTPS_ONLY[@]}" -fsSL "$GCS_BUCKET/$version/$platform/claude" -o "$work_dir/claude"; then
     echo "[claude] Download failed" >&2
+    rm -rf "$work_dir"
     return 1
   fi
 
-  chmod +x ~/.local/bin/claude
+  chmod +x "$work_dir/claude"
 
   # Verify it works
-  if ! ~/.local/bin/claude --version >/dev/null 2>&1; then
+  if ! "$work_dir/claude" --version >/dev/null 2>&1; then
     echo "[claude] Binary verification failed" >&2
-    rm -f ~/.local/bin/claude
+    rm -rf "$work_dir"
     return 1
   fi
+
+  # Replace the file ~/.local/bin/claude resolves to, as the direct download
+  # wrote through it, so the layout (native symlink, custom launcher) is kept.
+  # The binary is staged next to that file and renamed over it: a copy that
+  # fails midway (disk full) leaves the old binary whole, and a running
+  # binary can be replaced.
+  # Follow the link chain one readlink at a time: readlink -f differs between
+  # GNU and BSD for targets that do not exist.
+  local dest="$HOME/.local/bin/claude" link staged="" hops=0
+  while [[ -L "$dest" ]] && [[ $hops -lt 40 ]]; do
+    link="$(readlink "$dest")" || break
+    case "$link" in
+      /*) dest="$link" ;;
+      *) dest="$(dirname "$dest")/$link" ;;
+    esac
+    hops=$((hops + 1))
+  done
+  # A launcher into an npm install of claude would dangle once
+  # cleanup_npm_versions below removes that install (or already dangles from
+  # an earlier cleanup): replace the launcher itself instead of its target
+  local replace_launcher=""
+  case "$dest" in
+    */node_modules/@anthropic-ai/claude-code/*|"$HOME"/.nvm/versions/node/*/bin/claude)
+      dest="$HOME/.local/bin/claude"
+      replace_launcher=1
+      ;;
+    *) ;;
+  esac
+  # A link whose directory is missing (e.g. an unmounted filesystem) is left alone
+  if { [[ -z "$replace_launcher" ]] && [[ -L "$dest" ]]; } || [[ ! -d "$(dirname "$dest")" ]] \
+    || ! staged="$(mktemp "$(dirname "$dest")/.claude-new.XXXXXX")" \
+    || ! cp "$work_dir/claude" "$staged" \
+    || ! chmod 755 "$staged" \
+    || ! mv -f "$staged" "$dest"; then
+    echo "[claude] Could not install the binary to $dest" >&2
+    [[ -n "$staged" ]] && rm -f "$staged"
+    rm -rf "$work_dir"
+    return 1
+  fi
+  rm -rf "$work_dir"
 
   echo "[claude] Installed to ~/.local/bin/claude" >&2
 
