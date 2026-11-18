@@ -73,7 +73,9 @@ install_tmux() {
   dpkg -s bison >/dev/null 2>&1 || missing_deps+=(bison)
   dpkg -s autoconf >/dev/null 2>&1 || missing_deps+=(autoconf)
   dpkg -s automake >/dev/null 2>&1 || missing_deps+=(automake)
-  dpkg -s pkg-config >/dev/null 2>&1 || missing_deps+=(pkg-config)
+  # Ubuntu 26.04 ships /usr/bin/pkg-config in the pkgconf package; the pkg-config
+  # package is only a transitional name there, so ask for the program instead.
+  command -v pkg-config >/dev/null 2>&1 || missing_deps+=(pkg-config)
 
   if [ ${#missing_deps[@]} -gt 0 ]; then
     echo "[$TOOL] Installing build dependencies: ${missing_deps[*]}" >&2
