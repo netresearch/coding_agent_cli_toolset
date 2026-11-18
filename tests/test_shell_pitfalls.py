@@ -138,8 +138,12 @@ class TestFilesInPlace:
 
         # A redirect under umask 077 takes the default ACL: group-readable, entry inherited.
         assert mode_and_acl("a", 'umask 077; : >"$f"') == ("664", True)
-        # install copies the (empty) ACL of /dev/null: private, nothing inherited.
-        assert mode_and_acl("b", 'install -m 600 /dev/null "$f"') == ("600", False)
+        # GNU install copies the (empty) ACL of /dev/null: private, nothing inherited.
+        # uutils install (Ubuntu 26.04's coreutils) does not: the entry is inherited,
+        # masked by mode 600, and only setfacl -b removes it.
+        gnu = "GNU coreutils" in subprocess.run(["install", "--version"], capture_output=True, text=True).stdout
+        assert mode_and_acl("b", 'install -m 600 /dev/null "$f"') == ("600", not gnu)
+        assert mode_and_acl("b", 'setfacl -b "$f"') == ("600", False)
         # chmod after the fact only masks the inherited entry; setfacl -b removes it.
         assert mode_and_acl("c", 'touch "$f" && chmod 600 "$f"') == ("600", True)
         assert mode_and_acl("c", 'setfacl -b "$f"') == ("600", False)
