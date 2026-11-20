@@ -297,10 +297,12 @@ f='^(hostname|user|port|proxyjump) '
 diff <(ssh -G web1 | grep -E "$f") <(ssh -F /dev/null -G web1 | grep -E "$f")
 ```
 
-No difference means nothing configures `web1`. Unlike a grep of the config
-file, this follows `Include` files, `Match` blocks and case-insensitive
-keywords. Instructions written for someone else's machine spell the target
-out (`ssh user@host -J user@jumphost`) and are tested with `-F /dev/null`.
+No difference means no config file changes these four fields for `web1`;
+a block that sets only, say, `IdentityFile` does not show, so add the
+settings you care about to the pattern. Unlike a grep of the config file,
+this follows `Include` files, `Match` blocks and case-insensitive keywords.
+Instructions written for someone else's machine spell the target out
+(`ssh user@host -J user@jumphost`) and are tested with `-F /dev/null`.
 
 **A script named after a standard-library module shadows it.** Python puts
 the script's directory first on `sys.path`, so a scratch `json.py` or

@@ -210,5 +210,10 @@ class TestPkill:
         assert (proc.returncode, proc.stdout) == expected
 
     def test_an_anchored_pattern_leaves_the_caller_alone(self):
-        proc = bash('sleep 987.654 & pkill -f "^sleep 987.654$"; echo after; wait', start_new_session=True)
+        # Wait until the child has exec'd sleep, or pkill can miss it and wait hangs.
+        proc = bash(
+            'sleep 987.654 & for _ in $(seq 100); do pgrep -f "^sleep 987.654$" >/dev/null && break; sleep 0.05; done; '
+            'pkill -f "^sleep 987.654$"; echo after; wait',
+            start_new_session=True,
+        )
         assert (proc.returncode, proc.stdout) == (0, "after\n")
