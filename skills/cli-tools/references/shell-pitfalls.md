@@ -51,6 +51,19 @@ exits 1 when it counts 0 — while `n` still holds a plausible `0`. Gate on the
 producing command's own status, or on the success token alone
 (`grep -q '^SUCCESS'`).
 
+**`set -e` is off inside anything whose status is tested.** A function called
+as `f || …`, `f && …` or `if f` runs its whole body without `set -e`:
+`bash -c 'set -e; f() { false; echo after-false; }; f || echo handled'`
+prints `after-false` and exits 0, while a bare `f` stops at `false`. A test
+harness that wraps each variant in a function and calls it that way, or pipes
+it into a filter, therefore measures the harness: the failing variant reports
+success. Run one case per `bash -c` with the options of the script under
+test, capture the status, and treat a missing last line as the abort:
+
+```bash
+bash -c 'set -eo pipefail; <case>; echo REACHED'; rc=$?
+```
+
 ## Pipes and SIGPIPE
 
 **Under `pipefail`, a reader that stops early turns a match into a failure.**
@@ -120,6 +133,13 @@ more than intended. A jq filter in double quotes fails the same way, loudly:
 that way runs the commands it merely mentions. Quote the delimiter:
 `<<'EOF'`.
 
+**A Makefile recipe expands `$` before the shell sees it.** In a recipe,
+`spec=pkg@1.2; echo ${spec#*@}` reaches the shell as `echo ` — make reads
+`${spec#*@}` as one of its own variables, finds none and substitutes nothing,
+without a warning. Double the dollar for shell expansion (`$${spec#*@}`,
+`$$HOME`); make's own variables keep a single `$`. `make -n <target>` prints
+the commands as the shell will receive them.
+
 **A same-line assignment reads the old value.**
 `export A=$(cat token) B=$A` sets `B` to the empty string: the shell expands
 `$A` before the assignment to its left takes effect. Use two statements.
@@ -146,15 +166,42 @@ the code under test, and passes against code with no cleanup at all. Signal
 the caller's process group instead, and wait for the command to finish before
 asserting, because it outlives the signal.
 
+**`pkill -f <pattern>` also matches the shell that runs it.** `-f` matches
+the whole command line, and the pattern is part of the command line of the
+`bash -c`, script or agent shell call that issues it:
+`bash -c 'pkill -f zz_probe; echo after'` kills its own shell — exit 143, no
+`after` — whether or not anything else matched. Anchor the pattern to the
+target's full command line (`bash -c 'sleep 1234 & pkill -f "^sleep 1234$"; echo after'`
+prints `after`), or list first with `pgrep -af <pattern>`, which shows the
+wrapper shells too, confirm each pid with `ps -o cmd= -p <pid>`, and kill by
+pid.
+
 ## Files written in place
 
 **`cmd > file` truncates `file` before `cmd` starts.** A failing `cmd` leaves
 it empty (0 bytes). Write to a temporary file, check the status and the
 content, then move it into place.
 
+**A format check passes an empty artefact.** `gzip -t` accepts the 20-byte
+stream that `: | gzip` writes, so `mysqldump … 2>/dev/null | gzip > db.sql.gz`
+with a client that was refused access produces a file that tests as valid —
+and without `pipefail` the pipeline exits 0 as well. Keep stderr of a step
+whose output you are about to trust, and check a plausible size plus the
+artefact's own end marker: a complete `mysqldump` or `mariadb-dump` ends with
+`-- Dump completed on …` (`zcat db.sql.gz | tail -n 1`).
+
 **`sed -i` exits 0 when nothing matched.** A pattern with the wrong
 indentation leaves the file unchanged and reports success. Read the result
 (`grep -n`, `git diff`), never the exit code.
+
+**Replacing a whole line discards the syntax of the old value.**
+`sed -i 's|^IMAGE_TAG=.*|IMAGE_TAG=84|' .env` writes exactly `84`, also when
+the old line was `IMAGE_TAG=:82` because the compose file concatenates it
+(`image: app${IMAGE_TAG}`): the result names the image `app84`, not the tag
+`app:84`, and nothing that leaves `.env` alone notices before the next
+`docker compose up`. Print the old value first (`grep '^IMAGE_TAG=' .env`),
+look at how the variable is consumed (`grep -rn 'IMAGE_TAG' compose*.yml`),
+and shape the new value after the old one.
 
 **A default ACL on the directory overrides `umask`.** In a directory with a
 default ACL (a `+` after the mode in `ls -ld`), a file created under
@@ -220,6 +267,45 @@ does not exist. Test the exit status: `if gh api … >/dev/null 2>&1`.
 **`gh` picks its host from `GH_HOST` or the enclosing repository.** Inside a
 checkout of a GitHub Enterprise or other host, `gh api repos/o/r` goes there.
 Pin it: `gh api --hostname github.com …`.
+
+**Redirect `HOME` for one command, never for the shell.** `HOME="$tmp" cmd`
+changes it for `cmd` alone; `export HOME="$tmp"` changes it for every later
+command in that shell, and each tool that keeps its configuration or login
+under `$HOME` then behaves as on a fresh machine: after the export,
+`gh auth status` reports no login (exit 1) — a failure that reads like a
+broken request, not like a moved home directory.
+
+**`uv python find` does not read `UV_PYTHON`; `uv run` does.** With
+`UV_PYTHON=3.12`, `uv run --no-project python -c …` runs 3.12, while
+`uv python find` without an argument answers from elsewhere — an active
+virtual environment, a `.python-version`, or uv's default (uv 0.13.6).
+`uv python find 3.12` resolves 3.12, but only echoes the request. A check
+that should prove which interpreter `uv run` uses has to run `uv run`, or
+assert on `UV_PYTHON` itself. The `python-version` input of
+`astral-sh/setup-uv` sets `UV_PYTHON` for the rest of the job, so the same
+applies in CI.
+
+**`ssh -G <name>` succeeds for any name.** It exits 0 and prints a full
+configuration for a host that appears in no config file, with `hostname` set
+to the name itself, so its exit status does not say whether an alias exists.
+Compare the resolved target with a run that ignores all configuration:
+
+```bash
+f='^(hostname|user|port|proxyjump) '
+diff <(ssh -G web1 | grep -E "$f") <(ssh -F /dev/null -G web1 | grep -E "$f")
+```
+
+No difference means nothing configures `web1`. Unlike a grep of the config
+file, this follows `Include` files, `Match` blocks and case-insensitive
+keywords. Instructions written for someone else's machine spell the target
+out (`ssh user@host -J user@jumphost`) and are tested with `-F /dev/null`.
+
+**A script named after a standard-library module shadows it.** Python puts
+the script's directory first on `sys.path`, so a scratch `json.py` or
+`inspect.py` next to a script replaces the real module for every script run
+from there, including imports deep inside libraries. Prefix scratch files
+with their task (`release_inspect.py`), or run with `python3 -I`, which drops
+the script's directory from the path.
 
 **Sourcing a `.env` exports git's identity variables.** `set -a; . ./.env`
 with `GIT_AUTHOR_NAME`/`GIT_AUTHOR_EMAIL` placeholders makes the next commit

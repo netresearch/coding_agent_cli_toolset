@@ -116,6 +116,7 @@ This repo **is** a CLI tool manager, so the word "upgrade" is overloaded:
 ## External API gotchas
 
 - **crates.io requires a User-Agent** (`curl -fsSL -A "cli-audit" https://crates.io/api/v1/crates/<name>`) — without it the response is non-JSON and parsing throws. The package-version MCP tools do not cover crates/cargo; manual curl is the fallback.
+- **`make` hands `.env` to every target, and `gh` prefers `GITHUB_TOKEN` over its stored login.** The `Makefile` does `-include .env` followed by a bare `export`, so a `GITHUB_TOKEN` line in the gitignored `.env` reaches every `make install-<tool>` / `make upgrade-<tool>` run, and `gh` uses it ahead of the credentials from `gh auth login` (`gh help environment`). A revoked token there makes `gh api` answer `401 Bad credentials` under `make` while the same command works in a plain shell. When a GitHub call fails only under `make`, run `grep -cE '^(export )?GITHUB_TOKEN=' .env` (prints a count, not the token) and refresh or remove that line.
 - **Default to jq optional chaining** over external API JSON (`.arr[]?`, `.field?`): iterating a null/absent array with `.arr[]` aborts the whole pipeline (`Cannot iterate over null`), killing loops on one empty response. Safe even when the field is usually present.
 
 ## Data files
