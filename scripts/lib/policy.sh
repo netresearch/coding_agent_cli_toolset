@@ -76,7 +76,9 @@ is_sudo_allowed() {
 
   if command -v jq >/dev/null 2>&1; then
     local allow_sudo
-    allow_sudo="$(jq -r '.allow_sudo // true' "$CONFIG_FILE" 2>/dev/null || echo "true")"
+    # Not `.allow_sudo // true`: jq's // replaces false as well as null,
+    # so an explicit "allow_sudo": false would read as true.
+    allow_sudo="$(jq -r 'if .allow_sudo == null then true else .allow_sudo end' "$CONFIG_FILE" 2>/dev/null || echo "true")"
     [ "$allow_sudo" = "true" ]
   else
     # Fallback: check for explicit "allow_sudo": false
