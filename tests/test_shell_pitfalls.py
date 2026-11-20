@@ -47,6 +47,12 @@ class TestExitStatus:
     def test_grep_count_assignment_fails_on_zero(self):
         assert bash("n=$(echo x | grep -c zz) && echo pushed || echo skipped $n").stdout == "skipped 0\n"
 
+    def test_set_e_is_off_in_a_function_whose_status_is_tested(self):
+        tested = bash("set -e; f() { false; echo after-false; }; f || echo handled")
+        assert (tested.returncode, tested.stdout) == (0, "after-false\n")
+        bare = bash("set -e; f() { false; echo after-false; }; f; echo reached")
+        assert (bare.returncode, bare.stdout) == (1, "")
+
 
 class TestPipes:
     def test_early_reader_under_pipefail_reports_the_match_as_a_failure(self):
@@ -99,6 +105,13 @@ class TestQuoting:
     def test_same_line_assignment_reads_the_old_value(self):
         assert bash('export A=$(echo tok) B=$A; echo "[$B]"').stdout == "[]\n"
 
+    @pytest.mark.skipif(shutil.which("make") is None, reason="needs make(1)")
+    def test_make_recipe_expands_a_single_dollar_itself(self, tmp_path):
+        (tmp_path / "Makefile").write_text(
+            'single:\n\t@spec=pkg@1.2; echo "[${spec#*@}]"\ndouble:\n\t@spec=pkg@1.2; echo "[$${spec#*@}]"\n'
+        )
+        assert bash("make -s single double", cwd=tmp_path).stdout == "[]\n[1.2]\n"
+
     def test_bash_s_loses_the_rest_of_the_script_to_a_stdin_reader(self):
         proc = bash("bash -s <<'EOF'\necho one\ncat >/dev/null\necho two\nEOF")
         assert proc.stdout == "one\n"
@@ -110,6 +123,13 @@ class TestFilesInPlace:
         target.write_text("data\n")
         bash(f'no_such_command_zz >"{target}" 2>/dev/null')
         assert target.read_text() == ""
+
+    @pytest.mark.skipif(shutil.which("gzip") is None, reason="needs gzip(1)")
+    def test_gzip_t_accepts_an_empty_stream(self, tmp_path):
+        target = tmp_path / "dump.sql.gz"
+        proc = bash(f': | gzip >"{target}" && gzip -t "{target}"')
+        assert proc.returncode == 0
+        assert target.stat().st_size < 64  # 20 bytes with GNU gzip
 
     @pytest.mark.skipif(sys.platform == "darwin", reason="BSD sed takes a suffix argument after -i")
     def test_sed_in_place_succeeds_without_a_match(self, tmp_path):
@@ -177,3 +197,25 @@ class TestProcessGroups:
         )
         assert "caller-got-TERM" not in proc.stdout
         assert proc.stdout.strip().endswith("survived")
+
+
+@pytest.mark.skipif(shutil.which("pkill") is None, reason="needs pkill(1)")
+class TestPkill:
+    def test_pkill_f_kills_the_shell_that_runs_it(self):
+        # Own session, and a pattern nothing else carries: the only match is
+        # the bash -c whose command line contains it. BSD pkill (macOS)
+        # excludes its own ancestors unless given -a, so the shell survives.
+        proc = bash("pkill -f zz_pitfall_probe_7f3c; echo after", start_new_session=True)
+        if sys.platform == "darwin":
+            assert (proc.returncode, proc.stdout) == (0, "after\n")
+        else:
+            assert (proc.returncode, proc.stdout) == (-15, "")
+
+    def test_an_anchored_pattern_leaves_the_caller_alone(self):
+        # Wait until the child has exec'd sleep, or pkill can miss it and wait hangs.
+        proc = bash(
+            'sleep 987.654 & for _ in $(seq 100); do pgrep -f "^sleep 987.654$" >/dev/null && break; sleep 0.05; done; '
+            'pkill -f "^sleep 987.654$"; echo after; wait',
+            start_new_session=True,
+        )
+        assert (proc.returncode, proc.stdout) == (0, "after\n")
