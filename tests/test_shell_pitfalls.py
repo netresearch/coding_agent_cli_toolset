@@ -203,9 +203,11 @@ class TestProcessGroups:
 class TestPkill:
     def test_pkill_f_kills_the_shell_that_runs_it(self):
         # Own session, and a pattern nothing else carries: the only match is
-        # the bash -c whose command line contains it.
+        # the bash -c whose command line contains it. BSD pkill (macOS)
+        # excludes its own ancestors unless given -a, so the shell survives.
         proc = bash("pkill -f zz_pitfall_probe_7f3c; echo after", start_new_session=True)
-        assert (proc.returncode, proc.stdout) == (-15, "")
+        expected = (0, "after\n") if sys.platform == "darwin" else (-15, "")
+        assert (proc.returncode, proc.stdout) == expected
 
     def test_an_anchored_pattern_leaves_the_caller_alone(self):
         proc = bash('sleep 987.654 & pkill -f "^sleep 987.654$"; echo after; wait', start_new_session=True)

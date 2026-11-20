@@ -166,15 +166,17 @@ the code under test, and passes against code with no cleanup at all. Signal
 the caller's process group instead, and wait for the command to finish before
 asserting, because it outlives the signal.
 
-**`pkill -f <pattern>` also matches the shell that runs it.** `-f` matches
-the whole command line, and the pattern is part of the command line of the
-`bash -c`, script or agent shell call that issues it:
+**`pkill -f <pattern>` also matches the shell that runs it (Linux).** `-f`
+matches the whole command line, and the pattern is part of the command line
+of the `bash -c`, script or agent shell call that issues it: with procps-ng,
 `bash -c 'pkill -f zz_probe; echo after'` kills its own shell — exit 143, no
-`after` — whether or not anything else matched. Anchor the pattern to the
-target's full command line (`bash -c 'sleep 1234 & pkill -f "^sleep 1234$"; echo after'`
-prints `after`), or list first with `pgrep -af <pattern>`, which shows the
-wrapper shells too, confirm each pid with `ps -o cmd= -p <pid>`, and kill by
-pid.
+`after` — whether or not anything else matched. BSD `pkill` (macOS, FreeBSD)
+leaves its own ancestors out of the match unless given `-a`, so the same line
+prints `after` there. Anchor the pattern to the target's full command line
+(`bash -c 'sleep 1234 & pkill -f "^sleep 1234$"; echo after'` prints
+`after`), or list first with `pgrep -af <pattern>` (procps; `pgrep -lf` on
+BSD), which shows the wrapper shells too, confirm each pid with
+`ps -o args= -p <pid>`, and kill by pid.
 
 ## Files written in place
 
