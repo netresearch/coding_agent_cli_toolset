@@ -206,8 +206,10 @@ class TestPkill:
         # the bash -c whose command line contains it. BSD pkill (macOS)
         # excludes its own ancestors unless given -a, so the shell survives.
         proc = bash("pkill -f zz_pitfall_probe_7f3c; echo after", start_new_session=True)
-        expected = (0, "after\n") if sys.platform == "darwin" else (-15, "")
-        assert (proc.returncode, proc.stdout) == expected
+        if sys.platform == "darwin":
+            assert (proc.returncode, proc.stdout) == (0, "after\n")
+        else:
+            assert (proc.returncode, proc.stdout) == (-15, "")
 
     def test_an_anchored_pattern_leaves_the_caller_alone(self):
         # Wait until the child has exec'd sleep, or pkill can miss it and wait hangs.
