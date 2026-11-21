@@ -23,10 +23,11 @@
      ```bash
      zgrep -h -E " (remove|purge) <pkg>:" /var/log/dpkg.log*   # when it went
      grep -h "<pkg>" /var/log/dist-upgrade/history.log         # under Purge: = release upgrade
-     apt-cache policy <pkg>                                    # no candidate = the release dropped it
+     sudo apt update && apt-cache policy <pkg>                 # no candidate = the release dropped it
      ```
-     Without a candidate, `apt install` cannot bring it back: switch to another tool
-     or put a small replacement script in `~/.local/bin`.
+     Without a candidate, `apt install` cannot bring it back: point the setting at
+     another tool, or put an executable of the same name into a directory on `PATH`
+     (for example `~/.local/bin`).
 
 3. **If tool exists but not in PATH:**
    ```bash
