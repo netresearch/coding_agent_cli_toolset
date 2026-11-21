@@ -403,5 +403,21 @@
         "description": "Uses rg to search content"
       }
     ]
+  },
+  {
+    "name": "command-not-found-after-release-upgrade",
+    "prompt": "After upgrading Ubuntu to the next release, 'wslview' says command not found, but BROWSER=wslview is still set in my .bashrc. Fix it.",
+    "assertions": [
+      {
+        "type": "content_contains",
+        "value": "dpkg.log",
+        "description": "Reads the dpkg log to find out whether the package was removed"
+      },
+      {
+        "type": "content_contains",
+        "value": "apt-cache policy",
+        "description": "Checks whether the new release still ships the package before installing"
+      }
+    ]
   }
 ]

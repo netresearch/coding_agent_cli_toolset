@@ -16,6 +16,18 @@
    - **Version conflict**: Multiple versions installed, wrong one active
    - **Shell state**: Installed in current session but shell hash table stale (`hash -r`)
    - **Package manager isolation**: Installed via pip/npm/cargo but not in global PATH
+   - **Removed by the package manager**: a release upgrade (`do-release-upgrade`) purges
+     packages the new release no longer ships, and a setting that names the binary
+     (for example `BROWSER=wslview`) stays behind. Read the logs before reinstalling.
+     The package name can differ from the binary (`wslview` comes from `wslu`):
+     ```bash
+     zgrep -h -E " (remove|purge) <pkg>:" /var/log/dpkg.log*   # when it went
+     grep -h "<pkg>" /var/log/dist-upgrade/history.log         # under Purge: = release upgrade
+     sudo apt update && apt-cache policy <pkg>                 # no candidate = the release dropped it
+     ```
+     Without a candidate, `apt install` cannot bring it back: point the setting at
+     another tool, or put an executable of the same name into a directory on `PATH`
+     (for example `~/.local/bin`).
 
 3. **If tool exists but not in PATH:**
    ```bash
