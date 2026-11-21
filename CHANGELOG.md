@@ -7,6 +7,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [2.0.0-alpha.7] - 2026-11-20
+
 ### Added
 - `pi` catalog entry: the pi coding agent, installed from npm as `@earendil-works/pi-coding-agent` (the earlier `@mariozechner/pi-coding-agent` package is deprecated); upstream version from GitHub `earendil-works/pi`.
 - `jules` catalog entry: the Google Jules CLI (`@google/jules`), Google's asynchronous coding agent, with bash completion from `jules completion bash`.
