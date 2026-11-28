@@ -7,7 +7,7 @@
   "binary_name": "agy",
   "script": "install_agy.sh",
   "skip_upstream": true,
-  "version_command": "timeout 2 agy --version 2>/dev/null | grep -oE '[0-9]+\\.[0-9]+\\.[0-9]+' | head -1",
+  "version_command": "agy --version 2>/dev/null | grep -oE '[0-9]+\\.[0-9]+\\.[0-9]+' | head -1",
   "guide": {
     "display_name": "Google Antigravity CLI",
     "install_action": "upgrade",

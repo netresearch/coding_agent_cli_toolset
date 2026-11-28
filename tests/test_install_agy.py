@@ -76,6 +76,7 @@ class TestInstallAgy:
         bin_entry: str | None = None,
         extra_path: str = "",
         env_home: Path | None = None,
+        cwd: Path | None = None,
     ):
         stubs = home / "stubs"
         _write_exe(stubs / "curl", CURL_STUB)
@@ -95,6 +96,7 @@ class TestInstallAgy:
             capture_output=True,
             text=True,
             timeout=20,
+            cwd=cwd,
             env={"HOME": str(env_home or home), "PATH": path, "CURL_PAYLOAD": str(payload)},
         )
 
@@ -127,6 +129,22 @@ class TestInstallAgy:
         result = self._run(real, "install", path_has_bin=True, env_home=link)
         assert result.returncode == 0, result.stderr
         assert "install --skip-path" in self._args(real)
+
+    def test_install_ignores_relative_path_entries(self, tmp_path: Path):
+        # "." resolves to ~/.local/bin only because the script runs from there
+        (tmp_path / ".local" / "bin").mkdir(parents=True)
+        result = self._run(tmp_path, "install", path_has_bin=True, bin_entry=".", cwd=tmp_path / ".local" / "bin")
+        assert result.returncode == 0, result.stderr
+        assert "install --skip-path" not in self._args(tmp_path)
+
+    def test_install_replaces_dangling_symlink(self, tmp_path: Path):
+        binary = tmp_path / ".local" / "bin" / "agy"
+        binary.parent.mkdir(parents=True)
+        binary.symlink_to(tmp_path / "gone")
+        result = self._run(tmp_path, "install", path_has_bin=True)
+        assert result.returncode == 0, result.stderr
+        assert not binary.is_symlink()
+        assert "install --skip-path" in self._args(tmp_path)
 
     def test_install_warns_when_installer_layout_changed(self, tmp_path: Path):
         changed = FAKE_INSTALLER.replace('"$BINARY_PATH" install || true', '"$BINARY_PATH" setup || true')
@@ -174,6 +192,13 @@ class TestInstallAgy:
         result = self._run(tmp_path, "uninstall", path_has_bin=True)
         assert result.returncode == 0, result.stderr
         assert not binary.exists()
+
+    def test_uninstall_names_agy_installed_elsewhere(self, tmp_path: Path):
+        _write_exe(tmp_path / "opt" / "agy", "#!/bin/sh\n")
+        result = self._run(tmp_path, "uninstall", path_has_bin=True, extra_path=f"{tmp_path}/opt")
+        assert result.returncode == 0, result.stderr
+        assert f"{tmp_path}/opt/agy was installed another way" in result.stderr
+        assert (tmp_path / "opt" / "agy").exists()
 
     def test_uninstall_removes_dangling_symlink(self, tmp_path: Path):
         binary = tmp_path / ".local" / "bin" / "agy"

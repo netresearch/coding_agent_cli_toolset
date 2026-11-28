@@ -43,7 +43,8 @@ bin_dir_on_path() {
     [ -d "$BIN_DIR" ] && resolved_bin="$(cd "$BIN_DIR" && pwd -P)"
     IFS=: read -r -a entries <<<"$PATH"
     for entry in "${entries[@]}"; do
-        [ -n "$entry" ] || continue
+        # Relative entries (., bin) depend on the current directory
+        case "$entry" in /*) ;; *) continue ;; esac
         [ "${entry%/}" = "$BIN_DIR" ] && return 0
         if [ -n "$resolved_bin" ] && [ -d "$entry" ]; then
             resolved="$(cd "$entry" && pwd -P)" || continue
@@ -74,6 +75,11 @@ install_native() {
         echo "[agy] Failed to download $INSTALLER_URL" >&2
         rm -rf "$work_dir"
         return 1
+    fi
+
+    # A dangling ~/.local/bin/agy makes the installer's cp refuse to write
+    if [ -L "$AGY_BIN" ] && [ ! -e "$AGY_BIN" ]; then
+        rm -f "$AGY_BIN"
     fi
 
     if bin_dir_on_path; then
@@ -148,7 +154,13 @@ upgrade_agy() {
 
 uninstall_agy() {
     if [ ! -e "$AGY_BIN" ] && [ ! -L "$AGY_BIN" ]; then
-        echo "[agy] Not installed at $AGY_BIN" >&2
+        local other
+        other="$(command -v agy 2>/dev/null || true)"
+        if [ -n "$other" ]; then
+            echo "[agy] Not installed at $AGY_BIN; $other was installed another way, remove it by hand" >&2
+        else
+            echo "[agy] Not installed at $AGY_BIN" >&2
+        fi
         return 0
     fi
     rm -f "$AGY_BIN"

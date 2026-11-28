@@ -6,7 +6,7 @@
 
 ## Overview
 
-34 Bash scripts for installing developer tools with multiple actions:
+41 Bash scripts for installing developer tools with multiple actions:
 - **install**: Fresh installation (default action)
 - **update**: Upgrade to latest version
 - **uninstall**: Remove installation
