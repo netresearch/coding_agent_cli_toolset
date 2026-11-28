@@ -28,8 +28,8 @@ A sweep on 2026-07-22 (commit 9b6c053) audited the entries present in that
 commit for a bash-completion generator: each generator was executed and its
 output validated against `complete -…` / `compgen ` / `COMPREPLY`, then
 checked to confirm it registers the entry's own `binary_name`. codex, pip and
-pipx were not installed then; see the end of this section. herdr, jules, pi
-and vault were checked when they were added. Five entries are not audited:
+pipx were not installed then; see the end of this section. agy, herdr, jules,
+pi and vault were checked when they were added. Five entries are not audited:
 blesh, bw, bwrap, byobu, trustmux.
 
 **42 entries declare `bash_completion`** — 41 `command`, 1 `source_path` (rbenv).
@@ -57,7 +57,7 @@ The completion file is named after `binary_name`, so a script that registers a
 
 ### No bash completion available
 
-actionlint, ansible-core, aws, bandit, claude, ctags, curlie, difftastic,
+actionlint, agy, ansible-core, aws, bandit, claude, ctags, curlie, difftastic,
 direnv, dust, entr, eslint, flake8, gam, gem, gemini, gh-aw-firewall, git,
 git-branchless, git-filter-repo, go, google-workspace-cli, gosec, httpie,
 hyperfine, isort, jq, ninja, opengrep, php, pi, pre-commit, prename, prettier,

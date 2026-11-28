@@ -96,6 +96,6 @@ make upgrade
 
 ## Architecture
 
-All 107 tools have catalog entries. The generic installer (`scripts/install_tool.sh`) reads a tool's catalog JSON and delegates to the appropriate method-specific installer under `scripts/installers/`. Tools with complex installation needs (python, node, docker, rust, etc.) use `install_method: "dedicated_script"` to route to their existing bespoke scripts.
+All 108 tools have catalog entries. The generic installer (`scripts/install_tool.sh`) reads a tool's catalog JSON and delegates to the appropriate method-specific installer under `scripts/installers/`. Tools with complex installation needs (python, node, docker, rust, etc.) use `install_method: "dedicated_script"` to route to their existing bespoke scripts.
 
 See [ADR-007](../docs/adr/ADR-007-generic-tool-installation-architecture.md) for the full architectural decision record.

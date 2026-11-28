@@ -67,7 +67,16 @@ class TestAgyCatalog:
 
 @skip_on_windows
 class TestInstallAgy:
-    def _run(self, home: Path, action: str, path_has_bin: bool, installer: str = FAKE_INSTALLER):
+    def _run(
+        self,
+        home: Path,
+        action: str,
+        path_has_bin: bool,
+        installer: str = FAKE_INSTALLER,
+        bin_entry: str | None = None,
+        extra_path: str = "",
+        env_home: Path | None = None,
+    ):
         stubs = home / "stubs"
         _write_exe(stubs / "curl", CURL_STUB)
         payload = home / "payload"
@@ -77,18 +86,21 @@ class TestInstallAgy:
         script = home / "scripts" / "install_agy.sh"
         _write_exe(script, SCRIPT.read_text())
         path = f"{stubs}:/usr/bin:/bin"
+        if extra_path:
+            path = f"{extra_path}:{path}"
         if path_has_bin:
-            path = f"{home}/.local/bin:{path}"
+            path = f"{bin_entry or str(home) + '/.local/bin'}:{path}"
         return subprocess.run(
             ["bash", str(script), action],
             capture_output=True,
             text=True,
             timeout=20,
-            env={"HOME": str(home), "PATH": path, "CURL_PAYLOAD": str(payload)},
+            env={"HOME": str(env_home or home), "PATH": path, "CURL_PAYLOAD": str(payload)},
         )
 
     def _args(self, home: Path) -> list[str]:
-        return (home / "agy-args").read_text().splitlines()
+        args = home / "agy-args"
+        return args.read_text().splitlines() if args.exists() else []
 
     def test_install_skips_path_line_when_bin_dir_on_path(self, tmp_path: Path):
         result = self._run(tmp_path, "install", path_has_bin=True)
@@ -100,6 +112,21 @@ class TestInstallAgy:
         assert result.returncode == 0, result.stderr
         assert "install" in self._args(tmp_path)
         assert "install --skip-path" not in self._args(tmp_path)
+
+    def test_install_skips_path_line_for_trailing_slash_entry(self, tmp_path: Path):
+        result = self._run(tmp_path, "install", path_has_bin=True, bin_entry=f"{tmp_path}/.local/bin/")
+        assert result.returncode == 0, result.stderr
+        assert "install --skip-path" in self._args(tmp_path)
+
+    def test_install_skips_path_line_when_home_is_a_symlink(self, tmp_path: Path):
+        real = tmp_path / "real"
+        (real / ".local" / "bin").mkdir(parents=True)
+        link = tmp_path / "link"
+        link.symlink_to(real)
+        # HOME is the symlink, PATH holds the resolved directory
+        result = self._run(real, "install", path_has_bin=True, env_home=link)
+        assert result.returncode == 0, result.stderr
+        assert "install --skip-path" in self._args(real)
 
     def test_install_warns_when_installer_layout_changed(self, tmp_path: Path):
         changed = FAKE_INSTALLER.replace('"$BINARY_PATH" install || true', '"$BINARY_PATH" setup || true')
@@ -115,11 +142,31 @@ class TestInstallAgy:
         assert "Already installed" in result.stderr
         assert not [a for a in self._args(tmp_path) if a.startswith("install")]
 
+    def test_install_leaves_agy_elsewhere_on_path_alone(self, tmp_path: Path):
+        _write_exe(tmp_path / "opt" / "agy", '#!/bin/sh\necho "$*" >> "$HOME/agy-args"\n')
+        result = self._run(tmp_path, "install", path_has_bin=True, extra_path=f"{tmp_path}/opt")
+        assert result.returncode == 0, result.stderr
+        assert f"Already installed at {tmp_path}/opt/agy" in result.stderr
+        assert not (tmp_path / ".local" / "bin" / "agy").exists()
+
+    def test_update_uses_agy_elsewhere_on_path(self, tmp_path: Path):
+        _write_exe(tmp_path / "opt" / "agy", '#!/bin/sh\necho "$*" >> "$HOME/agy-args"\n')
+        result = self._run(tmp_path, "update", path_has_bin=True, extra_path=f"{tmp_path}/opt")
+        assert result.returncode == 0, result.stderr
+        assert "update" in self._args(tmp_path)
+        assert not (tmp_path / ".local" / "bin" / "agy").exists()
+
+    def test_update_reports_failure(self, tmp_path: Path):
+        _write_exe(tmp_path / ".local" / "bin" / "agy", '#!/bin/sh\n[ "$1" = update ] && exit 3\nexit 0\n')
+        result = self._run(tmp_path, "update", path_has_bin=True)
+        assert result.returncode == 1
+        assert "update' failed" in result.stderr
+
     def test_update_runs_agy_update(self, tmp_path: Path):
         _write_exe(tmp_path / ".local" / "bin" / "agy", '#!/bin/sh\necho "$*" >> "$HOME/agy-args"\n')
         result = self._run(tmp_path, "update", path_has_bin=True)
         assert result.returncode == 0, result.stderr
-        assert self._args(tmp_path)[0] == "update"
+        assert "update" in self._args(tmp_path)
 
     def test_uninstall_removes_binary(self, tmp_path: Path):
         binary = tmp_path / ".local" / "bin" / "agy"
@@ -127,3 +174,11 @@ class TestInstallAgy:
         result = self._run(tmp_path, "uninstall", path_has_bin=True)
         assert result.returncode == 0, result.stderr
         assert not binary.exists()
+
+    def test_uninstall_removes_dangling_symlink(self, tmp_path: Path):
+        binary = tmp_path / ".local" / "bin" / "agy"
+        binary.parent.mkdir(parents=True)
+        binary.symlink_to(tmp_path / "gone")
+        result = self._run(tmp_path, "uninstall", path_has_bin=True)
+        assert result.returncode == 0, result.stderr
+        assert not binary.is_symlink()
