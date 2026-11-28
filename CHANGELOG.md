@@ -8,7 +8,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 ## [Unreleased]
 
 ### Added
-- `agy` catalog entry (`catalog/agy.json` + `scripts/install_agy.sh`): the Google Antigravity CLI, installed with the official installer from antigravity.google. When `~/.local/bin` is already on `PATH`, the installer passes `--skip-path` so `~/.bashrc` and `~/.profile` get no extra PATH line; updates run `agy update`.
+- `agy` catalog entry (`catalog/agy.json` + `scripts/install_agy.sh`): the Google Antigravity CLI, installed with the official installer from antigravity.google. When `~/.local/bin` is already on `PATH`, the installer passes `--skip-path` so `~/.bashrc` and `~/.profile` get no extra PATH line (if Google changes the line it patches, it warns and runs the unpatched installer, which adds that line); updates run `agy update`.
 - `pi` catalog entry: the pi coding agent, installed from npm as `@earendil-works/pi-coding-agent` (the earlier `@mariozechner/pi-coding-agent` package is deprecated); upstream version from GitHub `earendil-works/pi`.
 - `jules` catalog entry: the Google Jules CLI (`@google/jules`), Google's asynchronous coding agent, with bash completion from `jules completion bash`.
 - `herdr` catalog entry (`catalog/herdr.json`): terminal multiplexer for coding agents, installed as a raw linux binary from GitHub releases (x86_64, aarch64) with bash completion.

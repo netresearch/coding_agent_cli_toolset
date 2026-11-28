@@ -167,6 +167,22 @@ class TestInstallAgy:
         assert f"Already installed at {tmp_path}/opt/agy" in result.stderr
         assert not (tmp_path / ".local" / "bin" / "agy").exists()
 
+    def test_install_ignores_agy_in_a_virtualenv(self, tmp_path: Path):
+        _write_exe(tmp_path / "proj" / ".venv" / "bin" / "agy", '#!/bin/sh\necho "$*" >> "$HOME/agy-args"\n')
+        result = self._run(tmp_path, "install", path_has_bin=True, extra_path=f"{tmp_path}/proj/.venv/bin")
+        assert result.returncode == 0, result.stderr
+        assert "install --skip-path" in self._args(tmp_path)
+        assert (tmp_path / ".local" / "bin" / "agy").exists()
+
+    def test_update_prefers_the_agy_on_path(self, tmp_path: Path):
+        # ~/.local/bin is not on PATH; the copy on PATH is the one a plain agy runs
+        _write_exe(tmp_path / ".local" / "bin" / "agy", '#!/bin/sh\necho "local $*" >> "$HOME/agy-args"\n')
+        _write_exe(tmp_path / "opt" / "agy", '#!/bin/sh\necho "opt $*" >> "$HOME/agy-args"\n')
+        result = self._run(tmp_path, "update", path_has_bin=False, extra_path=f"{tmp_path}/opt")
+        assert result.returncode == 0, result.stderr
+        assert "opt update" in self._args(tmp_path)
+        assert "local update" not in self._args(tmp_path)
+
     def test_update_uses_agy_elsewhere_on_path(self, tmp_path: Path):
         _write_exe(tmp_path / "opt" / "agy", '#!/bin/sh\necho "$*" >> "$HOME/agy-args"\n')
         result = self._run(tmp_path, "update", path_has_bin=True, extra_path=f"{tmp_path}/opt")

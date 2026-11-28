@@ -13,13 +13,24 @@ AGY_BIN="$BIN_DIR/agy"
 # curl may only use https, including on redirects
 CURL_HTTPS_ONLY=(--proto '=https')
 
-# The agy to act on: ~/.local/bin/agy (where the official installer puts it),
-# else the first agy on PATH (an install with --dir or by another method)
+# The agy to act on: the first agy on PATH, which is the copy a plain `agy`
+# runs and the audit reports, else ~/.local/bin/agy (where the official
+# installer puts it). Virtualenv and conda bins are environments, not
+# installations; the patterns follow detect_all_installations in
+# lib/capability.sh.
 find_agy() {
+    local candidate
+    while IFS= read -r candidate; do
+        case "$candidate" in
+            */venv/bin/*|*/.venv/bin/*|*/venvs/*/bin/*|*/.venvs/*/bin/*|*/virtualenvs/*/bin/*|*/.virtualenvs/*/bin/*) continue ;;
+            */envs/*/bin/*|*/conda/*/bin/*|*/miniconda*/bin/*|*/anaconda*/bin/*) continue ;;
+            */env/bin/*) continue ;;
+        esac
+        printf '%s\n' "$candidate"
+        return 0
+    done < <(type -P -a agy 2>/dev/null || true)
     if [ -x "$AGY_BIN" ]; then
         printf '%s\n' "$AGY_BIN"
-    else
-        command -v agy 2>/dev/null || true
     fi
 }
 
@@ -104,7 +115,8 @@ install_native() {
 refresh_agy_snapshot() {
     if [ -f "$DIR/lib/install_strategy.sh" ]; then
         . "$DIR/lib/install_strategy.sh"
-        refresh_snapshot "agy" 2>/dev/null || true
+        # The audit looks on PATH; let it see a fresh ~/.local/bin/agy
+        PATH="$BIN_DIR:$PATH" refresh_snapshot "agy" 2>/dev/null || true
     fi
 }
 
