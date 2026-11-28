@@ -15,7 +15,7 @@ The catalog system allows tool definitions to be managed as JSON files instead o
 - **Clear Separation**: Data (JSON) vs Logic (Python)
 
 **Location**: `catalog/` directory at project root
-**Current Size**: 107 JSON tool definitions
+**Current Size**: 108 JSON tool definitions
 
 ## Quick Start
 

@@ -2,14 +2,14 @@
 
 This file documents which tools have catalog entries and how each one is installed.
 
-## Catalog entries (107)
+## Catalog entries (108)
 
-Counted from `catalog/*.json` on 2026-09-22. Every tool the audit tracks has a catalog entry; its `install_method` selects the installer (`scripts/installers/<method>.sh`). `dedicated_script` runs the script named in the entry's `script` field. `auto` goes through the reconciliation system (`reconcile_tool` in `scripts/lib/reconcile.sh`).
+Counted from `catalog/*.json` on 2026-11-28. Every tool the audit tracks has a catalog entry; its `install_method` selects the installer (`scripts/installers/<method>.sh`). `dedicated_script` runs the script named in the entry's `script` field. `auto` goes through the reconciliation system (`reconcile_tool` in `scripts/lib/reconcile.sh`).
 
 | install_method | Count | Tools |
 |---|---|---|
 | `github_release_binary` | 38 | ast-grep, curlie, dasel, direnv, dive, fx, fzf, gh, gh-aw, gh-aw-firewall, git-absorb, git-branchless, git-lfs, gitleaks, glab, golangci-lint, google-workspace-cli, gosec, herdr, jq, just, kubectl, mlr, ninja, opengrep, qsv, rga, sd, shellcheck, shfmt, symfony, tfsec, trivy, vhs, watchexec, xsv, yq, zellij |
-| `dedicated_script` | 18 | blesh, byobu, claude, composer, docker, gem, go, node, parallel, pip, python, ruby, rust, tmux, tree, uv, wslu, yarn |
+| `dedicated_script` | 19 | agy, blesh, byobu, claude, composer, docker, gem, go, node, parallel, pip, python, ruby, rust, tmux, tree, uv, wslu, yarn |
 | `auto` | 13 | actionlint, bat, delta, difftastic, dust, fd, gup, hyperfine, jj, pnpm, ripgrep, scc, tokei |
 | `uv_tool` | 12 | ansible-core, bandit, black, flake8, gam, git-filter-repo, httpie, isort, pre-commit, ruff, semgrep, trustmux |
 | `package_manager` | 10 | bwrap, ctags, entr, git, php, pipx, poetry, prename, rename.ul, sponge |
@@ -28,8 +28,8 @@ A sweep on 2026-07-22 (commit 9b6c053) audited the entries present in that
 commit for a bash-completion generator: each generator was executed and its
 output validated against `complete -…` / `compgen ` / `COMPREPLY`, then
 checked to confirm it registers the entry's own `binary_name`. codex, pip and
-pipx were not installed then; see the end of this section. herdr, jules, pi
-and vault were checked when they were added. Five entries are not audited:
+pipx were not installed then; see the end of this section. agy, herdr, jules,
+pi and vault were checked when they were added. Five entries are not audited:
 blesh, bw, bwrap, byobu, trustmux.
 
 **42 entries declare `bash_completion`** — 41 `command`, 1 `source_path` (rbenv).
@@ -57,7 +57,7 @@ The completion file is named after `binary_name`, so a script that registers a
 
 ### No bash completion available
 
-actionlint, ansible-core, aws, bandit, claude, ctags, curlie, difftastic,
+actionlint, agy, ansible-core, aws, bandit, claude, ctags, curlie, difftastic,
 direnv, dust, entr, eslint, flake8, gam, gem, gemini, gh-aw-firewall, git,
 git-branchless, git-filter-repo, go, google-workspace-cli, gosec, httpie,
 hyperfine, isort, jq, ninja, opengrep, php, pi, pre-commit, prename, prettier,

@@ -576,6 +576,14 @@ CLI_AUDIT_JSON=1 uv run python audit.py | jq '.[] | select(.category == "securit
 - **Install:** `npm install -g @google/gemini-cli`
 - **Upgrade:** `npm update -g @google/gemini-cli`
 
+### agy
+- **Purpose:** Google Antigravity CLI - AI coding agent that runs in your terminal
+- **Executable:** `agy`
+- **Upstream:** Official installer (https://antigravity.google/cli/install.sh); no release feed, the CLI updates itself
+- **Use Case:** Terminal coding agent backed by Google models
+- **Install:** `make install-agy` (runs the official installer)
+- **Upgrade:** `agy update`
+
 ### jules
 - **Purpose:** Google Jules CLI - terminal client for Jules, Google's asynchronous coding agent
 - **Executable:** `jules`

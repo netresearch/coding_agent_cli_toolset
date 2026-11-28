@@ -6,7 +6,7 @@
 
 ## Overview
 
-34 Bash scripts for installing developer tools with multiple actions:
+41 Bash scripts for installing developer tools with multiple actions:
 - **install**: Fresh installation (default action)
 - **update**: Upgrade to latest version
 - **uninstall**: Remove installation
@@ -25,6 +25,7 @@
 - `install_tool.sh`: Main orchestrator - reads catalog, delegates to installers
 - `install_group.sh`: Install tool groups
 - `install_claude.sh`: Claude Code CLI (native installer)
+- `install_agy.sh`: Google Antigravity CLI (official installer; `agy update` for updates)
 - `install_ansible.sh`, `install_brew.sh`, `install_composer.sh`
 - `install_docker.sh`, `install_gem.sh`, `install_parallel.sh`, `install_yarn.sh`
 - `install_tmux.sh`, `install_tree.sh` (single-binary utilities)
@@ -128,7 +129,7 @@ make scripts-perms  # Ensure all scripts are executable
 ./scripts/install_node.sh reconcile
 ```
 
-**Via Make (works for all 107 cataloged tools):**
+**Via Make (works for all 108 cataloged tools):**
 ```bash
 make install-python              # Install Python toolchain (dedicated script)
 make upgrade-python              # Upgrade Python toolchain

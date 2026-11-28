@@ -636,8 +636,9 @@ class TestCatalogDebianNaming:
 # 13. Dedicated scripts: uninstall handler contract (Issue #36)
 # ===========================================================================
 
-# All 14 dedicated scripts from the catalog
+# Dedicated scripts from the catalog
 DEDICATED_SCRIPTS = [
+    "agy",
     "claude",
     "composer",
     "docker",
@@ -657,7 +658,7 @@ DEDICATED_SCRIPTS = [
 
 @skip_on_windows
 class TestDedicatedScriptUninstallHandler:
-    """Tests that all 14 dedicated scripts handle the uninstall action (Issue #36)."""
+    """Tests that the listed dedicated scripts handle the uninstall action (Issue #36)."""
 
     @pytest.mark.parametrize("catalog_name", DEDICATED_SCRIPTS)
     def test_dedicated_script_handles_uninstall_action(self, catalog_name):
