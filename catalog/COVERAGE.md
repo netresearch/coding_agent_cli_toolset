@@ -2,14 +2,14 @@
 
 This file documents which tools have catalog entries and how each one is installed.
 
-## Catalog entries (107)
+## Catalog entries (108)
 
-Counted from `catalog/*.json` on 2026-09-22. Every tool the audit tracks has a catalog entry; its `install_method` selects the installer (`scripts/installers/<method>.sh`). `dedicated_script` runs the script named in the entry's `script` field. `auto` goes through the reconciliation system (`reconcile_tool` in `scripts/lib/reconcile.sh`).
+Counted from `catalog/*.json` on 2026-11-28. Every tool the audit tracks has a catalog entry; its `install_method` selects the installer (`scripts/installers/<method>.sh`). `dedicated_script` runs the script named in the entry's `script` field. `auto` goes through the reconciliation system (`reconcile_tool` in `scripts/lib/reconcile.sh`).
 
 | install_method | Count | Tools |
 |---|---|---|
 | `github_release_binary` | 38 | ast-grep, curlie, dasel, direnv, dive, fx, fzf, gh, gh-aw, gh-aw-firewall, git-absorb, git-branchless, git-lfs, gitleaks, glab, golangci-lint, google-workspace-cli, gosec, herdr, jq, just, kubectl, mlr, ninja, opengrep, qsv, rga, sd, shellcheck, shfmt, symfony, tfsec, trivy, vhs, watchexec, xsv, yq, zellij |
-| `dedicated_script` | 18 | blesh, byobu, claude, composer, docker, gem, go, node, parallel, pip, python, ruby, rust, tmux, tree, uv, wslu, yarn |
+| `dedicated_script` | 19 | agy, blesh, byobu, claude, composer, docker, gem, go, node, parallel, pip, python, ruby, rust, tmux, tree, uv, wslu, yarn |
 | `auto` | 13 | actionlint, bat, delta, difftastic, dust, fd, gup, hyperfine, jj, pnpm, ripgrep, scc, tokei |
 | `uv_tool` | 12 | ansible-core, bandit, black, flake8, gam, git-filter-repo, httpie, isort, pre-commit, ruff, semgrep, trustmux |
 | `package_manager` | 10 | bwrap, ctags, entr, git, php, pipx, poetry, prename, rename.ul, sponge |

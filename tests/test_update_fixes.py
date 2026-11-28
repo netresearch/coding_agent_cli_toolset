@@ -638,6 +638,7 @@ class TestCatalogDebianNaming:
 
 # All 14 dedicated scripts from the catalog
 DEDICATED_SCRIPTS = [
+    "agy",
     "claude",
     "composer",
     "docker",

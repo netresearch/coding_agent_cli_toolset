@@ -1,0 +1,17 @@
+{
+  "name": "agy",
+  "category": "ai",
+  "install_method": "dedicated_script",
+  "description": "Google Antigravity CLI - AI coding agent that runs in your terminal",
+  "homepage": "https://antigravity.google/docs/cli/install",
+  "binary_name": "agy",
+  "script": "install_agy.sh",
+  "skip_upstream": true,
+  "version_command": "timeout 2 agy --version 2>/dev/null | grep -oE '[0-9]+\\.[0-9]+\\.[0-9]+' | head -1",
+  "guide": {
+    "display_name": "Google Antigravity CLI",
+    "install_action": "upgrade",
+    "order": 406
+  },
+  "notes": "Official installer: curl -fsSL https://antigravity.google/cli/install.sh | bash (binary in ~/.local/bin/agy, SHA512 checked against the release manifest). Updates itself in the background; 'agy update' updates on demand. First run signs in with a Google account."
+}

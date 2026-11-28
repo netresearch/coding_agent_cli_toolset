@@ -71,7 +71,7 @@ Install tools via system package managers (apt, brew, dnf, pacman).
 2. The tool will automatically be available via `make install-<tool>`, `make upgrade-<tool>`, `make uninstall-<tool>`, and `make reconcile-<tool>`
 3. No need to create a custom install script!
 
-Currently **107 tools** are cataloged.
+Currently **108 tools** are cataloged.
 
 ## Environment Variables
 
